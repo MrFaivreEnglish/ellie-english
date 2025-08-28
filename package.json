@@ -1,0 +1,49 @@
+{
+  "name": "my-english-passport",
+  "version": "1.0.0",
+  "license": "0BSD",
+  "private": true,
+  "main": "index.ts",
+  "scripts": {
+    "start": "npx expo start",
+    "android": "npx expo run:android",
+    "ios": "npx expo run:ios",
+    "web": "npx expo start --web"
+  },
+  "dependencies": {
+    "@expo/vector-icons": "latest",
+    "@react-native-async-storage/async-storage": "latest",
+    "@react-native-community/slider": "5.0.1",
+    "@react-navigation/bottom-tabs": "7.4.6",
+    "@react-navigation/native": "7.1.17",
+    "@react-navigation/native-stack": "7.3.25",
+    "@supabase/supabase-js": "2.56.0",
+    "expo": "^52.0.42",
+    "expo-asset": "latest",
+    "expo-av": "15.1.7",
+    "expo-camera": "16.1.11",
+    "expo-clipboard": "7.1.5",
+    "expo-font": "latest",
+    "expo-haptics": "14.1.4",
+    "expo-linear-gradient": "14.1.5",
+    "fs": "latest",
+    "http": "latest",
+    "https": "latest",
+    "lucide-react-native": "0.542.0",
+    "path": "0.12.7",
+    "react": "18.2.0",
+    "react-native": "0.72.6",
+    "react-native-gesture-handler": "^2.16.1",
+    "react-native-reanimated": "~3.16.1",
+    "react-native-safe-area-context": "5.4.0",
+    "react-native-screens": "4.11.1",
+    "react-native-svg": "15.12.1",
+    "react-native-web": "~0.19.6",
+    "sonner-native": "0.21.1"
+  },
+  "devDependencies": {
+    "@babel/core": "^7.20.0",
+    "@types/react": "~18.2.14",
+    "typescript": "^5.1.3"
+  }
+}

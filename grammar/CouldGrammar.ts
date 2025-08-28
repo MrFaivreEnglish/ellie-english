@@ -1,0 +1,40 @@
+const CouldGrammar = {
+  id: '33',
+  title: 'Could / Was able to',
+  description: 'Practice past ability with could and was able to',
+  imageUrl: 'https://i.ibb.co/zVngQRfw/could.png',
+  exercises: [
+    { question: 'I could swim when I was five.', answer: true, explanation: "Correct: 'could' for past ability." },
+    { question: 'I could to swim when I was five.', answer: false, explanation: "Incorrect: do not use 'to' after 'could'." },
+    { question: 'He was able to fix it.', answer: true, explanation: "Correct: 'was able to' + base verb." },
+    { question: 'He was able fix it.', answer: false, explanation: "Incorrect: need 'to' after 'able'." },
+    { question: 'They could run fast.', answer: true, explanation: "Correct: 'could' + base verb." },
+    { question: 'They could running fast.', answer: false, explanation: "Incorrect: use base form 'run'." },
+    { question: 'She could read at six.', answer: true, explanation: "Correct: 'could' for past ability." },
+    { question: 'She could to read at six.', answer: false, explanation: "Incorrect: drop 'to'." },
+    { question: 'I was able to open it.', answer: true, explanation: "Correct: 'was able to' + base verb." },
+    { question: 'I was able open it.', answer: false, explanation: "Incorrect: needs 'to'." },
+    { question: 'We could climb the hill.', answer: true, explanation: "Correct: 'could' + base verb." },
+    { question: 'We could to climb the hill.', answer: false, explanation: "Incorrect: remove 'to'." },
+    { question: 'Tom was able to help me.', answer: true, explanation: "Correct: 'was able to' + base verb." },
+    { question: 'Tom was able helping me.', answer: false, explanation: "Incorrect: use base verb 'help'." },
+    { question: 'I could see the moon.', answer: true, explanation: "Correct: 'could' + base verb." },
+    { question: 'I could to see the moon.', answer: false, explanation: "Incorrect: drop 'to'." },
+    { question: 'She was able to open the box.', answer: true, explanation: "Correct: 'was able to' + base verb." },
+    { question: 'She was able open the box.', answer: false, explanation: "Incorrect: missing 'to'." },
+    { question: 'They could find the key.', answer: true, explanation: "Correct: 'could' + base verb." },
+    { question: 'They could finding the key.', answer: false, explanation: "Incorrect: use base form 'find'." },
+    { question: 'We were able to finish.', answer: true, explanation: "Correct: 'were able to' + base verb." },
+    { question: 'We were able finish.', answer: false, explanation: "Incorrect: needs 'to'." },
+    { question: 'He could ride a bike.', answer: true, explanation: "Correct: 'could' + base verb." },
+    { question: 'He could to ride a bike.', answer: false, explanation: "Incorrect: drop 'to'." },
+    { question: 'I was able to open the door.', answer: true, explanation: "Correct: 'was able to' + base verb." },
+    { question: 'I was able opening the door.', answer: false, explanation: "Incorrect: use base verb 'open'." },
+    { question: 'She could sing well.', answer: true, explanation: "Correct: 'could' + base verb." },
+    { question: 'She could to sing well.', answer: false, explanation: "Incorrect: no 'to' after 'could'." },
+    { question: 'They were able to help.', answer: true, explanation: "Correct: 'were able to' + base verb." },
+    { question: 'They were able helping.', answer: false, explanation: "Incorrect: use base verb 'help'." }
+  ]
+};
+
+export default CouldGrammar;

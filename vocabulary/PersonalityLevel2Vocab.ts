@@ -1,0 +1,42 @@
+const PersonalityLevel2Vocab = {
+  id: '202',
+  title: 'Personality +',
+  description: 'Intermediate personality adjectives and nuanced traits',
+  imageUrl: 'https://i.ibb.co/jPyywN3t/personality-Level-2-1.png',
+  flashcards: [
+      { english: 'Intelligent', french: 'Intelligent' },
+    { english: 'Clever', french: 'Malin' },
+    { english: 'Smart', french: 'Malin' },
+    { english: 'Bright', french: 'Brillant' },
+    { english: 'Chatty', french: 'Bavard' },
+    { english: 'Outgoing', french: 'Sociable' },
+    { english: 'Friendly', french: 'Amical' },
+    { english: 'Welcoming', french: 'Accueillant' },
+    { english: 'Gentle', french: 'Doux' },
+    { english: 'Kind', french: 'Gentil' },
+    { english: 'Caring', french: 'Attentionné' },
+    { english: 'Funny', french: 'Drôle' },
+    { english: 'Creative', french: 'Créatif' },
+    { english: 'Curious', french: 'Curieux' },
+    { english: 'Imaginative', french: 'Imaginatif' },
+    { english: 'Passionate', french: 'Passionné' },
+    { english: 'Energetic', french: 'Énergique' },
+    { english: 'Dynamic', french: 'Dynamique' },
+    { english: 'Sporty', french: 'Sportif' },
+    { english: 'Polite', french: 'Poli' },
+    { english: 'Helpful', french: 'Serviable' },
+    { english: 'Generous', french: 'Généreux' },
+    { english: 'Brave', french: 'Courageux' },
+    { english: 'Lovely', french: 'Adorable' },
+    { english: 'Patient', french: 'Patient' },
+    { english: 'Honest', french: 'Honnête' },
+    { english: 'Shy', french: 'Timide' },
+    { english: 'Messy', french: 'Désordonné' },
+    { english: 'Greedy', french: 'Gourmand' },
+    { english: 'Clumsy', french: 'Maladroit' },
+    { english: 'Lazy', french: 'Paresseux' },
+    { english: 'Selfish', french: 'Égoïste' }
+  ]
+};
+
+export default PersonalityLevel2Vocab;
