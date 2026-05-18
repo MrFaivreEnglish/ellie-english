@@ -1,333 +1,214 @@
-import React, { useState, useMemo, useEffect, useRef } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Image, Animated, Easing, Platform } from 'react-native';
-import { useNavigation } from '@react-navigation/native';
-import { getLocalLessonImage, getLessonImage } from '../utils/vocabularyUtils';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
+import {
+  View,
+  Text,
+  StyleSheet,
+  ScrollView,
+  TouchableOpacity,
+  Image,
+  Animated,
+  Easing,
+  TextInput,
+  Platform,
+  Pressable,
+  useWindowDimensions,
+} from 'react-native';
+import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { MaterialIcons } from '@expo/vector-icons';
-import { useTheme } from '../contexts/ThemeContext';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useTheme } from '../contexts/ThemeContext';
 import BackButton from '../components/BackButton';
+import { getLocalLessonImage, getLessonImage } from '../utils/vocabularyUtils';
+import { vocabularyCategories } from '../content/lessons/vocabularyRegistry';
+import { getCustomVocabularyLessons } from '../utils/customLessonStorage';
+import { getMenuCopy } from '../utils/menuCopy';
 
-// Import vocabulary modules
-import LoveVocab from '../vocabulary/LoveVocab';
-import SpaceVocab from '../vocabulary/SpaceVocab';
-import ClothesVocab from '../vocabulary/ClothesVocab';
-import DetectiveVocab from '../vocabulary/DetectiveVocab';
-import SchoolLvl2Vocab from '../vocabulary/SchoolLvl2Vocab';
-import BodyVocab from '../vocabulary/BodyVocab';
-import FoodVocab from '../vocabulary/FoodVocab';
-import CookingVocab from '../vocabulary/CookingVocab';
-import CityTravelVocab from '../vocabulary/CityTravelVocab';
-import EmotionsVocab from '../vocabulary/EmotionsVocab';
-import EmotionsLevel2Vocab from '../vocabulary/EmotionsLevel2Vocab';
-import BreakfastVocab from '../vocabulary/BreakfastVocab';
-import GeographyVocab from '../vocabulary/GeographyVocab';
-import InternetVocab from '../vocabulary/InternetVocab';
-import OpinionLevel1Vocab from '../vocabulary/OpinionLevel1Vocab';
-import OpinionLevel2Vocab from '../vocabulary/OpinionLevel2Vocab';
-import PersonalityLevel1Vocab from '../vocabulary/PersonalityLevel1Vocab';
-import PersonalityLevel2Vocab from '../vocabulary/PersonalityLevel2Vocab';
-import FurnitureVocab from '../vocabulary/FurnitureVocab';
-import EcologyVocab from '../vocabulary/EcologyVocab';
-import RobotsVocab from '../vocabulary/RobotsVocab';
-import VideoGamesVocab from '../vocabulary/VideoGamesVocab';
-import VideoGamePowersVocab from '../vocabulary/VideoGamePowersVocab';
-import CinemaVocab from '../vocabulary/CinemaVocab';
-import LegendsVocab from '../vocabulary/LegendsVocab';
-import UKVocab from '../vocabulary/UKVocab';
-import ActivityVocab from '../vocabulary/ActivityVocab';
-import AnimalsVocab from '../vocabulary/AnimalsVocab';
-import ClassroomEnglishVocab from '../vocabulary/ClassroomEnglishVocab';
-import BullyingVocab from '../vocabulary/BullyingVocab';
-import ExtremeSportsVocab from '../vocabulary/ExtremeSportsVocab';
-import SegregationVocab from '../vocabulary/SegregationVocab';
-import JobsVocab from '../vocabulary/JobsVocab';
-import GettingAJobVocab from '../vocabulary/GettingAJobVocab';
-import TypesOfDocumentsVocab from '../vocabulary/TypesOfDocumentsVocab';
-import NourritureVocab from '../vocabulary/NourritureVocab';
-import FrequencyAdverbsVocab from '../vocabulary/FrequencyAdverbsVocab';
-import AtSchoolVocab from '../vocabulary/AtSchoolVocab';
-import InstructionsVocab from '../vocabulary/InstructionsVocab';
-import ColoursVocab from '../vocabulary/ColoursVocab';
-import PhysicalDescriptionVocab from '../vocabulary/PhysicalDescriptionVocab';
-import TheBlitzVocab from '../vocabulary/TheBlitzVocab';
+const bundledCustomVocabularyLessons = require('../content/lessons/customVocabularyLessons.json') as any[];
 
-// New standalone imports from ExtraVocab
-import NationalityVocab from '../vocabulary/NationalityVocab';
-import DailyRoutineVocab from '../vocabulary/DailyRoutineVocab';
-import DateVocab from '../vocabulary/DateVocab';
-import DailyQuestionsVocab from '../vocabulary/DailyQuestionsVocab';
-import QuestionWordsVocab from '../vocabulary/QuestionWordsVocab';
-import TastesVocab from '../vocabulary/TastesVocab';
-import DescribingPictureVocab from '../vocabulary/DescribingPictureVocab';
-import LocationVocab from '../vocabulary/LocationVocab';
-import TimeVocab from '../vocabulary/TimeVocab';
-import HouseVocab from '../vocabulary/HouseVocab';
-import FamilyVocab from '../vocabulary/FamilyVocab';
+const STAR = '\u2605';
+const STAR_EMOJI = '\u2B50';
 
-// Lazy load vocabulary modules
-const CATEGORY_EMOJI_MAP: { [key: string]: string } = {
-  'Grammar & Useful Vocab': '📘',
-  'People': '👥',
-  'Life / School': '🏫',
-  'Food & Cooking': '🍽️',
-  'Culture / Hobbies': '🎭',
-  'Science / Nature / Space': '🌌',
-  'Objects / Places': '🏠',
-  'Social Issues / Society': '⚖️',
-  'Essentials': '🌱',
-  // Add new Grammar category emoji
-  'Grammar': '📘',
-  // New History & Literatureé category emoji
-  'History & Literatureé': '📜',
-  'History & Literature': '📜',
-  // Ensure current titles map to emojis
-  'Science & Nature': '🌌',
-  'Society': '⚖️',
+const CATEGORY_EMOJI_MAP: Record<string, string> = {
+  'Classroom English': '\u{1F3EB}',
+  Basics: '\u{1F331}',
+  People: '\u{1F465}',
+  'Opinions & Tastes': '\u{1F4AC}',
+  'Daily Life': '\u{1F3E0}',
+  Food: '\u{1F37D}\uFE0F',
+  'Hobbies & Culture': '\u{1F3AD}',
+  'Travel & Places': '\u{1F9ED}',
+  'Science & Nature': '\u{1F30C}',
+  'History & Society': '\u{1F4DC}',
+  Work: '\u{1F4BC}',
+  Custom: '\u{1F4DA}',
 };
 
-const useVocabularyLessons = () => {
-  // Return categories in the exact order requested. Each category contains an array
-  // of lesson modules (imported above). Inside each category lessons are alphabetized
-  // by their title before being returned.
-  const categories = useMemo(() => {
-    const groups = [
-      {
-        title: 'In the classroom',
-        lessons: [
-          ClassroomEnglishVocab,
-          DailyQuestionsVocab,
-          InstructionsVocab,
-          TypesOfDocumentsVocab,
-          DescribingPictureVocab,
+const difficultyMap: Record<string, number> = {
+  Activities: 1,
+  Animals: 1,
+  'American Dishes': 2,
+  Body: 1,
+  Breakfast: 1,
+  Bullying: 3,
+  Cinema: 3,
+  'City Travel': 1,
+  'Classroom English': 1,
+  Clothes: 1,
+  Colours: 1,
+  Cooking: 2,
+  'Daily questions': 2,
+  'Daily Routine': 1,
+  Date: 1,
+  'Describing a picture': 2,
+  Detective: 2,
+  Ecology: 2,
+  Emotions: 1,
+  'Emotions Level 2': 3,
+  'Extreme Sports': 3,
+  Family: 1,
+  'Food Basics': 1,
+  'Frequency Adverbs': 1,
+  Furniture: 1,
+  Geography: 2,
+  'Getting a job': 3,
+  House: 1,
+  Instructions: 1,
+  Internet: 3,
+  Jobs: 2,
+  Legends: 2,
+  Location: 1,
+  Love: 3,
+  Nationality: 1,
+  'Opinion Basics': 1,
+  'Opinion +': 3,
+  'Personality Basics': 1,
+  'Personality +': 3,
+  'Physical Description': 1,
+  'Question Words': 1,
+  Robots: 2,
+  'School Basics': 1,
+  'School life': 2,
+  Segregation: 3,
+  Space: 3,
+  Tastes: 1,
+  'The UK': 1,
+  Time: 1,
+  'Types of documents': 1,
+  'Video game powers': 2,
+  'Video Games': 2,
+  'The Blitz': 3,
+  Fashion: 2,
+};
 
-        ],
-      },
-      {
-        title: 'Essentials',
-        lessons: [
-          // Moved Frequency Adverbs and Question Words to Grammar
-          TimeVocab,
-          ColoursVocab,
-          DateVocab,
-          UKVocab,
-        ],
-      },
-      {
-        title: 'Presenting People',
-        lessons: [
-          EmotionsVocab,
-          EmotionsLevel2Vocab,
-          FamilyVocab,
-          NationalityVocab,
-          OpinionLevel2Vocab,
-          OpinionLevel1Vocab,
-          PersonalityLevel1Vocab,
-          PersonalityLevel2Vocab,
-          TastesVocab,
-          JobsVocab,
-          PhysicalDescriptionVocab,
-          LoveVocab,
-          // Added Body here from Objects / Places
-          BodyVocab,
-        ],
-      },
-      {
-        title: 'Life / School',
-        lessons: [
-          DailyRoutineVocab,
-          AtSchoolVocab,
-          SchoolLvl2Vocab,
-          // Moved Clothes, House, Furniture here from Objects / Places
-          ClothesVocab,
-          HouseVocab,
-          FurnitureVocab,
-        ],
-      },
-      {
-        title: 'Food & Cooking',
-        lessons: [
-          FoodVocab,
-          BreakfastVocab,
-          CookingVocab,
-          NourritureVocab,
-        ],
-      },
-      {
-        title: 'Culture / Hobbies',
-        lessons: [
-          ActivityVocab,
-          CinemaVocab,
-          CityTravelVocab,
-          // Detective and Legends moved to History & Literatureé
-          ExtremeSportsVocab,
-          // LegendsVocab,
-          VideoGamePowersVocab,
-          VideoGamesVocab,
-        ],
-      },
-      {
-        title: 'History & Literature',
-        lessons: [
-          DetectiveVocab,
-          LegendsVocab,
-          SegregationVocab,
-          TheBlitzVocab,
-        ],
-      },
-      {
-        title: 'Science & Nature',
-        lessons: [
-          AnimalsVocab,
-          EcologyVocab,
-          SpaceVocab,
-          GeographyVocab,
-          // Moved Robots here from Objects / Places
-          RobotsVocab,
-        ],
-      },
-      {
-        title: 'Grammar',
-        lessons: [
-          FrequencyAdverbsVocab,
-          QuestionWordsVocab,
-          LocationVocab,
-        ],
-      },
-      // Removed Objects / Places category since all its lessons were redistributed
-      {
-        title: 'Society',
-        lessons: [
-          BullyingVocab,
-          // Segregation moved to History & Literatureé
-          InternetVocab,
-          GettingAJobVocab,
-          // TheBlitz moved to History & Literatureé
-        ],
-      },
-    ];
+const normalizeCustomLesson = (lesson: any) => {
+  if (!lesson || typeof lesson !== 'object' || typeof lesson.title !== 'string' || !Array.isArray(lesson.flashcards)) {
+    return null;
+  }
 
-    // Clean up and sort the lessons alphabetically by their published title.
-    return groups.map(group => ({
-      title: group.title,
-      lessons: group.lessons
-        .filter(Boolean)
-        .sort((a, b) => {
-          const ta = (a.title || '');
-          const tb = (b.title || '');
+  const flashcards = lesson.flashcards
+    .map((word: any) => ({
+      english: String(word?.english ?? '').trim(),
+      french: String(word?.french ?? '').trim(),
+    }))
+    .filter((word: any) => word.english && word.french);
 
-          // Ensure "Basics" precedes "+" within the same base (e.g., Opinion, Personality)
-          const baseA = ta.split(' ')[0];
-          const baseB = tb.split(' ')[0];
-          if (baseA === baseB) {
-            const isABasics = /\bBasics\b/i.test(ta);
-            const isBBasics = /\bBasics\b/i.test(tb);
-            const isAPlus = /\+/.test(ta);
-            const isBPlus = /\+/.test(tb);
+  if (!flashcards.length) return null;
 
-            if (isABasics && isBPlus) return -1; // Basics before Plus
-            if (isAPlus && isBBasics) return 1;  // Plus after Basics
-          }
+  return {
+    id: typeof lesson.id === 'string' ? lesson.id : `bundled-${lesson.title}`,
+    title: lesson.title.trim(),
+    description: typeof lesson.description === 'string' ? lesson.description : '',
+    imageUrl: typeof lesson.imageUrl === 'string' ? lesson.imageUrl : '',
+    category: typeof lesson.category === 'string' ? lesson.category : 'Custom',
+    flashcards,
+  };
+};
 
-          // Default alphabetical order
-          return ta.localeCompare(tb);
-        }),
-    }));
-  }, []);
-
-  return categories;
+const getLessonWordCount = (lesson: any) => {
+  if (!lesson?.flashcards) return 0;
+  if (Array.isArray(lesson.flashcards[0]?.words)) {
+    return lesson.flashcards.reduce((total: number, group: any) => total + (group.words?.length ?? 0), 0);
+  }
+  return lesson.flashcards.length;
 };
 
 export default function VocabularyScreen() {
-  const categories = useVocabularyLessons();
-  const navigation = useNavigation();
-  const { isDarkMode, colors } = useTheme();
+  const navigation = useNavigation<any>();
+  const { isDarkMode, colors, vocabLessonCardView, updateVocabLessonCardView, isAndroidStatusBarEnabled, menuLanguage } = useTheme();
+  const appCopy = getMenuCopy(menuLanguage);
+  const copy = appCopy.vocabulary;
+  const commonCopy = appCopy.common;
   const insets = useSafeAreaInsets();
-  const [selectedDifficulty, setSelectedDifficulty] = useState(null);
+  const { width: windowWidth } = useWindowDimensions();
+  const topContentInset = Platform.OS === 'ios'
+    ? insets.top
+    : Platform.OS === 'android' && isAndroidStatusBarEnabled
+      ? insets.top
+      : 0;
+  const thumbX = useRef(new Animated.Value(0)).current;
+  const isPortraitTight = windowWidth < 430;
+
+  const bundledCustomLessons = useMemo(
+    () => bundledCustomVocabularyLessons.map(normalizeCustomLesson).filter(Boolean),
+    []
+  );
+
+  const [customLessons, setCustomLessons] = useState<any[]>([]);
+  const [selectedDifficulty, setSelectedDifficulty] = useState<number | null>(null);
   const [showDifficultyMenu, setShowDifficultyMenu] = useState(false);
   const [viewMode, setViewMode] = useState<'category' | 'abc'>('category');
+  const [cardView, setCardView] = useState<'list' | 'tile'>(vocabLessonCardView);
+  const [searchText, setSearchText] = useState('');
   const [toggleWidth, setToggleWidth] = useState(0);
-  const thumbX = useRef(new Animated.Value(0)).current;
-  const segmentPadding = 8; // increased from 4 to make the toggle taller and roomier
+  const [difficultyAnchor, setDifficultyAnchor] = useState({ x: 16, y: 0, width: 180, height: 50 });
+  const [failedLessonImageKeys, setFailedLessonImageKeys] = useState<Set<string>>(() => new Set());
+  const segmentPadding = 8;
 
-  const filterLessonsByDifficulty = (lessonArray) => {
-    if (!selectedDifficulty) return lessonArray;
-
-    const difficultyMap = {
-      // Exact mappings from provided list
-      'Activities': 2,
-      'Animals': 1,
-      'American Dishes': 2,
-      'Body': 1,
-      'Breakfast': 1,
-      'Bullying': 3,
-      'Cinema': 3,
-      'City Travel': 2,
-      'Classroom English': 1,
-      'Clothes': 1,
-      'Colours': 1,
-      'Cooking': 2,
-      'Daily questions': 2,
-      'Daily Routine': 1,
-      'Date': 1,
-      'Describing a picture': 2,
-      'Detective': 2,
-      'Ecology': 2,
-      'Emotions': 1,
-      'Emotions +': 3,
-      'Extreme Sports': 3,
-      'Family': 1,
-      'Food Basics': 1,
-      'Furniture': 1,
-      'Geography': 2,
-      'Getting a job': 3,
-      'House': 1,
-      'Instructions': 1,
-      'Internet': 3,
-      'Jobs': 2,
-      'Legends': 2,
-      'Location': 1,
-      'Love': 3,
-      'Nationality': 1,
-      'Opinion Basics': 1,
-      'Opinion +': 3,
-      'Personality Basics': 1,
-      'Personality +': 3,
-      'Physical Description': 1,
-      'Question Words': 1,
-      'Robots': 2,
-      'School Basics': 1,
-      'School life': 2,
-      'Segregation': 3,
-      'Space': 3,
-      'Tastes': 1,
-      'The UK': 1,
-      'Time': 1,
-      'Types of documents': 2,
-      'Video game powers': 2,
-      'Video Games': 2,
-      'The Blitz': 3,
-    };
-
-    return lessonArray.filter(lesson => {
-      const cleanTitle = (lesson.title || '').replace(/\s*\d+$/, '');
-      return difficultyMap[cleanTitle] === selectedDifficulty;
+  const markLessonImageFailed = (key: string) => {
+    setFailedLessonImageKeys((current) => {
+      if (current.has(key)) return current;
+      const next = new Set(current);
+      next.add(key);
+      return next;
     });
   };
 
-  const handleDifficultySelect = (level) => {
-    setSelectedDifficulty(level === selectedDifficulty ? null : level);
-    setShowDifficultyMenu(false);
-  };
+  const categories = useMemo(() => {
+    const mergedCustomLessons = [...bundledCustomLessons];
+
+    customLessons.forEach((lesson) => {
+      const existingIndex = mergedCustomLessons.findIndex((item: any) => item.id === lesson.id);
+      if (existingIndex >= 0) {
+        mergedCustomLessons[existingIndex] = lesson;
+      } else {
+        mergedCustomLessons.unshift(lesson);
+      }
+    });
+
+    if (!mergedCustomLessons.length) return vocabularyCategories;
+    return [{ title: 'Custom', lessons: mergedCustomLessons }, ...vocabularyCategories];
+  }, [bundledCustomLessons, customLessons]);
 
   const allLessons = useMemo(() => {
-    // Flatten all lessons across categories and sort alphabetically by title
-    const flat = categories.flatMap(cat => cat.lessons || []);
-    return flat
-      .filter(Boolean)
-      .sort((a, b) => (a.title || '').localeCompare(b.title || ''));
+    return categories
+      .flatMap((category: any) => category.lessons)
+      .sort((a, b) => (a.title || '').localeCompare(b.title || '', undefined, { sensitivity: 'base' }));
   }, [categories]);
 
-  // Animate the sliding thumb when view mode changes or width is measured
+  useFocusEffect(
+    React.useCallback(() => {
+      let active = true;
+
+      getCustomVocabularyLessons().then((lessons) => {
+        if (active) setCustomLessons(lessons);
+      });
+
+      return () => {
+        active = false;
+      };
+    }, [])
+  );
+
   useEffect(() => {
     const half = Math.max(0, (toggleWidth - segmentPadding * 2) / 2);
     const toValue = viewMode === 'category' ? 0 : half;
@@ -337,425 +218,585 @@ export default function VocabularyScreen() {
       easing: Easing.out(Easing.cubic),
       useNativeDriver: true,
     }).start();
-  }, [viewMode, toggleWidth, thumbX]);
+  }, [thumbX, toggleWidth, viewMode]);
+
+  useEffect(() => {
+    setCardView(vocabLessonCardView);
+  }, [vocabLessonCardView]);
+
+  const handleDifficultySelect = (level: number | null) => {
+    setSelectedDifficulty(level === selectedDifficulty ? null : level);
+    setShowDifficultyMenu(false);
+  };
+
+  const handleCardViewChange = (nextView: 'list' | 'tile') => {
+    setCardView(nextView);
+    updateVocabLessonCardView(nextView);
+  };
+
+  const filterLessons = (lessons: any[]) =>
+    lessons.filter((lesson: any) => {
+      const title = (lesson.title || '').replace(/\s*\d+$/, '');
+      return (
+        (!selectedDifficulty || difficultyMap[title] === selectedDifficulty) &&
+        (!searchText || title.toLowerCase().includes(searchText.toLowerCase()))
+      );
+    });
+
+  const getLevelLabel = (level: number | null) => {
+    if (!level) return copy.allLevels;
+    return STAR_EMOJI.repeat(level);
+  };
+
+  const visibleSections = (viewMode === 'category' ? categories : [{ title: 'All', lessons: allLessons }]).filter(
+    (category) => filterLessons(category.lessons).length > 0
+  );
 
   return (
-    <ScrollView 
-      style={[
-        styles.container, 
-        { backgroundColor: colors.background }
-      ]}
-      contentContainerStyle={{
-        paddingTop: Platform.OS === 'ios' ? (insets.top > 0 ? insets.top : 0) : 0 // iOS safe area; let Android draw behind status bar
-      }}
-      // Ensure the dropdown is not clipped by the ScrollView
-      removeClippedSubviews={false}
-      windowSize={5} // Reduce the number of rendered items
-    >
-      <BackButton label="Back to Home" onPress={() => navigation.navigate('Home')} />
-      
-      <View style={styles.headerTitleContainer}>
-        <Text style={[styles.headerTitle, { color: colors.text }]}>Vocabulary</Text>
+    <View style={[styles.container, { backgroundColor: colors.background }]}>
+      <ScrollView
+        contentContainerStyle={{ paddingTop: topContentInset }}
+        removeClippedSubviews={false}
+        onScrollBeginDrag={() => setShowDifficultyMenu(false)}
+        keyboardShouldPersistTaps="handled"
+      >
+        <BackButton label={commonCopy.backToHome} onPress={() => navigation.navigate('Home')} />
 
-        {/* Controls row: left segmented view toggle, right difficulty dropdown */}
-        <View style={styles.controlsRow}>
+        <View style={styles.headerTitleContainer}>
+          <Text style={[styles.headerTitle, { color: colors.text }]}>{copy.header}</Text>
+
           <View
-            onLayout={(e) => setToggleWidth(e.nativeEvent.layout.width)}
             style={[
-              styles.modeToggle,
-              isDarkMode
-                ? {
-                    backgroundColor: colors.card,
-                    borderColor: '#415a77',
-                    borderWidth: 2,
-                    shadowColor: '#000',
-                    shadowOpacity: 0.3,
-                    shadowOffset: { width: 0, height: 4 },
-                    shadowRadius: 8,
-                    elevation: 5,
-                  }
-                : {
-                    borderColor: '#d9e2ec',
-                    backgroundColor: '#f6f9fc',
-                    borderWidth: 1,
-                  }
+              styles.controlPanel,
+              isPortraitTight && styles.controlPanelCompact,
+              {
+                backgroundColor: colors.surface,
+                borderColor: colors.border,
+              },
             ]}
           >
-            {/* Sliding thumb */}
-            <Animated.View
-              pointerEvents="none"
-              style={{
-                position: 'absolute',
-                top: segmentPadding,
-                bottom: segmentPadding,
-                left: segmentPadding,
-                width: Math.max(0, (toggleWidth - segmentPadding * 2) / 2),
-                borderRadius: 16, // increased to match larger control
-                backgroundColor: isDarkMode ? 'rgba(22,113,182,0.12)' : '#1671B6',
-                borderWidth: isDarkMode ? 2 : 0,
-                borderColor: '#1671B6',
-                transform: [{ translateX: thumbX }],
-                zIndex: 0,
-              }}
-            />
-
-            {/* Options */}
-            <TouchableOpacity
-              style={[styles.modeOption]}
-              onPress={() => setViewMode('category')}
-              activeOpacity={0.9}
-            >
-              <Text
-                style={[
-                  styles.modeOptionText,
-                  viewMode === 'category'
-                    ? (isDarkMode ? { color: colors.text } : { color: '#fff' })
-                    : { color: colors.text },
-                ]}
-              >
-                Category
-              </Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[styles.modeOption]}
-              onPress={() => setViewMode('abc')}
-              activeOpacity={0.9}
-            >
-              <Text
-                style={[
-                  styles.modeOptionText,
-                  viewMode === 'abc'
-                    ? (isDarkMode ? { color: colors.text } : { color: '#fff' })
-                    : { color: colors.text },
-                ]}
-              >
-                ABC
-              </Text>
-            </TouchableOpacity>
-          </View>
-
-          <View style={styles.headerControls}>
-            <TouchableOpacity
-              style={[
-                styles.difficultyButton,
-                {
-                  backgroundColor: isDarkMode ? 'rgba(22,113,182,0.12)' : '#ffffff',
-                  borderColor: '#1671B6',
-                  shadowColor: isDarkMode ? '#000' : '#1671B6'
-                }
-              ]}
-              onPress={() => setShowDifficultyMenu(!showDifficultyMenu)}
-              activeOpacity={0.9}
-            >
-              <Text style={[styles.difficultyButtonText, { color: isDarkMode ? '#ffffff' : '#1671B6' }]}>  
-                {selectedDifficulty ? '⭐'.repeat(selectedDifficulty) : 'Choose a level'}
-              </Text>
-              <MaterialIcons name="arrow-drop-down" size={22} color={'#1671B6'} />
-            </TouchableOpacity>
-            {showDifficultyMenu && (
+            <View style={styles.controlsRow}>
               <View
+                onLayout={(event) => setToggleWidth(event.nativeEvent.layout.width)}
                 style={[
-                  styles.difficultyMenu,
+                  styles.modeToggle,
+                  isPortraitTight && styles.modeToggleCompact,
                   {
                     backgroundColor: colors.card,
-                    borderColor: isDarkMode ? '#415a77' : '#e5e7eb',
+                    borderColor: colors.border,
+                    borderWidth: 2,
                   },
                 ]}
-              >  
-                <TouchableOpacity 
-                  style={[styles.difficultyMenuItem, { borderBottomColor: isDarkMode ? '#415a77' : '#f0f0f0' }, selectedDifficulty === null && { backgroundColor: isDarkMode ? 'rgba(22,113,182,0.15)' : '#E8F7FA' }]} 
-                  onPress={() => handleDifficultySelect(null)}
+              >
+                <Animated.View
+                  pointerEvents="none"
+                  style={{
+                    position: 'absolute',
+                    top: segmentPadding,
+                    bottom: segmentPadding,
+                    left: segmentPadding,
+                    width: Math.max(0, (toggleWidth - segmentPadding * 2) / 2),
+                    borderRadius: 16,
+                    backgroundColor: colors.primary,
+                    transform: [{ translateX: thumbX }],
+                  }}
+                />
+                <TouchableOpacity
+                  style={styles.modeOption}
+                  onPress={() => setViewMode('category')}
+                  activeOpacity={0.9}
+                  accessibilityRole="button"
+                  accessibilityLabel={copy.showByCategory}
+                  accessibilityState={{ selected: viewMode === 'category' }}
                 >
-                  <Text style={[styles.difficultyMenuText, { color: colors.text }]}>All Levels</Text>
+                  <Text style={[styles.modeOptionText, isPortraitTight && styles.modeOptionTextCompact, { color: viewMode === 'category' ? '#fff' : colors.text }]}>
+                    {copy.category}
+                  </Text>
                 </TouchableOpacity>
-                <TouchableOpacity 
-                  style={[
-                    styles.difficultyMenuItem, 
-                    { borderBottomColor: isDarkMode ? '#415a77' : '#f0f0f0' },
-                    selectedDifficulty === 1 && { backgroundColor: isDarkMode ? 'rgba(22,113,182,0.15)' : '#E8F7FA' }
-                  ]}
-                  onPress={() => handleDifficultySelect(1)}
+                <TouchableOpacity
+                  style={styles.modeOption}
+                  onPress={() => setViewMode('abc')}
+                  activeOpacity={0.9}
+                  accessibilityRole="button"
+                  accessibilityLabel={copy.showAlphabetically}
+                  accessibilityState={{ selected: viewMode === 'abc' }}
                 >
-                  <Text style={[styles.difficultyMenuText, { color: colors.text }]}>⭐</Text>
-                </TouchableOpacity>
-                <TouchableOpacity 
-                  style={[
-                    styles.difficultyMenuItem, 
-                    { borderBottomColor: isDarkMode ? '#415a77' : '#f0f0f0' },
-                    selectedDifficulty === 2 && { backgroundColor: isDarkMode ? 'rgba(22,113,182,0.15)' : '#E8F7FA' }
-                  ]}
-                  onPress={() => handleDifficultySelect(2)}
-                >
-                  <Text style={[styles.difficultyMenuText, { color: colors.text }]}>⭐⭐</Text>
-                </TouchableOpacity>
-                <TouchableOpacity 
-                  style={[
-                    styles.difficultyMenuItem, 
-                    { borderBottomColor: isDarkMode ? '#415a77' : '#f0f0f0' },
-                    selectedDifficulty === 3 && { backgroundColor: isDarkMode ? 'rgba(22,113,182,0.15)' : '#E8F7FA' }
-                  ]}
-                  onPress={() => handleDifficultySelect(3)}
-                >
-                  <Text style={[styles.difficultyMenuText, { color: colors.text }]}>⭐⭐⭐</Text>
+                  <Text style={[styles.modeOptionText, isPortraitTight && styles.modeOptionTextCompact, { color: viewMode === 'abc' ? '#fff' : colors.text }]}>
+                    {copy.abc}
+                  </Text>
                 </TouchableOpacity>
               </View>
-            )}
+
+              <View style={[styles.viewToggleGroup, isPortraitTight && styles.viewToggleGroupCompact]}>
+                <TouchableOpacity
+                  onPress={() => handleCardViewChange('list')}
+                  accessibilityRole="button"
+                  accessibilityLabel={copy.useListLayout}
+                  accessibilityState={{ selected: cardView === 'list' }}
+                  style={[
+                    styles.iconToggleButton,
+                    isPortraitTight && styles.iconToggleButtonCompact,
+                    { backgroundColor: colors.card, borderColor: colors.border },
+                    cardView === 'list' && { backgroundColor: colors.primary, borderColor: colors.primary },
+                  ]}
+                >
+                  <MaterialIcons name="view-agenda" size={18} color={cardView === 'list' ? colors.buttonText : colors.primary} />
+                </TouchableOpacity>
+                <TouchableOpacity
+                  onPress={() => handleCardViewChange('tile')}
+                  accessibilityRole="button"
+                  accessibilityLabel={copy.useTileLayout}
+                  accessibilityState={{ selected: cardView === 'tile' }}
+                  style={[
+                    styles.iconToggleButton,
+                    { backgroundColor: colors.card, borderColor: colors.border },
+                    cardView === 'tile' && { backgroundColor: colors.primary, borderColor: colors.primary },
+                  ]}
+                >
+                  <MaterialIcons name="grid-view" size={18} color={cardView === 'tile' ? colors.buttonText : colors.primary} />
+                </TouchableOpacity>
+              </View>
+
+              <View
+                style={[styles.levelControlWrap, isPortraitTight && styles.levelControlWrapCompact]}
+                onLayout={(event) => {
+                  const { x, y, width, height } = event.nativeEvent.layout;
+                  setDifficultyAnchor({ x, y, width, height });
+                }}
+              >
+                <TouchableOpacity
+                  style={[styles.dropdownButton, isPortraitTight && styles.dropdownButtonCompact, { backgroundColor: colors.card, borderColor: colors.border }]}
+                  onPress={() => setShowDifficultyMenu((current) => !current)}
+                  accessibilityRole="button"
+                  accessibilityLabel={copy.chooseLevel}
+                  accessibilityState={{ expanded: showDifficultyMenu }}
+                >
+                  <Text style={[styles.dropdownButtonText, isPortraitTight && styles.dropdownButtonTextCompact, { color: colors.primary }]}>
+                    {getLevelLabel(selectedDifficulty)}
+                  </Text>
+                  <MaterialIcons name="arrow-drop-down" size={22} color={colors.primary} />
+                </TouchableOpacity>
+              </View>
+            </View>
           </View>
         </View>
-      </View>
 
-      {/* Render either grouped-by-category or alphabetized grid */}
-      {viewMode === 'category' ? (
-        // Category mode
-        categories.map((category) => {
-          const filteredLessons = filterLessonsByDifficulty(category.lessons);
-          if (selectedDifficulty && filteredLessons.length === 0) {
-            return null; // Hide subcategory with no lessons for the selected difficulty
-          }
+        <View
+          style={[
+            styles.searchShell,
+            {
+              backgroundColor: colors.surface,
+              borderColor: colors.border,
+            },
+          ]}
+        >
+          <TextInput
+            placeholder={copy.searchPlaceholder}
+            placeholderTextColor={colors.secondaryText}
+            value={searchText}
+            onChangeText={setSearchText}
+            style={[
+              styles.searchInput,
+              {
+                backgroundColor: colors.surfaceAlt,
+                color: colors.text,
+                borderWidth: 2,
+                borderColor: colors.borderStrong,
+                paddingRight: 45,
+                paddingLeft: 44,
+                paddingVertical: 14,
+                borderRadius: 12,
+                fontSize: 16,
+              },
+            ]}
+          />
+
+          <View style={styles.searchIconWrap}>
+            <MaterialIcons name="search" size={20} color={colors.primary} />
+          </View>
+
+          {searchText.length > 0 && (
+            <TouchableOpacity
+              onPress={() => setSearchText('')}
+              style={styles.searchClearButton}
+              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+              accessibilityRole="button"
+              accessibilityLabel={copy.clearSearch}
+            >
+              <MaterialIcons name="close" size={20} color={colors.primary} />
+            </TouchableOpacity>
+          )}
+        </View>
+
+        {visibleSections.length === 0 && (
+          <View
+            style={[
+              styles.emptyStateCard,
+              {
+                backgroundColor: colors.surface,
+                borderColor: colors.border,
+              },
+            ]}
+          >
+            <Text style={[styles.emptyStateTitle, { color: colors.text }]}>{copy.noLessonTitle}</Text>
+            <Text style={[styles.emptyStateText, { color: colors.secondaryText }]}>
+              {copy.noLessonText}
+            </Text>
+          </View>
+        )}
+
+        {visibleSections.map((category) => {
+          const lessons = filterLessons(category.lessons);
+
           return (
-            <View key={`cat-${category.title}`} style={{ paddingHorizontal: 16, marginBottom: 8 }}>
-              <View style={styles.categoryHeaderRow}>
-                <Text style={styles.categoryEmoji}>{(CATEGORY_EMOJI_MAP[category.title] || '📚')}</Text>
-                <Text style={[styles.categoryHeader, { color: colors.text }]}>{category.title}</Text>
-              </View>
-              <View style={styles.lessonsContainer}>
-                {filteredLessons
-                  .map((lesson, index) => (
+            <View key={category.title} style={{ paddingHorizontal: 16, marginBottom: 8 }}>
+              {viewMode === 'category' && (
+                <View style={styles.categoryHeaderRow}>
+                  <Text style={styles.categoryEmoji}>{CATEGORY_EMOJI_MAP[category.title] || '\u{1F4DA}'}</Text>
+                  <View style={styles.categoryTitleBlock}>
+                    <Text style={[styles.categoryHeader, { color: colors.text }]}>{category.title}</Text>
+                    <Text style={[styles.categoryMeta, { color: colors.secondaryText }]}>
+                      {lessons.length} {lessons.length > 1 ? copy.lessonPlural : copy.lessonSingular}
+                    </Text>
+                    <View style={[styles.categoryRule, { backgroundColor: colors.border }]} />
+                  </View>
+                </View>
+              )}
+
+              <View style={[styles.lessonsContainer, cardView === 'tile' && styles.lessonsContainerTile]}>
+                {lessons.map((lesson: any, i: number) => {
+                  const lessonTitle = (lesson.title || '').replace(/\s*\d+/, '');
+                  const difficulty = difficultyMap[lessonTitle];
+                  const lessonImageKey = String(lesson.id || lesson.title || lessonTitle || i);
+                  const localLessonImage = getLocalLessonImage(lesson.title);
+                  const lessonImageSource = localLessonImage || { uri: getLessonImage(lesson.title) };
+                  const imageFailed = failedLessonImageKeys.has(lessonImageKey);
+
+                  return (
                     <TouchableOpacity
-                      key={`lesson-${lesson.id || lesson.title}-${index}`}  
-                      style={[styles.lessonCard, { 
-                        backgroundColor: colors.card,
-                        borderColor: isDarkMode ? '#415a77' : 'rgba(0,0,0,0.05)',
-                        borderWidth: 2,
-                        shadowColor: isDarkMode ? '#000' : '#000',
-                        shadowOpacity: isDarkMode ? 0.3 : 0.15,
-                      }]}
-                      onPress={() => {
-                        if (lesson) {
-                          navigation.navigate('VocabularyLesson', { lesson });
-                        }
-                      }}
+                      key={`${lesson.id || lesson.title}-${i}`}
+                      style={[
+                        styles.lessonCard,
+                        cardView === 'tile' ? styles.lessonCardTile : styles.lessonCardList,
+                        { backgroundColor: isDarkMode ? '#112c48' : colors.card, borderColor: colors.border },
+                      ]}
+                      onPress={() => navigation.navigate('VocabularyLesson', { lesson })}
+                      accessibilityRole="button"
+                      accessibilityLabel={`Open ${lessonTitle}`}
                     >
-                      <Image
-                        // Prefer local bundled thumbnails when available; fallback to imgbb remote images
-                        source={getLocalLessonImage(lesson.title) ? getLocalLessonImage(lesson.title) : { uri: getLessonImage(lesson.title) }}
-                        style={styles.lessonImage}
-                      />
-                      <Text style={[styles.lessonTitle, { color: colors.text }]}>{(lesson.title || '').replace(/\s*\d+/, '')}</Text>
+                      {cardView === 'tile' && !!difficulty && (
+                        <View
+                          style={[
+                            styles.lessonDifficultyBadge,
+                            styles.lessonDifficultyBadgeTile,
+                            { backgroundColor: colors.primarySoft },
+                          ]}
+                        >
+                          <Text style={[styles.lessonDifficultyText, { color: colors.primary }]}>{STAR.repeat(difficulty)}</Text>
+                        </View>
+                      )}
+
+                      <View
+                        style={[
+                          styles.lessonImageFrame,
+                          cardView === 'tile' && styles.lessonImageFrameTile,
+                          { backgroundColor: isDarkMode ? '#112c48' : colors.card },
+                          imageFailed && [
+                            styles.lessonImageFallback,
+                            { borderColor: colors.border },
+                          ],
+                        ]}
+                      >
+                        {imageFailed ? (
+                          <MaterialIcons
+                            name="image-not-supported"
+                            size={cardView === 'tile' ? 30 : 26}
+                            color={colors.secondaryText}
+                          />
+                        ) : (
+                          <Image
+                            source={lessonImageSource}
+                            style={styles.lessonImage}
+                            onError={() => markLessonImageFailed(lessonImageKey)}
+                            accessibilityIgnoresInvertColors
+                          />
+                        )}
+                      </View>
+
+                      <View style={[styles.lessonContent, cardView === 'tile' && styles.lessonContentTile]}>
+                        <View style={[styles.lessonTopRow, cardView === 'tile' && styles.lessonTopRowTile]}>
+                          <Text
+                            style={[styles.lessonTitle, cardView === 'tile' && styles.lessonTitleTile, { color: colors.text }]}
+                            numberOfLines={2}
+                          >
+                            {lessonTitle}
+                          </Text>
+                          {cardView === 'list' && !!difficulty && (
+                            <View
+                              style={[
+                                styles.lessonDifficultyBadge,
+                                { backgroundColor: colors.primarySoft },
+                              ]}
+                            >
+                              <Text style={[styles.lessonDifficultyText, { color: colors.primary }]}>{STAR.repeat(difficulty)}</Text>
+                            </View>
+                          )}
+                        </View>
+
+                        <Text
+                          style={[
+                            styles.lessonMetaLine,
+                            cardView === 'tile' && styles.lessonMetaLineTile,
+                            { color: colors.secondaryText },
+                          ]}
+                        >
+                          {getLessonWordCount(lesson)} {getLessonWordCount(lesson) > 1 ? copy.wordPlural : copy.wordSingular}
+                        </Text>
+
+                        {cardView === 'list' && !!lesson.description && (
+                          <Text
+                            style={[styles.lessonDescription, { color: colors.secondaryText }]}
+                            numberOfLines={2}
+                          >
+                            {lesson.description}
+                          </Text>
+                        )}
+                      </View>
                     </TouchableOpacity>
-                  ))}
+                  );
+                })}
               </View>
             </View>
           );
-        })
-      ) : (
-        // ABC mode
-        <View style={{ paddingHorizontal: 16, marginBottom: 8 }}>
-          <View style={styles.lessonsContainer}>
-            {filterLessonsByDifficulty(allLessons).map((lesson, index) => (
+        })}
+      </ScrollView>
+
+      {showDifficultyMenu && (
+        <Pressable style={styles.menuBackdrop} onPress={() => setShowDifficultyMenu(false)}>
+          <View
+            style={[
+              styles.dropdownMenu,
+              styles.difficultyMenu,
+              {
+                backgroundColor: colors.card,
+                borderColor: colors.border,
+                shadowColor: '#000',
+                top: insets.top + difficultyAnchor.y + difficultyAnchor.height + 8,
+                left: Math.max(16, difficultyAnchor.x + difficultyAnchor.width - 188),
+              },
+            ]}
+          >
+            {[null, 1, 2, 3].map((lvl, i) => (
               <TouchableOpacity
-                key={`abc-lesson-${lesson.id || lesson.title}-${index}`}
-                style={[styles.lessonCard, { 
-                  backgroundColor: colors.card,
-                  borderColor: isDarkMode ? '#415a77' : 'rgba(0,0,0,0.05)',
-                  borderWidth: 2,
-                  shadowColor: isDarkMode ? '#000' : '#000',
-                  shadowOpacity: isDarkMode ? 0.3 : 0.15,
-                }]}
-                onPress={() => {
-                  if (lesson) {
-                    navigation.navigate('VocabularyLesson', { lesson });
-                  }
-                }}
+                key={i}
+                style={[
+                  styles.difficultyMenuItem,
+                  selectedDifficulty === lvl && { backgroundColor: colors.primarySoft },
+                ]}
+                onPress={() => handleDifficultySelect(lvl)}
+                accessibilityRole="button"
+                accessibilityLabel={lvl ? `${copy.showLevel} ${lvl}` : copy.showAllLevels}
               >
-                <Image
-                  source={getLocalLessonImage(lesson.title) ? getLocalLessonImage(lesson.title) : { uri: getLessonImage(lesson.title) }}
-                  style={styles.lessonImage}
-                />
-                <Text style={[styles.lessonTitle, { color: colors.text }]}>{(lesson.title || '').replace(/\s*\d+/, '')}</Text>
+                <Text style={[styles.difficultyMenuText, { color: colors.text }]}>
+                  {lvl ? STAR_EMOJI.repeat(lvl) : `\u2728 ${copy.allLevels}`}
+                </Text>
               </TouchableOpacity>
             ))}
           </View>
-        </View>
+        </Pressable>
       )}
-    </ScrollView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  categoryHeaderRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 4,
-  },
-  categoryEmoji: {
-    fontSize: 34,
-    marginRight: 8,
-  },
-  headerControls: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    position: 'relative',
-    flexShrink: 0,
-  },
-  controlsRow: {
-    width: '100%',
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-  },
-  modeToggle: {
-    flexDirection: 'row',
-    borderRadius: 20,
-    padding: 8,
-    position: 'relative',
-    overflow: 'hidden',
-    minHeight: 44, // larger overall control height
-    width: 175,
-    marginRight: 8,
-  },
-  modeOption: {
-    flex: 1,
-    paddingVertical: 14,
+  container: { flex: 1 },
+  headerTitleContainer: { paddingHorizontal: 16, paddingBottom: 6 },
+  headerTitle: { fontSize: 32, fontWeight: 'bold', marginBottom: 4 },
+  controlPanel: {
+    marginTop: 4,
+    borderWidth: 1.5,
     borderRadius: 16,
+    paddingHorizontal: 8,
+    paddingTop: 8,
+    paddingBottom: 8,
+  },
+  controlPanelCompact: {
+    paddingTop: 4,
+    paddingBottom: 4,
+  },
+  controlsRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 6 },
+  viewToggleGroup: { flexDirection: 'row', gap: 6, width: '20%', minWidth: 84, maxWidth: 96 },
+  viewToggleGroupCompact: { minWidth: 74, maxWidth: 84 },
+  dropdownButton: {
+    flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    zIndex: 1,
-  },
-  modeOptionText: {
-    fontSize: 16,
-    fontWeight: '700',
-  },
-  headerTitleContainer: {
-    flexDirection: 'column',
-    alignItems: 'flex-start',
-    justifyContent: 'flex-start',
-    paddingHorizontal: 16,
-    paddingBottom: 8,
-    paddingTop: -4,
-    // Allow children (dropdown) to overflow and be visible above other content
-    overflow: 'visible',
-    zIndex: 9999,
-  },
-  categoryHeader: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    marginBottom: 8,
-  },
-  container: {
-    flex: 1,
-  },
-  lessonsContainer: {
-    paddingTop: 16,
-    paddingHorizontal: 16,
-    paddingBottom: 4,
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    justifyContent: 'space-between',
-  },
-  lessonCard: {
-    width: '48%',
-    borderRadius: 16,
-    marginBottom: 16,
-    padding: 12,
-    shadowOffset: { width: 0, height: 4 },
-    shadowRadius: 8,
-    elevation: 5,
-    borderWidth: 2,
-    borderColor: 'rgba(0,0,0,0.05)',
-  },
-  lessonImage: {
-    width: 100,
-    height: 100,
-    alignSelf: 'center',
-    resizeMode: 'contain',
-    marginBottom: 12,
-    marginTop: 8,
-    borderRadius: 12,
-  },
-  headerTitle: {
-    fontSize: 32,
-    fontWeight: 'bold',
-    paddingRight: 16,
-    marginBottom: 10,
-  },
-  lessonTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-    textAlign: 'center',
-    marginTop: 4,
-    textTransform: 'capitalize',
-  },
-  aaCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: 14,
-    borderRadius: 14,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.18,
-    shadowRadius: 10,
-    elevation: 6,
-  },
-  aaImage: {
-    width: 78,
-    height: 78,
-    borderRadius: 12,
-    resizeMode: 'cover',
-    backgroundColor: '#fff',
-  },
-  aaTitle: {
-    fontSize: 20,
-    fontWeight: '800',
-    color: '#fff',
-    marginBottom: 4,
-  },
-  aaSubtitle: {
-    fontSize: 13,
-    color: 'rgba(255,255,255,0.95)',
-    opacity: 0.95,
-  },
-  difficultyButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: 10,
-    paddingHorizontal: 14,
+    gap: 4,
+    borderWidth: 1.5,
+    borderColor: '#BFD7EA',
     borderRadius: 999,
-    borderWidth: 2,
+    minHeight: 50,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
     backgroundColor: '#fff',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.15,
-    shadowRadius: 6,
-    elevation: 2,
+    width: '100%',
   },
-  difficultyButtonText: {
-    fontSize: 14,
-    fontWeight: '700',
-    marginRight: 4,
+  dropdownButtonCompact: {
+    minHeight: 38,
+    paddingHorizontal: 8,
+    paddingVertical: 2,
   },
-  difficultyMenu: {
+  dropdownButtonText: { color: '#1671B6', fontSize: 12, fontWeight: '700' },
+  dropdownButtonTextCompact: { fontSize: 10, lineHeight: 12 },
+  modeToggle: { flexDirection: 'row', borderRadius: 16, padding: 8, minHeight: 54, width: '30%', minWidth: 122, maxWidth: 136, marginRight: 0 },
+  modeToggleCompact: { padding: 5, minHeight: 42, minWidth: 108, maxWidth: 120 },
+  modeOption: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingVertical: 12 },
+  modeOptionText: { fontSize: 12, fontWeight: '700' },
+  modeOptionTextCompact: { fontSize: 10, lineHeight: 12 },
+  iconToggleButton: {
+    minHeight: 50,
+    flex: 1,
+    borderRadius: 999,
+    borderWidth: 1.5,
+    borderColor: '#BFD7EA',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  iconToggleButtonCompact: {
+    minHeight: 38,
+  },
+  iconToggleButtonActive: {
+    backgroundColor: '#1671B6',
+    borderColor: '#1671B6',
+  },
+  levelControlWrap: { width: '30%', minWidth: 124, maxWidth: 156 },
+  levelControlWrapCompact: { minWidth: 104, maxWidth: 128 },
+  menuBackdrop: { ...StyleSheet.absoluteFillObject, zIndex: 9998 },
+  dropdownMenu: {
     position: 'absolute',
-    top: 44,
-    right: 0,
-    width: 180,
     borderRadius: 12,
     borderWidth: 1,
     overflow: 'hidden',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.2,
-    shadowRadius: 16,
+    zIndex: 9999,
+    shadowOpacity: 0.16,
+    shadowRadius: 10,
+    shadowOffset: { width: 0, height: 6 },
     elevation: 8,
   },
+  difficultyMenu: { width: 180 },
   difficultyMenuItem: {
-    paddingVertical: 12,
-    paddingHorizontal: 12,
+    paddingVertical: 14,
+    paddingHorizontal: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
     borderBottomWidth: 1,
+    borderBottomColor: '#F0F0F0',
+  },
+  difficultyMenuText: { fontSize: 15, fontWeight: '700' },
+  searchShell: {
+    marginHorizontal: 16,
+    marginTop: 10,
+    marginBottom: 14,
+    borderWidth: 1.5,
+    borderRadius: 14,
+    overflow: 'hidden',
+    position: 'relative',
+  },
+  searchInput: { minHeight: 44, padding: 14, borderRadius: 12, fontSize: 16 },
+  searchIconWrap: {
+    position: 'absolute',
+    left: 16,
+    top: 0,
+    bottom: 0,
+    width: 24,
+    paddingTop: 15,
+    paddingBottom : 15,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  searchClearButton: {
+    position: 'absolute',
+    right: 18,
+    top: 0,
+    bottom: 0,
+    width: 40,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  emptyStateCard: {
+    marginHorizontal: 16,
+    marginTop: 8,
+    marginBottom: 10,
+    padding: 18,
+    borderRadius: 14,
+    borderWidth: 1.5,
+  },
+  emptyStateTitle: {
+    fontSize: 18,
+    fontWeight: '800',
+    marginBottom: 4,
+  },
+  emptyStateText: {
+    fontSize: 14,
+    lineHeight: 20,
+    fontWeight: '600',
+  },
+  categoryHeaderRow: { flexDirection: 'row', alignItems: 'flex-start', marginTop: 12, marginBottom: 12 },
+  categoryEmoji: { fontSize: 34, marginRight: 8 },
+  categoryTitleBlock: { flex: 1 },
+  categoryHeader: { fontSize: 22, fontWeight: '800' },
+  categoryMeta: { fontSize: 12, fontWeight: '700', marginTop: 2 },
+  categoryRule: {
+    width: '100%',
+    height: 2,
+    borderRadius: 999,
+    marginTop: 8,
+  },
+  lessonsContainer: { paddingBottom: 8 },
+  lessonsContainerTile: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between' },
+  lessonCard: {
+    borderRadius: 16,
+    marginBottom: 12,
+    padding: 12,
+    borderWidth: 1.5,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.04,
+    shadowRadius: 6,
+    elevation: 2,
+  },
+  lessonCardList: { flexDirection: 'row', alignItems: 'center' },
+  lessonCardTile: { width: '48%', minHeight: 176, alignItems: 'center', paddingTop: 16, paddingBottom: 14 },
+  lessonImageFrame: { width: 80, height: 80, borderRadius: 12, marginRight: 12, overflow: 'hidden' },
+  lessonImageFrameTile: { width: 92, height: 92, marginRight: 0, marginBottom: 10 },
+  lessonImage: { width: '100%', height: '100%', resizeMode: 'cover' },
+  lessonImageFallback: { alignItems: 'center', justifyContent: 'center', borderWidth: 1.5 },
+  lessonContent: { flex: 1, minWidth: 0 },
+  lessonContentTile: { alignItems: 'center' },
+  lessonTopRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 8 },
+  lessonTopRowTile: { width: '100%', justifyContent: 'center' },
+  lessonTitle: { flex: 1, fontSize: 17, fontWeight: '700', lineHeight: 21, textTransform: 'capitalize' },
+  lessonTitleTile: { textAlign: 'center', lineHeight: 19, fontSize: 15 },
+  lessonDifficultyBadge: {
+    minWidth: 42,
+    paddingHorizontal: 8,
+    paddingVertical: 6,
+    borderRadius: 999,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  difficultyMenuText: {
-    fontSize: 16,
-    fontWeight: '600',
+  lessonDifficultyBadgeTile: {
+    position: 'absolute',
+    top: 10,
+    right: 10,
+    minWidth: 36,
+    paddingHorizontal: 6,
+    paddingVertical: 4,
+    zIndex: 2,
   },
+  lessonDifficultyText: { color: '#1671B6', fontSize: 12, fontWeight: '800' },
+  lessonMetaLine: { fontSize: 13, fontWeight: '700', marginTop: 4 },
+  lessonMetaLineTile: { textAlign: 'center', marginTop: 6 },
+  lessonDescription: { fontSize: 13, lineHeight: 17, marginTop: 4 },
 });

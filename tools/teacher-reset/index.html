@@ -1,0 +1,96 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Ellie Teacher Password Reset</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <main class="shell">
+      <section class="panel" aria-labelledby="page-title">
+        <div class="heading">
+          <div class="badge" aria-hidden="true">E</div>
+          <div>
+            <p class="eyebrow">Teacher tool</p>
+            <h1 id="page-title">Reset a student password</h1>
+          </div>
+        </div>
+
+        <p class="summary">
+          Use this only from your teacher device. The student app never stores the admin key.
+        </p>
+
+        <form id="reset-form" class="form">
+          <label class="field">
+            <span>Supabase project URL</span>
+            <input
+              id="project-url"
+              name="projectUrl"
+              type="url"
+              autocomplete="off"
+              spellcheck="false"
+              placeholder="https://your-project-ref.supabase.co"
+              required
+            />
+          </label>
+
+          <label class="field">
+            <span>Teacher code</span>
+            <input
+              id="teacher-code"
+              name="teacherCode"
+              type="password"
+              autocomplete="current-password"
+              placeholder="Private reset code"
+              required
+            />
+          </label>
+
+          <div class="divider"></div>
+
+          <label class="field">
+            <span>Student username</span>
+            <input
+              id="username"
+              name="username"
+              type="text"
+              autocomplete="username"
+              autocapitalize="none"
+              spellcheck="false"
+              placeholder="john"
+              minlength="3"
+              maxlength="32"
+              required
+            />
+          </label>
+
+          <label class="field">
+            <span>New password</span>
+            <input
+              id="new-password"
+              name="newPassword"
+              type="password"
+              autocomplete="new-password"
+              placeholder="At least 6 characters"
+              minlength="6"
+              maxlength="72"
+              required
+            />
+          </label>
+
+          <button id="submit-button" type="submit">Reset password</button>
+        </form>
+
+        <p id="status" class="status" role="status" aria-live="polite"></p>
+
+        <section class="notes" aria-label="Safety notes">
+          <p>No one can see the old password. This sets a new one.</p>
+          <p>Keep the teacher code private. Change it if a student learns it.</p>
+        </section>
+      </section>
+    </main>
+
+    <script src="./app.js"></script>
+  </body>
+</html>

@@ -3,6 +3,7 @@ import { TouchableOpacity, Text, StyleSheet, ViewStyle, TextStyle } from 'react-
 import { MaterialIcons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
 import { useTheme } from '../contexts/ThemeContext';
+import { getMenuCopy } from '../utils/menuCopy';
 
 interface BackButtonProps {
   /**
@@ -32,13 +33,15 @@ interface BackButtonProps {
  * ```
  */
 const BackButton: React.FC<BackButtonProps> = ({
-  label = 'Back',
+  label,
   onPress,
   style,
   textStyle,
 }) => {
   const navigation = useNavigation<any>();
-  const { colors } = useTheme();
+  const { colors, menuLanguage } = useTheme();
+  const copy = getMenuCopy(menuLanguage).common;
+  const resolvedLabel = label ?? copy.back;
 
   const handlePress = React.useCallback(() => {
     if (onPress) {
@@ -49,9 +52,14 @@ const BackButton: React.FC<BackButtonProps> = ({
   }, [navigation, onPress]);
 
   return (
-    <TouchableOpacity style={[styles.button, style]} onPress={handlePress}>
+    <TouchableOpacity
+      style={[styles.button, style]}
+      onPress={handlePress}
+      accessibilityRole="button"
+      accessibilityLabel={resolvedLabel}
+    >
       <MaterialIcons name="arrow-back" size={24} color={colors.text} />
-      <Text style={[styles.label, { color: colors.text }, textStyle]}>{label}</Text>
+      <Text style={[styles.label, { color: colors.text }, textStyle]}>{resolvedLabel}</Text>
     </TouchableOpacity>
   );
 };

@@ -1,181 +1,324 @@
-import React, { useState } from 'react';
-import { ScrollView, View, Text, TouchableOpacity, Image, StyleSheet, Platform } from 'react-native';
+import React, { useCallback, useMemo, useState } from 'react';
+import {
+  ScrollView,
+  View,
+  Text,
+  TouchableOpacity,
+  Image,
+  StyleSheet,
+  Platform,
+  TextInput
+} from 'react-native';
 import { useTheme } from '../contexts/ThemeContext';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useNavigation } from '@react-navigation/native';
+import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import { MaterialIcons } from '@expo/vector-icons';
 import BackButton from '../components/BackButton';
-import PresentSimpleGrammar from '../grammar/PresentSimpleGrammar';
-import PresentNegativeGrammar from '../grammar/PresentNegativeGrammar';
-import PreteritGrammar from '../grammar/PreteritGrammar';
-import PresentIngGrammar from '../grammar/PresentIngGrammar';
-import PastPerfectGrammar from '../grammar/PastPerfectGrammar';
-import PresentPerfectGrammar from '../grammar/PresentPerfectGrammar';
-import ComparativeGrammar from '../grammar/ComparativeGrammar';
-import SuperlativeGrammar from '../grammar/SuperlativeGrammar';
-import MustGrammar from '../grammar/MustGrammar';
-import ShouldGrammar from '../grammar/ShouldGrammar';
-import WouldLikeGrammar from '../grammar/WouldLikeGrammar';
-import LikeGrammar from '../grammar/LikeGrammar';
-import PastIngGrammar from '../grammar/PastIngGrammar';
-import BeGoingToGrammar from '../grammar/BeGoingToGrammar';
-import FutureWillGrammar from '../grammar/FutureWillGrammar';
-import Conditional1Grammar from '../grammar/Conditional1Grammar';
-import Conditional2Grammar from '../grammar/Conditional2Grammar';
-import CanGrammar from '../grammar/CanGrammar';
-import BePreteritGrammar from '../grammar/BePreteritGrammar';
-import SuperlativeInferiorityGrammar from '../grammar/SuperlativeInferiorityGrammar';
-import PresentIngInterrogativeGrammar from '../grammar/PresentIngInterrogativeGrammar';
-import ImperativeGrammar from '../grammar/ImperativeGrammar';
-import HypothesesGrammar from '../grammar/HypothesesGrammar';
-import MustHaveToGrammar from '../grammar/MustHaveToGrammar';
-import SinceForGrammar from '../grammar/SinceForGrammar';
-import CanBeAbleToGrammar from '../grammar/CanBeAbleToGrammar';
-import ComparativeInferiorityEqualityGrammar from '../grammar/ComparativeInferiorityEqualityGrammar';
-import CouldGrammar from '../grammar/CouldGrammar';
-import HadToWasAllowedToGrammar from '../grammar/HadToWasAllowedToGrammar';
-import FrequencyGrammar from '../grammar/FrequencyGrammar';
-import PassivePresGrammar from '../grammar/PassivePresGrammar';
-import PassivePastGrammar from '../grammar/PassivePastGrammar';
-import PresentPerfectNIGrammar from '../grammar/PresentPerfectNIGrammar';
-import PreteritNIGrammar from '../grammar/PreteritNIGrammar';
-// New grammar lessons (added so they show in the UI)
-import ArticlesGrammar from '../grammar/ArticlesGrammar';
-import BeVerbGrammar from '../grammar/BeVerbGrammar';
-import GenitiveGrammar from '../grammar/GenitiveGrammar';
-import PossessivesGrammar from '../grammar/PossessivesGrammar';
-import RelativePronounsGrammar from '../grammar/RelativePronounsGrammar';
-import WordTypesGrammar from '../grammar/WordTypesGrammar';
-import HaveHaveGotGrammar from '../grammar/HaveHaveGotGrammar';
+import { grammarCategories } from '../content/lessons/grammarRegistry';
+import { getGrammarLessonProgressCounts, getGrammarLessonProgressKey } from '../utils/grammarProgressStorage';
+import { getMenuCopy } from '../utils/menuCopy';
 
-const sectionTitles = ['🌱 Essentials', '🌿 Developing', '🌳 Growing strong'];
-const grammarCategories = [
-  {
-    group: '🌱 Essentials', title: '🌱 Essentials', icon: '🌱', color: '#AED581',
-    subcategories: [
-      // Requested Essentials order
-      { title: 'Bases de grammaire', lessons: [WordTypesGrammar, ArticlesGrammar] },
-      { title: 'Temps du présent', lessons: [PresentSimpleGrammar, PresentNegativeGrammar, PresentIngGrammar, PresentIngInterrogativeGrammar] },
-      { title: 'Parler de soi', lessons: [LikeGrammar, BeVerbGrammar, HaveHaveGotGrammar] },
-      { title: 'La possession', lessons: [GenitiveGrammar, PossessivesGrammar] },
-      { title: 'Pouvoir / Devoir', lessons: [CanGrammar, MustGrammar] },
-      { title: 'Fréquence', lessons: [FrequencyGrammar] },
-    ]
-  },
-  {
-    group: '🌿 Developing', title: '🌿 Developing', icon: '🌿', color: '#4FC3F7',
-    subcategories: [
-      // Requested Developing order and Modaux lesson ordering
-      { title: 'Temps du passé', lessons: [PreteritGrammar, BePreteritGrammar, PreteritNIGrammar, PastIngGrammar] },
-      { title: 'Futur', lessons: [FutureWillGrammar, BeGoingToGrammar] },
-      { title: 'Modaux', lessons: [CanBeAbleToGrammar, MustHaveToGrammar, HypothesesGrammar, WouldLikeGrammar] },
-      { title: 'Comparaisons', lessons: [ComparativeGrammar, ComparativeInferiorityEqualityGrammar, SuperlativeGrammar, SuperlativeInferiorityGrammar] },
-           { title: 'Ordres/Conseils', lessons: [ShouldGrammar, ImperativeGrammar] },
-      // 'Since et For' moved to Growing strong as requested
-    ]
-  },
-  {
-    group: '🌳 Growing strong', title: '🌳 Growing strong', icon: '🌳', color: '#FFB74D',
-    subcategories: [
-      // Include Since et For in Temps parfaits per request
-      { title: 'Temps parfaits', lessons: [PresentPerfectGrammar, PresentPerfectNIGrammar, PastPerfectGrammar, SinceForGrammar] },
-      { title: 'Voix passive', lessons: [PassivePresGrammar, PassivePastGrammar] },
-      { title: 'Pronoms', lessons: [RelativePronounsGrammar] },
-      { title: 'Modaux avancés', lessons: [HadToWasAllowedToGrammar, CouldGrammar] },
-      { title: 'Conditions', lessons: [Conditional1Grammar, Conditional2Grammar] },
-    ]
-  }
+const subEmojiMap: Record<string, string> = {
+  'Temps du pr\u00E9sent': '\u23F0',
+  'Parler de soi': '\uD83D\uDC4B',
+  'La possession': '\uD83D\uDD11',
+  'Pouvoir / Devoir': '\u2705',
+  'Fr\u00E9quence': '\uD83D\uDD01',
+  'Temps du pass\u00E9': '\uD83D\uDD70\uFE0F',
+  'Futur': '\uD83D\uDD2E',
+  'Modaux': '\uD83E\uDDF0',
+  'Comparaisons': '\u2696\uFE0F',
+  'Ordres/Conseils': '\uD83D\uDCE3',
+  'Temps parfaits': '\u2728',
+  'Voix passive': '\uD83D\uDD01',
+  'Pronoms': '\uD83C\uDFF7\uFE0F',
+  'Modaux avanc\u00E9s': '\uD83D\uDD27',
+  'Conditions': '\uD83C\uDFB2',
+  'Bases de grammaire': '\uD83D\uDCD8',
+};
+const subColors = [
+  '#ee9cb0ff',
+  '#D9A6E8',
+  '#B79CFF',
+  '#8F9BFF',
+  '#6FA8FF',
+  '#92c490ff',
 ];
 
-// Define unique colors for subcategories (cycle through LessonScreen palette)
-const subColors = ['#E57373', '#64B5F6', '#FFB74D', '#81C784', '#BA68C8', '#4DD0E1'];
-
-// Map each subcategory title to a corresponding emoji
-const subEmojiMap: Record<string, string> = {
-  'Temps du présent': '⏰', // alarm clock
-  'Se présenter': '👋', // greeting
-  'Fréquence': '🔁', // repeat symbol
-  'Temps du passé': '📅', // calendar
-  'Comparaisons': '⚖️',
-  'Futur': '🔮', // crystal ball
-  'Since et For': '📆',
-  'Hypothèses': '❓',
-  'Temps parfaits': '✔️', // tick
-  'Voix passive': '🤐',
-  'Modaux avancés': '🔧',
-  'Conditions': '🎲', // dice
-  'Ordres/Conseils': '💡',
-  'Pouvoir / Devoir': '💪',
-  'Modaux': '🛠️',
-  // Added per request:
-  'Bases de grammaire': '🏁',
-  'La possession': '🐱'
-};
-
-// Flatten all subcategories to assign colors/emojis consistently
-const allSubs = grammarCategories.reduce((acc, lvl) => acc.concat(lvl.subcategories), [] as { title: string; lessons: any[] }[]);
-
-const GrammarCategoryList: React.FC<{ onSelectLesson: (lesson: any) => void }> = ({ onSelectLesson }) => {
+const GrammarCategoryList: React.FC<{ onSelectLesson: (lesson: any) => void }> =
+({ onSelectLesson }) => {
   const insets = useSafeAreaInsets();
   const navigation = useNavigation();
-  const { colors, isDarkMode } = useTheme();
-  const [expandedSub, setExpandedSub] = useState<Record<string, boolean>>({});
+  const { colors, isDarkMode, isAndroidStatusBarEnabled, menuLanguage } = useTheme();
+  const appCopy = getMenuCopy(menuLanguage);
+  const copy = appCopy.grammar;
+  const commonCopy = appCopy.common;
+  const topContentInset = Platform.OS === 'ios'
+    ? (insets.top ?? 0)
+    : Platform.OS === 'android' && isAndroidStatusBarEnabled
+      ? insets.top
+      : 0;
 
-  const toggleSub = (key: string) => setExpandedSub(prev => ({ ...prev, [key]: !prev[key] }));
+  const [expandedSub, setExpandedSub] = useState<Record<string, boolean>>({});
+  const [search, setSearch] = useState('');
+  const [grammarProgressCounts, setGrammarProgressCounts] = useState<Record<string, number>>({});
+  const lessonProgressKeys = useMemo(
+    () =>
+      grammarCategories.flatMap((level) =>
+        level.subcategories.flatMap((subcategory) =>
+          subcategory.lessons.map((lesson) => getGrammarLessonProgressKey(lesson))
+        )
+      ),
+    []
+  );
+
+  useFocusEffect(
+    useCallback(() => {
+      let active = true;
+
+      getGrammarLessonProgressCounts(lessonProgressKeys).then((counts) => {
+        if (active) setGrammarProgressCounts(counts);
+      });
+
+      return () => {
+        active = false;
+      };
+    }, [lessonProgressKeys])
+  );
+
+  const toggleSub = (key: string) =>
+    setExpandedSub(prev => ({ ...prev, [key]: !prev[key] }));
+
+  const normalizeSearchText = (value: string) =>
+    value
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, ' ')
+      .trim();
+
+  const isLooseTokenMatch = (textToken: string, queryToken: string) => {
+    if (textToken.includes(queryToken) || queryToken.includes(textToken)) return true;
+    if (queryToken.length < 4) return false;
+
+    let misses = 0;
+    let queryIndex = 0;
+
+    for (let textIndex = 0; textIndex < textToken.length && queryIndex < queryToken.length; textIndex++) {
+      if (textToken[textIndex] === queryToken[queryIndex]) {
+        queryIndex++;
+      } else {
+        misses++;
+      }
+    }
+
+    return queryIndex >= queryToken.length - 1 && misses <= 3;
+  };
+
+  const matchesSearch = (text: string, query: string) => {
+    const normalizedText = normalizeSearchText(text);
+    const normalizedQuery = normalizeSearchText(query);
+
+    if (!normalizedQuery) return true;
+    if (normalizedText.includes(normalizedQuery)) return true;
+
+    const textTokens = normalizedText.split(' ').filter(Boolean);
+    const queryTokens = normalizedQuery.split(' ').filter(Boolean);
+
+    return queryTokens.every((queryToken) =>
+      textTokens.some((textToken) => isLooseTokenMatch(textToken, queryToken))
+    );
+  };
+
+  const filterLessons = (lessons: any[], categoryText: string) => {
+    if (!search.trim()) return lessons;
+    if (matchesSearch(categoryText, search)) return lessons;
+
+    return lessons.filter((lesson) => matchesSearch(lesson.title || '', search));
+  };
 
   return (
     <ScrollView
       style={[styles.container, { backgroundColor: colors.background }]}
-      contentContainerStyle={{ 
-        paddingTop: Platform.OS === 'ios' ? (insets.top > 0 ? insets.top : 0) : 0
+      contentContainerStyle={{
+        paddingTop: topContentInset
       }}
     >
-      <BackButton label="Back to Home" onPress={() => navigation.goBack()} />
-      <Text style={[styles.headerTitle, { color: colors.text }]}>Grammar</Text>
+      <BackButton label={commonCopy.backToHome} onPress={() => navigation.goBack()} />
 
-      {grammarCategories.map((level) => (
+      <Text style={[styles.headerTitle, { color: colors.text }]}>
+        {copy.header}
+      </Text>
+
+      <View
+        style={[
+          styles.searchShell,
+          {
+            backgroundColor: colors.surface,
+            borderColor: colors.border,
+          },
+        ]}
+      >
+        <TextInput
+          value={search}
+          onChangeText={setSearch}
+          placeholder={copy.searchPlaceholder}
+          placeholderTextColor={colors.secondaryText}
+          style={[
+            styles.searchInput,
+            {
+              backgroundColor: colors.surfaceAlt,
+              color: colors.text,
+              borderWidth: 2,
+              borderColor: search.trim() ? colors.primary : colors.borderStrong,
+              paddingRight: 45,
+              paddingLeft: 44,
+              paddingVertical: 14,
+              borderRadius: 12,
+              fontSize: 16,
+            },
+          ]}
+        />
+
+        <View style={styles.searchIconWrap}>
+          <MaterialIcons name="search" size={20} color={colors.primary} />
+        </View>
+
+        {search.length > 0 && (
+          <TouchableOpacity
+            onPress={() => setSearch('')}
+            style={styles.searchClearButton}
+            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+          >
+            <MaterialIcons name="close" size={20} color={colors.primary} />
+          </TouchableOpacity>
+        )}
+      </View>
+
+      {grammarCategories.map((level) => {
+        const visibleSubcategories = level.subcategories
+          .map((sub, si) => ({
+            sub,
+            si,
+            lessons: filterLessons(
+              sub.lessons,
+              `${level.title} ${sub.title}`
+            ),
+          }))
+          .filter(({ lessons }) => !search.trim() || lessons.length > 0);
+
+        if (search.trim() && visibleSubcategories.length === 0) return null;
+
+        return (
         <View key={level.group} style={{ marginBottom: 32 }}>
-          {/* Level header, plain title */}
-          <Text style={[styles.levelTitle, { color: colors.text }]}>{level.title}</Text>
-          {level.subcategories.map((sub, si) => {
+          <View style={styles.levelHeader}>
+            <Text style={[styles.levelTitle, { color: colors.text }]}>
+              {level.title}
+            </Text>
+          </View>
+
+          {visibleSubcategories.map(({ sub, si, lessons }) => {
             const key = `${level.group}-${si}`;
-            const open = expandedSub[key];
-            // Determine unique color and emoji for this subcategory
-            const subIdx = allSubs.findIndex(ss => ss === sub);
+            const open = search ? true : expandedSub[key];
+
+            const subIdx = level.subcategories.findIndex(s => s === sub);
             const subColor = subColors[subIdx % subColors.length];
-            const emoji = subEmojiMap[sub.title] || '📚';
+            const emoji = subEmojiMap[sub.title] || '\uD83D\uDCD8';
+
             return (
-              <View key={key} style={[styles.categoryContainer, { backgroundColor: colors.card, shadowColor: isDarkMode ? '#000' : '#000', shadowOpacity: isDarkMode ? 0.2 : 0.1 }]}>                
-                <TouchableOpacity style={[styles.categoryHeader, { backgroundColor: subColor }]} onPress={() => toggleSub(key)}>
-                  <Text style={styles.categoryTitle}>{`${emoji} ${sub.title}`}</Text>
-                  <MaterialIcons name={open ? 'expand-less' : 'expand-more'} size={20} color={colors.text} />
+              <View
+                key={key}
+                style={[
+                  styles.categoryContainer,
+                  open && styles.categoryContainerActive,
+                  {
+                    backgroundColor: colors.card,
+                    borderColor: open ? subColor : 'transparent',
+                    shadowColor: '#000',
+                    shadowOpacity: open ? (isDarkMode ? 0.28 : 0.16) : (isDarkMode ? 0.2 : 0.1)
+                  }
+                ]}
+              >
+                <TouchableOpacity
+                  style={[styles.categoryHeader, { backgroundColor: subColor }]}
+                  onPress={() => toggleSub(key)}
+                >
+                  <Text style={styles.categoryIcon}>{emoji}</Text>
+                  <View style={styles.categoryTitleBlock}>
+                    <Text style={styles.categoryTitle}>{sub.title}</Text>
+                  </View>
+                  <View style={styles.lessonCountPill}>
+                    <Text style={styles.lessonCountText}>
+                      {lessons.length} {lessons.length > 1 ? copy.lessonPlural : copy.lessonSingular}
+                    </Text>
+                  </View>
+
+                  {!search && (
+                    <MaterialIcons
+                      name={open ? 'expand-less' : 'expand-more'}
+                      size={20}
+                      color={colors.text}
+                    />
+                  )}
                 </TouchableOpacity>
+
                 {open && (
                   <View style={styles.lessonsContainer}>
-                    {sub.lessons.map((lesson: any, li: number) => (
-                      <TouchableOpacity
-                        key={li}
-                        style={[styles.lessonItem, { borderBottomColor: isDarkMode ? '#444444' : '#eeeeee' }]}
-                        onPress={() => onSelectLesson(lesson)}
-                      >
-                        <Image
-                          source={typeof lesson.imageUrl === 'string' ? { uri: lesson.imageUrl } : lesson.imageUrl}
-                          style={styles.lessonThumbnail}
-                        />
-                        <View style={styles.lessonInfo}>
-                          <Text style={[styles.lessonTitle, { color: colors.text }]}>{lesson.title}</Text>
-                          <Text style={[styles.exerciseCount, { color: colors.secondaryText }]}>{lesson.exercises.length} exercises</Text>
-                        </View>
-                        <MaterialIcons name="arrow-forward-ios" size={16} color={colors.secondaryText} />
-                      </TouchableOpacity>
-                    ))}
+                    {lessons.map((lesson: any, li: number) => {
+                      const savedAnswerCount = grammarProgressCounts[getGrammarLessonProgressKey(lesson)] ?? 0;
+
+                      return (
+                        <TouchableOpacity
+                          key={li}
+                          style={[
+                            styles.lessonItem,
+                            {
+                              backgroundColor: isDarkMode ? '#23324d' : '#f8fafc',
+                              borderColor: isDarkMode ? '#34495e' : '#e6edf5',
+                            },
+                          ]}
+                          activeOpacity={0.82}
+                          onPress={() => onSelectLesson(lesson)}
+                        >
+                          <Image
+                            source={
+                              typeof lesson.imageUrl === 'string'
+                                ? { uri: lesson.imageUrl }
+                                : lesson.imageUrl
+                            }
+                            style={styles.lessonThumbnail}
+                          />
+
+                          <View style={styles.lessonInfo}>
+                            <Text style={[styles.lessonTitle, { color: colors.text }]}>
+                              {lesson.title}
+                            </Text>
+                            {savedAnswerCount > 0 && (
+                              <View style={[styles.savedAnswersPill, { backgroundColor: colors.successSoft, borderColor: colors.success }]}>
+                                <MaterialIcons name="check-circle" size={14} color={colors.success} />
+                                <Text style={[styles.savedAnswersText, { color: colors.successText ?? colors.success }]}>
+                                  {savedAnswerCount} {savedAnswerCount === 1 ? copy.savedAnswerSingular : copy.savedAnswerPlural}
+                                </Text>
+                              </View>
+                            )}
+                          </View>
+
+                          <MaterialIcons
+                            name="arrow-forward-ios"
+                            size={16}
+                            color={colors.secondaryText}
+                          />
+                        </TouchableOpacity>
+                      );
+                    })}
                   </View>
                 )}
               </View>
             );
           })}
         </View>
-      ))}
+        );
+      })}
     </ScrollView>
   );
 };
@@ -183,72 +326,153 @@ const GrammarCategoryList: React.FC<{ onSelectLesson: (lesson: any) => void }> =
 export default GrammarCategoryList;
 
 const styles = StyleSheet.create({
-  levelTitle: { 
-    fontSize: 24, 
-    fontWeight: 'bold', 
-    marginTop: 8, 
-    marginBottom: 16, 
-    marginHorizontal: 16
-  },
-  container: {
-    flex: 1,
-  },
-  headerTitle: { 
-    fontSize: 32, 
-    fontWeight: 'bold', 
+  container: { flex: 1 },
+
+  headerTitle: {
+    fontSize: 32,
+    fontWeight: 'bold',
     paddingHorizontal: 24,
     paddingBottom: 16,
   },
-  sectionTitle: { 
-    fontSize: 24, 
-    fontWeight: 'bold', 
-    marginVertical: 8, 
-    marginHorizontal: 16
-  },
-  sectionDivider: { 
-    height: 1, 
+
+  searchShell: {
     marginHorizontal: 16,
-    marginBottom: 8 
+    marginTop: 10,
+    marginBottom: 14,
+    borderWidth: 1.5,
+    borderRadius: 14,
+    overflow: 'hidden',
+    position: 'relative',
   },
-  categoryContainer: { 
-    marginBottom: 16, 
-    marginHorizontal: 16,
-    borderRadius: 16, 
-    overflow: 'hidden', 
-    shadowOffset: { width: 0, height: 2 }, 
-    shadowRadius: 4, 
-    elevation: 3 
-  },
-  categoryHeader: { 
-    flexDirection: 'row', 
-    alignItems: 'center', 
-    padding: 16, 
-    justifyContent: 'space-between' 
-  },
-  categoryIcon: { fontSize: 24 },
-  categoryTitle: { flex: 1, fontSize: 20, fontWeight: 'bold', color: 'white', marginLeft: 12 },
-  lessonsContainer: { padding: 16 },
-  lessonItem: { 
-    flexDirection: 'row', 
-    alignItems: 'center', 
-    paddingVertical: 12, 
-    borderBottomWidth: 1
-  },
-  lessonThumbnail: { width: 60, height: 60, borderRadius: 8, backgroundColor: '#f0f0f0', marginRight: 8 },
-  lessonInfo: { flex: 1, marginLeft: 16 },
-  lessonTitle: { fontSize: 18, fontWeight: 'bold' },
-  exerciseCount: { fontSize: 14, color: '#666' },
-  subTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    marginTop: 12,
-    marginBottom: 4,
-    marginLeft: 4,
-  },
-  subHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
+  searchInput: { minHeight: 44, padding: 14, borderRadius: 12, fontSize: 16 },
+  searchIconWrap: {
+    position: 'absolute',
+    left: 16,
+    top: 0,
+    bottom: 0,
+    width: 24,
+    paddingTop: 15,
+    paddingBottom: 15,
+    justifyContent: 'center',
     alignItems: 'center',
-    paddingVertical: 8,
   },
+  searchClearButton: {
+    position: 'absolute',
+    right: 18,
+    top: 0,
+    bottom: 0,
+    width: 40,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+
+  levelHeader: {
+    marginHorizontal: 16,
+    marginBottom: 16,
+  },
+  levelTitle: {
+    fontSize: 25,
+    fontWeight: 'bold',
+  },
+
+  categoryContainer: {
+    marginBottom: 16,
+    marginHorizontal: 16,
+    borderRadius: 16,
+    overflow: 'hidden',
+    borderWidth: 2,
+    shadowOffset: { width: 0, height: 2 },
+    shadowRadius: 4,
+    elevation: 3
+  },
+  categoryContainerActive: {
+    shadowOffset: { width: 0, height: 5 },
+    shadowRadius: 10,
+    elevation: 6,
+  },
+
+  categoryHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 16,
+    justifyContent: 'space-between'
+  },
+
+  categoryIcon: {
+    fontSize: 24,
+  },
+  categoryTitleBlock: {
+    flex: 1,
+    marginLeft: 12,
+    minHeight: 39,
+    justifyContent: 'center',
+  },
+  categoryTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: 'white',
+  },
+  lessonCountPill: {
+    minWidth: 88,
+    height: 28,
+    paddingHorizontal: 10,
+    borderRadius: 999,
+    backgroundColor: 'rgba(255,255,255,0.24)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 8,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.28)',
+  },
+  lessonCountText: {
+    color: '#fff',
+    fontSize: 13,
+    fontWeight: '800',
+  },
+
+  lessonsContainer: {
+    padding: 14,
+    gap: 10,
+  },
+  lessonItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 12,
+    paddingHorizontal: 12,
+    borderRadius: 12,
+    borderWidth: 1,
+  },
+
+  lessonThumbnail: {
+    width: 60,
+    height: 60,
+    borderRadius: 8,
+    marginRight: 8
+  },
+
+  lessonInfo: {
+    flex: 1,
+    marginLeft: 16
+  },
+
+  lessonTitle: {
+    fontSize: 17,
+    fontWeight: '700',
+    lineHeight: 22,
+  },
+  savedAnswersPill: {
+    alignSelf: 'flex-start',
+    marginTop: 8,
+    minHeight: 26,
+    borderRadius: 999,
+    borderWidth: 1,
+    paddingHorizontal: 9,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+  },
+  savedAnswersText: {
+    fontSize: 12,
+    fontWeight: '800',
+  }
 });

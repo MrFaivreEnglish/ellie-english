@@ -1,168 +1,164 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Linking, Platform } from 'react-native';
 import * as Clipboard from 'expo-clipboard';
 import BackButton from '../components/BackButton';
 import { toast } from 'sonner-native';
 import { MaterialIcons } from '@expo/vector-icons';
-import { useNavigation } from '@react-navigation/native';
+import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import { useTheme } from '../contexts/ThemeContext';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { lessonCategories as chapterCategories } from '../content/lessons/chapterData';
+import { resourceCategories as resourceLinkCategories } from '../content/lessons/resourceLinks';
+import { resolveChapterAppLink } from '../content/lessons/appLessonRegistry';
+import type { ResolvedChapterAppLink } from '../content/lessons/lessonTypes';
+import { SHOW_PRONUNCIATION_FEATURE } from '../lib/featureFlags';
+import { getMenuCopy } from '../utils/menuCopy';
+import {
+  getCustomChapterLinkOverrides,
+  makeChapterLinkOverrideId,
+  normalizeChapterLinkOverrides,
+  type ChapterLinkOverride,
+} from '../utils/chapterLinkStorage';
 
-const lessonCategories = [  {    title: '6e',    icon: '❤️',  // Heart emoji
-    color: '#E57373', // Rouge doux
-    lessons: [
-      { title: "Unit 0 : Welcome to the English Class", url: 'https://digipad.app/p/1212467/6b87b8ceeec43' },
-      { title: "Unit 1 : That's me!", url: 'https://digipad.app/p/1212468/a0fed9d2764f5' },
-      { title: "Unit 2 : Amazing families!", url: 'https://digipad.app/p/1212469/64d0f0c0f50de' },
-      { title: "Mini Unit 1 : Spooky Halloween!", url: 'https://digipad.app/p/1212484/e66796260e5d7' },
-      { title: "Mini Unit 2 : Thanksgiving", url: 'https://digipad.app/p/1212485/de34521838b7b' },
-      { title: "Unit 3 : School in the UK", url: 'https://digipad.app/p/1212470/cc606bdae2a54' },
-      { title: "Unit 4 : Christmas in the UK", url: 'https://digipad.app/p/1212472/2568a09a7fe0b' },
-      { title: "Unit 5 : Superheroes", url: 'https://digipad.app/p/1212482/1edf4446b3e37' },
-      { title: "Unit 6 : My House", url: 'https://digipad.app/p/1212473/6b253f881752f' },
-      { title: "Unit 7 : Animals in London", url: 'https://digipad.app/p/1212474/42b1b83781081' },
-      { title: "Unit 8 : Holidays in the USA", url: 'https://digipad.app/p/1212476/add6b50ad4ff1' },
-      { title: "Unit 9 : Welcome to the Highlands!", url: 'https://digipad.app/p/1212480/fb69c6155bdbb' },
-      { title: "Unit 10 : Have fun with food!", url: 'https://digipad.app/p/1212483/7aa72e822b5fb' },
-      { title: "Unit 11 : British legends", url: 'https://digipad.app/p/1212486/213041759c181' },
-    ]
-  },  {    title: '5e',
-    icon: '🏅',  // Medal emoji
-    color: '#64B5F6', // Bleu doux
-    lessons: [
-      { title: 'Unit 1: That\'s me!', url: 'https://digipad.app/p/807000/eb9227f5d2c64' },
-      { title: 'Unit 2: Let\'s play!', url: 'https://digipad.app/p/550899/eda29ef422829' },
-      { title: 'Unit 3: New York, New York!', url: 'https://digipad.app/p/559800/60a65979c163e' },
-      { title: 'Unit 4: Welcome to America!', url: 'https://digipad.app/p/612010/25fed7858664c' },
-      { title: 'Unit 5: British legends!', url: 'https://digipad.app/p/1137677/939d59f52cfce' },
-      { title: 'Unit 6: My robot friend!', url: 'https://digipad.app/p/682343/0383f7f84da3b' },
-      { title: 'Unit 7: Off to summer camp!', url: 'https://digipad.app/p/788075/d020a51c8716a' }
-    ]
-  },  {    title: '4e',
-    icon: '🏆',  // Trophy emoji
-    color: '#FFB74D', // Orange doux
-    lessons: [
-      { title: 'Unit 1: Eating American Style!', url: 'https://digipad.app/p/837534/5a2b877226b53' },
-      { title: 'Unit 2: Enjoy the trip!', url: 'https://digipad.app/p/557680/6bc5305145694' },
-      { title: 'Unit 3: Welcome to the team', url: 'https://digipad.app/p/1274332/481b20f6faa2f' },
-      { title: 'Unit 4: Like and Subscribe!', url: 'https://digipad.app/p/611916/4717d2cec34cb' },
-      { title: 'Unit 5: Who\'s the culprit?', url: 'https://digipad.app/p/639127/54ba8570d288c' },
-      { title: 'Unit 6: Space Oddity', url: 'https://digipad.app/p/1136904/cb4695e57bb79' },
-      { title: 'Unit 7: Fashion the world!', url: 'https://digipad.app/p/1274380/77e7923aa1453' },
-    ]
-  },  {    title: '3e',    icon: '⭐',  // Star emoji
-    color: '#81C784', // Vert doux
-    lessons: [      { title: 'Unit 1: Once upon a time in Hollywood!', url: 'https://digipad.app/p/837442/f004b8c5852b4' },
-      { title: 'Unit 2: Blitz Britain', url: 'https://digipad.app/p/557684/12588426f4da1' },
-      { title: 'Unit 3: Hire me!', url: 'https://digipad.app/p/594612/757688673ed14' },
-      { title: 'Unit 4: Us versus the world!', url: 'https://digipad.app/p/929952/8168a61b6f0cf' },
-      { title: 'Unit 5: Love is in the air!', url: 'https://digipad.app/p/639123/9407c817aed48' },
-      { title: 'Unit 6: I want to break free!', url: 'https://digipad.app/p/710125/a8ab3ac9284d9' },
-    ]
-  },  {    title: 'SEGPA',
-    icon: '🎯',  // Target emoji
-    color: '#BA68C8', // Violet doux
-    lessons: [
-      { title: 'Unit 1: That\'s me!', url: 'https://digipad.app/p/1274335/1390481b5587c' },
-      { title: 'Unit 2: Let\'s play!', url: 'https://digipad.app/p/573547/9c25a461f960d' },
-      { title: 'Unit 3: My dream job!', url: 'https://digipad.app/p/782151/a76b33edb3af2' },
-      { title: 'Unit 4: New York, New York!', url: 'https://digipad.app/p/1052736/71549e46c028d' },
-      { title: 'Unit 5: Eating American style!', url: 'https://digipad.app/p/659867/d2e470e9402cb' },
-      { title: 'Unit 6: My digital footprint!', url: 'https://digipad.app/p/621801/05d06e8bcbc0a' },
-      { title: 'Unit 7: California dreaming!', url: 'https://digipad.app/p/1274340/0dde28307cb46' }
-    ]
-  },
-  {    title: 'Irregular Verbs',
-    icon: '✨',  // Sparkles emoji
-    color: '#4DD0E1', // Turquoise doux
-    lessons: [
-      { title: 'All Irregular Verbs', url: 'https://digipad.app/p/573582/69f8ed4f2129d' }
-    ]
-  },
-];
+const bundledCustomChapterLinks = require('../content/lessons/customChapterLinks.json') as any[];
 
-// Inline placeholder configuration (4 hidden spots per category).
-// Toggle visible: true and optionally set title/url to show them.
-// If url is empty, the item appears dimmed and is not clickable.
-export type PlaceholderSlot = {
-  visible: boolean;
-  title?: string;
-  url?: string;
-};
+const parseChapterTitle = (title: string) => {
+  const match = title.match(/^\s*((?:Mini\s+)?Chapter\s+\d+)\s*:?\s*(.+)$/i);
 
-const inlinePlaceholders: Record<string, PlaceholderSlot[]> = {
-  '6e': [
-    { visible: false, title: '', url: '' },
-    { visible: false, title: '', url: '' },
-    { visible: false, title: '', url: '' },
-    { visible: false, title: '', url: '' },
-  ],
-  '5e': [
-    { visible: false, title: '', url: '' },
-    { visible: false, title: '', url: '' },
-    { visible: false, title: '', url: '' },
-    { visible: false, title: '', url: '' },
-  ],
-  '4e': [
-    { visible: false, title: 'Unit 2: Join the club!', url: 'https://digipad.app/p/807030/54a9568f66dca' },
-    { visible: false, title: 'Unit 7: Earth Day, everyday!', url: 'https://digipad.app/p/774864/257068f355307' },
-    { visible: false, title: '', url: '' },
-    { visible: false, title: '', url: '' },
-  ],
-  '3e': [
-    { visible: false, title: '', url: '' },
-    { visible: false, title: '', url: '' },
-    { visible: false, title: '', url: '' },
-    { visible: false, title: '', url: '' },
-  ],
-  'SEGPA': [
-    { visible: false, title: '', url: '' },
-    { visible: false, title: '', url: '' },
-    { visible: false, title: '', url: '' },
-    { visible: false, title: '', url: '' },
-  ],
-  'Irregular Verbs': [
-    { visible: false, title: '', url: '' },
-    { visible: false, title: '', url: '' },
-    { visible: false, title: '', url: '' },
-    { visible: false, title: '', url: '' },
-  ],
+  if (!match) {
+    return {
+      label: '',
+      labelPrefix: '',
+      labelNumber: '',
+      title,
+    };
+  }
+
+  const labelNumberMatch = match[1].match(/^(.+?)\s+(\d+)$/);
+
+  return {
+    label: match[1],
+    labelPrefix: labelNumberMatch ? labelNumberMatch[1] : match[1],
+    labelNumber: labelNumberMatch ? labelNumberMatch[2] : '',
+    title: match[2],
+  };
 };
 
 export default function LessonsScreen() {
   const navigation = useNavigation();
-  const { isDarkMode, colors } = useTheme();
+  const { isDarkMode, colors, isAndroidStatusBarEnabled, menuLanguage } = useTheme();
+  const appCopy = getMenuCopy(menuLanguage);
+  const copy = appCopy.lessons;
+  const commonCopy = appCopy.common;
   const insets = useSafeAreaInsets();
-  const [selectedCategory, setSelectedCategory] = useState(null);
-  const [selectedLink, setSelectedLink] = useState(null);
+  const topContentInset = Platform.OS === 'ios'
+    ? (insets.top > 0 ? insets.top : 0)
+    : Platform.OS === 'android' && isAndroidStatusBarEnabled
+      ? insets.top
+      : 0;
+  const [viewMode, setViewMode] = useState<'chapters' | 'resources'>('chapters');
+  const [selectedCategory, setSelectedCategory] = useState<number | null>(null);
+  const [selectedResourceCategory, setSelectedResourceCategory] = useState<number | null>(null);
+  const [selectedLink, setSelectedLink] = useState<string | null>(null);
+  const bundledChapterLinkOverrides = useMemo(
+    () => normalizeChapterLinkOverrides(bundledCustomChapterLinks),
+    []
+  );
+  const [localChapterLinkOverrides, setLocalChapterLinkOverrides] = useState<ChapterLinkOverride[]>([]);
+  const chapterLinkOverrideMap = useMemo(() => {
+    const map = new Map<string, ChapterLinkOverride>();
 
-  const openLink = async (url) => {
+    bundledChapterLinkOverrides.forEach((override) => {
+      map.set(override.id, override);
+    });
+
+    localChapterLinkOverrides.forEach((override) => {
+      map.set(override.id, override);
+    });
+
+    return map;
+  }, [bundledChapterLinkOverrides, localChapterLinkOverrides]);
+
+  useFocusEffect(
+    React.useCallback(() => {
+      let active = true;
+
+      getCustomChapterLinkOverrides().then((overrides) => {
+        if (active) setLocalChapterLinkOverrides(overrides);
+      });
+
+      return () => {
+        active = false;
+      };
+    }, [])
+  );
+
+  const openLink = async (url: string) => {
     try {
       const supported = await Linking.canOpenURL(url);
       if (supported) {
         await Linking.openURL(url);
-      } else {    toast('Cannot open this URL', {
-        type: 'error'
-      });
+      } else {
+        toast.error(copy.cannotOpenUrl);
       }
-    } catch (err) {    toast('An error occurred while opening the link', {
-        type: 'error'
-      });
+    } catch (err) {
+      toast.error(copy.openUrlError);
     }
   };
 
   const copyToClipboard = async (text: string) => {
     try {
       await Clipboard.setStringAsync(text);
-      toast('Link copied to clipboard', { type: 'success' });
+      toast.success(copy.copied);
     } catch (err) {
-      toast('Failed to copy link', { type: 'error' });
+      toast.error(copy.copyFailed);
     }
   };
 
-  const showLink = (url) => {
+  const showLink = (url: string) => {
     setSelectedLink(url);
     openLink(url);
+  };
+
+  const openAppLink = (appLink: ResolvedChapterAppLink) => {
+    setSelectedLink(null);
+
+    if (appLink.target === 'vocabulary') {
+      (navigation as any).navigate('Vocabulary', {
+        screen: 'VocabularyLesson',
+        params: {
+          lesson: appLink.lesson,
+          backLabel: commonCopy.backToChapters,
+          backTarget: 'Lessons',
+        },
+      });
+      return;
+    }
+
+    if (appLink.target === 'pronunciation') {
+      (navigation as any).navigate('Pronunciation', {
+        screen: 'PronunciationLesson',
+        params: {
+          lesson: appLink.lesson,
+          categoryColor: appLink.categoryColor,
+        },
+      });
+      return;
+    }
+
+    (navigation as any).navigate('Grammar', {
+      lesson: appLink.lesson,
+      backLabel: commonCopy.backToChapters,
+      backTarget: 'Lessons',
+      openKey: Date.now(),
+    });
+  };
+
+  const handleViewModeChange = (mode: 'chapters' | 'resources') => {
+    setViewMode(mode);
+    setSelectedCategory(null);
+    setSelectedResourceCategory(null);
+    setSelectedLink(null);
   };
 
   return (
@@ -172,22 +168,95 @@ export default function LessonsScreen() {
         { backgroundColor: colors.background }
       ]}
       contentContainerStyle={{
-        paddingTop: Platform.OS === 'ios' ? (insets.top > 0 ? insets.top : 0) : 0 // iOS only; Android draws behind status bar
+        paddingTop: topContentInset,
+        paddingBottom: selectedLink ? 96 : 24,
       }}
     >
-      <BackButton label="Back to Home" onPress={() => navigation.navigate('Home')} />
-      <Text style={[styles.headerTitle, { color: colors.text }]}>Lessons</Text>
-      {lessonCategories.map((category, index) => (
-        <View key={index} style={[styles.categoryContainer, { 
-          backgroundColor: colors.card,
-          shadowColor: isDarkMode ? '#000000' : '#000000',
-          shadowOpacity: isDarkMode ? 0.2 : 0.1,
-        }]}>
+      <BackButton label={commonCopy.backToHome} onPress={() => (navigation as any).navigate('Home')} />
+      <Text style={[styles.headerTitle, { color: colors.text }]}>{copy.header}</Text>
+
+      <View
+        style={[
+          styles.modeToggle,
+          {
+            backgroundColor: isDarkMode ? colors.card : '#f6f9fc',
+            borderColor: isDarkMode ? 'rgba(255,255,255,0.72)' : '#d9e2ec',
+          },
+        ]}
+      >
+        <TouchableOpacity
+          style={[
+            styles.modeOption,
+            viewMode === 'chapters' && styles.modeOptionActive,
+          ]}
+          onPress={() => handleViewModeChange('chapters')}
+          activeOpacity={0.86}
+          accessibilityRole="button"
+          accessibilityLabel={copy.showChapters}
+          accessibilityState={{ selected: viewMode === 'chapters' }}
+        >
+          <Text
+            style={[
+              styles.modeOptionText,
+              { color: viewMode === 'chapters' ? '#fff' : colors.text },
+            ]}
+          >
+            {copy.chapters}
+          </Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={[
+            styles.modeOption,
+            viewMode === 'resources' && styles.modeOptionActive,
+          ]}
+          onPress={() => handleViewModeChange('resources')}
+          activeOpacity={0.86}
+          accessibilityRole="button"
+          accessibilityLabel={copy.showResources}
+          accessibilityState={{ selected: viewMode === 'resources' }}
+        >
+          <Text
+            style={[
+              styles.modeOptionText,
+              { color: viewMode === 'resources' ? '#fff' : colors.text },
+            ]}
+          >
+            {copy.resources}
+          </Text>
+        </TouchableOpacity>
+      </View>
+
+      {viewMode === 'chapters' && chapterCategories.map((category, index) => (
+        <View
+          key={index}
+          style={[
+            styles.categoryContainer,
+            selectedCategory === index && styles.categoryContainerActive,
+            {
+              backgroundColor: colors.card,
+              borderColor: selectedCategory === index ? category.color : 'transparent',
+              shadowColor: '#000000',
+              shadowOpacity: selectedCategory === index ? (isDarkMode ? 0.28 : 0.16) : (isDarkMode ? 0.2 : 0.1),
+            },
+          ]}
+        >
           <TouchableOpacity
             style={[styles.categoryHeader, { backgroundColor: category.color }]}
             onPress={() => setSelectedCategory(selectedCategory === index ? null : index)}
-          >            <Text style={styles.categoryIcon}>{category.icon}</Text>
-            <Text style={styles.categoryTitle}>{category.title}</Text>
+            activeOpacity={0.85}
+            accessibilityRole="button"
+            accessibilityLabel={`${selectedCategory === index ? commonCopy.collapse : commonCopy.expand} ${category.title} ${copy.chapterPlural}`}
+            accessibilityState={{ expanded: selectedCategory === index }}
+          >
+            <Text style={styles.categoryIcon}>{category.icon}</Text>
+            <View style={styles.categoryTitleBlock}>
+              <Text style={styles.categoryTitle}>{category.title}</Text>
+            </View>
+            <View style={styles.lessonCountPill}>
+              <Text style={styles.lessonCountText}>
+                {category.lessons.length} {category.lessons.length > 1 ? copy.chapterPlural : copy.chapterSingular}
+              </Text>
+            </View>
             <MaterialIcons 
               name={selectedCategory === index ? 'expand-less' : 'expand-more'} 
               size={24} 
@@ -196,56 +265,165 @@ export default function LessonsScreen() {
           </TouchableOpacity>
           {selectedCategory === index && (
             <View style={styles.lessonsContainer}>
-              {category.lessons.map((lesson, lessonIndex) => (
-                <TouchableOpacity
-                  key={lessonIndex}
-                  style={[styles.lessonItem, { 
-                    borderBottomColor: isDarkMode ? '#444444' : '#eeeeee' 
-                  }]}                  onPress={() => openLink(lesson.url)}
-                >
-                  <Text style={[styles.lessonTitle, { color: colors.text }]}>{lesson.title}</Text>
-                  <MaterialIcons name="arrow-forward-ios" size={16} color={colors.secondaryText} />
-                </TouchableOpacity>
-              ))}
-              {/* Placeholder unit spots (up to 4 per category). Now configured inline above. */}
-              {(inlinePlaceholders[category.title] || []).filter((p: PlaceholderSlot) => p.visible).slice(0, 4).map((spot, idx) => {
-                const clickable = !!spot.url;
+              {category.lessons.map((lesson, lessonIndex) => {
+                const chapterLinkOverride = chapterLinkOverrideMap.get(
+                  makeChapterLinkOverrideId(category.title, lesson.title)
+                );
+                const chapterUrl = chapterLinkOverride?.url ?? lesson.url;
+                const displayLessonTitle = chapterLinkOverride?.displayTitle || lesson.title;
+                const chapter = parseChapterTitle(displayLessonTitle);
+                const appLinks = (lesson.appLinks ?? [])
+                  .map(resolveChapterAppLink)
+                  .filter((link): link is ResolvedChapterAppLink => {
+                    if (!link) return false;
+                    return SHOW_PRONUNCIATION_FEATURE || link.target !== 'pronunciation';
+                  });
                 return (
-                  <TouchableOpacity
-                    key={`ph-${idx}`}
-                    style={[styles.lessonItem, {
-                      borderBottomColor: isDarkMode ? '#444444' : '#eeeeee',
-                      opacity: clickable ? 1 : 0.6,
-                    }]}
-                    onPress={() => clickable && spot.url ? openLink(spot.url) : undefined}
-                    disabled={!clickable}
+                  <View
+                    key={lessonIndex}
+                    style={[
+                      styles.lessonItem,
+                      appLinks && appLinks.length > 0 ? styles.lessonItemWithAppLinks : null,
+                      {
+                        backgroundColor: isDarkMode ? '#23324d' : '#f8fafc',
+                        borderColor: isDarkMode ? colors.border : '#e6edf5',
+                      },
+                    ]}
                   >
-                    <Text style={[styles.lessonTitle, { color: colors.text }]}>
-                      {spot.title && spot.title.trim().length > 0 ? spot.title : 'Unit spot'}
-                    </Text>
-                    <MaterialIcons name="arrow-forward-ios" size={16} color={colors.secondaryText} />
-                  </TouchableOpacity>
+                    <TouchableOpacity
+                      style={styles.chapterMainRow}
+                      activeOpacity={0.82}
+                      onPress={() => openLink(chapterUrl)}
+                      accessibilityRole="link"
+                      accessibilityLabel={`Open ${displayLessonTitle}`}
+                    >
+                      <View style={[styles.chapterLabelBadge, { backgroundColor: category.color }]}>
+                        <Text style={styles.chapterLabelPrefix}>
+                          {chapter.labelPrefix || copy.chapterFallback}
+                        </Text>
+                        <Text style={styles.chapterLabelNumber}>
+                          {chapter.labelNumber || lessonIndex + 1}
+                        </Text>
+                      </View>
+                      <View style={styles.chapterTextBlock}>
+                        <Text style={[styles.lessonTitle, { color: colors.text }]}>{chapter.title}</Text>
+                        {!!appLinks?.length && (
+                          <Text style={[styles.revisionHint, { color: colors.secondaryText }]} />
+                        )}
+                      </View>
+                      <View style={[styles.chapterArrow, { borderColor: isDarkMode ? colors.border : '#dbe6f2' }]}>
+                        <MaterialIcons name="open-in-new" size={15} color={colors.secondaryText} />
+                      </View>
+                    </TouchableOpacity>
+
+                    {!!appLinks?.length && (
+                      <View style={styles.appLinksBlock}>
+                        <Text style={[styles.appLinksTitle, { color: colors.text }]} />
+                        <View style={styles.appLinksGrid}>
+                          {appLinks.map((appLink) => (
+                            <TouchableOpacity
+                              key={`${lesson.title}-${appLink.label}`}
+                              style={[
+                                styles.appLinkButton,
+                                {
+                                  backgroundColor: isDarkMode ? '#1b2a42' : '#ffffff',
+                                  borderColor: isDarkMode ? colors.border : '#dbe6f2',
+                                },
+                              ]}
+                              onPress={() => openAppLink(appLink)}
+                              activeOpacity={0.86}
+                              accessibilityRole="button"
+                              accessibilityLabel={`${copy.practice} ${appLink.label}`}
+                            >
+                              <MaterialIcons name={appLink.icon} size={18} color={category.color} />
+                              <Text style={[styles.appLinkText, { color: colors.text }]}>
+                                {appLink.label}
+                              </Text>
+                            </TouchableOpacity>
+                          ))}
+                        </View>
+                      </View>
+                    )}
+                  </View>
                 );
               })}
             </View>          )}
         </View>
       ))}
-      
-      {selectedLink && (
-        <View style={[styles.linkContainer, { 
-          backgroundColor: colors.card,
-          shadowColor: isDarkMode ? '#000000' : '#000000',
-          shadowOpacity: isDarkMode ? 0.2 : 0.1,
-        }]}>
-          <TouchableOpacity 
-            style={styles.linkCard}
-            onPress={() => copyToClipboard(selectedLink)}
+
+      {viewMode === 'resources' && resourceLinkCategories.map((category, index) => (
+        <View
+          key={category.title}
+          style={[
+            styles.categoryContainer,
+            selectedResourceCategory === index && styles.categoryContainerActive,
+            {
+              backgroundColor: colors.card,
+              borderColor: selectedResourceCategory === index ? category.color : 'transparent',
+              shadowColor: '#000000',
+              shadowOpacity: selectedResourceCategory === index ? (isDarkMode ? 0.28 : 0.16) : (isDarkMode ? 0.2 : 0.1),
+            },
+          ]}
+        >
+          <TouchableOpacity
+            style={[styles.categoryHeader, { backgroundColor: category.color }]}
+            onPress={() => setSelectedResourceCategory(selectedResourceCategory === index ? null : index)}
+            activeOpacity={0.85}
+            accessibilityRole="button"
+            accessibilityLabel={`${selectedResourceCategory === index ? commonCopy.collapse : commonCopy.expand} ${category.title} ${copy.resources}`}
+            accessibilityState={{ expanded: selectedResourceCategory === index }}
           >
-            <Text style={[styles.linkText, { color: colors.text }]}>{selectedLink}</Text>
-            <MaterialIcons name="content-copy" size={24} color={colors.secondaryText} />
+            <Text style={styles.categoryIcon}>{category.icon}</Text>
+            <View style={styles.categoryTitleBlock}>
+              <Text style={styles.categoryTitle}>{category.title}</Text>
+            </View>
+            <View style={styles.lessonCountPill}>
+              <Text style={styles.lessonCountText}>
+                {category.resources.length} {category.resources.length > 1 ? copy.linkPlural : copy.linkSingular}
+              </Text>
+            </View>
+            <MaterialIcons
+              name={selectedResourceCategory === index ? 'expand-less' : 'expand-more'}
+              size={24}
+              color="white"
+            />
           </TouchableOpacity>
+          {selectedResourceCategory === index && (
+            <View style={styles.lessonsContainer}>
+              {category.resources.map((resource, resourceIndex) => (
+                <TouchableOpacity
+                  key={resource.title}
+                  style={[
+                    styles.lessonItem,
+                    {
+                      backgroundColor: isDarkMode ? '#23324d' : '#f8fafc',
+                      borderColor: isDarkMode ? colors.border : '#e6edf5',
+                    },
+                  ]}
+                  activeOpacity={0.82}
+                  onPress={() => showLink(resource.url)}
+                  accessibilityRole="link"
+                  accessibilityLabel={`Open ${resource.title}`}
+                >
+                  <View style={[styles.lessonNumberBadge, { backgroundColor: category.color }]}>
+                    <Text style={styles.lessonNumberText}>{resourceIndex + 1}</Text>
+                  </View>
+                  <View style={styles.resourceTextBlock}>
+                    <Text style={[styles.lessonTitle, { color: colors.text }]}>
+                      {resource.title}
+                    </Text>
+                    <Text style={[styles.resourceDescription, { color: colors.secondaryText }]}>
+                      {resource.description}
+                    </Text>
+                  </View>
+                  <MaterialIcons name="open-in-new" size={18} color={colors.secondaryText} />
+                </TouchableOpacity>
+              ))}
+            </View>
+          )}
         </View>
-      )}
+      ))}
+
     </ScrollView>
   );
 }
@@ -266,6 +444,28 @@ const styles = StyleSheet.create({  container: {
     paddingHorizontal: 24,
     paddingBottom: 16,
   },
+  modeToggle: {
+    borderRadius: 20,
+    borderWidth: 2,
+    flexDirection: 'row',
+    marginBottom: 18,
+    marginHorizontal: 16,
+    padding: 6,
+  },
+  modeOption: {
+    alignItems: 'center',
+    borderRadius: 14,
+    flex: 1,
+    justifyContent: 'center',
+    minHeight: 44,
+  },
+  modeOptionActive: {
+    backgroundColor: '#1671B6',
+  },
+  modeOptionText: {
+    fontSize: 16,
+    fontWeight: '800',
+  },
   backText: {
     fontSize: 16,
     color: '#007AFF',
@@ -277,9 +477,15 @@ const styles = StyleSheet.create({  container: {
     marginHorizontal: 16,
     borderRadius: 16,
     overflow: 'hidden',
+    borderWidth: 2,
     shadowOffset: { width: 0, height: 2 },
     shadowRadius: 4,
     elevation: 3,
+  },
+  categoryContainerActive: {
+    shadowOffset: { width: 0, height: 5 },
+    shadowRadius: 10,
+    elevation: 6,
   },
   categoryHeader: {
     flexDirection: 'row',
@@ -289,26 +495,153 @@ const styles = StyleSheet.create({  container: {
   },  categoryIcon: {
     fontSize: 24,
   },
-  categoryTitle: {
+  categoryTitleBlock: {
     flex: 1,
+    marginLeft: 12,
+  },
+  categoryTitle: {
     fontSize: 20,
     fontWeight: 'bold',
     color: 'white',
-    marginLeft: 12,
+  },
+  lessonCountPill: {
+    minWidth: 92,
+    height: 28,
+    paddingHorizontal: 10,
+    borderRadius: 999,
+    backgroundColor: 'rgba(255,255,255,0.24)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 8,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.28)',
+  },
+  lessonCountText: {
+    color: '#fff',
+    fontSize: 13,
+    fontWeight: '800',
   },
   lessonsContainer: {
-    padding: 16,
+    padding: 14,
+    gap: 10,
   },
   lessonItem: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
-    paddingVertical: 12,
-    borderBottomWidth: 1,
+    minHeight: 72,
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    borderRadius: 12,
+    borderWidth: 1,
+  },
+  lessonItemWithAppLinks: {
+    alignItems: 'stretch',
+    flexDirection: 'column',
+  },
+  chapterMainRow: {
+    alignItems: 'center',
+    flex: 1,
+    flexDirection: 'row',
+  },
+  lessonNumberBadge: {
+    width: 30,
+    height: 30,
+    borderRadius: 999,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 12,
+  },
+  lessonNumberText: {
+    color: '#fff',
+    fontSize: 13,
+    fontWeight: '800',
+  },
+  chapterLabelBadge: {
+    width: 74,
+    minHeight: 52,
+    borderRadius: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 12,
+    paddingHorizontal: 6,
+    paddingVertical: 7,
+  },
+  chapterLabelPrefix: {
+    color: '#fff',
+    fontSize: 10,
+    fontWeight: '800',
+    lineHeight: 12,
+    textAlign: 'center',
+    textTransform: 'uppercase',
+  },
+  chapterLabelNumber: {
+    color: '#fff',
+    fontSize: 20,
+    fontWeight: '900',
+    lineHeight: 23,
+    marginTop: 1,
+    textAlign: 'center',
   },
   lessonTitle: {
-    fontSize: 16,
+    fontSize: 17,
     flex: 1,
+    fontWeight: '800',
+    lineHeight: 22,
+  },
+  chapterTextBlock: {
+    flex: 1,
+    marginRight: 10,
+  },
+  revisionHint: {
+    fontSize: 13,
+    fontWeight: '700',
+    lineHeight: 18,
+    marginTop: 3,
+  },
+  chapterArrow: {
+    alignItems: 'center',
+    borderRadius: 999,
+    borderWidth: 1,
+    height: 32,
+    justifyContent: 'center',
+    width: 32,
+  },
+  appLinksBlock: {
+    marginTop: 12,
+  },
+  appLinksTitle: {
+    fontSize: 14,
+    fontWeight: '600',
+    marginBottom: 8,
+  },
+  appLinksGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  appLinkButton: {
+    alignItems: 'center',
+    borderRadius: 8,
+    borderWidth: 1,
+    flexDirection: 'row',
+    minHeight: 40,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+  },
+  appLinkText: {
+    fontSize: 13,
+    fontWeight: '800',
+    marginLeft: 6,
+  },
+  resourceTextBlock: {
+    flex: 1,
+    marginRight: 12,
+  },
+  resourceDescription: {
+    fontSize: 13,
+    fontWeight: '600',
+    lineHeight: 18,
+    marginTop: 4,
   },
   linkContainer: {
     position: 'absolute',

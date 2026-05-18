@@ -1,52 +1,77 @@
-import React, { useEffect } from 'react';
-import { View, Text, StyleSheet, Animated, ActivityIndicator } from 'react-native';
+import React, { useEffect, useRef, useState } from 'react';
+import { View, Text, StyleSheet, Animated, ActivityIndicator, Platform } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import * as Font from 'expo-font';
+import { enterImmersive, exitImmersiveOpaque } from '../lib/immersive';
+import { useTheme } from '../contexts/ThemeContext';
 
 export default function SplashScreen() {
-  const navigation = useNavigation();
-  const fadeAnim = new Animated.Value(0);
+  const navigation = useNavigation<any>();
+  const { isShinyEllieMode, unlockShinyEllie, isAndroidStatusBarEnabled } = useTheme();
+
+  const fadeAnim = useRef(new Animated.Value(0)).current;
+  const [isShiny, setIsShiny] = useState(isShinyEllieMode);
 
   useEffect(() => {
-    // Load any fonts or other resources here
+    enterImmersive().catch(() => {});
+
+    // 🎲 SHINY ROLL (1 / 4096)
+    const roll = Math.floor(Math.random() * 4096);
+    const foundShiny = roll === 0;
+
+    if (isShinyEllieMode || foundShiny) {
+      setIsShiny(true);
+    }
+
+    if (foundShiny) {
+      unlockShinyEllie();
+    }
+
     const loadResources = async () => {
       try {
-        // Load any fonts or other resources here
-        await Font.loadAsync({
-          // Add any custom fonts here if needed
-        });
+        await Font.loadAsync({});
 
-        // Start fade animation
         Animated.sequence([
           Animated.timing(fadeAnim, {
             toValue: 1,
             duration: 800,
             useNativeDriver: true,
           }),
-          Animated.delay(1200)
-        ]).start(() => {          // Navigate to Home after resources are loaded
+          Animated.delay(1200),
+        ]).start(() => {
           navigation.replace('Home');
         });
       } catch (error) {
         console.error('Error loading resources:', error);
-        // Navigate to Home even if there's an error
         navigation.replace('MainTabs');
       }
     };
 
     loadResources();
 
-    // No cleanup needed for StatusBar because the entire app keeps it hidden globally
-    return () => {};
+    return () => {
+      exitImmersiveOpaque('#000000', 'light', Platform.OS !== 'android' || isAndroidStatusBarEnabled).catch(() => {});
+    };
   }, []);
 
   return (
-    <View style={styles.container}>
+    <View
+      style={[
+        styles.container,
+        {
+          backgroundColor: isShiny ? '#f4b942' : '#1671B6',
+        },
+      ]}
+    >
       <Animated.View style={[styles.logoContainer, { opacity: fadeAnim }]}>
-        <Text style={styles.logoText}>Ellie</Text>
+        <Text style={styles.logoText}>
+          {isShiny ? '✨ Shiny Ellie ✨' : 'Ellie'}
+        </Text>
+
         <Text style={styles.logoSubText}>My English Assistant</Text>
         <Text style={styles.logoSubSubText}>By Mr Faivre</Text>
-        <ActivityIndicator size="large" color="#fff" style={styles.loader} />
+
+        <ActivityIndicator size="large" color="white" style={styles.loader} />
       </Animated.View>
     </View>
   );
@@ -54,7 +79,7 @@ export default function SplashScreen() {
 
 const styles = StyleSheet.create({
   container: {
-    flex: 1,    backgroundColor: '#1671B6',
+    flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -70,18 +95,18 @@ const styles = StyleSheet.create({
   logoSubText: {
     fontSize: 32,
     color: 'white',
-    marginTop: 16, // extra spacing for clarity
+    marginTop: 16,
     opacity: 0.9,
     textAlign: 'center',
   },
   logoSubSubText: {
     fontSize: 24,
     color: 'white',
-    marginTop: 12, // extra spacing for clarity
+    marginTop: 12,
     opacity: 0.8,
     textAlign: 'center',
   },
   loader: {
     marginTop: 20,
-  }
+  },
 });

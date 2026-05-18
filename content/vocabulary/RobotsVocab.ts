@@ -1,0 +1,40 @@
+const RobotsVocab = {
+  id: '315',
+  title: 'Robots',
+  description: 'Learn vocabulary related to robotics and automation',  imageUrl: 'https://i.ibb.co/d0dYkWz2/Robots.webp',
+  flashcards: [
+     { english: `Tall`, french: `Grand` },
+    { english: `Short`, french: `Petit` },
+    { english: `Strong`, french: `Fort` },
+    { english: `Cute`, french: `Mignon` },
+    { english: `Ugly`, french: `Laid` },
+    { english: `Fast`, french: `Rapide` },
+    { english: `Shiny`, french: `Brillant` },
+    { english: `New`, french: `Nouveau` },
+    { english: `Modern`, french: `Moderne` },
+    { english: `Sophisticated`, french: `Sophistiqué` },
+    { english: `Made of metal`, french: `Fait de métal` },
+    { english: `Made of plastic`, french: `Fait de plastique` },
+    { english: `Clever`, french: `Malin` },
+    { english: `Smart`, french: `Intelligent` },
+    { english: `Friendly`, french: `Amical` },
+    { english: `Nice`, french: `Sympa` },
+    { english: `Kind`, french: `Gentil` },
+    { english: `Caring`, french: `Attentionné` },
+    { english: `Helpful`, french: `Serviable` },
+    { english: `Polite`, french: `Poli` },
+    { english: `Funny`, french: `Drôle` },
+    { english: `Emotionless`, french: `Sans émotion` },
+    { english: `Scared`, french: `Effrayé` },
+    { english: `Fearful`, french: `Craintif` },
+    { english: `Aggressive`, french: `Agressif` },
+    { english: `Lazy`, french: `Paresseux` },
+    { english: `Fantastic`, french: `Fantastique` },
+    { english: `Cool`, french: `Cool` },
+    { english: `Scary`, french: `Effrayant` },
+    { english: `Awful`, french: `Affreux` },
+    { english: `Strange`, french: `Étrange` }
+  ]
+};
+
+export default RobotsVocab;

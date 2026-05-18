@@ -1,26 +1,42 @@
 import React from 'react';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { NavigationContainer, DefaultTheme as NavDefaultTheme, DarkTheme as NavDarkTheme } from '@react-navigation/native';
-import { BackHandler, StatusBar, View, Image, Platform } from 'react-native';
+import { BackHandler, View, Image, Platform, useWindowDimensions } from 'react-native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import 'react-native-gesture-handler';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import SplashScreen from './screens/SplashScreen';
 import { StyleSheet } from 'react-native';
-import { SafeAreaProvider } from "react-native-safe-area-context";
+import { SafeAreaProvider, useSafeAreaInsets } from "react-native-safe-area-context";
 import { Toaster } from 'sonner-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { ThemeProvider, useTheme } from './contexts/ThemeContext';
+import { AccountProvider } from './contexts/AccountContext';
 import HomeScreen from "./screens/HomeScreen";
 import GrammarScreen from "./screens/GrammarScreen";
 import VocabularyScreen from "./screens/VocabularyScreen";
 import LessonsScreen from "./screens/LessonsScreen";
 import VocabularyLessonScreen from "./screens/VocabularyLessonScreen";
 import SettingsScreen from "./screens/SettingsScreen";
+import AccountScreen from "./screens/AccountScreen";
+import AdminLessonPreviewScreen from "./screens/AdminLessonPreviewScreen";
 import { Asset } from 'expo-asset';
+import { applyAppChrome, applyImmersiveMode, bindImmersiveOnForeground } from './lib/immersive';
+import FullImageScreen from './screens/FullImageScreen';
+import { StatusBar } from 'expo-status-bar';
+import { getWebAppContentMaxWidth } from './utils/responsiveLayout';
+import { getMenuCopy } from './utils/menuCopy';
 
 const Tab = createBottomTabNavigator();
 const Stack = createNativeStackNavigator();
+type MaterialIconName = React.ComponentProps<typeof MaterialIcons>['name'];
+
+const tabIcons: Record<string, MaterialIconName> = {
+  Grammar: 'edit',
+  Vocabulary: 'style',
+  Lessons: 'menu-book',
+  Settings: 'settings',
+};
 
 function VocabularyStack(): React.JSX.Element {
   return (
@@ -40,38 +56,87 @@ function VocabularyStack(): React.JSX.Element {
 }
 
 function MainTabNavigator() {
-  const { isDarkMode, colors } = useTheme();
+  const { isDarkMode, colors, menuLanguage } = useTheme();
+  const copy = getMenuCopy(menuLanguage);
+  const insets = useSafeAreaInsets();
+  const { width } = useWindowDimensions();
+  const isCompactTabBar = width < 430;
+  const isLargeTabBar = width >= 900;
+  const isWebTabBar = Platform.OS === 'web';
+  const androidSystemNavInset = Platform.OS === 'android' ? Math.max(insets.bottom, 24) : 0;
+  const tabBarBaseHeight = isWebTabBar ? (isCompactTabBar ? 58 : isLargeTabBar ? 60 : 58) : (isCompactTabBar ? 48 : isLargeTabBar ? 50 : 48);
+  const tabBarHeight = tabBarBaseHeight + androidSystemNavInset;
+  const tabBarIconSize = isCompactTabBar ? 22 : isLargeTabBar ? 23 : 22;
+  const tabBarLabelFontSize = isCompactTabBar ? 11 : isLargeTabBar ? 12 : 11;
+  const tabBarLabelLineHeight = isCompactTabBar ? 13 : isLargeTabBar ? 14 : 13;
+  const tabBarStylePaddingBottom = androidSystemNavInset;
+  const tabBarTopBorderWidth = Platform.OS === 'android' ? 0 : StyleSheet.hairlineWidth;
   
   return (
     <Tab.Navigator
       backBehavior="none" // Let hardware back press bubble up to RootStack (we handle it globally)
       screenOptions={({ route }) => ({
         headerShown: false,
+        safeAreaInsets: { bottom: 0 },
+        tabBarShowLabel: true,
+        tabBarLabelPosition: 'below-icon',
         tabBarIcon: ({ focused, color, size }) => {
-          let iconName;
-          if (route.name === 'Grammar') {
-            iconName = 'edit';
-          } else if (route.name === 'Vocabulary') {
-            iconName = 'style';
-          } else if (route.name === 'Lessons') {
-            iconName = 'menu-book';
-          } else if (route.name === 'Settings') {
-            iconName = 'settings';
-          }
-          return <MaterialIcons name={iconName} size={size} color={color} />;
+          const iconName = tabIcons[route.name] ?? 'help-outline';
+          return <MaterialIcons name={iconName} size={tabBarIconSize} color={color} />;
         },        
-        tabBarActiveTintColor: '#1671B6',
-        tabBarInactiveTintColor: isDarkMode ? '#dddddd' : 'gray',
+        tabBarActiveTintColor: colors.primary,
+        tabBarInactiveTintColor: colors.secondaryText,
+        tabBarLabelStyle: {
+          fontSize: tabBarLabelFontSize,
+          lineHeight: tabBarLabelLineHeight,
+          marginTop: 0,
+          marginBottom: 0,
+          includeFontPadding: false,
+          textAlignVertical: 'center',
+        },
+        tabBarItemStyle: {
+          justifyContent: 'center',
+          alignItems: 'center',
+          paddingTop: 0,
+          transform: [{ translateY: isWebTabBar ? 0 : -2 }],
+        },
+        tabBarIconStyle: {
+          marginTop: 0,
+          marginBottom: 0,
+        },
         tabBarStyle: {
-          backgroundColor: colors.card,
-          borderTopColor: isDarkMode ? '#415a77' : '#eeeeee',
+          height: tabBarHeight,
+          paddingTop: 3,
+          paddingBottom: tabBarStylePaddingBottom,
+          backgroundColor: isDarkMode
+            ? colors.card
+            : 'rgba(255, 255, 255, 0.82)',
+          borderTopColor: Platform.OS === 'android' ? 'transparent' : isDarkMode ? colors.border : 'rgba(0,0,0,0.08)',
+          borderTopWidth: tabBarTopBorderWidth,
         },
       })}
     >
-      <Tab.Screen name="Grammar" component={GrammarScreen} />
-      <Tab.Screen name="Vocabulary" component={VocabularyStack} />
-      <Tab.Screen name="Lessons" component={LessonsScreen} />
-      <Tab.Screen name="Settings" component={SettingsScreen} />
+      <Tab.Screen
+        name="Grammar"
+        component={GrammarScreen}
+        options={{ tabBarLabel: copy.home.grammarTitle }}
+      />
+      <Tab.Screen
+        name="Vocabulary"
+        component={VocabularyStack}
+        options={{ tabBarLabel: isCompactTabBar ? 'Vocab' : copy.home.vocabularyTitle }}
+      />
+
+      <Tab.Screen
+        name="Lessons"
+        component={LessonsScreen}
+        options={{ tabBarLabel: isCompactTabBar ? copy.lessons.chapters : copy.lessons.header }}
+      />
+      <Tab.Screen
+        name="Settings"
+        component={SettingsScreen}
+        options={{ tabBarLabel: copy.home.settingsTitle }}
+      />
     </Tab.Navigator>
   );
 }
@@ -100,6 +165,17 @@ function RootStack() {
           gestureEnabled: false
         }}
       />
+      <Stack.Screen
+        name="Account"
+        component={AccountScreen}
+        options={{ headerShown: false }}
+      />
+      {/* Root-level full image modal so it overlays headers */}
+      <Stack.Screen
+        name="FullImageModal"
+        component={FullImageScreen}
+        options={{ presentation: 'transparentModal', headerShown: false }}
+      />
       <Stack.Screen 
         name="MainTabs" 
         component={MainTabNavigator}
@@ -107,23 +183,55 @@ function RootStack() {
           gestureEnabled: true
         }}
       />
+      <Stack.Screen
+        name="AdminLessonPreview"
+        component={AdminLessonPreviewScreen}
+        options={{ headerShown: false }}
+      />
     </Stack.Navigator>
   );
 }
 
 function AppInner() {
   const navigationRef = React.useRef<any>(null);
-  const { isDarkMode, colors } = useTheme();
+  const { isDarkMode, colors, isShinyEllieMode, isAndroidStatusBarEnabled } = useTheme();
+  const { width: windowWidth } = useWindowDimensions();
   const [currentRoute, setCurrentRoute] = React.useState<string>('Splash');
   const splashBG = '#1671B6';
+  const isDesktopWeb =
+    Platform.OS === 'web' &&
+    typeof window !== 'undefined' &&
+    window.matchMedia?.('(hover: hover) and (pointer: fine)').matches;
+  const sideBackground =
+    currentRoute === 'Splash'
+      ? isDesktopWeb && isShinyEllieMode
+        ? '#f4b942'
+        : splashBG
+      : colors.background;
+  const contentBackground = currentRoute === 'Splash' ? splashBG : colors.background;
+  const contentMaxWidth = getWebAppContentMaxWidth(windowWidth);
+  const isImmersiveRoute = currentRoute === 'Splash' || currentRoute === 'FullImageModal';
+  const showAppStatusBar = Platform.OS !== 'android' || isAndroidStatusBarEnabled;
+  const shouldHideStatusBar = isImmersiveRoute || !showAppStatusBar;
+  const statusBarStyle = shouldHideStatusBar || isDarkMode ? 'light' : 'dark';
+  const statusBarBackground = shouldHideStatusBar ? 'transparent' : colors.background;
+
+  const applyRouteChrome = React.useCallback((name?: string) => {
+    if (!name) return;
+
+    if (name === 'Splash' || name === 'FullImageModal') {
+      applyImmersiveMode();
+      return;
+    }
+
+    applyAppChrome('#000000', 'light', showAppStatusBar);
+  }, [showAppStatusBar]);
 
   // Preload lesson thumbnails (handles both bundled require() assets and http URIs)
   React.useEffect(() => {
-    let mounted = true;
     const preloadThumbnails = async () => {
       try {
-        // @ts-ignore - dynamic require of the generated assets index
-        const Assets = require('./assets');
+        const Assets = require('./assets/index') as typeof import('./assets/index');
         const thumbs = Assets?.lessonThumbnails || {};
         const tasks: Promise<any>[] = [];
 
@@ -141,68 +249,226 @@ function AppInner() {
         });
 
         if (tasks.length) await Promise.all(tasks);
-        if (mounted) console.log('Lesson thumbnails preloaded');
       } catch (err) {
         console.warn('Error preloading lesson thumbnails', err);
       }
     };
 
     preloadThumbnails();
-    return () => { mounted = false; };
   }, []);
 
-  // Global hardware back press handler
+  // Ensure immersive mode is applied on mount and whenever app returns to foreground
   React.useEffect(() => {
-    const onBackPress = () => {
-      const nav = navigationRef.current;
-      const route = nav?.getCurrentRoute()?.name;
+    // Do not force immersive on mount; route-specific screens (like Splash) manage their own immersive state.
+    const unbind = bindImmersiveOnForeground();
+    return () => {
+      unbind();
+    };
+  }, []);
 
-      if (route && ['MainTabs', 'Grammar', 'Vocabulary', 'VocabularyList', 'Lessons', 'Settings'].includes(route)) {
-        // From any tab, go back to Home
-        nav.navigate('Home');
-        return true;
+  React.useEffect(() => {
+    applyRouteChrome(currentRoute);
+  }, [applyRouteChrome, currentRoute]);
+
+  // Central back navigation logic for native hardware back.
+  const onBackRequested = React.useCallback(() => {
+    const nav = navigationRef.current;
+    const route = nav?.getCurrentRoute()?.name;
+
+    if (route && ['MainTabs', 'Grammar', 'Vocabulary', 'VocabularyList', 'Pronunciation', 'Lessons', 'Settings'].includes(route)) {
+      // From any tab, go back to Home
+      nav.navigate('Home');
+      return true;
+    }
+    if (nav?.canGoBack()) {
+      nav.goBack();
+      return true;
+    }
+    return false; // allow default behavior (exit app on native / leave page on web)
+  }, []);
+
+  // Global hardware back press handler (native)
+  React.useEffect(() => {
+    const sub = BackHandler.addEventListener('hardwareBackPress', onBackRequested);
+    return () => sub.remove();
+  }, [onBackRequested]);
+
+  // Web-only: block right-click/long-press save menus on images (local and remote).
+  React.useEffect(() => {
+    if (Platform.OS !== 'web') return;
+    if (typeof document === 'undefined') return;
+
+    const isImageTarget = (el: any): boolean => {
+      let node: any = el;
+      while (node && node !== document) {
+        if (node.tagName === 'IMG') return true;
+        if (node.getAttribute?.('role') === 'img') return true;
+
+        const inlineBackgroundImage = node?.style?.backgroundImage;
+        const computedBackgroundImage =
+          typeof window !== 'undefined' && node instanceof HTMLElement
+            ? window.getComputedStyle(node).backgroundImage
+            : '';
+        const backgroundImage = inlineBackgroundImage || computedBackgroundImage;
+
+        if (typeof backgroundImage === 'string' && backgroundImage.includes('url(')) {
+          return true;
+        }
+
+        node = node.parentElement;
       }
-      // Otherwise use default back if possible
-      if (nav?.canGoBack()) {
-        nav.goBack();
-        return true;
-      }
-      return false; // exit app
+      return false;
     };
 
-    const sub = BackHandler.addEventListener('hardwareBackPress', onBackPress);
-    return () => sub.remove();
+    const preventImageSaveMenu = (e: Event) => {
+      const target = e.target as HTMLElement | null;
+      if (target && isImageTarget(target)) {
+        e.preventDefault();
+        e.stopPropagation();
+      }
+    };
+
+    const onDragStart = (e: Event) => {
+      const target = e.target as HTMLElement | null;
+      if (target && isImageTarget(target)) {
+        e.preventDefault();
+        e.stopPropagation();
+      }
+    };
+
+    const markImagesUndraggable = () => {
+      document.querySelectorAll('img, [role="img"]').forEach((element) => {
+        element.setAttribute('draggable', 'false');
+      });
+    };
+
+    markImagesUndraggable();
+
+    const observer = typeof MutationObserver !== 'undefined'
+      ? new MutationObserver(markImagesUndraggable)
+      : null;
+    observer?.observe(document.body, { childList: true, subtree: true });
+
+    // Add listeners in capture phase so browser save affordances do not win first.
+    document.addEventListener('contextmenu', preventImageSaveMenu, true);
+    document.addEventListener('dragstart', onDragStart, true);
+    document.addEventListener('selectstart', preventImageSaveMenu, true);
+    document.addEventListener('copy', preventImageSaveMenu, true);
+
+    // Inject CSS to further suppress iOS/Android callouts and dragging on web-rendered images.
+    const style = document.createElement('style');
+    style.id = 'a0-image-protect';
+    style.textContent = `
+      img,
+      [role="img"],
+      [style*="background-image"] {
+        -webkit-touch-callout: none !important;
+        -webkit-user-select: none !important;
+        user-select: none !important;
+        -webkit-user-drag: none !important;
+        user-drag: none !important;
+      }
+    `;
+    document.head.appendChild(style);
+
+    return () => {
+      observer?.disconnect();
+      document.removeEventListener('contextmenu', preventImageSaveMenu, true);
+      document.removeEventListener('dragstart', onDragStart, true);
+      document.removeEventListener('selectstart', preventImageSaveMenu, true);
+      document.removeEventListener('copy', preventImageSaveMenu, true);
+      try {
+        const existing = document.getElementById('a0-image-protect');
+        if (existing && existing.parentNode) existing.parentNode.removeChild(existing);
+      } catch {}
+    };
+  }, []);
+
+  React.useEffect(() => {
+    if (Platform.OS !== 'web') return;
+    if (typeof document === 'undefined') return;
+
+    document.documentElement.style.backgroundColor = sideBackground;
+    document.body.style.backgroundColor = sideBackground;
+  }, [sideBackground]);
+
+  // Web-only (desktop): hide the scrollbar while keeping scrolling functional
+  React.useEffect(() => {
+    if (Platform.OS !== 'web') return;
+    if (typeof document === 'undefined') return;
+
+    const style = document.createElement('style');
+    style.id = 'a0-hide-scrollbars-desktop';
+    style.textContent = `
+      @media (hover: hover) and (pointer: fine) {
+        /* Hide scrollbars globally but preserve scrolling */
+        * {
+          -ms-overflow-style: none !important; /* IE 10+ */
+          scrollbar-width: none !important;     /* Firefox */
+        }
+        *::-webkit-scrollbar {
+          width: 0 !important;
+          height: 0 !important;
+        }
+        *::-webkit-scrollbar-thumb {
+          background-color: transparent !important;
+        }
+        html, body {
+          -ms-overflow-style: none !important;
+          scrollbar-width: none !important;
+        }
+        html::-webkit-scrollbar, body::-webkit-scrollbar {
+          width: 0 !important;
+          height: 0 !important;
+        }
+      }
+    `;
+    document.head.appendChild(style);
+
+    return () => {
+      try {
+        const existing = document.getElementById('a0-hide-scrollbars-desktop');
+        if (existing && existing.parentNode) existing.parentNode.removeChild(existing);
+      } catch {}
+    };
   }, []);
 
   return (
     <>
       {/* Full-width to capture scroll even when cursor is in the margins */}
-      <SafeAreaProvider style={{ flex: 1, backgroundColor: currentRoute === 'Splash' ? splashBG : colors.background }}>
+      <SafeAreaProvider style={{ flex: 1, backgroundColor: sideBackground }}>
         <Toaster />
-        {/* Show a translucent status bar to allow edge-to-edge content on Android */}
         <StatusBar
-          hidden={Platform.OS === 'android'}
-          translucent
-          backgroundColor="transparent"
-          barStyle={currentRoute === 'Splash' ? 'light-content' : (isDarkMode ? 'light-content' : 'dark-content')}
+          hidden={shouldHideStatusBar}
+          translucent={shouldHideStatusBar}
+          backgroundColor={statusBarBackground}
+          style={statusBarStyle}
           animated
         />
-        {/* Width-constrained content wrapper */}
-        <View style={styles.contentWrapper}>
-          <NavigationContainer
-            ref={navigationRef}
-            theme={isDarkMode ? NavDarkTheme : NavDefaultTheme}
-            onReady={() => {
-              const name = navigationRef.current?.getCurrentRoute()?.name;
-              if (name) setCurrentRoute(name);
-            }}
-            onStateChange={() => {
-              const name = navigationRef.current?.getCurrentRoute()?.name;
-              if (name) setCurrentRoute(name);
-            }}
-          >
-            <RootStack />
-          </NavigationContainer>
+        <View style={[styles.appShell, { backgroundColor: sideBackground }]}>
+          {/* Width-constrained content wrapper */}
+          <View style={[styles.contentWrapper, { backgroundColor: contentBackground, maxWidth: contentMaxWidth }]}>
+            <NavigationContainer
+              ref={navigationRef}
+              theme={isDarkMode ? NavDarkTheme : NavDefaultTheme}
+              onReady={() => {
+                const name = navigationRef.current?.getCurrentRoute()?.name;
+                if (name) setCurrentRoute(name);
+                applyRouteChrome(name);
+              }}
+              onStateChange={() => {
+                const name = navigationRef.current?.getCurrentRoute()?.name;
+                if (name) {
+                  setCurrentRoute(name);
+                }
+
+                applyRouteChrome(name);
+
+              }}
+            >
+              <RootStack />
+            </NavigationContainer>
+          </View>
         </View>
       </SafeAreaProvider>
     </>
@@ -213,14 +479,20 @@ export default function App() {
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
       <ThemeProvider>
-        <AppInner />
+        <AccountProvider>
+          <AppInner />
+        </AccountProvider>
       </ThemeProvider>
     </GestureHandlerRootView>
   );
 }
 
 const styles = StyleSheet.create({
-  // Wrapper that centres the actual app column but lets the SafeAreaProvider span
+  appShell: {
+    flex: 1,
+    width: '100%',
+    alignItems: 'center',
+  },
   contentWrapper: {
     flex: 1,
     userSelect: 'none',

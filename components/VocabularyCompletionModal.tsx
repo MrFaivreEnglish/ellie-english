@@ -1,10 +1,14 @@
-import React, { useEffect } from 'react';
-import { View, Text, Pressable, Modal, ScrollView, StyleSheet, Platform, Image, StatusBar } from 'react-native';
+import React, { useEffect, useRef, useState } from 'react';
+import { View, Text, Pressable, Modal, ScrollView, StyleSheet, Platform, Image, Animated, ImageStyle } from 'react-native';
 import { GameState } from '../types/VocabularyTypes';
-import { Audio } from 'expo-av';
+import { useAudioPlayer } from 'expo-audio';
+import { LinearGradient } from 'expo-linear-gradient';
 
-import TimerfireImg from '../assets/Timerfire.png';
+import TimerfireImg from '../assets/timerfire.png';
 import ShootingStarImg from '../assets/shooting-star.png';
+// Prefer importing compiled asset entries from the centralized assets registry.
+import Assets from '../assets/index';
+import { SOUND_EFFECT_OPTIONS, replaySoundEffect } from '../utils/soundEffects';
 
 interface CompletionModalProps {
   visible: boolean;
@@ -14,13 +18,12 @@ interface CompletionModalProps {
   isDarkMode: boolean;
   onReplay: (activateTimerMode?: boolean) => void;
   isFirstCompletion: boolean;
-  colors: {
-    buttonBackground: string;
-    buttonText: string;
-  };
   isPersonalBest: boolean;
-  // New: track if timer mode was started so we don't show the unlock card afterwards
   startedTimerMode: boolean;
+  bestTimeForActiveCategory?: number | null;
+  colors?: any;
+  primaryActionLabel?: string;
+  onPrimaryAction?: () => void;
 }
 
 export default function VocabularyCompletionModal({
@@ -33,29 +36,69 @@ export default function VocabularyCompletionModal({
   isFirstCompletion,
   isPersonalBest,
   colors,
-  startedTimerMode
+  startedTimerMode,
+  bestTimeForActiveCategory,
+  primaryActionLabel,
+  onPrimaryAction,
 }: CompletionModalProps) {
+  const bigSuccessPlayer = useAudioPlayer(Assets.bigsuccess, SOUND_EFFECT_OPTIONS);
+  const bestSuccessPlayer = useAudioPlayer(Assets.bestsuccess, SOUND_EFFECT_OPTIONS);
+
+  const backdropOpacity = useRef(new Animated.Value(0)).current;
+  const contentOpacity = useRef(new Animated.Value(0)).current;
+  const contentScale = useRef(new Animated.Value(0.98)).current;
+  const hasPlayedOpenSoundRef = useRef(false);
+  const [displayedPersonalBest, setDisplayedPersonalBest] = useState(isPersonalBest);
+
   useEffect(() => {
     if (visible) {
-      (async () => {
-        // choose best success for new personal best in timer mode, otherwise big success
-        const asset = (timerMode && isPersonalBest)
-          ? require('../assets/bestsuccess.mp3')
-          : require('../assets/bigsuccess.mp3');
-        await Audio.Sound.createAsync(asset, { shouldPlay: true });
-      })();
+      setDisplayedPersonalBest(isPersonalBest);
     }
-  }, [visible, timerMode, isPersonalBest]);
+  }, [isPersonalBest, visible]);
 
-  // Ensure the overlay goes under the Android status bar so background covers the bar.
-  const statusBarHeight = Platform.OS === 'android' && !visible ? StatusBar.currentHeight || 0 : 0;
+  useEffect(() => {
+    if (!visible) {
+      hasPlayedOpenSoundRef.current = false;
+      return;
+    }
 
-  // add time formatter
-  const formatTime = (secs: number) => {
-    const m = Math.floor(secs / 60);
-    const s = secs % 60;
-    return `${m}:${s < 10 ? '0' + s : s}`;
+    if (hasPlayedOpenSoundRef.current) return;
+    hasPlayedOpenSoundRef.current = true;
+
+    const player = timerMode && isPersonalBest ? bestSuccessPlayer : bigSuccessPlayer;
+    replaySoundEffect(player);
+  }, [bigSuccessPlayer, bestSuccessPlayer, isPersonalBest, visible, timerMode]);
+
+  useEffect(() => {
+    if (visible) {
+      Animated.parallel([
+        Animated.timing(backdropOpacity, { toValue: 1, duration: 300, useNativeDriver: true }),
+        Animated.timing(contentOpacity, { toValue: 1, duration: 320, delay: 80, useNativeDriver: true }),
+        Animated.spring(contentScale, { toValue: 1, friction: 9, useNativeDriver: true }),
+      ]).start();
+    } else {
+      Animated.parallel([
+        Animated.timing(contentOpacity, { toValue: 0, duration: 180, useNativeDriver: true }),
+        Animated.timing(backdropOpacity, { toValue: 0, duration: 240, useNativeDriver: true }),
+        Animated.timing(contentScale, { toValue: 0.98, duration: 200, useNativeDriver: true }),
+      ]).start();
+    }
+  }, [visible, backdropOpacity, contentOpacity, contentScale]);
+
+  const formatTime = (totalMs: number) => {
+    const safeMs = Math.max(0, Math.floor(totalMs));
+    const minutes = Math.floor(safeMs / 60000);
+    const seconds = Math.floor((safeMs % 60000) / 1000);
+    const ss = seconds < 10 ? `0${seconds}` : `${seconds}`;
+
+    return `${minutes}:${ss}`;
   };
+
+  const gradientColors: [string, string, string] = [
+    'rgba(0,0,0,0.18)',
+    'rgba(0,0,0,0.60)',
+    'rgba(0,0,0,0.95)',
+  ];
 
   return (
     <Modal
@@ -63,42 +106,62 @@ export default function VocabularyCompletionModal({
       transparent={true}
       animationType="fade"
       statusBarTranslucent={true}
+      presentationStyle="overFullScreen"
+      hardwareAccelerated
     >
-      <View style={[styles.completionMessage, { paddingTop: statusBarHeight }] }>
-        <ScrollView 
-          style={styles.completionScrollView}
-          contentContainerStyle={styles.completionScrollViewContent}
-          showsVerticalScrollIndicator={true}
+      {/* Full-screen gradient backdrop */}
+      <Animated.View
+        style={[
+          StyleSheet.absoluteFill,
+          { zIndex: 99999, elevation: 99999, opacity: backdropOpacity }
+        ]}
+        pointerEvents={visible ? 'auto' : 'none'}
+      >
+        <LinearGradient
+          style={StyleSheet.absoluteFill}
+          colors={gradientColors}
+          start={[0.5, 0]}
+          end={[0.5, 1]}
+        />
+
+        <Animated.View
+          // Center content on web while preserving the original flex behavior on native
+          style={[
+            { opacity: contentOpacity, transform: [{ scale: contentScale }] },
+            Platform.OS === 'web'
+              ? { flex: 1, justifyContent: 'center', alignItems: 'center' }
+              : { flex: 1 },
+          ]}
         >
-          <>
+          {/* Full-screen scroll content overlapping notch/status bar */}
+          <ScrollView
+            style={styles.completionScrollView}
+            contentContainerStyle={styles.completionScrollViewContent}
+            showsVerticalScrollIndicator={true}
+          >
             {/* Congratulations message */}
-            <View style={[styles.congratsCard, { 
-              backgroundColor: '#45BB78',
-              borderColor: '#1b6a28', // darker shade for contrast
-              padding: 20,
-            }]}> 
+            <View style={[styles.congratsCard, {
+              backgroundColor: displayedPersonalBest ? '#f4b942' : '#45BB78',
+              borderColor: displayedPersonalBest ? '#B9770E' : '#1b6a28',
+              padding: displayedPersonalBest ? 28 : 20,
+            }, displayedPersonalBest && styles.personalBestCard]}>
               <Image
                 source={timerMode ? TimerfireImg : ShootingStarImg}
                 style={[
                   styles.congratsImage,
-                  // desktop: reduce a lot
-                  Platform.OS === 'web' && { width: 80, height: 80 },
-                  // native: slightly larger
-                  Platform.OS !== 'web' && { width: 120, height: 120 }
+                  (displayedPersonalBest
+                    ? { width: Platform.OS === 'web' ? 112 : 132, height: Platform.OS === 'web' ? 112 : 132 }
+                    : (Platform.OS === 'web' ? { width: 80, height: 80 } : { width: 120, height: 120 })) as ImageStyle
                 ]}
               />
-              <Text style={[styles.congratsTitle, { 
-                color: '#fff',
-                fontSize: 28,
-                marginVertical: 10,
-              }]}> {isPersonalBest ? 'New Personal Best!' : 'Great job!'} </Text>
-              <Text style={[styles.congratsDescription, { 
-                color: '#fff',
-                fontSize: 16,
-                marginBottom: 16,
-              }]}> {isPersonalBest ? 'Try again?' : `You've successfully matched all ${wordsLength} words!`} </Text>
+              <Text style={[styles.congratsTitle, { color: '#fff', fontSize: 28, marginVertical: 10 }]}>
+                {displayedPersonalBest ? 'New Best Time!' : 'Great job!'}
+              </Text>
+              <Text style={[styles.congratsDescription, { color: '#fff', fontSize: 16, marginBottom: 16 }]}>
+                {displayedPersonalBest ? 'That is your fastest match yet.' : `You've successfully matched all ${wordsLength} words!`}
+              </Text>
             </View>
-            
+
             {/* Unlock card (first completion) */}
             {isFirstCompletion && !timerMode && !startedTimerMode && (
               <View style={[styles.unlockCard, styles.goldenCard]}> 
@@ -107,105 +170,84 @@ export default function VocabularyCompletionModal({
                 <Text style={styles.unlockDescription}>Try timer mode for an extra challenge.</Text>
               </View>
             )}
-            
+
             {/* Metrics display (timer mode) */}
             {timerMode && (
               <View style={[styles.metricsContainer, {
                 backgroundColor: isDarkMode ? colors.card : '#fff',
                 borderColor: isDarkMode ? '#415a77' : 'rgba(0,0,0,0.1)'
-              }]}
-              >
+              }]}>
                 <View style={styles.metricBox}>
-                  <Text style={[styles.metricLabel, { color: isDarkMode ? '#a5d6a7' : '#666' }]}>
-                    Score
-                  </Text>
+                  <Text style={[styles.metricLabel, { color: isDarkMode ? '#a5d6a7' : '#666' }]}>Score</Text>
                   <Text style={[styles.metricValue, { color: isDarkMode ? '#fff' : '#333' }]}>{gameState.totalScore}</Text>
                 </View>
                 <View style={styles.metricBox}>
-                  <Text style={[styles.metricLabel, { color: isDarkMode ? '#a5d6a7' : '#666' }]}>
-                    Time
-                  </Text>
+                  <Text style={[styles.metricLabel, { color: isDarkMode ? '#a5d6a7' : '#666' }]}>Time</Text>
                   <Text style={[styles.metricValue, { color: isDarkMode ? '#fff' : '#333' }]}>{formatTime(gameState.timer)}</Text>
                 </View>
                 <View style={styles.metricBox}>
-                  <Text style={[styles.metricLabel, { color: isDarkMode ? '#a5d6a7' : '#666' }]}>
-                    Best
+                  <Text style={[styles.metricLabel, { color: isDarkMode ? '#a5d6a7' : '#666' }]}>Best</Text>
+                  <Text style={[styles.metricValue, { color: isDarkMode ? '#fff' : '#333' }]}>
+                    {bestTimeForActiveCategory != null ? formatTime(bestTimeForActiveCategory) : '--:--'}
                   </Text>
-                  <Text style={[styles.metricValue, { color: isDarkMode ? '#fff' : '#333' }]}>{gameState.bestTime != null ? formatTime(gameState.bestTime) : '--:--'}</Text>
                 </View>
               </View>
             )}
-            
+
+            {/* Spacer between the congrats/metrics and the replay button when user didn't beat time in timer mode */}
+            {timerMode && !displayedPersonalBest && (
+              <View style={styles.tryAgainSpacer} />
+            )}
+
             {/* Replay / Timer Mode button */}
             <Pressable
               style={({ pressed }) => [
                 styles.replayButton,
-                { backgroundColor: '#1671B6' },
+                { backgroundColor: colors?.primary ?? '#1671B6' },
                 pressed && { opacity: 0.8 }
               ]}
               onPress={() => {
+                if (onPrimaryAction) {
+                  onPrimaryAction();
+                  return;
+                }
+
                 const activateTimer = (isFirstCompletion && !timerMode) || timerMode;
                 onReplay(activateTimer);
               }}
             >
               <Text style={styles.replayButtonText}>
-                {isFirstCompletion && !timerMode
-                  ? 'Try\nTimer Mode!'
-                  : timerMode
-                    ? 'Beat Your Time!'
-                    : 'Play Again'}
+                {primaryActionLabel ?? (
+                  isFirstCompletion && !timerMode
+                    ? 'Try\nTimer Mode!'
+                    : timerMode
+                      ? 'Beat Your Time!'
+                      : 'Play Again'
+                )}
               </Text>
             </Pressable>
-          </>
-        </ScrollView>
-      </View>
+          </ScrollView>
+        </Animated.View>
+      </Animated.View>
     </Modal>
   );
 }
 
 const styles = StyleSheet.create({
-  completionMessage: {
-    position: 'absolute',
-    left: 0,
-    right: 0,
-    top: 0,
-    bottom: 0,
-    backgroundColor: 'rgba(0,0,0,0.7)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    zIndex: 1000,
-    elevation: 1000,
-    display: Platform.OS === 'web' ? 'flex' : undefined,
-    paddingHorizontal: 20,
-  },
   completionScrollView: {
     width: '100%',
-    maxHeight: '100%',
+    // On web, constrain to viewport height so centering works and long content can still scroll
+    maxHeight: Platform.OS === 'web' ? ('90vh' as any) : '100%',
   },
   completionScrollViewContent: {
     paddingVertical: 20,
-    paddingHorizontal: Platform.OS === 'web' ? 20 : 0,
+    paddingHorizontal: Platform.OS === 'web' ? 18 : 8,
     alignItems: 'center',
     justifyContent: 'center',
-    // make sure the scroll content fills native screens so centering works consistently
+    maxWidth: Platform.OS === 'web' ? 680 : '100%',
     minHeight: Platform.OS === 'web' ? 'auto' : '100%',
-  },
-  completionCard: {
-    backgroundColor: '#fff',
-    borderRadius: 24,
-    padding: 24,
-    width: '100%',
-    // on mobile allow full width, limit only on web
-    maxWidth: Platform.OS === 'web' ? 800 : undefined,
-    alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.4,
-    shadowRadius: 16,
-    elevation: 10,
-    marginBottom: 40,
-    borderWidth: 1,
-    borderColor: 'rgba(0,0,0,0.1)',
+    // Ensure the content doesn't try to stretch vertically on web
+    alignSelf: 'center',
   },
   congratsCard: {
     backgroundColor: '#E8F5E9',
@@ -218,10 +260,14 @@ const styles = StyleSheet.create({
     shadowRadius: 8,
     elevation: 5,
   },
-  congratsEmoji: {
-    fontSize: 40,
-    marginBottom: 16,
-    textAlign: 'center',
+  personalBestCard: {
+    minHeight: Platform.OS === 'web' ? 250 : 300,
+    borderWidth: 3,
+    shadowColor: '#f4b942',
+    shadowOpacity: 0.45,
+    shadowRadius: 14,
+    elevation: 9,
+    justifyContent: 'center',
   },
   congratsImage: {
     width: 110,
@@ -257,20 +303,24 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.2,
     shadowRadius: 4,
     elevation: 5,
-    backgroundColor: '#fff', // overridden at runtime
-    borderColor: 'rgba(0,0,0,0.1)', // overridden at runtime
   },
+  // Each metric gets equal horizontal space and centers its content
   metricBox: {
+    flex: 1,
     alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 6,
   },
   metricLabel: {
     fontSize: 16,
     fontWeight: '600',
     marginBottom: 4,
+    textAlign: 'center',
   },
   metricValue: {
     fontSize: 24,
     fontWeight: 'bold',
+    textAlign: 'center',
   },
   unlockCard: {
     backgroundColor: '#fff',
@@ -338,22 +388,14 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
+  tryAgainSpacer: {
+    // Add extra breathing room specifically for the try-again flow on timer mode
+    height: Platform.OS === 'web' ? 40 : 24,
+    width: '100%',
+  },
   replayButtonText: {
     color: '#fff',
     fontSize: 18,
-    fontWeight: 'bold',
-    textAlign: 'center',
-  },
-  celebrationCard: {
-    backgroundColor: '#45BB78',
-    borderRadius: 16,
-    padding: 16,
-    marginVertical: 16,
-    alignItems: 'center',
-  },
-  celebrationText: {
-    color: '#fff',
-    fontSize: 20,
     fontWeight: 'bold',
     textAlign: 'center',
   },

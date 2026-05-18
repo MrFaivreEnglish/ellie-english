@@ -1,8 +1,8 @@
 {
   "expo": {
-    "name": "Ellie - Learn English",
+    "name": "Ellie by MrFaivre",
     "slug": "ellie",
-    "version": "1.0.0",
+    "version": "2.0.0",
     "orientation": "portrait",
     "icon": "./assets/icony.png",
     "scheme": "ellie",
@@ -30,10 +30,27 @@
       "backgroundColor": "#00000000",
       "barStyle": "light-content"
     },
-    "web": {
-      "name": "Ellie - Learn English",
-      "shortName": "Ellie - Learn English"
+    "updates": {
+      "enabled": false
     },
+    "web": {
+      "name": "Ellie by MrFaivre",
+      "shortName": "Ellie",
+      "themeColor": "#1671B6",
+      "backgroundColor": "#ffffff",
+      "display": "standalone",
+      "scope": "/",
+      "startUrl": "/",
+      "favicon": "./assets/icony.png"
+    },
+    "plugins": [
+      "expo-asset",
+      "expo-font",
+      "expo-audio"
+    ],
+    "assetBundlePatterns": [
+      "**/*"
+    ],
     "extra": {
       "eas": {
         "projectId": "52c68ae6-5457-4bf8-897a-e9e76d521e63"
