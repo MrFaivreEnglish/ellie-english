@@ -2,6 +2,7 @@ const GeographyVocab = {
   id: '17',
   title: 'Geography',
   description: 'Learn vocabulary related to geographical features',  imageUrl: 'https://i.ibb.co/V0RM676M/geography-vocab.webp',
+  thumbnail: require('../../assets/thumbnails/geography-thumbnail.png'),
   flashcards: [
     {
       category: 'Landforms & Terrain ⛰️',

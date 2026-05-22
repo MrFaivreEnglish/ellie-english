@@ -3,6 +3,7 @@ const DateVocab = {
   title: 'Date',
   description: 'Days, months and common date words',
   imageUrl: 'https://i.ibb.co/wNdFcDkZ/date-vocab.webp',
+  thumbnail: require('../../assets/thumbnails/date-thumbnail.png'),
   flashcards: [
     {
       category: 'Months 📆',

@@ -3,6 +3,7 @@ const CookingVocab = {
   title: 'Cooking',
   description: 'Learn common cooking verbs, utensils and techniques',
   imageUrl: 'https://i.ibb.co/5WXq9bjy/Cooking.webp',
+  thumbnail: require('../../assets/thumbnails/cooking-thumbnail.png'),
   flashcards: [
     {
       category: 'Utensils & Tableware 🍽️',

@@ -3,6 +3,7 @@ const PersonalityLevel2Vocab = {
   title: 'Personality +',
   description: 'Intermediate personality adjectives and nuanced traits',
   imageUrl: 'https://i.ibb.co/JF8VZNNd/personality-Level-2.webp',
+  thumbnail: require('../../assets/thumbnails/personality-plus-thumbnail.png'),
   flashcards: [
       { english: 'Intelligent', french: 'Intelligent' },
     { english: 'Clever, Smart', french: 'Malin' },

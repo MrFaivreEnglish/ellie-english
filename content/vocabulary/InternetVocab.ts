@@ -2,6 +2,7 @@ const InternetVocab = {
   id: '18',
   title: 'Internet',
   description: 'Learn vocabulary related to digital technology and online activities',  imageUrl: 'https://i.ibb.co/J4XRqSV/internet-vocab.webp',
+  thumbnail: require('../../assets/thumbnails/the-internet-thumbnail.png'),
   flashcards: [
      { english: 'The Internet', french: 'Internet' },
     { english: 'The Web', french: 'Le Web' },

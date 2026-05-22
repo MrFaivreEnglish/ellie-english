@@ -3,6 +3,7 @@ const TimeVocab = {
   title: 'Time',
   description: 'Time vocabulary and expressions',
   imageUrl: 'https://i.ibb.co/DfFs8xc2/Time.webp',
+  thumbnail: require('../../assets/thumbnails/time-thumbnail.png'),
   flashcards: [
   { "english": "AM", "french": "du matin" },
   { "english": "PM", "french": "de l'après-midi / du soir" },

@@ -3,6 +3,7 @@ const OpinionLevel1Vocab = {
   title: 'Opinion Basics',
   description: 'Easy opinion phrases and adjectives to express simple viewpoints',
   imageUrl: 'https://i.ibb.co/bVCHwGt/Opinion-Vocabulary-Level-1.webp',
+  thumbnail: require('../../assets/thumbnails/opinion-level-1-thumbnail.png'),
   flashcards: [
     { "english": "Fun", "french": "amusant" },
     { "english": "Funny", "french": "drôle" },

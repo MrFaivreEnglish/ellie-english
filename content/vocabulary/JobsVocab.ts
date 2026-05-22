@@ -3,6 +3,7 @@ const JobsVocab = {
   title: 'Jobs',
   description: 'Learn vocabulary related to different professions and careers',
   imageUrl: 'https://i.ibb.co/mCxpWP39/Jobs-examples.webp',
+  thumbnail: require('../../assets/thumbnails/job-examples-thumbnail.png'),
   flashcards: [
     {
       category: 'Healthcare 🏥',

@@ -4,6 +4,7 @@ const ExtremeSportsVocab = {
   description: 'Learn vocabulary related to extreme and adventure sports',
   // Provide a canonical remote image as a reliable fallback for the lesson detail view
   imageUrl: 'https://i.ibb.co/8gBGbtXN/extreme-sports.webp',
+  thumbnail: require('../../assets/thumbnails/extreme-sports-thumbnail.png'),
   flashcards: [
     {
       category: 'Water Sports 🌊',

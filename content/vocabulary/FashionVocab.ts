@@ -3,6 +3,7 @@ const FashionVocab = {
   title: 'Fashion',
   description: 'Learn vocabulary related to fashion and clothing trends',
   imageUrl: 'https://i.ibb.co/CLcnMwH/Fashion-vocab-1.webp',
+  thumbnail: require('../../assets/thumbnails/fashion-thumbnail.png'),
   flashcards: [
     {
       category: 'Trendy & Stylish 🧥',

@@ -3,6 +3,7 @@ const OpinionLevel2Vocab = {
   title: 'Opinion +',
   description: 'Expand your ability to express opinions with linking phrases and justifications',
   imageUrl: 'https://i.ibb.co/jNHrhBy/Opinion-Level-2.webp',
+  thumbnail: require('../../assets/thumbnails/opinion-level-2-thumbnail.png'),
   flashcards: [
     { english: 'Perfect', french: 'Parfait' },
     { english: 'Ideal', french: 'Idéal' },

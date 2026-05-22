@@ -3,6 +3,7 @@ const DailyQuestionsVocab = {
   title: 'Daily questions',
   description: 'Common daily questions to practice speaking and comprehension',
   imageUrl: 'https://i.ibb.co/DBvGR9x/Daily-questions.webp',
+  thumbnail: require('../../assets/thumbnails/daily-questions-thumbnail.png'),
   flashcards: [
     { "english": "What's the English for…", "french": "Quel est le mot anglais pour…" },
     { "english": "What's your name?", "french": "Comment tu t'appelles ?" },

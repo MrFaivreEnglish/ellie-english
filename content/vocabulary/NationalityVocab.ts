@@ -3,6 +3,7 @@ const NationalityVocab = {
   title: 'Nationality',
   description: 'Basic nationalities and countries',
   imageUrl: 'https://i.ibb.co/HLJv5LFd/nationality.webp',
+  thumbnail: require('../../assets/thumbnails/nationality-thumbnail.png'),
   flashcards: [
     { "english": "British", "french": "britannique" },
     { "english": "Scottish", "french": "écossais" },

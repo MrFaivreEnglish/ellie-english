@@ -3,6 +3,7 @@ const UKVocab = {
   title: 'The UK',
   description: 'Learn the countries of the United Kingdom & Ireland and their capitals',
   imageUrl: 'https://i.ibb.co/v4HXKhvf/The-United-Kingdom-and-Ireland.webp',
+  thumbnail: require('../../assets/thumbnails/the-uk-and-ireland-thumbnail.png'),
   flashcards: [
     {
       category: 'Countries 🗺️',

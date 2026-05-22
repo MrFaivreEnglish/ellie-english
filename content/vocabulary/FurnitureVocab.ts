@@ -2,6 +2,7 @@ const FurnitureVocab = {
   id: '25',
   title: 'Furniture',
   description: 'Learn vocabulary related to home furniture and furnishings',  imageUrl: 'https://i.ibb.co/4nsb5CV9/vocab-furniture-v2.webp',
+  thumbnail: require('../../assets/thumbnails/furniture-thumbnail.png'),
   flashcards: [
     {
       category: 'Living & Bedroom 🛏️',

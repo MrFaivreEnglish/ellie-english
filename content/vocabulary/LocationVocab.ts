@@ -3,6 +3,7 @@ const LocationVocab = {
   title: 'Location',
   description: 'Prepositions and location phrases',
   imageUrl: 'https://i.ibb.co/0RDVnn5Y/Location.webp',
+  thumbnail: require('../../assets/thumbnails/location-thumbnail.png'),
   flashcards: [
     { "english": "On the left", "french": "À gauche" },
     { "english": "On the right", "french": "À droite" },

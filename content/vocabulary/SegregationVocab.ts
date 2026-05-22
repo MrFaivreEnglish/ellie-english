@@ -3,6 +3,7 @@ const SegregationVocab = {
   title: 'Segregation',
   description: 'Vocabulary related to segregation, civil rights, and forms of protest (educational and age-appropriate).',
   imageUrl: 'https://i.ibb.co/d4yPjkWp/Segregation.webp',
+  thumbnail: require('../../assets/thumbnails/segregation-thumbnail.png'),
   flashcards: [
   { "english": "to separate", "french": "séparer" },
   { "english": "to oppress", "french": "opprimer" },

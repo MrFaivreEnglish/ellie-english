@@ -3,6 +3,7 @@ const HouseVocab = {
   title: 'House',
   description: 'Rooms and parts of a house',
   imageUrl: 'https://i.ibb.co/7J2Cp3J1/House.webp',
+  thumbnail: require('../../assets/thumbnails/house-thumbnail.png'),
   flashcards:[
 { english: 'Living room', french: 'Salon' },
 { english: 'Dining room', french: 'Salle à manger' },

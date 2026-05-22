@@ -3,6 +3,7 @@ const GettingAJobVocab = {
   title: 'Getting a job',
   description: 'Vocabulary and expressions for job applications and interviews',
   imageUrl: 'https://i.ibb.co/p6XxpJNp/Getting-a-job.webp',
+  thumbnail: require('../../assets/thumbnails/getting-a-job-thumbnail.png'),
   flashcards: [
     {
       category: 'Personal Qualities & Skills 💼',

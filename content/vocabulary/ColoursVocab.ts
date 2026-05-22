@@ -3,6 +3,7 @@ const ColoursVocab = {
   title: 'Colours',
   description: 'Key colour words in English with French translations',
   imageUrl: 'https://i.ibb.co/spNCbRvC/Colours.webp',
+  thumbnail: require('../../assets/thumbnails/colours-thumbnail.png'),
   flashcards: [
     {
       category: 'Main Colours 🎨',

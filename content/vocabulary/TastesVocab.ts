@@ -4,6 +4,7 @@ const TastesVocab = {
   description: 'Words to describe flavours',
   // Remote hero image used when opening the lesson. The list view will still use the local thumbnail mapping.
   imageUrl: 'https://i.ibb.co/j9WhGbg7/My-tastes.webp',
+  thumbnail: require('../../assets/thumbnails/likes-thumbnail.png'),
   flashcards: [
   { "english": "I love", "french": "J'adore" },
   { "english": "I really like", "french": "J'aime beaucoup" },

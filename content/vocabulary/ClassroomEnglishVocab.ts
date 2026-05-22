@@ -3,6 +3,7 @@ const ClassroomEnglishVocab = {
   title: 'Classroom English',
   description: 'Learn essential classroom vocabulary and phrases',
   imageUrl: 'https://i.ibb.co/W4CkT6TW/Classroom-English.webp',
+  thumbnail: require('../../assets/thumbnails/classroom-english-thumbnail.png'),
   flashcards: [
     { english: 'Read', french: 'Lire' },
     { english: 'Write', french: 'Écrire' },

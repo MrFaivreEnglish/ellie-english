@@ -5,27 +5,27 @@ import { BackHandler, View, Image, Platform, useWindowDimensions } from 'react-n
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import 'react-native-gesture-handler';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
-import SplashScreen from './screens/SplashScreen';
+import SplashScreen from './features/system/SplashScreen';
 import { StyleSheet } from 'react-native';
 import { SafeAreaProvider, useSafeAreaInsets } from "react-native-safe-area-context";
 import { Toaster } from 'sonner-native';
 import { MaterialIcons } from '@expo/vector-icons';
-import { ThemeProvider, useTheme } from './contexts/ThemeContext';
-import { AccountProvider } from './contexts/AccountContext';
-import HomeScreen from "./screens/HomeScreen";
-import GrammarScreen from "./screens/GrammarScreen";
-import VocabularyScreen from "./screens/VocabularyScreen";
-import LessonsScreen from "./screens/LessonsScreen";
-import VocabularyLessonScreen from "./screens/VocabularyLessonScreen";
-import SettingsScreen from "./screens/SettingsScreen";
-import AccountScreen from "./screens/AccountScreen";
-import AdminLessonPreviewScreen from "./screens/AdminLessonPreviewScreen";
+import { ThemeProvider, useTheme } from './features/settings/ThemeContext';
+import { AccountProvider } from './features/account/AccountContext';
+import HomeScreen from "./features/home/HomeScreen";
+import GrammarScreen from "./features/grammar/GrammarScreen";
+import VocabularyScreen from "./features/vocabulary/VocabularyScreen";
+import LessonsScreen from "./features/lessons/LessonsScreen";
+import VocabularyLessonScreen from "./features/vocabulary/VocabularyLessonScreen";
+import SettingsScreen from "./features/settings/SettingsScreen";
+import AccountScreen from "./features/account/AccountScreen";
+import AdminLessonPreviewScreen from "./features/lessons/AdminLessonPreviewScreen";
 import { Asset } from 'expo-asset';
 import { applyAppChrome, applyImmersiveMode, bindImmersiveOnForeground } from './lib/immersive';
-import FullImageScreen from './screens/FullImageScreen';
+import FullImageScreen from './features/shared/FullImageScreen';
 import { StatusBar } from 'expo-status-bar';
-import { getWebAppContentMaxWidth } from './utils/responsiveLayout';
-import { getMenuCopy } from './utils/menuCopy';
+import { getWebAppContentMaxWidth } from './features/shared/responsiveLayout';
+import { getMenuCopy } from './features/shared/menuCopy';
 
 const Tab = createBottomTabNavigator();
 const Stack = createNativeStackNavigator();
@@ -198,17 +198,14 @@ function AppInner() {
   const { width: windowWidth } = useWindowDimensions();
   const [currentRoute, setCurrentRoute] = React.useState<string>('Splash');
   const splashBG = '#1671B6';
-  const isDesktopWeb =
-    Platform.OS === 'web' &&
-    typeof window !== 'undefined' &&
-    window.matchMedia?.('(hover: hover) and (pointer: fine)').matches;
+  const shinySplashBG = '#f4b942';
+  const isSplashRoute = currentRoute === 'Splash';
+  const splashRouteBackground = isShinyEllieMode ? shinySplashBG : splashBG;
   const sideBackground =
-    currentRoute === 'Splash'
-      ? isDesktopWeb && isShinyEllieMode
-        ? '#f4b942'
-        : splashBG
+    isSplashRoute
+      ? splashRouteBackground
       : colors.background;
-  const contentBackground = currentRoute === 'Splash' ? splashBG : colors.background;
+  const contentBackground = isSplashRoute ? splashRouteBackground : colors.background;
   const contentMaxWidth = getWebAppContentMaxWidth(windowWidth);
   const isImmersiveRoute = currentRoute === 'Splash' || currentRoute === 'FullImageModal';
   const showAppStatusBar = Platform.OS !== 'android' || isAndroidStatusBarEnabled;

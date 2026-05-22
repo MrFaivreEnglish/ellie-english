@@ -58,12 +58,13 @@ export const thirdGradeChapters: ChapterCategory = {
       ],
     },
     {
-      title: 'Chapter 6: Us against the world',
-      url: 'https://digipad.app/p/929952/8168a61b6f0cf',
+      title: 'Chapter 6: What a wonderful world?',
+      url: 'https://digipad.app/p/1717464/3b9c6505721588',
       appLinks: [
-        { label: 'Bullying', target: 'vocabulary', lessonTitle: 'Bullying' },
-        { label: 'Fréquence', target: 'grammar', lessonTitle: 'Adverbes de fréquence' },
-        { label: 'Should', target: 'grammar', lessonTitle: 'Should' },
+        { label: 'Dystopia', target: 'vocabulary', lessonTitle: 'Dystopia' },
+        { label: 'Conditionnel 2', target: 'grammar', lessonTitle: 'Conditionnel 2' },
+        { label: 'Must et Have to', target: 'grammar', lessonTitle: 'Must et Have to' },
+        { label: 'Can & Be Able To', target: 'grammar', lessonTitle: 'Can & Be Able To' },
         { label: 'Opinions', target: 'pronunciation', lessonTitle: 'Say your opinion' },
       ],
     },

@@ -3,6 +3,7 @@ const PhysicalDescriptionVocab = {
   title: 'Physical Description',
   description: "Words to describe people's appearance",
   imageUrl: 'https://i.ibb.co/4Cy7ggw/physical-description.webp',
+  thumbnail: require('../../assets/thumbnails/physical-description-thumbnail.png'),
   flashcards: [
     {
       category: 'Hair 💇‍♂️',

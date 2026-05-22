@@ -1,6 +1,7 @@
 const BodyVocab = {
   id: '22',
   title: 'Body',  description: 'Learn vocabulary related to human body parts',  imageUrl: 'https://i.ibb.co/1fBZmGFm/Body.webp',
+  thumbnail: require('../../assets/thumbnails/body-thumbnail.png'),
   flashcards:[
     {
       category: 'Head & Face 🙂',

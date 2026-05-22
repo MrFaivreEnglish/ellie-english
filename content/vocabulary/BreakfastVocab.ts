@@ -2,6 +2,7 @@ const BreakfastVocab = {
   id: '6',
   title: 'Breakfast',
   description: 'Learn vocabulary related to breakfast and morning meals',  imageUrl: 'https://i.ibb.co/sdpKmrrP/Breakfast-vocab-full.webp',
+  thumbnail: require('../../assets/thumbnails/breakfast-thumbnail.png'),
   flashcards: [
     {
       category: 'Pastries & Breads 🥐',

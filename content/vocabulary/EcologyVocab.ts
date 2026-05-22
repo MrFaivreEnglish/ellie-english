@@ -2,6 +2,7 @@ const EcologyVocab = {
   id: '27',
   title: 'Ecology',
   description: 'Learn vocabulary related to environment and conservation',  imageUrl: 'https://i.ibb.co/LdHkDWTs/Ecology.webp',
+  thumbnail: require('../../assets/thumbnails/ecology-thumbnail.png'),
   flashcards: [
     {
       category: 'Core Concepts & Nature 🌿',

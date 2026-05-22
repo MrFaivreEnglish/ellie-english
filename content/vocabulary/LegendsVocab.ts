@@ -2,6 +2,7 @@ const LegendsVocab = {
   id: '38',
   title: 'Legends',
   description: 'Learn vocabulary related to mythology and folklore',  imageUrl: 'https://i.ibb.co/VpPS7LHp/Legends.webp',
+  thumbnail: require('../../assets/thumbnails/legends-thumbnail.png'),
   flashcards: [
     { english: 'A queen', french: 'Une reine' },
     { english: 'A king', french: 'Un roi' },

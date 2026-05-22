@@ -40,7 +40,7 @@ import SuperlativeGrammar from '../grammar/SuperlativeGrammar';
 import SuperlativeInferiorityGrammar from '../grammar/SuperlativeInferiorityGrammar';
 import WordTypesGrammar from '../grammar/WordTypesGrammar';
 import WouldLikeGrammar from '../grammar/WouldLikeGrammar';
-import { ExerciseMode, isReorderExercise, tokenizeTranslateAnswer } from '../../screens/grammarExercises/GrammarExerciseUtils';
+import { ExerciseMode, isReorderExercise, tokenizeTranslateAnswer } from '../../features/grammar/grammarExercises/GrammarExerciseUtils';
 
 type LessonModeConfig = {
   fill: boolean;

@@ -2,6 +2,7 @@ const DetectiveVocab = {
   id: '39',
   title: 'Detective',
   description: 'Learn vocabulary related to detective work and investigations',  imageUrl: 'https://i.ibb.co/JRmPTdXC/Detective-stories.webp',
+  thumbnail: require('../../assets/thumbnails/detective-stories-thumbnail.png'),
   flashcards: [
      { english: `Detective`, french: `Détective` },
     { english: `Blood`, french: `Sang` },

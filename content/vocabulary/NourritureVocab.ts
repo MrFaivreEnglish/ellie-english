@@ -1,5 +1,6 @@
 const NourritureVocab = {  id: '45',  title: 'Food Basics',
   description: 'Learn vocabulary related to food, meals, and cooking',  imageUrl: 'https://i.ibb.co/0LR1yGM/vocab-food.webp',
+  thumbnail: require('../../assets/thumbnails/food-basics-thumbnail.png'),
   flashcards: [
     {
       category: 'Vegetables 🥦',

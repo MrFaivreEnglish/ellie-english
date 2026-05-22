@@ -2,7 +2,7 @@
 
 The app supports optional personal accounts for syncing XP between devices. Guest mode still works without Supabase.
 
-Students see a simple username/password form. They do not choose a display name; the app uses the username as the account name. Internally, the app turns usernames into private Supabase auth emails like:
+Students see a simple username/password form. The username is the stable login name. The visible account display name starts as the username and can be edited later from the account screen. Internally, the app turns usernames into private Supabase auth emails like:
 
 ```txt
 username@ellie-students.example.com
@@ -167,10 +167,13 @@ For mobile testing, use the same hosted Supabase URL and run `npm start`.
 - No account is required.
 - XP is always saved locally on the device first.
 - Vocabulary learnt cards, grammar saved answers, timer bests, and Shiny Ellie unlocks are also saved locally on the device first.
-- Creating an account uploads the current device XP and local progress backup. It does not erase local saved work.
-- Signing in merges local and cloud XP by keeping the higher value.
-- Signing in merges local and cloud progress by keeping saved grammar answers, learnt vocabulary cards, unlocked achievements, and the fastest timer records.
-- Signing into a different account does not erase local saved work. The device and online work are combined.
+- Account preferences are also backed up: theme, practice modes, language, haptics, Today card, avatar, and avatar colour.
+- The visible account display name is saved in the online profile. Changing it does not change the username used to log in.
+- Creating an account starts a fresh online progress record. It does not copy XP or unlocks left on the shared device.
+- Signing in loads the account's online XP onto the device.
+- Signing in only merges local work when that local work is already marked as belonging to the same signed-in account.
+- Signing in applies the account's saved preferences when they exist. If the account has no saved preferences yet, the current device preferences are uploaded.
+- Signing into a different account does not copy the device's previous XP, unlocked achievements, or saved work into that account.
 - Signing out restores the device progress that existed before login. If there was no previous device progress, the device looks empty. The online copy stays in Supabase.
 - Reset saved work clears XP, grammar answers, learnt vocabulary cards, timer bests, and the hidden unlock state. If signed in, the online copy for that account is reset too.
 - Deleting an online account removes the Supabase account and cloud profile. Local progress stays on the device.
@@ -184,7 +187,8 @@ The account panel shows simple states:
 - Saving an online copy: sync is running.
 - Backup did not work: the student can tap Try again.
 
-When progress is merged, the app keeps the biggest XP number, combines saved grammar answers and learnt words, and keeps the fastest timer records.
+When progress belongs to the same signed-in account, the app keeps the biggest XP number, combines saved grammar answers and learnt words, and keeps the fastest timer records.
+While signed in, XP, saved grammar answers, learnt vocabulary cards, timer records, Shiny Ellie progress, avatar choices, and settings changes are saved online automatically for that account. The Sync button still exists as a manual retry/full backup action.
 
 ## Password recovery
 

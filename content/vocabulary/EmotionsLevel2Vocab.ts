@@ -1,8 +1,9 @@
 const EmotionsLevel2Vocab = {
   id: '207',
-  title: 'Emotions Level 2',
+  title: 'Emotions Plus',
   description: 'Advanced emotions vocabulary with nuanced feelings and expressions',
   imageUrl: 'https://i.ibb.co/6c2cc9ZB/emotions-Level-2.webp',
+  thumbnail: require('../../assets/thumbnails/emotions-level-2-thumbnail.png'),
   flashcards:[
     {
       category: 'Positive Emotions 🙂',

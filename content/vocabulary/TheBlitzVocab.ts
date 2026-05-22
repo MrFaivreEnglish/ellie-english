@@ -3,6 +3,7 @@ const TheBlitzVocab = {
   title: 'The Blitz',
   description: 'Key vocabulary related to life during The Blitz (WWII).',
   imageUrl: 'https://i.ibb.co/1fmLw2XY/Blitz.webp',
+  thumbnail: require('../../assets/thumbnails/blitzthumbnail.png'),
   flashcards: [
     { english: 'A soldier', french: 'Un soldat' },
     { english: 'The army', french: "L'armée" },

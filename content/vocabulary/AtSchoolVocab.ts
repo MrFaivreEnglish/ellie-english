@@ -3,6 +3,7 @@ const AtSchoolVocab = {
   title: 'School Basics',
   description: 'Learn vocabulary related to school supplies and subjects',
   imageUrl: 'https://i.ibb.co/XxcW0g8y/School-basics.webp',
+  thumbnail: require('../../assets/thumbnails/school-basics-thumbnail.png'),
   flashcards: [
     {
       category: 'School Supplies ✏️',

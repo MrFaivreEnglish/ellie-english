@@ -2,7 +2,7 @@ const PronouncingEDGrammar = {
   id: 'ED-1',
   title: 'Pronouncing ED',
   description: 'Master the pronunciation of -ed endings: /t/, /d/, /ɪd/ with clear examples.',
-  imageUrl: 'https://i.ibb.co/rf11mY1f/Pronounciation.png',
+  imageUrl: 'https://i.ibb.co/5g87gJJy/Prononcer-ED.png',
 
   exercises: [
     // /t/ sound

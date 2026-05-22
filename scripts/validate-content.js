@@ -13,18 +13,14 @@ const assetIndexPaths = [
   path.join(rootDir, 'assets', 'index.js'),
 ];
 const vocabularyRegistryPath = path.join(rootDir, 'content', 'lessons', 'vocabularyRegistry.ts');
-const vocabularyScreenPath = path.join(rootDir, 'screens', 'VocabularyScreen.tsx');
+const vocabularyScreenPath = path.join(rootDir, 'features', 'vocabulary', 'VocabularyScreen.tsx');
 const scanRoots = [
   'App.tsx',
   'assets/index.js',
   'assets/index.ts',
-  'components',
-  'contexts',
   'content',
-  'hooks',
+  'features',
   'lib',
-  'screens',
-  'utils',
   'README.md',
   'package.json',
   'tsconfig.json',

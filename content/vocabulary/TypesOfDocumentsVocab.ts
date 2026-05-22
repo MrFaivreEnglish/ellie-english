@@ -3,6 +3,7 @@ const TypesOfDocumentsVocab = {
   title: 'Types of documents',
   description: 'Common document names and vocabulary for real-world tasks',
   imageUrl: 'https://i.ibb.co/9kYGDDk7/Types-of-documents.webp',
+  thumbnail: require('../../assets/thumbnails/typesdocs-thumbnail.png'),
   flashcards: [
   { "english": "an article", "french": "un article" },
   { "english": "a letter", "french": "une lettre" },

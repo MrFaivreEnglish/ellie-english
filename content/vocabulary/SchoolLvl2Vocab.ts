@@ -2,6 +2,7 @@ const SchoolLvl2Vocab = {
   id: '204',
   title: 'School life',
   imageUrl: 'https://i.ibb.co/Y4LmMVjP/School-lvl-2.webp',
+  thumbnail: require('../../assets/thumbnails/school-life-thumbnail.png'),
   description: 'More advanced school vocabulary: subjects, classrooms and school activities',
   flashcards: [
   { "english": "A college", "french": "Une université" },

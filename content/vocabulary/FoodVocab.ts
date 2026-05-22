@@ -1,5 +1,6 @@
 const FoodVocab = {  id: '35',  title: 'American Dishes',
   description: 'Learn vocabulary related to food, cooking, and dining',  imageUrl: 'https://i.ibb.co/q3TvXbSD/American-dishes.webp',
+  thumbnail: require('../../assets/thumbnails/american-dishes-thumbnail.png'),
   flashcards: [
     {
       category: 'Fruits & Vegetables 🥗',

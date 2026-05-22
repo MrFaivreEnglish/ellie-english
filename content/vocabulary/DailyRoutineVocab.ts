@@ -3,6 +3,7 @@ const DailyRoutineVocab = {
   title: 'Daily Routine',
   description: 'Common verbs and phrases for daily routine',
   imageUrl: 'https://i.ibb.co/pr6b7j1N/daily-routine.webp',
+  thumbnail: require('../../assets/thumbnails/daily-routine-thumbnail.png'),
   flashcards: [
 { "english": "To wake up", "french": "Se réveiller" },
 { "english": "To get up", "french": "Se lever" },

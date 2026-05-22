@@ -65,8 +65,8 @@ translateExercises: [
   type: 'translate',
   question: 'Translate into English.',
   prompt: "Les devoirs n'ont pas été corrigés.",
-  answer: "The homework assignments were not corrected.",
-  wordBank: ["The", "homework", "assignments", "were", "not", "corrected.", "was"]
+  answer: "The homework was not corrected.",
+  wordBank: ["The", "homework", "were", "not", "corrected.", "was"]
 },
 {
   type: 'translate',

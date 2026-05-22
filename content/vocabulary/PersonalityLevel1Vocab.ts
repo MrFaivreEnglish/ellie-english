@@ -3,6 +3,7 @@ const PersonalityLevel1Vocab = {
   title: 'Personality Basics',
   description: 'Beginner-friendly personality adjectives and simple character words',
   imageUrl: 'https://i.ibb.co/ccz0VjyX/personality-Level-1.webp',
+  thumbnail: require('../../assets/thumbnails/personality-thumbnail.png'),
   flashcards: [
     { "english": "Intelligent", "french": "intelligent" },
     { "english": "Clever, Smart", "french": "malin" },

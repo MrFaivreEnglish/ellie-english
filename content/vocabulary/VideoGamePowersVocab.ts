@@ -3,6 +3,7 @@ const VideoGamePowersVocab = {
   title: 'Video game powers',
   description: 'Powers and special abilities commonly found in video games',
   imageUrl: 'https://i.ibb.co/5XCFgjgq/Video-game-powers.webp',
+  thumbnail: require('../../assets/thumbnails/video-game-actions-thumbnail.png'),
   flashcards: [
     { "english": "(to) run really fast", "french": "courir très vite" },
     { "english": "(to) fly", "french": "voler" },

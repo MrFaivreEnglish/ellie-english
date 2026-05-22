@@ -3,6 +3,7 @@ const CityTravelVocab = {
   title: 'City Travel',
   description: 'Learn vocabulary for navigating and exploring cities',
   imageUrl: 'https://i.ibb.co/pB891gS6/In-the-city-vocab.webp',
+  thumbnail: require('../../assets/thumbnails/city-travel-thumbnail.png'),
   flashcards: [
 {
   category: 'Parts of the city 🏙️',

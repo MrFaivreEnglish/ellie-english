@@ -15,6 +15,7 @@ import DailyRoutineVocab from '../vocabulary/DailyRoutineVocab';
 import DateVocab from '../vocabulary/DateVocab';
 import DescribingPictureVocab from '../vocabulary/DescribingPictureVocab';
 import DetectiveVocab from '../vocabulary/DetectiveVocab';
+import DystopiaVocab from '../vocabulary/DystopiaVocab';
 import EcologyVocab from '../vocabulary/EcologyVocab';
 import EmotionsLevel2Vocab from '../vocabulary/EmotionsLevel2Vocab';
 import EmotionsVocab from '../vocabulary/EmotionsVocab';
@@ -109,6 +110,7 @@ export const vocabularyCategories: Array<{ title: string; lessons: any[] }> = [
       withDescription(AtSchoolVocab, 'Use words for school life.'),
       withDescription(SchoolLvl2Vocab, 'Talk more about school and class.'),
       withDescription(ClothesVocab, 'Name clothes and what people wear.'),
+      withDescription(FashionVocab, 'Talk about fashion and style.'),
       withDescription(HouseVocab, 'Talk about rooms at home.'),
       withDescription(FurnitureVocab, 'Name things you find in a house.'),
     ],
@@ -154,11 +156,11 @@ export const vocabularyCategories: Array<{ title: string; lessons: any[] }> = [
     title: 'History & Society',
     lessons: [
       withDescription(DetectiveVocab, 'Use words from detective stories.'),
+      withDescription(DystopiaVocab, 'Talk about control, freedom, and rebellion in dystopian stories.'),
       withDescription(TheBlitzVocab, 'Talk about the Blitz.'),
       withDescription(SegregationVocab, 'Use words about segregation and rights.'),
       withDescription(BullyingVocab, 'Talk about bullying.'),
       withDescription(InternetVocab, 'Talk about the internet and online life.'),
-      withDescription(FashionVocab, 'Talk about fashion and style.'),
     ],
   },
   {

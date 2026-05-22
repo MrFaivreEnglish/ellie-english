@@ -3,6 +3,7 @@ const FamilyVocab = {
   title: 'Family',
   description: 'Family members',
   imageUrl: 'https://i.ibb.co/8gkbjjjq/Family.webp',
+  thumbnail: require('../../assets/thumbnails/family-thumbnail.png'),
   flashcards: [
          { english: 'Father', french: 'Père' },
         { english: 'Mother', french: 'Mère' },

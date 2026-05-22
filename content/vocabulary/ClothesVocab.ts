@@ -2,6 +2,7 @@ const ClothesVocab = {
   id: '37',
   title: 'Clothes',
   description: 'Learn vocabulary related to clothing and fashion',  imageUrl: 'https://i.ibb.co/7tD3k6Gk/clothes-vocab.webp', // Updated inside image
+  thumbnail: require('../../assets/thumbnails/clothes-thumbnail.png'),
   flashcards: [
     {
       category: 'Tops & Outerwear 🧥',

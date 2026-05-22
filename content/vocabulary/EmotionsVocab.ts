@@ -3,6 +3,7 @@ const EmotionsVocab = {
   title: 'Emotions',
   description: 'Learn vocabulary related to feelings and emotions',
   imageUrl: 'https://i.ibb.co/XkV4tkxD/emotions-level-1.webp',
+  thumbnail: require('../../assets/thumbnails/emotions-easy-thumbnail.png'),
   flashcards:[
     {
       category: 'Positive Emotions 🙂',

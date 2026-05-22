@@ -2,6 +2,7 @@ const SpaceVocab = {
   id: '41',
   title: 'Space',
   description: 'Learn vocabulary related to astronomy and space exploration',  imageUrl: 'https://i.ibb.co/7dhkKvv0/Space.webp',
+  thumbnail: require('../../assets/thumbnails/space-thumbnail.png'),
   flashcards: [
     {
       category: 'Celestial Bodies 🌌',

@@ -2,6 +2,7 @@ const BullyingVocab = {
   id: '313',
   title: 'Bullying',
   description: 'Learn vocabulary related to bullying awareness and prevention',  imageUrl: 'https://i.ibb.co/5XscZP7V/Bullying.webp',
+  thumbnail: require('../../assets/thumbnails/bullying-thumbnail.png'),
   flashcards: [
   { english: `Be nice with someone`, french: `Être gentil avec quelqu'un` },
     { english: `Hang out with someone`, french: `Sortir avec quelqu'un` },
