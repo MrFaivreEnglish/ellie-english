@@ -2,34 +2,7 @@
   "expo": {
     "name": "Ellie by MrFaivre",
     "slug": "ellie",
-    "version": "2.0.0",
-    "orientation": "portrait",
-    "icon": "./assets/icony.png",
-    "scheme": "ellie",
-    "splash": {
-      "image": "./assets/icony.png",
-      "backgroundColor": "#1671B6",
-      "resizeMode": "contain"
-    },
-    "ios": {
-      "bundleIdentifier": "com.ellie.app",
-      "supportsTablet": true,
-      "infoPlist": {
-        "CFBundleDisplayName": "Ellie - Learn English"
-      }
-    },
-    "android": {
-      "package": "com.ellie.app",
-      "adaptiveIcon": {
-        "foregroundImage": "./assets/icony.png",
-        "backgroundColor": "#1671B6"
-      }
-    },
-    "androidStatusBar": {
-      "translucent": true,
-      "backgroundColor": "#00000000",
-      "barStyle": "light-content"
-    },
+    "version": "2.2.0",
     "updates": {
       "enabled": false
     },
@@ -43,15 +16,12 @@
       "startUrl": "/",
       "favicon": "./assets/icony.png"
     },
-    "plugins": [
-      "expo-asset",
-      "expo-font",
-      "expo-audio"
-    ],
     "assetBundlePatterns": [
       "**/*"
     ],
     "extra": {
+      "supabaseUrl": "https://wretggbpaejzjdilemit.supabase.co",
+      "supabaseAnonKey": "sb_publishable_kX5uIGO8QFf4JH1oOlUfeA_0x0BCg2C",
       "eas": {
         "projectId": "52c68ae6-5457-4bf8-897a-e9e76d521e63"
       }

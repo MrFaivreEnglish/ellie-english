@@ -29,7 +29,7 @@ import {
   type AccountPreferenceSnapshot,
 } from '../account/accountPreferencesStorage';
 
-type Colors = {
+export type ThemeColors = {
   background: string;
   card: string;
   surface: string;
@@ -54,7 +54,7 @@ type Colors = {
 
 type ThemeContextType = {
   isDarkMode: boolean;
-  colors: Colors;
+  colors: ThemeColors;
   toggleTheme: () => void;
   isGrammarGameMode: boolean;
   toggleGrammarGameMode: () => void;
@@ -93,7 +93,7 @@ type ThemeContextType = {
   applyAccountPreferences: (snapshot: AccountPreferenceSnapshot) => void;
 };
 
-const lightColors: Colors = {
+const lightColors: ThemeColors = {
   background: '#f5f5f5',
   card: '#ffffff',
   surface: '#F4F8FC',
@@ -116,27 +116,27 @@ const lightColors: Colors = {
   buttonText: '#ffffff',
 };
 
-const darkColors: Colors = {
-  background: '#0D1B2A',
-  card: '#1B263B',
-  surface: '#22324A',
-  surfaceAlt: '#2B405C',
-  text: '#F2F6FA',
-  secondaryText: '#B8C5D3',
-  border: '#3A506B',
-  borderStrong: '#58708E',
-  primary: '#45B7D1',
-  primarySoft: '#17384B',
-  success: '#6FD08C',
-  successSoft: '#1D3A2A',
-  successText: '#C4F4D1',
-  danger: '#FF8A9A',
-  dangerSoft: '#46242C',
-  dangerText: '#FFD8DE',
-  warning: '#F2C35C',
-  warningSoft: '#3F321A',
-  buttonBackground: '#45B7D1',
-  buttonText: '#ffffff',
+const darkColors: ThemeColors = {
+  background: '#071A2D',
+  card: '#0D2742',
+  surface: '#123B61',
+  surfaceAlt: '#1B527F',
+  text: '#F7FAFF',
+  secondaryText: '#C9DDF0',
+  border: '#2A5C84',
+  borderStrong: '#5BA9DD',
+  primary: '#86D1FF',
+  primarySoft: '#143A67',
+  success: '#7ADB9E',
+  successSoft: '#123E36',
+  successText: '#D6FBE4',
+  danger: '#FF8BA1',
+  dangerSoft: '#4F2135',
+  dangerText: '#FFE0E7',
+  warning: '#FFD36D',
+  warningSoft: '#493912',
+  buttonBackground: '#276EE6',
+  buttonText: '#FFFFFF',
 };
 
 export const ThemeContext = createContext<ThemeContextType>({

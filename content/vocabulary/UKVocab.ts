@@ -9,21 +9,21 @@ const UKVocab = {
       category: 'Countries 🗺️',
       words: [
         { english: 'The United Kingdom', french: 'Le Royaume-Uni' },
-        { english: 'Ireland', french: 'Irlande' },
-        { english: 'Wales', french: 'Pays de Galles' },
-        { english: 'England', french: 'Angleterre' },
-        { english: 'Northern Ireland', french: 'Irlande du Nord' },
-        { english: 'Scotland', french: 'Écosse' }
+        { english: 'Ireland', french: "L'Irlande" },
+        { english: 'Wales', french: 'Le Pays de Galles' },
+        { english: 'England', french: "L'Angleterre" },
+        { english: 'Northern Ireland', french: "L'Irlande du Nord" },
+        { english: 'Scotland', french: "L'Écosse" }
       ]
     },
     {
       category: 'Capitals 🏛️',
       words: [
-        { english: 'London', french: 'the capital of England' },
-        { english: 'Dublin', french: 'the capital of Ireland' },
-        { english: 'Edinburgh', french: 'the capital of Scotland' },
-        { english: 'Cardiff', french: 'the capital of Wales' },
-        { english: 'Belfast', french: 'the capital of Northern Ireland' }
+        { english: 'London', french: "Capitale de l'Angleterre" },
+        { english: 'Dublin', french: "Capitale de l'Irlande" },
+        { english: 'Edinburgh', french: "Capitale de l'Écosse" },
+        { english: 'Cardiff', french: 'Capitale du Pays de Galles' },
+        { english: 'Belfast', french: "Capitale de l'Irlande du Nord" }
       ]
     }
   ]

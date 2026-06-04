@@ -3,6 +3,12 @@ import type { ImageSourcePropType } from 'react-native';
 
 export type AccountAvatarId =
   | 'spark'
+  | 'check'
+  | 'tips'
+  | 'retry'
+  | 'target'
+  | 'timer'
+  | 'keyboard'
   | 'rocket'
   | 'book'
   | 'star'
@@ -25,6 +31,21 @@ export type AccountAvatarId =
   | 'crown'
   | 'guardian'
   | 'legend'
+  | 'end-good'
+  | 'end-perfect'
+  | 'end-try-again'
+  | 'end-shooting-star'
+  | 'end-timer-fire'
+  | 'end-timer-beat'
+  | 'thumb-family'
+  | 'thumb-daily-routine'
+  | 'thumb-physical'
+  | 'thumb-personality'
+  | 'thumb-describing'
+  | 'thumb-getting-job'
+  | 'thumb-job-examples'
+  | 'thumb-emotions-plus'
+  | 'thumb-bullying'
   | 'thumb-animals'
   | 'thumb-space'
   | 'thumb-robot'
@@ -78,6 +99,8 @@ export type IconAccountAvatarPreset = BaseAccountAvatarPreset & {
 export type ThumbnailAccountAvatarPreset = BaseAccountAvatarPreset & {
   type: 'thumbnail';
   image: ImageSourcePropType;
+  imageFit?: 'cover' | 'contain';
+  imageInsetRatio?: number;
 };
 
 export type AccountAvatarPreset = IconAccountAvatarPreset | ThumbnailAccountAvatarPreset;
@@ -115,10 +138,16 @@ export const ACCOUNT_AVATAR_COLOR_PRESETS: AccountAvatarColorPreset[] = [
 
 export const ICON_ACCOUNT_AVATAR_PRESETS: IconAccountAvatarPreset[] = [
   { type: 'icon', id: 'spark', label: 'Spark', icon: 'auto-awesome', backgroundColor: '#EAF5FF', accentColor: '#1671B6' },
+  { type: 'icon', id: 'check', label: 'Great job', icon: 'check-circle', backgroundColor: '#E9F8EF', accentColor: '#2C8F54' },
+  { type: 'icon', id: 'tips', label: 'Bright idea', icon: 'tips-and-updates', backgroundColor: '#FFF6DE', accentColor: '#B87500', unlockLevel: 3 },
+  { type: 'icon', id: 'retry', label: 'Retry', icon: 'refresh', backgroundColor: '#EEF3F8', accentColor: '#44505C', unlockLevel: 4 },
   { type: 'icon', id: 'rocket', label: 'Rocket', icon: 'rocket-launch', backgroundColor: '#F1EDFF', accentColor: '#7654D4', unlockLevel: 5 },
+  { type: 'icon', id: 'target', label: 'Target', icon: 'track-changes', backgroundColor: '#EAF5FF', accentColor: '#1671B6', unlockLevel: 6 },
   { type: 'icon', id: 'book', label: 'Book', icon: 'menu-book', backgroundColor: '#ECF8F3', accentColor: '#258B62', unlockLevel: 7 },
+  { type: 'icon', id: 'timer', label: 'Timer', icon: 'timer', backgroundColor: '#FFF0E2', accentColor: '#D4681D', unlockLevel: 8 },
   { type: 'icon', id: 'star', label: 'Star', icon: 'stars', backgroundColor: '#FFF6DE', accentColor: '#B87500', unlockLevel: 9 },
   { type: 'icon', id: 'bolt', label: 'Bolt', icon: 'bolt', backgroundColor: '#FFECEF', accentColor: '#D63B55', unlockLevel: 11 },
+  { type: 'icon', id: 'keyboard', label: 'Writer', icon: 'keyboard', backgroundColor: '#EAF7FF', accentColor: '#1687A7', unlockLevel: 12 },
   { type: 'icon', id: 'game', label: 'Game', icon: 'sports-esports', backgroundColor: '#EAF7FF', accentColor: '#1687A7', unlockLevel: 13 },
   { type: 'icon', id: 'globe', label: 'Globe', icon: 'public', backgroundColor: '#EEF7E7', accentColor: '#4B8F2F', unlockLevel: 15 },
   { type: 'icon', id: 'leaf', label: 'Leaf', icon: 'eco', backgroundColor: '#E9F8EF', accentColor: '#2C8F54', unlockLevel: 18 },
@@ -139,36 +168,78 @@ export const ICON_ACCOUNT_AVATAR_PRESETS: IconAccountAvatarPreset[] = [
   { type: 'icon', id: 'legend', label: 'Legend', icon: 'verified', backgroundColor: '#FFF4BC', accentColor: '#C48B00', unlockLevel: 100, borderWidth: 3 },
 ];
 
+export const END_CARD_ACCOUNT_AVATAR_PRESETS: ThumbnailAccountAvatarPreset[] = [
+  { type: 'thumbnail', id: 'end-good', label: 'Great job', image: require('../../assets/good.png'), backgroundColor: '#E9F8EF', accentColor: '#2C8F54', unlockLevel: 2, imageFit: 'contain', imageInsetRatio: 0.08 },
+  { type: 'thumbnail', id: 'end-try-again', label: 'Try again', image: require('../../assets/embarrassed.png'), backgroundColor: '#FFECEF', accentColor: '#D63B55', unlockLevel: 4, imageFit: 'contain', imageInsetRatio: 0.08 },
+  { type: 'thumbnail', id: 'end-shooting-star', label: 'Shooting star', image: require('../../assets/shooting-star.png'), backgroundColor: '#EAF5FF', accentColor: '#1671B6', unlockLevel: 6, imageFit: 'contain', imageInsetRatio: 0.12 },
+  { type: 'thumbnail', id: 'end-perfect', label: 'Perfect', image: require('../../assets/comic.png'), backgroundColor: '#FFF6DE', accentColor: '#B87500', unlockLevel: 10, imageFit: 'contain', imageInsetRatio: 0.08 },
+  { type: 'thumbnail', id: 'end-timer-fire', label: 'Timer fire', image: require('../../assets/timerfire.png'), backgroundColor: '#FFF0E2', accentColor: '#D4681D', unlockLevel: 14, imageFit: 'contain', imageInsetRatio: 0.1 },
+  { type: 'thumbnail', id: 'end-timer-beat', label: 'Time beat', image: require('../../assets/timerbeat.png'), backgroundColor: '#FFF4BC', accentColor: '#C48B00', unlockLevel: 18, imageFit: 'contain', imageInsetRatio: 0.1 },
+];
+
 export const THUMBNAIL_ACCOUNT_AVATAR_PRESETS: ThumbnailAccountAvatarPreset[] = [
-  { type: 'thumbnail', id: 'thumb-animals', label: 'Animals', image: require('../../assets/thumbnails/animals-thumbnail.png'), backgroundColor: '#E9F8EF', accentColor: '#2C8F54', unlockLevel: 5 },
-  { type: 'thumbnail', id: 'thumb-space', label: 'Space', image: require('../../assets/thumbnails/space-thumbnail.png'), backgroundColor: '#EAF5FF', accentColor: '#1671B6', unlockLevel: 7 },
-  { type: 'thumbnail', id: 'thumb-robot', label: 'Robots', image: require('../../assets/thumbnails/robot-thumbnail.png'), backgroundColor: '#EAF4F2', accentColor: '#327E76', unlockLevel: 10 },
-  { type: 'thumbnail', id: 'thumb-videogames', label: 'Video games', image: require('../../assets/thumbnails/videogames-thumbnail.png'), backgroundColor: '#EAF7FF', accentColor: '#1687A7', unlockLevel: 12 },
-  { type: 'thumbnail', id: 'thumb-fashion', label: 'Fashion', image: require('../../assets/thumbnails/fashion-thumbnail.png'), backgroundColor: '#FFECEF', accentColor: '#D63B55', unlockLevel: 14 },
-  { type: 'thumbnail', id: 'thumb-cinema', label: 'Cinema', image: require('../../assets/thumbnails/cinema-thumbnail.png'), backgroundColor: '#F1EDFF', accentColor: '#7654D4', unlockLevel: 16 },
-  { type: 'thumbnail', id: 'thumb-cooking', label: 'Cooking', image: require('../../assets/thumbnails/cooking-thumbnail.png'), backgroundColor: '#FFF0E2', accentColor: '#D4681D', unlockLevel: 18 },
-  { type: 'thumbnail', id: 'thumb-extreme', label: 'Extreme', image: require('../../assets/thumbnails/extreme-sports-thumbnail.png'), backgroundColor: '#EAF5FF', accentColor: '#1671B6', unlockLevel: 20 },
-  { type: 'thumbnail', id: 'thumb-ecology', label: 'Ecology', image: require('../../assets/thumbnails/ecology-thumbnail.png'), backgroundColor: '#EEF7E7', accentColor: '#4B8F2F', unlockLevel: 24 },
-  { type: 'thumbnail', id: 'thumb-detective', label: 'Detective', image: require('../../assets/thumbnails/detective-stories-thumbnail.png'), backgroundColor: '#F5EEFF', accentColor: '#8B4DD6', unlockLevel: 28 },
-  { type: 'thumbnail', id: 'thumb-blitz', label: 'Blitz', image: require('../../assets/thumbnails/blitzthumbnail.png'), backgroundColor: '#F4F8FA', accentColor: '#6D7D87', unlockLevel: 32 },
-  { type: 'thumbnail', id: 'thumb-geography', label: 'Geography', image: require('../../assets/thumbnails/geography-thumbnail.png'), backgroundColor: '#EAF5FF', accentColor: '#1671B6', unlockLevel: 36 },
-  { type: 'thumbnail', id: 'thumb-love', label: 'Love', image: require('../../assets/thumbnails/love-thumbnail.png'), backgroundColor: '#FFECEF', accentColor: '#D63B55', unlockLevel: 40 },
-  { type: 'thumbnail', id: 'thumb-city', label: 'City', image: require('../../assets/thumbnails/city-travel-thumbnail.png'), backgroundColor: '#EAF7FF', accentColor: '#1687A7', unlockLevel: 44 },
-  { type: 'thumbnail', id: 'thumb-legends', label: 'Legends', image: require('../../assets/thumbnails/legends-thumbnail.png'), backgroundColor: '#FFF6DE', accentColor: '#B87500', unlockLevel: 48 },
-  { type: 'thumbnail', id: 'thumb-emotions', label: 'Emotions', image: require('../../assets/thumbnails/emotions-easy-thumbnail.png'), backgroundColor: '#FFECEF', accentColor: '#D63B55', unlockLevel: 52 },
-  { type: 'thumbnail', id: 'thumb-dystopia', label: 'Dystopia', image: require('../../assets/thumbnails/dystopia-thumbnail.png'), backgroundColor: '#E9EDFF', accentColor: '#3349C9', unlockLevel: 60 },
-  { type: 'thumbnail', id: 'thumb-school', label: 'School', image: require('../../assets/thumbnails/school-life-thumbnail.png'), backgroundColor: '#ECF8F3', accentColor: '#258B62', unlockLevel: 68 },
-  { type: 'thumbnail', id: 'thumb-segregation', label: 'History', image: require('../../assets/thumbnails/segregation-thumbnail.png'), backgroundColor: '#F4F8FA', accentColor: '#6D7D87', unlockLevel: 82 },
-  { type: 'thumbnail', id: 'thumb-uk', label: 'The UK', image: require('../../assets/thumbnails/the-uk-and-ireland-thumbnail.png'), backgroundColor: '#EAF5FF', accentColor: '#1671B6', unlockLevel: 94 },
+  { type: 'thumbnail', id: 'thumb-family', label: 'Family', image: require('../../assets/thumbnails/family-thumbnail.png'), backgroundColor: '#E9F8EF', accentColor: '#2C8F54', unlockLevel: 3 },
+  { type: 'thumbnail', id: 'thumb-daily-routine', label: 'Daily routine', image: require('../../assets/thumbnails/daily-routine-thumbnail.png'), backgroundColor: '#EAF5FF', accentColor: '#1671B6', unlockLevel: 5 },
+  { type: 'thumbnail', id: 'thumb-physical', label: 'Portraits', image: require('../../assets/thumbnails/physical-description-thumbnail.png'), backgroundColor: '#F1EDFF', accentColor: '#7654D4', unlockLevel: 7 },
+  { type: 'thumbnail', id: 'thumb-personality', label: 'Personality', image: require('../../assets/thumbnails/personality-thumbnail.png'), backgroundColor: '#FFF6DE', accentColor: '#B87500', unlockLevel: 9 },
+  { type: 'thumbnail', id: 'thumb-describing', label: 'Picture story', image: require('../../assets/thumbnails/describing-thumbnail.png'), backgroundColor: '#EAF7FF', accentColor: '#1687A7', unlockLevel: 11 },
+  { type: 'thumbnail', id: 'thumb-school', label: 'School life', image: require('../../assets/thumbnails/school-life-thumbnail.png'), backgroundColor: '#ECF8F3', accentColor: '#258B62', unlockLevel: 13 },
+  { type: 'thumbnail', id: 'thumb-getting-job', label: 'Interview', image: require('../../assets/thumbnails/getting-a-job-thumbnail.png'), backgroundColor: '#F4F8FA', accentColor: '#6D7D87', unlockLevel: 15 },
+  { type: 'thumbnail', id: 'thumb-job-examples', label: 'Jobs', image: require('../../assets/thumbnails/job-examples-thumbnail.png'), backgroundColor: '#EAF4F2', accentColor: '#327E76', unlockLevel: 17 },
+  { type: 'thumbnail', id: 'thumb-emotions', label: 'Emotions', image: require('../../assets/thumbnails/emotions-easy-thumbnail.png'), backgroundColor: '#FFECEF', accentColor: '#D63B55', unlockLevel: 19 },
+  { type: 'thumbnail', id: 'thumb-emotions-plus', label: 'More emotions', image: require('../../assets/thumbnails/emotions-level-2-thumbnail.png'), backgroundColor: '#FFECEF', accentColor: '#D63B55', unlockLevel: 21 },
+  { type: 'thumbnail', id: 'thumb-bullying', label: 'Drama', image: require('../../assets/thumbnails/bullying-thumbnail.png'), backgroundColor: '#F5EEFF', accentColor: '#8B4DD6', unlockLevel: 23 },
+  { type: 'thumbnail', id: 'thumb-fashion', label: 'Fashion', image: require('../../assets/thumbnails/fashion-thumbnail.png'), backgroundColor: '#FFECEF', accentColor: '#D63B55', unlockLevel: 25 },
+  { type: 'thumbnail', id: 'thumb-cinema', label: 'Cinema', image: require('../../assets/thumbnails/cinema-thumbnail.png'), backgroundColor: '#F1EDFF', accentColor: '#7654D4', unlockLevel: 27 },
+  { type: 'thumbnail', id: 'thumb-love', label: 'Love', image: require('../../assets/thumbnails/love-thumbnail.png'), backgroundColor: '#FFECEF', accentColor: '#D63B55', unlockLevel: 29 },
+  { type: 'thumbnail', id: 'thumb-city', label: 'City', image: require('../../assets/thumbnails/city-travel-thumbnail.png'), backgroundColor: '#EAF7FF', accentColor: '#1687A7', unlockLevel: 31 },
+  { type: 'thumbnail', id: 'thumb-detective', label: 'Detective', image: require('../../assets/thumbnails/detective-stories-thumbnail.png'), backgroundColor: '#F5EEFF', accentColor: '#8B4DD6', unlockLevel: 33 },
+  { type: 'thumbnail', id: 'thumb-videogames', label: 'Video games', image: require('../../assets/thumbnails/videogames-thumbnail.png'), backgroundColor: '#EAF7FF', accentColor: '#1687A7', unlockLevel: 35 },
+  { type: 'thumbnail', id: 'thumb-legends', label: 'Legends', image: require('../../assets/thumbnails/legends-thumbnail.png'), backgroundColor: '#FFF6DE', accentColor: '#B87500', unlockLevel: 38 },
+  { type: 'thumbnail', id: 'thumb-animals', label: 'Animals', image: require('../../assets/thumbnails/animals-thumbnail.png'), backgroundColor: '#E9F8EF', accentColor: '#2C8F54', unlockLevel: 42 },
+  { type: 'thumbnail', id: 'thumb-space', label: 'Space', image: require('../../assets/thumbnails/space-thumbnail.png'), backgroundColor: '#EAF5FF', accentColor: '#1671B6', unlockLevel: 46 },
+  { type: 'thumbnail', id: 'thumb-robot', label: 'Robots', image: require('../../assets/thumbnails/robot-thumbnail.png'), backgroundColor: '#EAF4F2', accentColor: '#327E76', unlockLevel: 50 },
+  { type: 'thumbnail', id: 'thumb-cooking', label: 'Cooking', image: require('../../assets/thumbnails/cooking-thumbnail.png'), backgroundColor: '#FFF0E2', accentColor: '#D4681D', unlockLevel: 54 },
+  { type: 'thumbnail', id: 'thumb-extreme', label: 'Extreme', image: require('../../assets/thumbnails/extreme-sports-thumbnail.png'), backgroundColor: '#EAF5FF', accentColor: '#1671B6', unlockLevel: 58 },
+  { type: 'thumbnail', id: 'thumb-ecology', label: 'Ecology', image: require('../../assets/thumbnails/ecology-thumbnail.png'), backgroundColor: '#EEF7E7', accentColor: '#4B8F2F', unlockLevel: 64 },
+  { type: 'thumbnail', id: 'thumb-dystopia', label: 'Dystopia', image: require('../../assets/thumbnails/dystopia-thumbnail.png'), backgroundColor: '#E9EDFF', accentColor: '#3349C9', unlockLevel: 70 },
+  { type: 'thumbnail', id: 'thumb-blitz', label: 'Blitz', image: require('../../assets/thumbnails/blitzthumbnail.png'), backgroundColor: '#F4F8FA', accentColor: '#6D7D87', unlockLevel: 76 },
+  { type: 'thumbnail', id: 'thumb-geography', label: 'Geography', image: require('../../assets/thumbnails/geography-thumbnail.png'), backgroundColor: '#EAF5FF', accentColor: '#1671B6', unlockLevel: 82 },
+  { type: 'thumbnail', id: 'thumb-segregation', label: 'History', image: require('../../assets/thumbnails/segregation-thumbnail.png'), backgroundColor: '#F4F8FA', accentColor: '#6D7D87', unlockLevel: 90 },
+  { type: 'thumbnail', id: 'thumb-uk', label: 'The UK', image: require('../../assets/thumbnails/the-uk-and-ireland-thumbnail.png'), backgroundColor: '#EAF5FF', accentColor: '#1671B6', unlockLevel: 96 },
+];
+
+export const IMAGE_ACCOUNT_AVATAR_PRESETS: ThumbnailAccountAvatarPreset[] = [
+  ...END_CARD_ACCOUNT_AVATAR_PRESETS,
+  ...THUMBNAIL_ACCOUNT_AVATAR_PRESETS,
 ];
 
 export const ACCOUNT_AVATAR_PRESETS: AccountAvatarPreset[] = [
   ...ICON_ACCOUNT_AVATAR_PRESETS,
-  ...THUMBNAIL_ACCOUNT_AVATAR_PRESETS,
+  ...IMAGE_ACCOUNT_AVATAR_PRESETS,
 ];
 
 const isUnlockedForLevel = (unlockLevel: number | undefined, currentLevel: number) =>
   !unlockLevel || currentLevel >= unlockLevel;
+
+const normalizeLevel = (level: number) => {
+  if (!Number.isFinite(level)) return 1;
+  return Math.max(1, Math.floor(level));
+};
+
+export const getAccountAvatarUnlocksBetweenLevels = (
+  previousLevel: number,
+  currentLevel: number
+) => {
+  const fromLevel = normalizeLevel(previousLevel);
+  const toLevel = normalizeLevel(currentLevel);
+
+  if (toLevel <= fromLevel) return [];
+
+  return ACCOUNT_AVATAR_PRESETS.filter((preset) => (
+    !!preset.unlockLevel && preset.unlockLevel > fromLevel && preset.unlockLevel <= toLevel
+  ));
+};
 
 export const getUnlockedAccountAvatarId = (
   avatarId: string | null | undefined,

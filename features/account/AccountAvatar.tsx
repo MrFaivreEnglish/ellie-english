@@ -26,6 +26,11 @@ export default function AccountAvatar({ avatarId, colorId, size = 48, style }: A
   const preset = getAccountAvatarPreset(avatarId);
   const colorPreset = getAccountAvatarColorPreset(colorId);
   const iconSize = Math.max(18, Math.round(size * 0.48));
+  const avatarRadius = Math.round(size * 0.36);
+  const thumbnailInset = preset.type === 'thumbnail'
+    ? Math.round(size * (preset.imageInsetRatio ?? 0))
+    : 0;
+  const thumbnailSize = Math.max(1, size - thumbnailInset * 2);
   const [thumbnailFailed, setThumbnailFailed] = React.useState(false);
   const thumbnailSource = React.useMemo(() => {
     if (preset.type !== 'thumbnail') return null;
@@ -43,7 +48,7 @@ export default function AccountAvatar({ avatarId, colorId, size = 48, style }: A
         {
           width: size,
           height: size,
-          borderRadius: Math.round(size * 0.32),
+          borderRadius: avatarRadius,
           backgroundColor: colorPreset.backgroundColor,
           borderColor: colorPreset.accentColor,
           borderWidth: colorPreset.borderWidth ?? preset.borderWidth ?? 2,
@@ -58,11 +63,11 @@ export default function AccountAvatar({ avatarId, colorId, size = 48, style }: A
           style={[
             styles.thumbnail,
             {
-              width: size,
-              height: size,
+              width: thumbnailSize,
+              height: thumbnailSize,
             },
           ]}
-          resizeMode="cover"
+          resizeMode={preset.imageFit ?? 'cover'}
           onError={() => setThumbnailFailed(true)}
         />
       ) : (

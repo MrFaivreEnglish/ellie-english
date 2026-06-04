@@ -7,7 +7,7 @@ const MustHaveToGrammar = {
   {
     type: 'translate',
     question: 'Translate into English.',
-    prompt: "Tu dois t'arreter.",
+    prompt: "Tu dois t'arrêter.",
     answer: "You must stop.",
     wordBank: ["You", "must", "stop."]
   },
@@ -21,7 +21,7 @@ const MustHaveToGrammar = {
   {
     type: 'translate',
     question: 'Translate into English.',
-    prompt: "Elle doit etre calme.",
+    prompt: "Elle doit être calme.",
     answer: "She must be quiet.",
     wordBank: ["She", "must", "be", "quiet."]
   },
@@ -49,7 +49,7 @@ const MustHaveToGrammar = {
   {
     type: 'translate',
     question: 'Translate into English.',
-    prompt: "Je dois etudier.",
+    prompt: "Je dois étudier.",
     answer: "I must study.",
     wordBank: ["I", "must", "study."]
   },
@@ -77,7 +77,7 @@ const MustHaveToGrammar = {
   {
     type: 'translate',
     question: 'Translate into English.',
-    prompt: "Nous devons ecouter.",
+    prompt: "Nous devons écouter.",
     answer: "We must listen.",
     wordBank: ["We", "must", "listen."]
   },
@@ -91,7 +91,7 @@ const MustHaveToGrammar = {
   {
     type: 'translate',
     question: 'Translate into English.',
-    prompt: "Ils doivent se depecher.",
+    prompt: "Ils doivent se dépêcher.",
     answer: "They must hurry.",
     wordBank: ["They", "must", "hurry."]
   },

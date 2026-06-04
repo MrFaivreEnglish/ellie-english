@@ -1,12 +1,22 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Platform, StyleSheet, Text, TouchableOpacity, View, useWindowDimensions } from 'react-native';
-import { CARD_HEIGHT, Exercise, normalizeAnswer } from './GrammarExerciseUtils';
-import { getWebLessonScale, scaleValue } from '../../shared/responsiveLayout';
-import { triggerSelectionHaptic, triggerSuccessHaptic, triggerWarningHaptic } from '../../shared/haptics';
+import { MaterialIcons } from '@expo/vector-icons';
+import { CARD_HEIGHT, Exercise, normalizeAnswer, shuffle } from './GrammarExerciseUtils';
+import { clampNumber, getWebLessonScale, scaleValue } from '../../shared/responsiveLayout';
+import { darkGameAccents, getPrimaryButtonStyle } from '../../shared/uiPrimitives';
+import { triggerSelectionHaptic } from '../../shared/haptics';
+import type { ThemeColors } from '../../settings/ThemeContext';
+
+const DARK_WORD_ACCENT = darkGameAccents.wordCardBorder;
+const DARK_WORD_BANK_BACKGROUND = darkGameAccents.wordArea;
+const DARK_WORD_CARD_BACKGROUND = darkGameAccents.wordCard;
+const DARK_WORD_CARD_TEXT = darkGameAccents.wordText;
+const DARK_SELECTED_WORD_BACKGROUND = darkGameAccents.wordCardPressed;
+const DARK_SELECTED_WORD_BORDER = darkGameAccents.wordAreaBorder;
 
 interface GrammarReorderExerciseProps {
   exercise?: Exercise;
-  colors: any;
+  colors: ThemeColors;
   isDarkMode: boolean;
   compact?: boolean;
   userAnswer: string;
@@ -37,6 +47,8 @@ const GrammarReorderExercise: React.FC<GrammarReorderExerciseProps> = ({
 }) => {
   const { width, height } = useWindowDimensions();
   const isDesktopWeb = Platform.OS === 'web' && width >= 768;
+  const isAndroid = Platform.OS === 'android';
+  const applyCompactStyles = compact && !isAndroid;
   const webScale = getWebLessonScale(width, height);
   const [selectedWordIds, setSelectedWordIds] = useState<string[]>([]);
   const [isSubmitLocked, setIsSubmitLocked] = useState(false);
@@ -53,7 +65,7 @@ const GrammarReorderExercise: React.FC<GrammarReorderExerciseProps> = ({
       options.every((option, position) => option.id === baseWordOptions[position]?.id);
 
     for (let attempt = 0; attempt < 12; attempt++) {
-      const shuffled = [...baseWordOptions].sort(() => Math.random() - 0.5);
+      const shuffled = shuffle(baseWordOptions);
       if (!isOriginalOrder(shuffled)) return shuffled;
     }
 
@@ -106,11 +118,9 @@ const GrammarReorderExercise: React.FC<GrammarReorderExerciseProps> = ({
 
     if (isCorrect) {
       setIsSubmitLocked(true);
-      triggerSuccessHaptic();
       await onCorrect(exercise.answer);
     } else {
       setIsSubmitLocked(true);
-      triggerWarningHaptic();
       onIncorrect('reorder');
       unlockTimeoutRef.current = setTimeout(() => {
         setIsSubmitLocked(false);
@@ -121,12 +131,18 @@ const GrammarReorderExercise: React.FC<GrammarReorderExerciseProps> = ({
 
   const disabled = userAnswer !== '' || isSubmitLocked || selectedWordIds.length === 0;
   const desktopCardMinHeight = Math.min(scaleValue(430, webScale), Math.max(scaleValue(360, webScale), Math.round(height * 0.48)));
-  const cardMinHeight = compact ? 236 : isDesktopWeb ? desktopCardMinHeight : CARD_HEIGHT;
-  const answerTrayMinHeight = compact ? 68 : isDesktopWeb ? scaleValue(126, webScale) : 92;
-  const selectedWordsMinHeight = compact ? 38 : isDesktopWeb ? scaleValue(76, webScale) : 54;
-  const wordBankPanelPadding = compact ? 10 : isDesktopWeb ? scaleValue(22, webScale) : 18;
-  const chipVerticalPadding = compact ? 7 : isDesktopWeb ? scaleValue(12, webScale) : 10;
-  const chipHorizontalPadding = compact ? 10 : isDesktopWeb ? scaleValue(16, webScale) : 14;
+  const androidCardMinHeight = Math.round(clampNumber(
+    height * (compact ? 0.39 : 0.43),
+    compact ? 286 : 320,
+    compact ? 348 : 420
+  ));
+  const cardMinHeight = isDesktopWeb ? desktopCardMinHeight : isAndroid ? androidCardMinHeight : compact ? 236 : CARD_HEIGHT;
+  const answerTrayMinHeight = isAndroid ? (compact ? 88 : 104) : compact ? 68 : isDesktopWeb ? scaleValue(126, webScale) : 92;
+  const selectedWordsMinHeight = isAndroid ? (compact ? 50 : 62) : compact ? 38 : isDesktopWeb ? scaleValue(76, webScale) : 54;
+  const wordBankPanelPadding = isAndroid ? (compact ? 14 : 18) : compact ? 10 : isDesktopWeb ? scaleValue(22, webScale) : 18;
+  const chipVerticalPadding = isAndroid ? (compact ? 9 : 11) : compact ? 7 : isDesktopWeb ? scaleValue(12, webScale) : 10;
+  const chipHorizontalPadding = isAndroid ? (compact ? 12 : 16) : compact ? 10 : isDesktopWeb ? scaleValue(16, webScale) : 14;
+  const darkShadowColor = '#020B13';
 
   return (
     <View
@@ -142,29 +158,40 @@ const GrammarReorderExercise: React.FC<GrammarReorderExerciseProps> = ({
         }}
         style={[
           styles.reorderCard,
-          compact && styles.reorderCardCompact,
+          applyCompactStyles && styles.reorderCardCompact,
           isDesktopWeb && styles.reorderCardDesktopWeb,
-          { minHeight: cardMinHeight },
-          isDarkMode && { backgroundColor: '#112c48', borderColor: colors.border, borderBottomColor: colors.borderStrong },
-          incorrectAnswer === 'reorder' && styles.incorrectOption,
+          {
+            minHeight: cardMinHeight,
+            backgroundColor: isDarkMode ? colors.card : colors.card,
+            borderColor: isDarkMode ? colors.border : colors.border,
+            borderBottomColor: isDarkMode ? colors.borderStrong : colors.borderStrong,
+            shadowColor: isDarkMode ? darkShadowColor : '#000',
+          },
+          incorrectAnswer === 'reorder' && [
+            styles.incorrectOption,
+            { backgroundColor: colors.dangerSoft, borderColor: colors.danger, borderBottomColor: colors.danger },
+          ],
         ]}
       >
         <View
           style={[
             styles.answerTray,
-            compact && styles.answerTrayCompact,
+            applyCompactStyles && styles.answerTrayCompact,
             isDesktopWeb && styles.answerTrayDesktopWeb,
-            { minHeight: answerTrayMinHeight },
-            isDarkMode && {
-              backgroundColor: '#112c48',
-              borderColor: colors.border,
-              borderBottomColor: colors.borderStrong,
+            {
+              minHeight: answerTrayMinHeight,
+              backgroundColor: isDarkMode ? colors.surfaceAlt : colors.surfaceAlt,
+              borderColor: isDarkMode ? colors.borderStrong : colors.border,
+              borderBottomColor: isDarkMode ? DARK_WORD_ACCENT : colors.borderStrong,
             },
-            incorrectAnswer === 'reorder' && styles.answerTrayIncorrect,
+            incorrectAnswer === 'reorder' && [
+              styles.answerTrayIncorrect,
+              { backgroundColor: colors.dangerSoft, borderColor: colors.danger, borderBottomColor: colors.danger },
+            ],
           ]}
         >
           <View style={styles.trayHeader}>
-            <Text style={[styles.trayHint, isDesktopWeb && { fontSize: scaleValue(13, webScale) }, isDarkMode && { color: '#B7C8D8' }]}>
+            <Text style={[styles.trayHint, { color: colors.secondaryText }, isDesktopWeb && { fontSize: scaleValue(13, webScale) }]}>
               {selectedWordIds.length === 0 ? 'Tap the words below' : 'Tap a word to remove it'}
             </Text>
             <View style={styles.trayUtilities}>
@@ -174,13 +201,21 @@ const GrammarReorderExercise: React.FC<GrammarReorderExerciseProps> = ({
                 accessibilityState={{ disabled }}
                 onPress={handleClear}
                 disabled={disabled}
-                style={[styles.trayUtilityButton, styles.clearButton, isDarkMode && styles.trayUtilityButtonDark, disabled && styles.disabledUtilityButton]}
+                style={[
+                  styles.trayUtilityButton,
+                  styles.clearButton,
+                  {
+                    backgroundColor: disabled ? colors.dangerSoft : colors.danger,
+                    borderColor: colors.danger,
+                  },
+                  disabled && styles.disabledUtilityButton,
+                ]}
               >
-                <Text style={[styles.clearButtonText, isDarkMode && styles.clearButtonTextDark]}>{'\u00d7'}</Text>
+                <MaterialIcons name="close" size={21} color={disabled ? colors.dangerText : '#FFFFFF'} />
               </TouchableOpacity>
             </View>
           </View>
-          <View style={[styles.selectedWordsRow, compact && styles.selectedWordsRowCompact, { minHeight: selectedWordsMinHeight }]}>
+          <View style={[styles.selectedWordsRow, applyCompactStyles && styles.selectedWordsRowCompact, { minHeight: selectedWordsMinHeight }]}>
             {selectedWordIds.length === 0 ? (
               <View style={styles.answerPlaceholder} />
             ) : (
@@ -194,9 +229,24 @@ const GrammarReorderExercise: React.FC<GrammarReorderExerciseProps> = ({
                     accessibilityRole="button"
                     accessibilityLabel={`Remove word ${selectedWord}`}
                     onPress={() => handleSelectedWordPress(position)}
-                    style={[styles.selectedWordChip, compact && styles.selectedWordChipCompact, isDesktopWeb && styles.selectedWordChipDesktopWeb]}
+                    style={[
+                      styles.selectedWordChip,
+                      applyCompactStyles && styles.selectedWordChipCompact,
+                      isDesktopWeb && styles.selectedWordChipDesktopWeb,
+                      {
+                        backgroundColor: isDarkMode ? DARK_SELECTED_WORD_BACKGROUND : colors.primary,
+                        borderColor: isDarkMode ? DARK_SELECTED_WORD_BORDER : colors.borderStrong,
+                        borderBottomColor: isDarkMode ? DARK_WORD_ACCENT : colors.primary,
+                      },
+                    ]}
                   >
-                    <Text style={[styles.selectedWordChipText, compact && styles.selectedWordChipTextCompact, isDesktopWeb && styles.selectedWordChipTextDesktopWeb, isDesktopWeb && { fontSize: scaleValue(16, webScale) }]}>
+                    <Text style={[
+                      styles.selectedWordChipText,
+                      applyCompactStyles && styles.selectedWordChipTextCompact,
+                      isDesktopWeb && styles.selectedWordChipTextDesktopWeb,
+                      isDesktopWeb && { fontSize: scaleValue(16, webScale) },
+                      { color: colors.buttonText },
+                    ]}>
                       {selectedWord}
                     </Text>
                   </TouchableOpacity>
@@ -204,11 +254,12 @@ const GrammarReorderExercise: React.FC<GrammarReorderExerciseProps> = ({
               })
             )}
           </View>
-          <View style={styles.answerLine} />
+          <View style={[styles.answerLine, { backgroundColor: isDarkMode ? DARK_WORD_ACCENT : colors.borderStrong }]} />
         </View>
-        <View style={[styles.wordBankPanel, compact && styles.wordBankPanelCompact, { padding: wordBankPanelPadding }, isDarkMode && {
-          backgroundColor: colors.surface,
-          borderColor: colors.border,
+        <View style={[styles.wordBankPanel, applyCompactStyles && styles.wordBankPanelCompact, {
+          padding: wordBankPanelPadding,
+          backgroundColor: isDarkMode ? DARK_WORD_BANK_BACKGROUND : colors.surface,
+          borderColor: isDarkMode ? DARK_WORD_ACCENT : colors.border,
         }]}>
           <View style={styles.wordBank}>
             {shuffledWordOptions.map(({ word, id }) => {
@@ -223,24 +274,25 @@ const GrammarReorderExercise: React.FC<GrammarReorderExerciseProps> = ({
                   disabled={isSelected || userAnswer !== ''}
                   style={[
                     styles.wordChip,
-                    compact && styles.wordChipCompact,
+                    applyCompactStyles && styles.wordChipCompact,
                     isDesktopWeb && styles.wordChipDesktopWeb,
                     { paddingVertical: chipVerticalPadding, paddingHorizontal: chipHorizontalPadding },
-                    isDarkMode && {
-                      backgroundColor: colors.card,
-                      borderColor: colors.border,
-                      borderBottomColor: colors.borderStrong,
+                    {
+                      backgroundColor: isDarkMode ? DARK_WORD_CARD_BACKGROUND : colors.card,
+                      borderColor: isDarkMode ? DARK_WORD_ACCENT : colors.border,
+                      borderBottomColor: isDarkMode ? DARK_WORD_ACCENT : colors.borderStrong,
+                      shadowColor: isDarkMode ? darkShadowColor : '#000',
                     },
                     isSelected && styles.disabledWordChip,
                   ]}
                 >
                   <Text style={[
                     styles.wordChipText,
-                    compact && styles.wordChipTextCompact,
+                    applyCompactStyles && styles.wordChipTextCompact,
                     isDesktopWeb && styles.wordChipTextDesktopWeb,
                     isDesktopWeb && { fontSize: scaleValue(16, webScale) },
-                    isDarkMode && { color: colors.text },
-                    isSelected && styles.disabledWordChipText,
+                    { color: isDarkMode ? DARK_WORD_CARD_TEXT : colors.text },
+                    isSelected && [styles.disabledWordChipText, { color: colors.secondaryText }],
                   ]}>{word}</Text>
                 </TouchableOpacity>
               );
@@ -255,16 +307,17 @@ const GrammarReorderExercise: React.FC<GrammarReorderExerciseProps> = ({
           disabled={disabled}
           style={[
             styles.checkAnswerButton,
-            compact && styles.checkAnswerButtonCompact,
+            applyCompactStyles && styles.checkAnswerButtonCompact,
             isDesktopWeb && styles.checkAnswerButtonDesktopWeb,
             isDesktopWeb && { minHeight: scaleValue(54, webScale) },
+            getPrimaryButtonStyle(colors, isDarkMode),
             disabled && styles.disabledCheckAnswerButton,
           ]}
         >
-          <Text style={[styles.checkAnswerButtonText, isDesktopWeb && { fontSize: scaleValue(16, webScale) }]}>Check</Text>
+          <Text style={[styles.checkAnswerButtonText, { color: colors.buttonText }, isDesktopWeb && { fontSize: scaleValue(16, webScale) }]}>Check</Text>
         </TouchableOpacity>
         {incorrectAnswer === 'reorder' && (
-          <Text style={styles.fillErrorText}>Try again.</Text>
+          <Text style={[styles.fillErrorText, { color: colors.dangerText }]}>Try again.</Text>
         )}
       </View>
     </View>
@@ -326,11 +379,6 @@ const styles = StyleSheet.create({
     paddingBottom: 16,
     marginBottom: 16,
   },
-  answerTrayDark: {
-    backgroundColor: '#203246',
-    borderColor: '#6F90B3',
-    borderBottomColor: '#8EAFD1',
-  },
   answerTrayIncorrect: {
     backgroundColor: '#FFF1F3',
     borderColor: '#F06A7F',
@@ -365,28 +413,6 @@ const styles = StyleSheet.create({
   },
   disabledUtilityButton: {
     opacity: 0.28,
-  },
-  trayUtilityButtonDark: {
-    backgroundColor: '#2A4159',
-    borderColor: '#7396BA',
-  },
-  trayActionText: {
-    color: '#1CB0F6',
-    fontSize: 13,
-    fontWeight: '800',
-  },
-  trayActionTextDark: {
-    color: '#CBEAFF',
-  },
-  clearButtonText: {
-    color: '#C62828',
-    fontSize: 28,
-    lineHeight: 30,
-    fontWeight: '700',
-    textAlign: 'center',
-  },
-  clearButtonTextDark: {
-    color: '#FFD1D8',
   },
   trayHint: {
     color: '#777',
@@ -430,10 +456,6 @@ const styles = StyleSheet.create({
   wordBankPanelCompact: {
     marginBottom: 8,
   },
-  wordBankPanelDark: {
-    backgroundColor: '#21354B',
-    borderColor: '#6F90B3',
-  },
   wordBank: {
     flexDirection: 'row',
     flexWrap: 'wrap',
@@ -461,11 +483,6 @@ const styles = StyleSheet.create({
   wordChipDesktopWeb: {
     borderBottomWidth: 4,
   },
-  wordChipDark: {
-    backgroundColor: '#2C435C',
-    borderColor: '#7396BA',
-    borderBottomColor: '#93B5D8',
-  },
   wordChipText: {
     color: '#4B4B4B',
     fontSize: 14,
@@ -476,9 +493,6 @@ const styles = StyleSheet.create({
   },
   wordChipTextDesktopWeb: {
     fontSize: 16,
-  },
-  wordChipTextDark: {
-    color: '#E7F2FB',
   },
   selectedWordChip: {
     paddingVertical: 9,

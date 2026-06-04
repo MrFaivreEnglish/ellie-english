@@ -4,15 +4,35 @@ import { Word, GameCard, MatchingGamePairs, GameState } from '../../types/Vocabu
 import { getMatchingSetCount, getMatchingSetWords, shuffleArray } from './vocabularyUtils';
 import { getVocabularyTimerBests, saveVocabularyTimerBest } from './vocabularyTimerStorage';
 import { SOUND_EFFECT_OPTIONS, SUCCESS_SOUND, replaySoundEffect } from '../shared/soundEffects';
-import { triggerSelectionHaptic, triggerSuccessHaptic, triggerWarningHaptic } from '../shared/haptics';
 import { awardActivityXPOnceToday } from '../progress/xpStorage';
 import { XP_REWARDS } from '../progress/xpRewards';
+import { triggerSelectionHaptic, triggerSuccessHaptic, triggerWarningHaptic } from '../shared/haptics';
 
-const buildMatchingPracticeActivityKey = (categoryKey: string, first: GameCard, second: GameCard) => {
+const buildMatchingPracticeActivityKey = (
+  categoryKey: string,
+  first: GameCard,
+  second: GameCard,
+  isTimerMode: boolean
+) => {
   const englishText = first.type === 'english' ? first.text : second.text;
   const frenchText = first.type === 'french' ? first.text : second.text;
 
-  return `vocabulary:matching:${categoryKey}:${englishText}:${frenchText}`;
+  return `vocabulary:matching:${isTimerMode ? 'timer' : 'practice'}:${categoryKey}:${englishText}:${frenchText}`;
+};
+
+const buildMatchingTimerBestActivityKey = (categoryKey: string, elapsedMs: number) =>
+  `vocabulary:matching-timer-best:${categoryKey}:${Math.floor(elapsedMs)}`;
+
+const getMatchingPairXP = (isTimerMode: boolean, hadMistake: boolean) => {
+  if (isTimerMode) {
+    return hadMistake
+      ? XP_REWARDS.vocabularyMatchingTimerRetryPair
+      : XP_REWARDS.vocabularyMatchingTimerCleanPair;
+  }
+
+  return hadMistake
+    ? XP_REWARDS.vocabularyMatchingRetryPair
+    : XP_REWARDS.vocabularyMatchingCleanPair;
 };
 
 export const useVocabularyGame = (
@@ -47,6 +67,7 @@ export const useVocabularyGame = (
   });
 
   const [sessionWords, setSessionWords] = useState<Word[]>([]);
+  const [matchingReviewWords, setMatchingReviewWords] = useState<Word[]>([]);
   const [matchingSessionXp, setMatchingSessionXp] = useState(0);
   const [lastMatchingXpGain, setLastMatchingXpGain] = useState(0);
 
@@ -59,6 +80,7 @@ export const useVocabularyGame = (
   const completionLockedRef = useRef(false);
   const setAdvanceLockedRef = useRef(false);
   const recordedMatchingActivityKeysRef = useRef<Set<string>>(new Set());
+  const mistakenMatchingActivityKeysRef = useRef<Set<string>>(new Set());
   const matchingXpTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // ---------------- TIMER ----------------
@@ -90,6 +112,59 @@ export const useVocabularyGame = (
     const cards = [...matchingGamePairs.english, ...matchingGamePairs.french];
     return new Map(cards.map((card) => [card.id, card]));
   }, [matchingGamePairs]);
+
+  const addMatchingReviewWord = useCallback((pairId: number) => {
+    const cards = [...matchingGamePairs.english, ...matchingGamePairs.french]
+      .filter((card) => card.pairId === pairId);
+    const english = cards.find((card) => card.type === 'english')?.text;
+    const french = cards.find((card) => card.type === 'french')?.text;
+
+    if (!english || !french) return;
+
+    setMatchingReviewWords((previous) => {
+      if (previous.some((word) => word.english === english && word.french === french)) {
+        return previous;
+      }
+
+      return [...previous, { english, french }];
+    });
+  }, [matchingGamePairs]);
+
+  const getMatchingActivityKeyForPairId = useCallback((pairId: number) => {
+    const cards = [...matchingGamePairs.english, ...matchingGamePairs.french]
+      .filter((card) => card.pairId === pairId);
+    const englishCard = cards.find((card) => card.type === 'english');
+    const frenchCard = cards.find((card) => card.type === 'french');
+
+    if (!englishCard || !frenchCard) return null;
+
+    return buildMatchingPracticeActivityKey(key, englishCard, frenchCard, timerMode);
+  }, [key, matchingGamePairs, timerMode]);
+
+  const markMatchingPairMistake = useCallback((pairId: number) => {
+    const activityKey = getMatchingActivityKeyForPairId(pairId);
+    if (!activityKey) return;
+
+    mistakenMatchingActivityKeysRef.current.add(activityKey);
+  }, [getMatchingActivityKeyForPairId]);
+
+  const awardMatchingXP = useCallback((activityKey: string, amount: number) => {
+    void awardActivityXPOnceToday(activityKey, amount).then((xpGain) => {
+      if (xpGain <= 0) return;
+
+      setMatchingSessionXp(current => current + xpGain);
+      setLastMatchingXpGain(xpGain);
+
+      if (matchingXpTimeoutRef.current) {
+        clearTimeout(matchingXpTimeoutRef.current);
+      }
+
+      matchingXpTimeoutRef.current = setTimeout(() => {
+        setLastMatchingXpGain(0);
+        matchingXpTimeoutRef.current = null;
+      }, 1400);
+    });
+  }, []);
 
   useEffect(() => {
     gameStateRef.current = gameState;
@@ -123,12 +198,14 @@ export const useVocabularyGame = (
     completionLockedRef.current = false;
     setAdvanceLockedRef.current = false;
     recordedMatchingActivityKeysRef.current = new Set();
+    mistakenMatchingActivityKeysRef.current = new Set();
     if (matchingXpTimeoutRef.current) {
       clearTimeout(matchingXpTimeoutRef.current);
       matchingXpTimeoutRef.current = null;
     }
     setMatchingSessionXp(0);
     setLastMatchingXpGain(0);
+    setMatchingReviewWords([]);
     timerValueRef.current = options?.preserveTimer ? timerValueRef.current : 0;
     if (!options?.preserveTimer) {
       timerStartedAtRef.current = null;
@@ -233,9 +310,18 @@ export const useVocabularyGame = (
 
       const isNewBest =
         previousBest == null || previousBest <= 0 || currentTime < previousBest;
+      const beatExistingBest =
+        previousBest != null && previousBest > 0 && currentTime < previousBest;
 
       if (isNewBest && saveTimerRecords) {
         saveVocabularyTimerBest(key, currentTime);
+      }
+
+      if (beatExistingBest) {
+        awardMatchingXP(
+          buildMatchingTimerBestActivityKey(key, currentTime),
+          XP_REWARDS.vocabularyMatchingTimerBestBonus
+        );
       }
 
       return {
@@ -251,7 +337,7 @@ export const useVocabularyGame = (
           : prev.bestTimeByCategory,
       };
     });
-  }, [isGameComplete, key, saveTimerRecords, timerMode]);
+  }, [awardMatchingXP, isGameComplete, key, saveTimerRecords, timerMode]);
 
   // ---------------- TIMER CONTROL ----------------
   useEffect(() => {
@@ -305,27 +391,14 @@ export const useVocabularyGame = (
 
       if (!englishCard || !frenchCard) return;
 
-      const activityKey = buildMatchingPracticeActivityKey(key, englishCard, frenchCard);
+      const activityKey = buildMatchingPracticeActivityKey(key, englishCard, frenchCard, timerMode);
       if (recordedMatchingActivityKeysRef.current.has(activityKey)) return;
 
       recordedMatchingActivityKeysRef.current.add(activityKey);
-      void awardActivityXPOnceToday(activityKey, XP_REWARDS.vocabularyMatchingPair).then((xpGain) => {
-        if (xpGain <= 0) return;
-
-        setMatchingSessionXp(current => current + xpGain);
-        setLastMatchingXpGain(xpGain);
-
-        if (matchingXpTimeoutRef.current) {
-          clearTimeout(matchingXpTimeoutRef.current);
-        }
-
-        matchingXpTimeoutRef.current = setTimeout(() => {
-          setLastMatchingXpGain(0);
-          matchingXpTimeoutRef.current = null;
-        }, 1400);
-      });
+      const hadMistake = mistakenMatchingActivityKeysRef.current.has(activityKey);
+      awardMatchingXP(activityKey, getMatchingPairXP(timerMode, hadMistake));
     });
-  }, [gameState.matchedPairs, key, matchingCardsById]);
+  }, [awardMatchingXP, gameState.matchedPairs, key, matchingCardsById, timerMode]);
 
   // ---------------- CARD LOGIC ----------------
   const handleCardPress = useCallback((card: GameCard) => {
@@ -334,14 +407,23 @@ export const useVocabularyGame = (
     if (current.isInputLocked) return;
     if (current.matchedPairs.includes(card.id)) return;
 
-    if (!current.selectedCard) {
-      triggerSelectionHaptic();
-    } else if (current.selectedCard.type === card.type) {
+    if (!current.selectedCard || current.selectedCard.type === card.type) {
       triggerSelectionHaptic();
     } else if (current.selectedCard.pairId === card.pairId) {
       triggerSuccessHaptic();
     } else {
       triggerWarningHaptic();
+    }
+
+    if (
+      current.selectedCard &&
+      current.selectedCard.type !== card.type &&
+      current.selectedCard.pairId !== card.pairId
+    ) {
+      addMatchingReviewWord(current.selectedCard.pairId);
+      addMatchingReviewWord(card.pairId);
+      markMatchingPairMistake(current.selectedCard.pairId);
+      markMatchingPairMistake(card.pairId);
     }
 
     setGameState(prev => {
@@ -381,7 +463,7 @@ export const useVocabularyGame = (
       };
     });
 
-  }, []);
+  }, [addMatchingReviewWord, markMatchingPairMistake]);
 
   // Clear wrong-answer feedback and unlock input after a short pause.
   useEffect(() => {
@@ -467,5 +549,6 @@ export const useVocabularyGame = (
     stopTimer,
     matchingSessionXp,
     lastMatchingXpGain,
+    matchingReviewWords,
   };
 };

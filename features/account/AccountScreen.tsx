@@ -126,6 +126,8 @@ export default function AccountScreen() {
         paddingTop: topContentInset,
         paddingBottom: insets.bottom + 32,
       }}
+      keyboardShouldPersistTaps="handled"
+      keyboardDismissMode="none"
     >
       <BackButton onPress={() => navigation.goBack()} />
 

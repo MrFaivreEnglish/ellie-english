@@ -6,7 +6,6 @@ import Animated, {
   useAnimatedStyle,
   useSharedValue,
   withTiming,
-  runOnJS,
 } from 'react-native-reanimated';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useWindowDimensions } from 'react-native';

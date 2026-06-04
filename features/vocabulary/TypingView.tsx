@@ -17,9 +17,9 @@ import { useAudioPlayer } from 'expo-audio';
 import { useTypingGame } from './useTypingGame';
 import type { Word } from '../../types/VocabularyTypes';
 import { SOUND_EFFECT_OPTIONS, SUCCESS_SOUND, replaySoundEffect } from '../shared/soundEffects';
-import { getWebLessonScale, scaleValue } from '../shared/responsiveLayout';
+import { clampNumber, getWebLessonScale, scaleValue } from '../shared/responsiveLayout';
+import LevelProgressSummary from '../progress/LevelProgressSummary';
 import { triggerSelectionHaptic, triggerSuccessHaptic, triggerWarningHaptic } from '../shared/haptics';
-import { xpForLevel } from '../progress/xpLevels';
 
 type ThemeColors = {
   isDark?: boolean;
@@ -33,21 +33,32 @@ type ThemeColors = {
   secondaryText?: string;
   primary?: string;
   success?: string;
+  successSoft?: string;
   danger?: string;
+  dangerSoft?: string;
   warning?: string;
+  warningSoft?: string;
   buttonBackground?: string;
   buttonText?: string;
 };
 
 type FeedbackType = 'correct' | 'close' | 'wrong' | 'levelup' | null;
+type DifficultyStats = {
+  correct?: number;
+  misses?: number;
+  seen?: number;
+};
 
 interface TypingViewProps {
   words?: Word[];
   colors?: ThemeColors;
   isDarkMode?: boolean;
   allowSlashAlternatives?: boolean;
+  promptLabel?: string;
+  answerPlaceholder?: string;
   keyboardVisible?: boolean;
   layoutHeight?: number;
+  forceAndroidLayout?: boolean;
   onShuffle?: () => void;
   onSessionComplete?: () => void;
   suppressCompletionScreen?: boolean;
@@ -55,7 +66,7 @@ interface TypingViewProps {
     attempts: Record<string, number>;
     correctAnswers: number;
     currentWord: Word | null;
-    difficultyByWord?: Record<string, unknown>;
+    difficultyByWord?: Record<string, DifficultyStats>;
     feedbackEvent: { type: 'correct' | 'close' | 'wrong'; text: string; streak?: number } | null;
     goToNextWord: () => void;
     goToPreviousWord: () => void;
@@ -67,13 +78,8 @@ interface TypingViewProps {
     isSessionComplete: boolean;
     inlineMessage: string;
     level: number;
-    levelUpMessage?: string;
-    masteredCount: number;
     maxStreak: number;
-    mistakes: number;
     reset: () => void;
-    rewardPreview: string;
-    sessionHighlight: string;
     sessionXp: number;
     setTypedAnswer: (value: string) => void;
     strictMode: boolean;
@@ -88,25 +94,30 @@ interface TypingViewProps {
 
 const ACCURACY_EMOJI = '\uD83C\uDFAF';
 const COMBO_EMOJI = '\uD83D\uDD25';
+const XP_EMOJI = '\u2728';
+const getTypingWordKey = (word: Word) => `${word.english.trim().toLowerCase()}|${word.french.trim().toLowerCase()}`;
 
 const buildTheme = (colors?: ThemeColors) => {
   const isDark = colors?.isDark ?? false;
 
   return {
     isDark,
-    background: colors?.background ?? (isDark ? '#0B0B0F' : '#F8FAFC'),
-    card: colors?.card ?? (isDark ? '#16161A' : '#FFFFFF'),
-    text: colors?.text ?? (isDark ? '#FFFFFF' : '#0F172A'),
-    subText: colors?.secondaryText ?? (isDark ? '#9CA3AF' : '#64748B'),
-    border: colors?.border ?? (isDark ? '#2A2A2A' : '#E2E8F0'),
+    background: colors?.background ?? (isDark ? '#071A2D' : '#F8FAFC'),
+    card: colors?.card ?? (isDark ? '#0D2742' : '#FFFFFF'),
+    text: colors?.text ?? (isDark ? '#F7FAFF' : '#0F172A'),
+    subText: colors?.secondaryText ?? (isDark ? '#C9DDF0' : '#64748B'),
+    border: colors?.border ?? (isDark ? '#2A5C84' : '#E2E8F0'),
     primary: colors?.primary ?? colors?.buttonBackground ?? '#3B82F6',
-    success: colors?.success ?? '#63E894',
-    warning: colors?.warning ?? '#FFBF51',
-    error: colors?.danger ?? '#FF7878',
-    progressBg: colors?.border ?? (isDark ? '#1F1F23' : '#E5E7EB'),
-    inputBackground: colors?.surfaceAlt ?? (isDark ? '#0F0F14' : '#FFFFFF'),
-    statsBackground: colors?.surface ?? (isDark ? '#1F2937' : '#EEF2F7'),
-    statsBorder: colors?.border ?? (isDark ? '#374151' : '#E5E7EB'),
+    success: colors?.success ?? (isDark ? '#7ADB9E' : '#63E894'),
+    successSoft: colors?.successSoft ?? (isDark ? '#123E36' : '#E9F8EF'),
+    warning: colors?.warning ?? (isDark ? '#FFD36D' : '#FFBF51'),
+    warningSoft: colors?.warningSoft ?? (isDark ? '#493912' : '#FFF4D8'),
+    error: colors?.danger ?? (isDark ? '#FF8BA1' : '#FF7878'),
+    errorSoft: colors?.dangerSoft ?? (isDark ? '#4F2135' : '#FFE8EC'),
+    progressBg: colors?.border ?? (isDark ? '#2A5C84' : '#E5E7EB'),
+    inputBackground: colors?.surfaceAlt ?? (isDark ? '#1B527F' : '#FFFFFF'),
+    statsBackground: colors?.surface ?? (isDark ? '#123B61' : '#EEF2F7'),
+    statsBorder: colors?.border ?? (isDark ? '#2A5C84' : '#E5E7EB'),
   };
 };
 
@@ -144,34 +155,30 @@ const getAchievement = (accuracy: number, streak: number) => {
   const perfectYellow = '#FACC15';
 
   if (accuracy === 100) {
-    if (streak >= 5) {
-      return { label: 'PERFECT STREAK!', color: perfectYellow };
-    }
-
-    return { label: 'PERFECT!', color: perfectYellow };
+    return { color: perfectYellow };
   }
 
   if (accuracy >= 90) {
-    return { label: 'GREAT JOB!', color: successGreen };
+    return { color: successGreen };
   }
 
   if (streak >= 10) {
-    return { label: 'UNSTOPPABLE!', color: successGreen };
+    return { color: successGreen };
   }
 
   if (streak >= 7) {
-    return { label: 'ON FIRE!', color: successGreen };
+    return { color: successGreen };
   }
 
   if (streak >= 5) {
-    return { label: 'GREAT STREAK!', color: successGreen };
+    return { color: successGreen };
   }
 
   if (streak >= 3) {
-    return { label: 'NICE COMBO!', color: successGreen };
+    return { color: successGreen };
   }
 
-  return { label: 'KEEP GOING', color: successGreen };
+  return { color: successGreen };
 };
 
 export default function TypingView({
@@ -179,8 +186,11 @@ export default function TypingView({
   colors,
   isDarkMode,
   allowSlashAlternatives = true,
+  promptLabel = 'French',
+  answerPlaceholder = 'Type the English translation',
   keyboardVisible = false,
   layoutHeight,
+  forceAndroidLayout = false,
   onShuffle,
   onSessionComplete,
   suppressCompletionScreen = false,
@@ -189,10 +199,14 @@ export default function TypingView({
   const safeWords = words ?? [];
   const { width, height } = useWindowDimensions();
   const responsiveHeight = layoutHeight ?? height;
-  const isDesktopWeb = Platform.OS === 'web' && width >= 768;
+  const isAndroid = Platform.OS === 'android' || forceAndroidLayout;
+  const isDesktopWeb = Platform.OS === 'web' && !forceAndroidLayout && width >= 768;
   const webScale = getWebLessonScale(width, responsiveHeight);
+  const typingWebScale = isDesktopWeb ? Math.min(webScale * 1.06, 1.16) : webScale;
   const isCompact = !isDesktopWeb && (responsiveHeight < 760 || width < 390);
-  const isKeyboardTight = !isDesktopWeb && (responsiveHeight < 700 || width < 380);
+  const isKeyboardTight = isAndroid
+    ? responsiveHeight < 640
+    : !isDesktopWeb && (responsiveHeight < 700 || width < 380);
   const keyboardMode = keyboardVisible || isKeyboardTight;
   const inputRef = useRef<TextInput | null>(null);
   const successPlayer = useAudioPlayer(SUCCESS_SOUND, SOUND_EFFECT_OPTIONS);
@@ -205,7 +219,6 @@ export default function TypingView({
 
   const feedbackOpacity = useRef(new Animated.Value(0)).current;
   const feedbackScale = useRef(new Animated.Value(0.7)).current;
-  const progressAnim = useRef(new Animated.Value(0)).current;
   const shuffleScale = useRef(new Animated.Value(1)).current;
   const comboFireScale = useRef(new Animated.Value(1)).current;
 
@@ -240,14 +253,8 @@ export default function TypingView({
     isReviewMode,
     isSessionComplete,
     inlineMessage,
-    level,
-    levelUpMessage,
-    masteredCount,
     maxStreak,
-    mistakes,
     reset,
-    rewardPreview,
-    sessionHighlight,
     sessionXp,
     setTypedAnswer,
     strictMode,
@@ -255,6 +262,7 @@ export default function TypingView({
     typedAnswer,
     typingIndex,
     correctAnswers,
+    difficultyByWord = {},
     totalAttempts,
     totalWords,
     currentWord,
@@ -263,21 +271,114 @@ export default function TypingView({
 
   const isFinished = safeWords.length > 0 && isSessionComplete;
   const currentWordNumber = Math.min(typingIndex + 1, totalWords || safeWords.length);
-  const shouldReserveKeyboardSpace = Platform.OS !== 'web' || width < 768;
-  const interactiveCardMinHeight = keyboardMode
-    ? 276
-    : isDesktopWeb
-      ? Math.max(scaleValue(480, webScale), Math.round(responsiveHeight * 0.76))
-      : isCompact
-        ? 380
-        : 440;
+  const shouldReserveKeyboardSpace = forceAndroidLayout || Platform.OS !== 'web' || width < 768;
+  const androidInteractiveCardMinHeight = Math.round(clampNumber(
+    responsiveHeight * (keyboardMode ? 0.47 : isCompact ? 0.62 : 0.68),
+    keyboardMode ? (isCompact ? 350 : 380) : isCompact ? 460 : 540,
+    keyboardMode ? (isCompact ? 440 : 480) : isCompact ? 600 : 720
+  ));
+  const interactiveCardMinHeight = isAndroid
+    ? androidInteractiveCardMinHeight
+    : keyboardMode
+      ? 276
+      : isDesktopWeb
+        ? Math.max(scaleValue(510, typingWebScale), Math.round(responsiveHeight * 0.76))
+        : isCompact
+          ? 380
+          : 440;
+  const androidStatusPillStyle = isAndroid
+    ? {
+        minHeight: keyboardMode ? 32 : 38,
+        paddingHorizontal: keyboardMode ? 9 : 11,
+        gap: 6,
+      }
+    : undefined;
+  const androidStatusLabelStyle = isAndroid
+    ? { fontSize: keyboardMode ? 12 : 13, lineHeight: keyboardMode ? 15 : 16 }
+    : undefined;
+  const androidStatusValueStyle = isAndroid
+    ? { fontSize: keyboardMode ? 15 : 17, lineHeight: keyboardMode ? 18 : 21 }
+    : undefined;
+  const desktopStatusPillStyle = isDesktopWeb
+    ? {
+        minHeight: scaleValue(38, typingWebScale),
+        paddingHorizontal: scaleValue(12, typingWebScale),
+        gap: scaleValue(7, typingWebScale),
+      }
+    : undefined;
+  const desktopStatusLabelStyle = isDesktopWeb
+    ? { fontSize: scaleValue(12, typingWebScale), lineHeight: scaleValue(15, typingWebScale) }
+    : undefined;
+  const desktopStatusValueStyle = isDesktopWeb
+    ? { fontSize: scaleValue(16, typingWebScale), lineHeight: scaleValue(20, typingWebScale) }
+    : undefined;
   const completionMinHeight = keyboardMode
-    ? 420
+    ? 360
     : isDesktopWeb
-      ? Math.max(scaleValue(540, webScale), Math.round(responsiveHeight * 0.80))
+      ? Math.max(scaleValue(470, webScale), Math.round(responsiveHeight * 0.70))
       : isCompact
-        ? 460
-        : 520;
+        ? 400
+        : 460;
+  const androidPromptMinHeight = Math.round(clampNumber(
+    responsiveHeight * (keyboardMode ? 0.18 : 0.23),
+    keyboardMode ? 124 : isCompact ? 150 : 164,
+    keyboardMode ? 158 : isCompact ? 188 : 212
+  ));
+  const promptMinHeight = isAndroid
+    ? androidPromptMinHeight
+    : keyboardMode
+      ? 78
+      : isDesktopWeb
+        ? scaleValue(158, typingWebScale)
+        : isCompact
+          ? 104
+          : 124;
+  const promptFontSize = isAndroid
+    ? keyboardMode
+      ? 30
+      : isCompact ? 35 : 38
+    : keyboardMode
+      ? 23
+      : isDesktopWeb
+        ? scaleValue(42, typingWebScale)
+        : isCompact
+          ? 28
+          : 34;
+  const promptLineHeight = isAndroid
+    ? keyboardMode
+      ? 36
+      : isCompact ? 41 : 45
+    : keyboardMode
+      ? 27
+      : isDesktopWeb
+        ? scaleValue(50, typingWebScale)
+        : isCompact
+          ? 32
+          : 38;
+  const contentHorizontalPadding = isAndroid
+    ? isCompact ? 8 : 10
+    : isCompact ? 12 : 18;
+  const contentBottomPadding = isAndroid
+    ? keyboardMode ? 34 : shouldReserveKeyboardSpace ? (isCompact ? 18 : 26) : 16
+    : keyboardMode ? 44 : shouldReserveKeyboardSpace ? (isCompact ? 16 : 24) : 16;
+  const androidPromptMarginTop = keyboardMode ? 10 : isCompact ? 18 : 24;
+  const androidAnswerMarginTop = keyboardMode ? 10 : isCompact ? 15 : 18;
+  const inputVerticalPadding = isAndroid
+    ? keyboardMode ? 12 : 15
+    : keyboardMode ? 9 : isDesktopWeb ? scaleValue(16, typingWebScale) : 13;
+  const inputFontSize = isAndroid
+    ? keyboardMode ? 18 : 19
+    : keyboardMode ? 16 : isDesktopWeb ? scaleValue(19, typingWebScale) : 17;
+  const checkButtonAndroidStyle = isAndroid
+    ? {
+        minHeight: keyboardMode ? 44 : 52,
+        paddingVertical: keyboardMode ? 9 : 12,
+        paddingHorizontal: 24,
+      }
+    : undefined;
+  const secondaryControlsMarginTop = isAndroid
+    ? keyboardMode ? 10 : isCompact ? 14 : 16
+    : keyboardMode ? 8 : isCompact ? 12 : 14;
 
   React.useLayoutEffect(() => {
     if (Platform.OS === 'android') {
@@ -303,40 +404,25 @@ export default function TypingView({
 
   const achievement = useMemo(() => getAchievement(accuracy, maxStreak), [accuracy, maxStreak]);
 
-  const xpForCurrentLevel = useMemo(() => xpForLevel(level), [level]);
-  const xpForNextLevel = useMemo(() => xpForLevel(level + 1), [level]);
-  const xpBeforeSession = Math.max(xp - sessionXp, 0);
-  const xpIntoCurrentLevel = Math.max(xp - xpForCurrentLevel, 0);
-  const xpIntoCurrentLevelBeforeSession = Math.max(xpBeforeSession - xpForCurrentLevel, 0);
-  const xpNeededThisLevel = Math.max(xpForNextLevel - xpForCurrentLevel, 1);
-  const progressPercent = useMemo(() => {
-    const progress = xpIntoCurrentLevel / xpNeededThisLevel;
-    return Math.min(Math.max(progress * 100, 0), 100);
-  }, [xpIntoCurrentLevel, xpNeededThisLevel]);
-  const startingProgressPercent = useMemo(() => {
-    const progress = xpIntoCurrentLevelBeforeSession / xpNeededThisLevel;
-    return Math.min(Math.max(progress * 100, 0), 100);
-  }, [xpIntoCurrentLevelBeforeSession, xpNeededThisLevel]);
-  const xpRemaining = Math.max(xpForNextLevel - xp, 0);
-  const reviewHint = mistakes === 0
-    ? 'No words marked for review'
-    : `${mistakes} ${mistakes === 1 ? 'word' : 'words'} to review`;
-  const answerPanelMessage = inlineMessage || rewardPreview;
-  const shouldShowAnswerSignal = !!inlineMessage || (!keyboardMode && !!rewardPreview);
-  const answerPanelIcon = inlineMessage
-    ? feedbackEvent?.type === 'wrong'
-      ? 'error-outline'
-      : feedbackEvent?.type === 'close'
-        ? 'tips-and-updates'
-        : 'check-circle'
-    : 'edit-note';
-  const answerPanelTone = inlineMessage
-    ? feedbackEvent?.type === 'wrong'
-      ? theme.error
-      : feedbackEvent?.type === 'close'
-        ? theme.warning
-        : theme.success
-    : theme.primary;
+  const weakWords = useMemo(
+    () => safeWords.filter((word) => {
+      const key = getTypingWordKey(word);
+      const stats = difficultyByWord[key];
+      const misses = stats?.misses ?? 0;
+      const correct = stats?.correct ?? 0;
+
+      return misses > 0 && correct < Math.max(2, misses + 1);
+    }),
+    [difficultyByWord, safeWords]
+  );
+  const completionTitleText = accuracy === 100
+    ? 'Perfect typing!'
+    : accuracy >= 90
+      ? 'Great typing!'
+      : 'Nice work!';
+  const completionSubtitleText = accuracy === 100
+    ? 'Clean round. You got every word.'
+    : 'You finished the round. Nice work!';
   const playSuccessSound = useCallback(() => {
     replaySoundEffect(successPlayer);
   }, [successPlayer]);
@@ -382,11 +468,17 @@ export default function TypingView({
     [feedbackOpacity, feedbackScale]
   );
 
+  const shouldAutoFocusInput = Platform.OS !== 'web' && !isDesktopWeb;
+
   const focusInput = useCallback(() => {
+    if (!shouldAutoFocusInput) {
+      return;
+    }
+
     requestAnimationFrame(() => {
       inputRef.current?.focus();
     });
-  }, []);
+  }, [shouldAutoFocusInput]);
 
   const onSubmit = useCallback(() => {
     if (isAdvancing || !typedAnswer.trim()) {
@@ -403,10 +495,14 @@ export default function TypingView({
 
     requestAnimationFrame(() => {
       setTimeout(() => {
+        if (!shouldAutoFocusInput) {
+          return;
+        }
+
         inputRef.current?.focus();
       }, 150);
     });
-  }, [reset]);
+  }, [reset, shouldAutoFocusInput]);
 
   const handleShufflePress = useCallback(() => {
     if (!onShuffle) {
@@ -439,18 +535,6 @@ export default function TypingView({
   }, [canGoNext, goToNextWord, isAdvancing]);
 
   useEffect(() => {
-    if (!levelUpMessage) {
-      return;
-    }
-
-    const timeoutId = setTimeout(() => {
-      triggerFeedbackCard('levelup', `Level Up!\nYou are now level ${level}`);
-    }, 1150);
-
-    return () => clearTimeout(timeoutId);
-  }, [level, levelUpMessage, triggerFeedbackCard]);
-
-  useEffect(() => {
     if (!feedbackEvent?.type || !feedbackEvent.text) {
       return;
     }
@@ -462,12 +546,15 @@ export default function TypingView({
       triggerWarningHaptic();
     }
 
-    const feedbackText =
+    const baseFeedbackText =
       feedbackEvent.type === 'correct' && feedbackEvent.streak
         ? `${feedbackEvent.text}\nCombo ${feedbackEvent.streak}`
         : feedbackEvent.text;
+    const helperText = inlineMessage && !baseFeedbackText.includes(inlineMessage)
+      ? `\n${inlineMessage}`
+      : '';
 
-    triggerFeedbackCard(feedbackEvent.type, feedbackText);
+    triggerFeedbackCard(feedbackEvent.type, `${baseFeedbackText}${helperText}`);
   }, [feedbackEvent, playSuccessSound, triggerFeedbackCard]);
 
   useEffect(() => {
@@ -476,12 +563,16 @@ export default function TypingView({
       return;
     }
 
+    if (!shouldAutoFocusInput) {
+      return;
+    }
+
     const timeoutId = setTimeout(() => {
       inputRef.current?.focus();
-    }, 150);
+    }, 60);
 
     return () => clearTimeout(timeoutId);
-  }, [isFinished]);
+  }, [isFinished, shouldAutoFocusInput, typingIndex]);
 
   useEffect(() => {
     if (!isFinished) {
@@ -532,20 +623,6 @@ export default function TypingView({
     setShowShuffleFeedback(false);
   }, [safeWords]);
 
-  useEffect(() => {
-    if (!isFinished) {
-      progressAnim.setValue(0);
-      return;
-    }
-
-    progressAnim.setValue(startingProgressPercent);
-    Animated.timing(progressAnim, {
-      toValue: progressPercent,
-      duration: 700,
-      useNativeDriver: false,
-    }).start();
-  }, [isFinished, progressAnim, progressPercent, startingProgressPercent]);
-
   if (!safeWords.length) {
     return null;
   }
@@ -557,133 +634,114 @@ export default function TypingView({
   if (isFinished) {
     return (
       <View style={[styles.screen, styles.completionScreen, { backgroundColor: theme.background, minHeight: completionMinHeight }]}>
-        <Text style={[styles.title, styles.completionTitle, isDesktopWeb && { fontSize: scaleValue(22, webScale) }, { color: theme.text }]}>Revision Complete</Text>
-
         <View
           style={[
             styles.card,
             styles.completionCard,
-            styles.completionStatsCard,
-            isDesktopWeb && { maxWidth: scaleValue(520, webScale) },
+            styles.completionHeroCard,
+            isDesktopWeb && { maxWidth: scaleValue(620, webScale) },
             {
               backgroundColor: theme.card,
               borderColor: theme.border,
             },
           ]}
         >
-          <View style={[styles.statItem, styles.xpStatItem]}>
-            <Animated.Text style={styles.xpText}>{sessionXp}</Animated.Text>
-            <Text style={[styles.statLabel, { color: theme.subText }]}>XP</Text>
+          <View style={[styles.completionHeroIcon, { backgroundColor: achievement.color }]}>
+            <MaterialIcons name={accuracy === 100 ? 'workspace-premium' : 'check-circle'} size={28} color="#FFFFFF" />
           </View>
 
-          <View style={[styles.divider, { backgroundColor: theme.border }]} />
+          <Text style={[styles.title, styles.completionTitle, isDesktopWeb && { fontSize: scaleValue(23, webScale) }, { color: theme.text }]}>
+            {completionTitleText}
+          </Text>
+          <Text style={[styles.completionSubtitle, { color: theme.subText }]}>
+            {completionSubtitleText}
+          </Text>
 
-          <View style={styles.statItem}>
-              <Text style={styles.statEmoji}>{ACCURACY_EMOJI}</Text>
+          <View style={[styles.completionStatsGrid, { borderColor: theme.border }]}>
+            <View style={styles.completionStatPill}>
+              <View style={styles.completionStatValueRow}>
+                <Text style={styles.statEmoji}>{XP_EMOJI}</Text>
+                <Animated.Text style={styles.xpText}>{sessionXp}</Animated.Text>
+              </View>
+              <Text style={[styles.statLabel, { color: theme.subText }]}>XP</Text>
+            </View>
+
+            <View style={[styles.completionStatPill, { borderLeftColor: theme.border, borderLeftWidth: 1 }]}>
+              <View style={styles.completionStatValueRow}>
+                <Text style={styles.statEmoji}>{ACCURACY_EMOJI}</Text>
+                <Text style={[styles.statText, { color: theme.text }]}>{accuracy}%</Text>
+              </View>
               <Text style={[styles.statLabel, { color: theme.subText }]}>Accuracy</Text>
-              <Text style={[styles.statText, { color: theme.text }]}>{accuracy}%</Text>
-          </View>
+            </View>
 
-          <View style={[styles.divider, { backgroundColor: theme.border }]} />
-
-          <View style={styles.statItem}>
-              <Text style={styles.statEmoji}>{COMBO_EMOJI}</Text>
+            <View style={[styles.completionStatPill, { borderLeftColor: theme.border, borderLeftWidth: 1 }]}>
+              <View style={styles.completionStatValueRow}>
+                <Text style={styles.statEmoji}>{COMBO_EMOJI}</Text>
+                <Text style={[styles.statText, { color: theme.text }]}>{maxStreak}</Text>
+              </View>
               <Text style={[styles.statLabel, { color: theme.subText }]}>Max Combo</Text>
-              <Text style={[styles.statText, { color: theme.text }]}>{maxStreak}</Text>
+            </View>
           </View>
+
         </View>
 
-        <Animated.View
-          style={[
-            styles.badge,
-            isDesktopWeb && {
-              minWidth: scaleValue(230, webScale),
-              paddingVertical: scaleValue(10, webScale),
-              paddingHorizontal: scaleValue(18, webScale),
-            },
-            {
-              backgroundColor: achievement.color,
-              transform: [{ scale: feedbackScale }],
-            },
-          ]}
-        >
-         <Text style={[styles.badgeText, isDesktopWeb && { fontSize: scaleValue(20, webScale) }]}>{achievement.label}</Text>
-        </Animated.View>
-
-        <View
-          style={[
-            styles.sessionHighlight,
-            isDesktopWeb && {
-              maxWidth: scaleValue(520, webScale),
-              minHeight: scaleValue(38, webScale),
-            },
-            {
-              backgroundColor: theme.statsBackground,
-              borderColor: theme.statsBorder,
-            },
-          ]}
-        >
-          <MaterialIcons name="auto-awesome" size={16} color={theme.primary} />
-          <Text
-            style={[styles.sessionHighlightText, { color: theme.text }]}
-            numberOfLines={1}
-            adjustsFontSizeToFit
-            minimumFontScale={0.84}
-          >
-            {sessionHighlight}
-          </Text>
-        </View>
+        <LevelProgressSummary
+          totalXP={xp}
+          sessionXP={sessionXp}
+          colors={theme}
+          isDarkMode={theme.isDark}
+          style={[styles.completionCard, styles.levelSummaryCard, isDesktopWeb && { maxWidth: scaleValue(620, webScale) }]}
+        />
 
         <View
           style={[
             styles.card,
             styles.completionCard,
-            styles.levelSummaryCard,
-            isDesktopWeb && { maxWidth: scaleValue(520, webScale) },
+            styles.reviewWordsCard,
+            isDesktopWeb && { maxWidth: scaleValue(620, webScale) },
             {
               backgroundColor: theme.card,
               borderColor: theme.border,
             },
           ]}
         >
-          <View style={styles.levelSummaryHeader}>
-            <View>
-              <Text style={[styles.sectionTitle, styles.levelSummaryTitle, { color: theme.subText }]}>Total Level</Text>
-              <Text style={[styles.levelText, styles.levelSummaryValue, { color: theme.text }]}>Level {level}</Text>
-            </View>
-            <View style={styles.levelSummaryStats}>
-              <Text style={[styles.levelSummaryStatText, { color: theme.text }]}>
-                {masteredCount}/{safeWords.length}
-              </Text>
-              <Text style={[styles.levelSummaryStatLabel, { color: theme.subText }]}>mastered</Text>
-            </View>
+          <View style={styles.reviewWordsHeader}>
+            <MaterialIcons name="rate-review" size={18} color={theme.primary} />
+            <Text style={[styles.reviewWordsTitle, { color: theme.text }]}>Words to Practise</Text>
           </View>
 
-          <View style={[styles.progressTrack, { backgroundColor: theme.progressBg }]}>
-            <Animated.View
-              style={[
-                styles.progressFill,
-                {
-                  width: progressAnim.interpolate({
-                    inputRange: [0, 100],
-                    outputRange: ['0%', '100%'],
-                  }),
-                  backgroundColor: theme.primary,
-                },
-              ]}
-            />
-          </View>
-
-          <Text style={[styles.subText, styles.levelSummaryHint, { color: theme.subText }]}>
-            {reviewHint} - {xpRemaining} XP to level {level + 1}
-          </Text>
+          {weakWords.length > 0 ? (
+            <View style={styles.reviewWordsList}>
+              {weakWords.slice(0, 3).map((word) => (
+                <View key={`${word.english}-${word.french}`} style={styles.reviewWordRow}>
+                  <Text style={[styles.reviewWordText, { color: theme.text }]} numberOfLines={1}>
+                    {word.english}
+                  </Text>
+                  <Text style={[styles.reviewWordDivider, { color: theme.subText }]}>/</Text>
+                  <Text style={[styles.reviewWordText, { color: theme.text }]} numberOfLines={1}>
+                    {word.french}
+                  </Text>
+                </View>
+              ))}
+              {weakWords.length > 3 && (
+                <Text style={[styles.reviewMoreText, { color: theme.subText }]}>
+                  +{weakWords.length - 3} more
+                </Text>
+              )}
+            </View>
+          ) : (
+            <Text style={[styles.reviewEmptyText, { color: theme.subText }]}>
+              Nice! No tricky words left.
+            </Text>
+          )}
         </View>
 
         <TouchableOpacity
           onPress={handlePlayAgain}
           style={[styles.button, styles.playAgainButton, isDesktopWeb && { maxWidth: scaleValue(360, webScale), minHeight: scaleValue(44, webScale) }, { backgroundColor: theme.primary }]}
         >
-          <Text style={[styles.buttonText, isDesktopWeb && { fontSize: scaleValue(14, webScale) }]}>Practise Again</Text>
+          <MaterialIcons name="refresh" size={18} color={theme.buttonText} />
+          <Text style={[styles.buttonText, isDesktopWeb && { fontSize: scaleValue(14, webScale) }]}>Play Again</Text>
         </TouchableOpacity>
       </View>
     );
@@ -691,66 +749,14 @@ export default function TypingView({
 
   return (
     <View style={styles.interactiveShell}>
-      {showFeedbackCard && (
-        <Animated.View
-          pointerEvents="none"
-          style={[
-            styles.feedbackContainer,
-            keyboardMode ? styles.feedbackContainerTight : isCompact && styles.feedbackContainerCompact,
-            isDesktopWeb && styles.feedbackContainerDesktopWeb,
-            {
-              opacity: feedbackOpacity,
-              transform: [
-                {
-                  translateY: feedbackOpacity.interpolate({
-                    inputRange: [0, 1],
-                    outputRange: [-20, 0],
-                  }),
-                },
-                { scale: feedbackScale },
-              ],
-            },
-          ]}
-        >
-          <View
-            style={[
-              styles.feedbackCard,
-              keyboardMode && styles.feedbackCardTight,
-              isDesktopWeb && styles.feedbackCardDesktopWeb,
-              {
-                backgroundColor: getFeedbackBackgroundColor(feedbackType, theme),
-              },
-            ]}
-          >
-            <View style={styles.feedbackContent}>
-              <View style={styles.feedbackIconBubble}>
-                <MaterialIcons name={getFeedbackIconName(feedbackType)} size={18} color="#FFFFFF" />
-              </View>
-              <Text
-                style={[
-                  styles.feedbackText,
-                  keyboardMode && styles.feedbackTextTight,
-                  isDesktopWeb && styles.feedbackTextDesktopWeb,
-                ]}
-                numberOfLines={2}
-                adjustsFontSizeToFit
-                minimumFontScale={0.82}
-              >
-                {feedbackText}
-              </Text>
-            </View>
-          </View>
-        </Animated.View>
-      )}
-
       <View
         style={[
           styles.contentContainer,
           {
             backgroundColor: theme.background,
-            paddingTop: 0,
-            paddingBottom: keyboardMode ? 44 : shouldReserveKeyboardSpace ? (isCompact ? 16 : 24) : 16,
-            paddingHorizontal: isCompact ? 12 : 18,
+            paddingTop: isAndroid ? 6 : 0,
+            paddingBottom: contentBottomPadding,
+            paddingHorizontal: contentHorizontalPadding,
             minHeight: keyboardMode ? undefined : interactiveCardMinHeight + (shouldReserveKeyboardSpace ? 20 : 32),
           },
         ]}
@@ -760,7 +766,7 @@ export default function TypingView({
             styles.card,
             styles.interactiveCard,
             isDesktopWeb && styles.interactiveCardDesktopWeb,
-            isDesktopWeb && { maxWidth: scaleValue(640, webScale) },
+            isDesktopWeb && { maxWidth: scaleValue(730, typingWebScale) },
             {
               backgroundColor: theme.background,
               borderColor: 'transparent',
@@ -775,8 +781,8 @@ export default function TypingView({
               styles.typingProgressPanel,
               keyboardMode && styles.typingProgressPanelTight,
               isDesktopWeb && {
-                padding: scaleValue(10, webScale),
-                borderRadius: scaleValue(16, webScale),
+                padding: scaleValue(12, typingWebScale),
+                borderRadius: scaleValue(17, typingWebScale),
               },
               {
                 backgroundColor: theme.statsBackground,
@@ -784,48 +790,18 @@ export default function TypingView({
               },
             ]}
           >
-            <View style={[styles.levelHeaderRow, keyboardMode && styles.levelHeaderRowTight]}>
-              <View style={keyboardMode && styles.levelTitleTight}>
-                <Text style={[styles.levelLabel, keyboardMode && styles.levelLabelTight, isDesktopWeb && { fontSize: scaleValue(11, webScale) }, { color: theme.subText }]}>Level</Text>
-                <Text style={[styles.levelValue, keyboardMode && styles.levelValueTight, isDesktopWeb && { fontSize: scaleValue(23, webScale), lineHeight: scaleValue(27, webScale) }, { color: theme.text }]}>{level}</Text>
-              </View>
-
-              <View style={[styles.levelXpGroup, keyboardMode && styles.levelXpGroupTight]}>
-                <Text style={[styles.levelXpValue, keyboardMode && styles.levelXpValueTight, isDesktopWeb && { fontSize: scaleValue(16, webScale) }, { color: theme.success }]}>
-                  {masteredCount}/{totalWords || safeWords.length}
-                </Text>
-                {!keyboardMode && (
-                  <Text style={[styles.levelXpHint, { color: theme.subText }]}>
-                    mastered this session
-                  </Text>
-                )}
-              </View>
-            </View>
-
-            <View style={[styles.levelProgressTrack, keyboardMode && styles.levelProgressTrackTight, { backgroundColor: theme.progressBg }]}>
-              <View
-                style={[
-                  styles.levelProgressFill,
-                  {
-                    width: `${progressPercent}%`,
-                    backgroundColor: theme.primary,
-                  },
-                ]}
-              />
-            </View>
-
-            <View style={[styles.typingStatusRow, keyboardMode && styles.typingStatusRowTight]}>
-              <View style={[styles.typingStatusPill, keyboardMode && styles.typingStatusPillTight, { backgroundColor: theme.card, borderColor: theme.statsBorder }]}>
-                <Text style={[styles.typingStatusLabel, { color: theme.subText }]}>Word</Text>
-                <Text style={[styles.typingStatusValue, { color: theme.text }]}>
+            <View style={[styles.typingStatusRow, keyboardMode && styles.typingStatusRowTight, isAndroid && styles.typingStatusRowAndroid]}>
+              <View style={[styles.typingStatusPill, keyboardMode && styles.typingStatusPillTight, androidStatusPillStyle, desktopStatusPillStyle, { backgroundColor: theme.card, borderColor: theme.statsBorder }]}>
+                <Text style={[styles.typingStatusLabel, androidStatusLabelStyle, desktopStatusLabelStyle, { color: theme.subText }]}>Word</Text>
+                <Text style={[styles.typingStatusValue, androidStatusValueStyle, desktopStatusValueStyle, { color: theme.text }]}>
                   {currentWordNumber} / {totalWords || safeWords.length}
                 </Text>
               </View>
 
-              <View style={[styles.typingStatusPill, keyboardMode && styles.typingStatusPillTight, { backgroundColor: theme.card, borderColor: theme.statsBorder }]}>
-                <Text style={[styles.typingStatusLabel, { color: theme.subText }]}>Combo</Text>
+              <View style={[styles.typingStatusPill, keyboardMode && styles.typingStatusPillTight, androidStatusPillStyle, desktopStatusPillStyle, { backgroundColor: theme.card, borderColor: theme.statsBorder }]}>
+                <Text style={[styles.typingStatusLabel, androidStatusLabelStyle, desktopStatusLabelStyle, { color: theme.subText }]}>Combo</Text>
                 <View style={styles.comboValueRow}>
-                  <Text style={[styles.typingStatusValue, { color: theme.warning }]}>{streak}</Text>
+                  <Text style={[styles.typingStatusValue, androidStatusValueStyle, desktopStatusValueStyle, { color: theme.warning }]}>{streak}</Text>
                   {streak >= 3 && (
                     <Animated.Text
                       style={[
@@ -840,6 +816,13 @@ export default function TypingView({
                   )}
                 </View>
               </View>
+
+              <View style={[styles.typingStatusPill, keyboardMode && styles.typingStatusPillTight, androidStatusPillStyle, desktopStatusPillStyle, { backgroundColor: theme.card, borderColor: theme.statsBorder }]}>
+                <Text style={[styles.typingStatusLabel, androidStatusLabelStyle, desktopStatusLabelStyle, { color: theme.subText }]}>Done</Text>
+                <Text style={[styles.typingStatusValue, androidStatusValueStyle, desktopStatusValueStyle, { color: theme.success }]}>
+                  {correctAnswers}/{safeWords.length}
+                </Text>
+              </View>
             </View>
 
           </View>
@@ -852,7 +835,7 @@ export default function TypingView({
                     styles.modeStatusBadge,
                     styles.reviewModeBadge,
                     {
-                      backgroundColor: theme.isDark ? 'rgba(255,191,81,0.16)' : '#FFF4D8',
+                      backgroundColor: theme.warningSoft,
                       borderColor: theme.warning,
                     },
                   ]}
@@ -881,36 +864,102 @@ export default function TypingView({
 
           <View
             style={[
-              styles.promptPanel,
-              isDesktopWeb && styles.promptPanelDesktopWeb,
+              styles.promptOverlayWrap,
               isDesktopWeb && {
-                maxWidth: scaleValue(600, webScale),
-                paddingVertical: scaleValue(20, webScale),
-                paddingHorizontal: scaleValue(22, webScale),
+                maxWidth: scaleValue(700, typingWebScale),
               },
               {
-                backgroundColor: theme.card,
-                borderColor: typedAnswer.trim() ? theme.primary : theme.border,
-                marginTop: keyboardMode ? 8 : isDesktopWeb ? scaleValue(20, webScale) : isCompact ? 14 : 20,
-                minHeight: keyboardMode ? 78 : isDesktopWeb ? scaleValue(136, webScale) : isCompact ? 104 : 124,
+                marginTop: isAndroid ? androidPromptMarginTop : keyboardMode ? 8 : isDesktopWeb ? scaleValue(21, typingWebScale) : isCompact ? 14 : 20,
+                minHeight: promptMinHeight,
               },
             ]}
           >
-            <View style={[styles.promptBadge, { backgroundColor: theme.primary }]}>
-              <Text style={[styles.promptBadgeText, { color: theme.buttonText }]}>French</Text>
-            </View>
-            <Text
+            <View
               style={[
-                styles.promptText,
+                styles.promptPanel,
+                isDesktopWeb && styles.promptPanelDesktopWeb,
+                isDesktopWeb && {
+                  maxWidth: scaleValue(700, typingWebScale),
+                  minHeight: scaleValue(158, typingWebScale),
+                  paddingVertical: scaleValue(23, typingWebScale),
+                  paddingHorizontal: scaleValue(27, typingWebScale),
+                },
                 {
-                  color: theme.text,
-                  fontSize: keyboardMode ? 23 : isDesktopWeb ? scaleValue(38, webScale) : isCompact ? 28 : 34,
-                  lineHeight: keyboardMode ? 27 : isDesktopWeb ? scaleValue(44, webScale) : isCompact ? 32 : 38,
+                  backgroundColor: theme.card,
+                  borderColor: typedAnswer.trim() ? theme.primary : theme.border,
+                  marginTop: 0,
+                  minHeight: promptMinHeight,
                 },
               ]}
             >
-              {currentWord?.french}
-            </Text>
+              <View style={[styles.promptBadge, { backgroundColor: theme.primary }]}>
+                <Text style={[styles.promptBadgeText, { color: theme.buttonText }]}>{promptLabel}</Text>
+              </View>
+              <Text
+                style={[
+                  styles.promptText,
+                  {
+                    color: theme.text,
+                    fontSize: promptFontSize,
+                    lineHeight: promptLineHeight,
+                  },
+                ]}
+              >
+                {currentWord?.french}
+              </Text>
+            </View>
+
+            {showFeedbackCard && (
+              <Animated.View
+                pointerEvents="none"
+                style={[
+                  styles.promptFeedbackOverlay,
+                  {
+                    opacity: feedbackOpacity,
+                    transform: [
+                      {
+                        translateY: feedbackOpacity.interpolate({
+                          inputRange: [0, 1],
+                          outputRange: [-12, 0],
+                        }),
+                      },
+                      { scale: feedbackScale },
+                    ],
+                  },
+                ]}
+              >
+                <View
+                  style={[
+                    styles.feedbackCard,
+                    keyboardMode && (isAndroid ? styles.feedbackCardTightAndroid : styles.feedbackCardTight),
+                    !keyboardMode && isCompact && (isAndroid ? styles.feedbackCardCompactAndroid : styles.feedbackCardCompact),
+                    isDesktopWeb && styles.feedbackCardDesktopWeb,
+                    {
+                      backgroundColor: getFeedbackBackgroundColor(feedbackType, theme),
+                    },
+                  ]}
+                >
+                  <View style={styles.feedbackContent}>
+                    <View style={styles.feedbackIconBubble}>
+                      <MaterialIcons name={getFeedbackIconName(feedbackType)} size={18} color="#FFFFFF" />
+                    </View>
+                    <Text
+                      style={[
+                        styles.feedbackText,
+                        !keyboardMode && isAndroid && styles.feedbackTextAndroid,
+                        keyboardMode && (isAndroid ? styles.feedbackTextTightAndroid : styles.feedbackTextTight),
+                        isDesktopWeb && styles.feedbackTextDesktopWeb,
+                      ]}
+                      numberOfLines={isAndroid ? 4 : 3}
+                      adjustsFontSizeToFit
+                      minimumFontScale={isAndroid ? 0.92 : 0.82}
+                    >
+                      {feedbackText}
+                    </Text>
+                  </View>
+                </View>
+              </Animated.View>
+            )}
           </View>
 
           <View
@@ -918,49 +967,28 @@ export default function TypingView({
               styles.answerPanel,
               isDesktopWeb && styles.answerPanelDesktopWeb,
               isDesktopWeb && {
-                maxWidth: scaleValue(600, webScale),
-                padding: scaleValue(12, webScale),
+                maxWidth: scaleValue(700, typingWebScale),
+                padding: scaleValue(13, typingWebScale),
               },
               {
                 backgroundColor: theme.card,
                 borderColor: theme.border,
-                marginTop: keyboardMode ? 8 : isDesktopWeb ? scaleValue(18, webScale) : isCompact ? 12 : 16,
+                marginTop: isAndroid ? androidAnswerMarginTop : keyboardMode ? 8 : isDesktopWeb ? scaleValue(19, typingWebScale) : isCompact ? 12 : 16,
               },
             ]}
           >
-            {shouldShowAnswerSignal && (
-              <View
-                style={[
-                  styles.answerSignalRow,
-                  keyboardMode && styles.answerSignalRowTight,
-                ]}
-              >
-                <MaterialIcons name={answerPanelIcon} size={14} color={answerPanelTone} />
-                <Text
-                  style={[
-                    styles.answerSignalText,
-                    keyboardMode && styles.answerSignalTextTight,
-                    { color: inlineMessage ? answerPanelTone : theme.subText },
-                  ]}
-                  numberOfLines={1}
-                  adjustsFontSizeToFit
-                  minimumFontScale={0.86}
-                >
-                  {answerPanelMessage}
-                </Text>
-              </View>
-            )}
-
             <TextInput
               ref={inputRef}
               value={typedAnswer}
               onChangeText={setTypedAnswer}
               onSubmitEditing={onSubmit}
               blurOnSubmit={false}
+              submitBehavior="submit"
               autoCapitalize="none"
               autoCorrect={false}
+              showSoftInputOnFocus
               returnKeyType="done"
-              placeholder="Type the English translation"
+              placeholder={answerPlaceholder}
               placeholderTextColor={theme.subText}
               style={[
                 styles.input,
@@ -969,8 +997,8 @@ export default function TypingView({
                   color: theme.text,
                   backgroundColor: theme.inputBackground,
                   borderColor: typedAnswer.trim() ? theme.primary : theme.border,
-                  paddingVertical: keyboardMode ? 9 : isDesktopWeb ? scaleValue(15, webScale) : 13,
-                  fontSize: keyboardMode ? 16 : isDesktopWeb ? scaleValue(17, webScale) : 17,
+                  paddingVertical: inputVerticalPadding,
+                  fontSize: inputFontSize,
                 },
               ]}
             />
@@ -983,10 +1011,11 @@ export default function TypingView({
                 styles.primaryCheckButton,
                 isCompact && styles.primaryCheckButtonCompact,
                 keyboardMode && styles.primaryCheckButtonTight,
+                checkButtonAndroidStyle,
                 isDesktopWeb && {
-                  minHeight: scaleValue(44, webScale),
-                  paddingVertical: scaleValue(11, webScale),
-                  paddingHorizontal: scaleValue(26, webScale),
+                  minHeight: scaleValue(47, typingWebScale),
+                  paddingVertical: scaleValue(11, typingWebScale),
+                  paddingHorizontal: scaleValue(27, typingWebScale),
                 },
                 {
                   backgroundColor: theme.primary,
@@ -994,11 +1023,11 @@ export default function TypingView({
                 },
               ]}
             >
-              <Text style={[styles.buttonText, isDesktopWeb && { fontSize: scaleValue(14, webScale) }, { color: theme.buttonText }]}>Check</Text>
+              <Text style={[styles.buttonText, isDesktopWeb && { fontSize: scaleValue(15, typingWebScale) }, { color: theme.buttonText }]}>Check</Text>
             </TouchableOpacity>
           </View>
 
-          <View style={[styles.secondaryControlsRow, keyboardMode && styles.secondaryControlsRowTight, { marginTop: keyboardMode ? 8 : isCompact ? 12 : 14 }]}>
+          <View style={[styles.secondaryControlsRow, keyboardMode && styles.secondaryControlsRowTight, { marginTop: secondaryControlsMarginTop }]}>
             <TouchableOpacity
               onPress={handlePreviousWordPress}
               disabled={!canGoPrevious || isAdvancing}
@@ -1082,7 +1111,8 @@ const styles = StyleSheet.create({
     padding: 24,
   },
   completionScreen: {
-    padding: 16,
+    padding: 10,
+    justifyContent: 'center',
   },
   contentContainer: {
     justifyContent: 'flex-start',
@@ -1099,10 +1129,10 @@ const styles = StyleSheet.create({
   },
   completionCard: {
     width: '100%',
-    maxWidth: 520,
+    maxWidth: 620,
     alignSelf: 'center',
     alignItems: 'center',
-    marginBottom: 10,
+    marginBottom: 7,
   },
   completionStatsCard: {
     minHeight: 82,
@@ -1126,8 +1156,16 @@ const styles = StyleSheet.create({
     marginBottom: 20,
   },
   completionTitle: {
-    fontSize: 22,
-    marginBottom: 12,
+    fontSize: 23,
+    lineHeight: 27,
+    marginBottom: 2,
+  },
+  completionSubtitle: {
+    fontSize: 13,
+    lineHeight: 17,
+    fontWeight: '700',
+    textAlign: 'center',
+    marginBottom: 7,
   },
   sectionTitle: {
     textAlign: 'center',
@@ -1135,7 +1173,7 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   xpText: {
-    fontSize: 28,
+    fontSize: 24,
     fontWeight: '900',
     textAlign: 'center',
     color: '#24B75A',
@@ -1160,57 +1198,54 @@ const styles = StyleSheet.create({
     gap: 0,
   },
   statEmoji: {
-    fontSize: 18,
-    marginBottom: 2,
+    fontSize: 15,
   },
   statLabel: {
-    fontSize: 11,
+    fontSize: 10,
     fontWeight: '700',
-    marginBottom: 2,
   },
   statText: {
-    fontSize: 18,
+    fontSize: 17,
     fontWeight: '700',
   },
   divider: {
     width: 1,
     alignSelf: 'stretch',
   },
-  badge: {
-    alignSelf: 'center',
-    minWidth: 230,
-    paddingVertical: 10,
-    paddingHorizontal: 18,
-    borderRadius: 16,
-    marginBottom: 10,
+  completionHeroCard: {
     alignItems: 'center',
+    paddingVertical: 12,
+    paddingHorizontal: 12,
   },
-  badgeText: {
-    color: '#FFFFFF',
-    fontWeight: '800',
-    fontSize: 20,
-    textAlign: 'center',
+  completionHeroIcon: {
+    width: 48,
+    height: 48,
+    borderRadius: 15,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 7,
   },
-  sessionHighlight: {
+  completionStatsGrid: {
     width: '100%',
-    maxWidth: 520,
-    alignSelf: 'center',
-    minHeight: 38,
-    borderRadius: 999,
-    borderWidth: 1,
-    paddingHorizontal: 14,
-    marginBottom: 10,
+    minHeight: 58,
+    marginTop: 8,
+    borderTopWidth: 1,
+    borderBottomWidth: 1,
+    flexDirection: 'row',
+    alignItems: 'stretch',
+  },
+  completionStatPill: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 7,
+    paddingHorizontal: 6,
+  },
+  completionStatValueRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 7,
-  },
-  sessionHighlightText: {
-    flexShrink: 1,
-    fontSize: 13,
-    lineHeight: 17,
-    fontWeight: '800',
-    textAlign: 'center',
+    gap: 4,
   },
   levelText: {
     fontSize: 29,
@@ -1221,8 +1256,76 @@ const styles = StyleSheet.create({
   },
   levelSummaryCard: {
     alignItems: 'stretch',
-    paddingVertical: 12,
-    paddingHorizontal: 14,
+    paddingVertical: 16,
+    paddingHorizontal: 16,
+  },
+  levelUpSummaryPill: {
+    alignSelf: 'center',
+    minHeight: 38,
+    marginBottom: 10,
+    paddingHorizontal: 15,
+    paddingVertical: 8,
+    borderRadius: 999,
+    backgroundColor: '#FFE8A3',
+    borderWidth: 1.5,
+    borderColor: '#F4B942',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+  },
+  levelUpSummaryText: {
+    color: '#7A4B00',
+    fontSize: 14,
+    lineHeight: 17,
+    fontWeight: '900',
+    textAlign: 'center',
+  },
+  reviewWordsCard: {
+    alignItems: 'stretch',
+    paddingVertical: 10,
+  },
+  reviewWordsHeader: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    gap: 7,
+    marginBottom: 6,
+  },
+  reviewWordsTitle: {
+    fontSize: 15,
+    fontWeight: '800',
+    textAlign: 'center',
+  },
+  reviewWordsList: {
+    gap: 4,
+  },
+  reviewWordRow: {
+    minHeight: 21,
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    gap: 7,
+  },
+  reviewWordText: {
+    flexShrink: 1,
+    fontSize: 13,
+    fontWeight: '700',
+    textAlign: 'center',
+  },
+  reviewWordDivider: {
+    fontSize: 13,
+    fontWeight: '800',
+  },
+  reviewMoreText: {
+    fontSize: 12,
+    fontWeight: '700',
+    textAlign: 'center',
+  },
+  reviewEmptyText: {
+    fontSize: 13,
+    fontWeight: '700',
+    textAlign: 'center',
   },
   levelSummaryHeader: {
     flexDirection: 'row',
@@ -1238,15 +1341,15 @@ const styles = StyleSheet.create({
   },
   levelSummaryValue: {
     textAlign: 'left',
-    fontSize: 23,
-    lineHeight: 27,
+    fontSize: 21,
+    lineHeight: 24,
     marginTop: 2,
     marginBottom: 0,
   },
   levelSummaryStats: {
     minWidth: 88,
     borderRadius: 12,
-    paddingVertical: 7,
+    paddingVertical: 5,
     paddingHorizontal: 10,
     backgroundColor: 'rgba(127,127,127,0.10)',
     alignItems: 'center',
@@ -1260,7 +1363,7 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
   levelSummaryHint: {
-    marginTop: 8,
+    marginTop: 5,
     fontSize: 12,
   },
   levelProgressValue: {
@@ -1281,10 +1384,13 @@ const styles = StyleSheet.create({
     width: '100%',
     maxWidth: 360,
     alignSelf: 'center',
-    minHeight: 44,
-    marginTop: 4,
-    paddingVertical: 11,
+    minHeight: 40,
+    marginTop: 2,
+    paddingVertical: 9,
     borderRadius: 999,
+    flexDirection: 'row',
+    justifyContent: 'center',
+    gap: 7,
   },
   buttonText: {
     color: '#FFFFFF',
@@ -1292,39 +1398,40 @@ const styles = StyleSheet.create({
   },
   progressTrack: {
     width: '100%',
-    height: 7,
+    height: 6,
     borderRadius: 999,
     overflow: 'hidden',
-    marginTop: 10,
+    marginTop: 7,
   },
   progressFill: {
     height: '100%',
   },
   feedbackContainer: {
     position: 'absolute',
-    top: 148,
+    top: 92,
     left: 16,
     right: 16,
     alignItems: 'center',
     zIndex: 999,
   },
   feedbackContainerCompact: {
-    top: 132,
+    top: 84,
   },
   feedbackContainerTight: {
-    top: 106,
+    top: 60,
   },
   feedbackContainerDesktopWeb: {
-    top: 126,
+    top: 86,
   },
   feedbackCard: {
-    paddingVertical: 11,
-    paddingHorizontal: 14,
+    paddingVertical: 18,
+    paddingHorizontal: 16,
     borderRadius: 16,
     elevation: 7,
     width: '100%',
-    maxWidth: 360,
-    minHeight: 62,
+    height: '100%',
+    maxWidth: '100%',
+    minHeight: 124,
     justifyContent: 'center',
     alignItems: 'center',
     shadowColor: '#000',
@@ -1332,18 +1439,31 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.16,
     shadowRadius: 16,
   },
+  feedbackCardCompact: {
+    minHeight: 104,
+  },
+  feedbackCardCompactAndroid: {
+    minHeight: 130,
+  },
   feedbackCardTight: {
-    maxWidth: 320,
-    minHeight: 54,
-    paddingVertical: 8,
-    paddingHorizontal: 10,
-    borderRadius: 14,
+    maxWidth: '100%',
+    minHeight: 78,
+    paddingVertical: 12,
+    paddingHorizontal: 12,
+    borderRadius: 16,
+  },
+  feedbackCardTightAndroid: {
+    maxWidth: '100%',
+    minHeight: 118,
+    paddingVertical: 16,
+    paddingHorizontal: 14,
+    borderRadius: 16,
   },
   feedbackCardDesktopWeb: {
-    maxWidth: 420,
-    minHeight: 68,
-    paddingVertical: 12,
-    paddingHorizontal: 16,
+    maxWidth: '100%',
+    minHeight: 136,
+    paddingVertical: 20,
+    paddingHorizontal: 22,
   },
   feedbackContent: {
     width: '100%',
@@ -1369,9 +1489,17 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     letterSpacing: 0,
   },
+  feedbackTextAndroid: {
+    fontSize: 24,
+    lineHeight: 28,
+  },
   feedbackTextTight: {
     fontSize: 18,
     lineHeight: 21,
+  },
+  feedbackTextTightAndroid: {
+    fontSize: 22,
+    lineHeight: 26,
   },
   feedbackTextDesktopWeb: {
     fontSize: 23,
@@ -1459,10 +1587,13 @@ const styles = StyleSheet.create({
   typingStatusRow: {
     flexDirection: 'row',
     gap: 6,
-    marginTop: 8,
+    marginTop: 0,
+  },
+  typingStatusRowAndroid: {
+    gap: 7,
   },
   typingStatusRowTight: {
-    marginTop: 6,
+    marginTop: 0,
     gap: 6,
   },
   typingStatusPill: {
@@ -1531,6 +1662,19 @@ const styles = StyleSheet.create({
     fontWeight: '800',
     textAlignVertical: 'center',
   },
+  promptOverlayWrap: {
+    alignSelf: 'center',
+    width: '100%',
+    maxWidth: 460,
+    position: 'relative',
+  },
+  promptFeedbackOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    alignItems: 'center',
+    justifyContent: 'center',
+    zIndex: 30,
+    elevation: 30,
+  },
   promptPanel: {
     alignSelf: 'center',
     width: '100%',
@@ -1582,31 +1726,6 @@ const styles = StyleSheet.create({
   answerPanelDesktopWeb: {
     maxWidth: 600,
     padding: 12,
-  },
-  answerSignalRow: {
-    minHeight: 20,
-    paddingHorizontal: 2,
-    marginBottom: 6,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'flex-start',
-    gap: 5,
-  },
-  answerSignalRowTight: {
-    minHeight: 18,
-    marginBottom: 5,
-    paddingHorizontal: 1,
-  },
-  answerSignalText: {
-    flexShrink: 1,
-    fontSize: 12,
-    lineHeight: 15,
-    fontWeight: '700',
-    textAlign: 'left',
-  },
-  answerSignalTextTight: {
-    fontSize: 11,
-    lineHeight: 14,
   },
   input: {
     width: '100%',

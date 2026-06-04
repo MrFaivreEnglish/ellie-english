@@ -16,7 +16,7 @@ const DetectiveVocab = {
     { english: `Steal`, french: `Voler` },
     { english: `Guess`, french: `Deviner` },
     { english: `Investigate`, french: `Enquêter` },
-    { english: `Witness`, french: `Être témoin` },
+    { english: `Witness`, french: `Un témoin` },
     { english: `Die`, french: `Mourir` },
     { english: `Kill`, french: `Tuer` },
     { english: `Be dead`, french: `Être mort` }

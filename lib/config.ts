@@ -1,3 +1,5 @@
+import Constants from 'expo-constants';
+
 // Centralized application configuration and feature flags
 // Adjust these toggles to enable/disable features without exposing UI switches
 
@@ -11,5 +13,21 @@ export const featureToggles: FeatureToggles = {
   showGrammarExerciseCount: false,
 };
 
-export const supabaseUrl = (process.env.EXPO_PUBLIC_SUPABASE_URL ?? '').trim();
-export const supabaseAnonKey = (process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY ?? '').trim();
+type AppExtraConfig = {
+  supabaseUrl?: string;
+  supabaseAnonKey?: string;
+};
+
+const appExtra = (Constants.expoConfig?.extra ?? {}) as AppExtraConfig;
+
+export const supabaseUrl = (
+  process.env.EXPO_PUBLIC_SUPABASE_URL ??
+  appExtra.supabaseUrl ??
+  ''
+).trim();
+
+export const supabaseAnonKey = (
+  process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY ??
+  appExtra.supabaseAnonKey ??
+  ''
+).trim();

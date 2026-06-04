@@ -21,6 +21,8 @@ const normalizeLessonKey = (lessonKey: string) =>
     .replace(/[^a-z0-9._-]+/g, '_')
     .replace(/^_+|_+$/g, '') || 'lesson';
 
+export const normalizeFlashcardLessonKey = normalizeLessonKey;
+
 const getStorageKey = (lessonKey: string) => `${LEARNED_FLASHCARDS_PREFIX}:${normalizeLessonKey(lessonKey)}`;
 
 const buildCloudItemKey = (lessonKey: string, wordKey: string) =>
@@ -70,6 +72,28 @@ export const getLearnedFlashcardKeys = async (lessonKey: string): Promise<Set<st
     return parseStringSet(raw);
   } catch {
     return new Set<string>();
+  }
+};
+
+export const getLearnedFlashcardKeysByLesson = async (): Promise<Map<string, Set<string>>> => {
+  try {
+    const allKeys = await AsyncStorage.getAllKeys();
+    const learnedStorageKeys = allKeys.filter((key) => key.startsWith(`${LEARNED_FLASHCARDS_PREFIX}:`));
+    const learnedEntries = await AsyncStorage.multiGet(learnedStorageKeys);
+    const learnedByLesson = new Map<string, Set<string>>();
+
+    learnedEntries.forEach(([storageKey, raw]) => {
+      const lessonKey = storageKey.replace(`${LEARNED_FLASHCARDS_PREFIX}:`, '');
+      const learnedKeys = parseStringSet(raw);
+
+      if (learnedKeys.size > 0) {
+        learnedByLesson.set(normalizeLessonKey(lessonKey), learnedKeys);
+      }
+    });
+
+    return learnedByLesson;
+  } catch {
+    return new Map<string, Set<string>>();
   }
 };
 

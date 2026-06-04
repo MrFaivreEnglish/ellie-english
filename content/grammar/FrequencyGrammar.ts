@@ -15,21 +15,21 @@ translateExercises: [
   {
     type: 'translate',
     question: 'Translate into English.',
-    prompt: "Ils jouent souvent au football apres l'ecole.",
+    prompt: "Ils jouent souvent au football après l'école.",
     answer: "They often play football after school.",
     wordBank: ["They", "often", "play", "football", "after", "school."]
   },
   {
     type: 'translate',
     question: 'Translate into English.',
-    prompt: "Il etudie habituellement a la bibliotheque.",
+    prompt: "Il étudie habituellement à la bibliothèque.",
     answer: "He usually studies in the library.",
     wordBank: ["He", "usually", "studies", "in", "the library."]
   },
   {
     type: 'translate',
     question: 'Translate into English.',
-    prompt: "Tu arrives toujours a l'heure en cours.",
+    prompt: "Tu arrives toujours à l'heure en cours.",
     answer: "You always arrive on time for class.",
     wordBank: ["You", "always", "arrive", "on time", "for", "class."]
   },
@@ -43,7 +43,7 @@ translateExercises: [
   {
     type: 'translate',
     question: 'Translate into English.',
-    prompt: "Il se couche habituellement tot.",
+    prompt: "Il se couche habituellement tôt.",
     answer: "He usually goes to bed early.",
     wordBank: ["He", "usually", "goes", "to", "bed", "early."]
   },
@@ -64,28 +64,28 @@ translateExercises: [
   {
     type: 'translate',
     question: 'Translate into English.',
-    prompt: "Elle n'est jamais fatiguee le matin.",
+    prompt: "Elle n'est jamais fatiguée le matin.",
     answer: "She is never tired in the morning.",
     wordBank: ["She", "is", "never", "tired", "in", "the morning."]
   },
   {
     type: 'translate',
     question: 'Translate into English.',
-    prompt: "Nous dejeunons habituellement a midi.",
+    prompt: "Nous déjeunons habituellement à midi.",
     answer: "We usually eat lunch at noon.",
     wordBank: ["We", "usually", "eat", "lunch", "at", "noon."]
   },
   {
     type: 'translate',
     question: 'Translate into English.',
-    prompt: "Il finit toujours ses devoirs a temps.",
+    prompt: "Il finit toujours ses devoirs à temps.",
     answer: "He always finishes his homework on time.",
     wordBank: ["He", "always", "finishes", "his homework", "on", "time."]
   },
   {
     type: 'translate',
     question: 'Translate into English.',
-    prompt: "Ils ne visitent jamais ce musee.",
+    prompt: "Ils ne visitent jamais ce musée.",
     answer: "They never visit that museum.",
     wordBank: ["They", "never", "visit", "that museum."]
   },
@@ -106,7 +106,7 @@ translateExercises: [
   {
     type: 'translate',
     question: 'Translate into English.',
-    prompt: "Nous prenons toujours le petit dejeuner ensemble.",
+    prompt: "Nous prenons toujours le petit déjeuner ensemble.",
     answer: "We always eat breakfast together.",
     wordBank: ["We", "always", "eat", "breakfast", "together."]
   },
@@ -141,7 +141,7 @@ translateExercises: [
   {
     type: 'translate',
     question: 'Translate into English.',
-    prompt: "Tu regardes souvent des videos le soir.",
+    prompt: "Tu regardes souvent des vidéos le soir.",
     answer: "You often watch videos in the evening.",
     wordBank: ["You", "often", "watch", "videos", "in", "the evening."]
   }

@@ -16,8 +16,8 @@ import AccountAvatar from './AccountAvatar';
 import { useAccount } from './AccountContext';
 import {
   ACCOUNT_AVATAR_COLOR_PRESETS,
+  IMAGE_ACCOUNT_AVATAR_PRESETS,
   ICON_ACCOUNT_AVATAR_PRESETS,
-  THUMBNAIL_ACCOUNT_AVATAR_PRESETS,
   getUnlockedAccountAvatarColorId,
   getUnlockedAccountAvatarId,
   type AccountAvatarColorId,
@@ -33,7 +33,13 @@ import {
   type GrammarProgressSummary,
 } from '../grammar/grammarProgressStorage';
 import { getVocabularyTimerBests } from '../vocabulary/vocabularyTimerStorage';
-import { getXPLevelStats } from '../progress/xpLevels';
+import {
+  getLevelBadgeLabel,
+  getMasterStarCount,
+  getMasterTierLabel,
+  getXPLevelStats,
+  isMasterLevel,
+} from '../progress/xpLevels';
 
 type AccountPanelProps = {
   colors: {
@@ -107,6 +113,7 @@ export default function AccountPanel({ colors, isDarkMode }: AccountPanelProps) 
   const [isProfileEditorOpen, setIsProfileEditorOpen] = useState(false);
   const [isNameEditorOpen, setIsNameEditorOpen] = useState(false);
   const [draftAccountName, setDraftAccountName] = useState('');
+  const usernameInputRef = useRef<TextInput>(null);
   const passwordInputRef = useRef<TextInput>(null);
 
   const isCreateMode = mode === 'create';
@@ -136,6 +143,10 @@ export default function AccountPanel({ colors, isDarkMode }: AccountPanelProps) 
     cleanedDraftAccountName.length > 40 ||
     cleanedDraftAccountName === accountName;
   const totalSavedItems = grammarSummary.totalCorrectAnswers + learnedSummary.totalLearned + timerBestCount;
+  const isMaster = isMasterLevel(levelStats.level);
+  const levelBadgeLabel = useMemo(() => getLevelBadgeLabel(levelStats.level), [levelStats.level]);
+  const masterTierLabel = useMemo(() => getMasterTierLabel(levelStats.level), [levelStats.level]);
+  const masterStarCount = useMemo(() => getMasterStarCount(levelStats.level), [levelStats.level]);
   const backupSummary = useMemo(
     () =>
       `${grammarSummary.totalCorrectAnswers} grammar answers, ${learnedSummary.totalLearned} learnt words, ${timerBestCount} best times, and ${localXP} revision points.`,
@@ -361,40 +372,34 @@ export default function AccountPanel({ colors, isDarkMode }: AccountPanelProps) 
     ]);
   }, [backupSummary, error, runSync, syncStatus]);
 
-  const renderLevelProgress = () => (
-    <View style={styles.levelBlock}>
-      <View style={styles.levelHeader}>
-        <Text style={[styles.levelText, { color: colors.text }]}>Level {levelStats.level}</Text>
-        <Text style={[styles.levelSubtext, { color: colors.secondaryText }]}>
-          {levelStats.progressXP}/{levelStats.neededXP} points
-        </Text>
-      </View>
-      <View style={[styles.progressTrack, { backgroundColor: isDarkMode ? '#294259' : '#D8E9F7' }]}>
-        <View
-          style={[
-            styles.progressFill,
-            {
-              width: `${levelStats.progressPercent}%`,
-              backgroundColor: colors.warning,
-            },
-          ]}
-        />
-      </View>
-    </View>
-  );
+  const renderMasterStars = (size = 11) => {
+    if (!isMaster) return null;
 
-  const renderStat = (
-    icon: React.ComponentProps<typeof MaterialIcons>['name'],
-    value: string,
-    label: string,
-    accentColor: string
-  ) => (
-    <View style={[styles.statTile, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-      <MaterialIcons name={icon} size={18} color={accentColor} />
-      <Text style={[styles.statValue, { color: colors.text }]} numberOfLines={1}>{value}</Text>
-      <Text style={[styles.statLabel, { color: colors.secondaryText }]} numberOfLines={2}>{label}</Text>
-    </View>
-  );
+    return (
+      <View style={styles.masterStars}>
+        {Array.from({ length: masterStarCount }).map((_, index) => (
+          <MaterialIcons key={`account-master-star-${index}`} name="star" size={size} color="#B87500" />
+        ))}
+      </View>
+    );
+  };
+
+  const renderMasterProfileBadge = () => {
+    if (!isMaster) return null;
+
+    return (
+      <View style={styles.masterProfileBadge}>
+        <MaterialIcons name="workspace-premium" size={16} color="#8A5A00" />
+        <Text style={styles.masterProfileBadgeText} numberOfLines={1}>
+          {levelBadgeLabel}
+        </Text>
+        <Text style={styles.masterProfileBadgeSubtext} numberOfLines={1}>
+          {levelStats.level === 100 ? 'Ellie Master' : masterTierLabel}
+        </Text>
+        {renderMasterStars()}
+      </View>
+    );
+  };
 
   const renderDashboardStat = (
     icon: React.ComponentProps<typeof MaterialIcons>['name'],
@@ -507,7 +512,9 @@ export default function AccountPanel({ colors, isDarkMode }: AccountPanelProps) 
       <View style={styles.profileEditor}>
         <View style={styles.profileEditorHeader}>
           <Text style={[styles.profileEditorTitle, { color: colors.text }]}>Profile styles</Text>
-          <Text style={[styles.profileEditorMeta, { color: colors.secondaryText }]}>Level {levelStats.level}</Text>
+          <Text style={[styles.profileEditorMeta, { color: isMaster ? '#8A5A00' : colors.secondaryText }]}>
+            {levelBadgeLabel}
+          </Text>
         </View>
         <Text style={[styles.avatarGroupLabel, { color: colors.secondaryText }]}>Colour</Text>
         <View style={styles.colorGrid}>
@@ -529,10 +536,10 @@ export default function AccountPanel({ colors, isDarkMode }: AccountPanelProps) 
           )}
         </View>
         <Text style={[styles.avatarGroupLabel, styles.avatarGroupLabelSpaced, { color: colors.secondaryText }]}>
-          Lesson badges
+          Images
         </Text>
         <View style={styles.avatarGrid}>
-          {THUMBNAIL_ACCOUNT_AVATAR_PRESETS.map((preset) =>
+          {IMAGE_ACCOUNT_AVATAR_PRESETS.map((preset) =>
             renderAvatarChoice(preset.id, preset.label, preset.unlockLevel)
           )}
         </View>
@@ -585,32 +592,21 @@ export default function AccountPanel({ colors, isDarkMode }: AccountPanelProps) 
 
       <View style={styles.levelSummaryRow}>
         <Text style={[styles.levelSummaryTitle, { color: colors.text }]}>Profile progress</Text>
-        <Text style={[styles.levelSummaryMeta, { color: colors.secondaryText }]}>Level {levelStats.level}</Text>
+        <Text style={[styles.levelSummaryMeta, { color: isMaster ? '#8A5A00' : colors.secondaryText }]}>
+          {levelBadgeLabel}
+        </Text>
       </View>
-      <View style={[styles.progressTrackLarge, { backgroundColor: isDarkMode ? '#294259' : '#D8E9F7' }]}>
+      {renderMasterProfileBadge()}
+      <View style={[styles.progressTrackLarge, { backgroundColor: isDarkMode ? colors.surfaceAlt : '#D8E9F7' }]}>
         <View
           style={[
             styles.progressFill,
             {
               width: `${levelStats.progressPercent}%`,
-              backgroundColor: colors.warning,
+              backgroundColor: isMaster ? '#D79A00' : colors.warning,
             },
           ]}
         />
-      </View>
-    </View>
-  );
-
-  const renderProgressStats = () => (
-    <View style={styles.savedWorkBlock}>
-      <View style={styles.savedWorkHeader}>
-        <Text style={[styles.savedWorkTitle, { color: colors.text }]}>Saved work</Text>
-        <Text style={[styles.savedWorkSubtitle, { color: colors.secondaryText }]}>On this device</Text>
-      </View>
-      <View style={[styles.statsRow, compact && styles.statsRowCompact]}>
-        {renderStat('edit', `${grammarSummary.totalCorrectAnswers}`, 'Grammar', colors.primary)}
-        {renderStat('style', `${learnedSummary.totalLearned}`, 'Words learnt', colors.success)}
-        {renderStat('timer', `${timerBestCount}`, 'Best times', colors.primary)}
       </View>
     </View>
   );
@@ -634,13 +630,16 @@ export default function AccountPanel({ colors, isDarkMode }: AccountPanelProps) 
   }) => {
     const focused = focusedField === field;
     const isPasswordField = field === 'password';
+    const inputRef = isPasswordField ? passwordInputRef : usernameInputRef;
 
     return (
-      <View
+      <TouchableOpacity
+        activeOpacity={1}
+        onPress={() => inputRef.current?.focus()}
         style={[
           styles.inputShell,
           {
-            backgroundColor: isDarkMode ? '#132033' : '#fff',
+            backgroundColor: isDarkMode ? colors.surface : '#fff',
             borderColor: focused ? colors.primary : colors.border,
           },
           focused && styles.inputShellFocused,
@@ -650,7 +649,7 @@ export default function AccountPanel({ colors, isDarkMode }: AccountPanelProps) 
           <MaterialIcons name={icon} size={19} color={focused ? colors.primary : colors.secondaryText} />
         </View>
         <TextInput
-          ref={isPasswordField ? passwordInputRef : undefined}
+          ref={inputRef}
           value={value}
           onChangeText={onChangeText}
           onFocus={() => setFocusedField(field)}
@@ -661,6 +660,10 @@ export default function AccountPanel({ colors, isDarkMode }: AccountPanelProps) 
           placeholder={placeholder}
           placeholderTextColor={colors.secondaryText}
           returnKeyType={returnKeyType}
+          showSoftInputOnFocus
+          textContentType={isPasswordField ? 'password' : 'username'}
+          autoComplete={isPasswordField ? 'password' : 'username'}
+          importantForAutofill="yes"
           onSubmitEditing={
             isPasswordField
               ? !isSubmitDisabled ? submit : undefined
@@ -682,7 +685,7 @@ export default function AccountPanel({ colors, isDarkMode }: AccountPanelProps) 
             />
           </TouchableOpacity>
         )}
-      </View>
+      </TouchableOpacity>
     );
   };
 
@@ -762,6 +765,7 @@ export default function AccountPanel({ colors, isDarkMode }: AccountPanelProps) 
                       autoCapitalize="words"
                       autoCorrect={false}
                       autoFocus
+                      showSoftInputOnFocus
                       selectTextOnFocus
                       returnKeyType="done"
                       onSubmitEditing={submitAccountName}
@@ -841,15 +845,18 @@ export default function AccountPanel({ colors, isDarkMode }: AccountPanelProps) 
 
           <View style={styles.levelSummaryRow}>
             <Text style={[styles.levelSummaryTitle, { color: colors.text }]}>Profile progress</Text>
-            <Text style={[styles.levelSummaryMeta, { color: colors.secondaryText }]}>Level {levelStats.level}</Text>
+            <Text style={[styles.levelSummaryMeta, { color: isMaster ? '#8A5A00' : colors.secondaryText }]}>
+              {levelBadgeLabel}
+            </Text>
           </View>
-          <View style={[styles.progressTrackLarge, { backgroundColor: isDarkMode ? '#294259' : '#D8E9F7' }]}>
+          {renderMasterProfileBadge()}
+          <View style={[styles.progressTrackLarge, { backgroundColor: isDarkMode ? colors.surfaceAlt : '#D8E9F7' }]}>
             <View
               style={[
                 styles.progressFill,
                 {
                   width: `${levelStats.progressPercent}%`,
-                  backgroundColor: colors.warning,
+                  backgroundColor: isMaster ? '#D79A00' : colors.warning,
                 },
               ]}
             />
@@ -1960,80 +1967,39 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 10,
   },
-  levelBlock: {
-    marginBottom: 10,
-  },
-  levelHeader: {
+  masterProfileBadge: {
+    minHeight: 34,
+    marginBottom: 7,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 999,
+    borderWidth: 1.5,
+    borderColor: '#D79A00',
+    backgroundColor: '#FFF7D7',
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
-    gap: 10,
-    marginBottom: 7,
+    justifyContent: 'center',
+    gap: 5,
   },
-  levelText: {
-    fontSize: 13,
+  masterProfileBadgeText: {
+    color: '#7A4B00',
+    fontSize: 11,
     fontWeight: '900',
   },
-  levelSubtext: {
-    fontSize: 12,
+  masterProfileBadgeSubtext: {
+    color: '#7A4B00',
+    fontSize: 11,
     fontWeight: '800',
+    flexShrink: 1,
   },
-  progressTrack: {
-    height: 8,
-    borderRadius: 999,
-    overflow: 'hidden',
+  masterStars: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 1,
   },
   progressFill: {
     height: '100%',
     borderRadius: 999,
-  },
-  statsRow: {
-    flexDirection: 'row',
-    gap: 8,
-  },
-  savedWorkBlock: {
-    marginTop: 2,
-  },
-  savedWorkHeader: {
-    minHeight: 22,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    gap: 10,
-    marginBottom: 7,
-  },
-  savedWorkTitle: {
-    fontSize: 13,
-    fontWeight: '900',
-  },
-  savedWorkSubtitle: {
-    fontSize: 11,
-    fontWeight: '800',
-    textTransform: 'uppercase',
-  },
-  statsRowCompact: {
-    gap: 6,
-  },
-  statTile: {
-    flex: 1,
-    minHeight: 64,
-    borderRadius: 12,
-    borderWidth: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingHorizontal: 8,
-  },
-  statValue: {
-    fontSize: 15,
-    fontWeight: '900',
-    marginTop: 4,
-  },
-  statLabel: {
-    fontSize: 10,
-    fontWeight: '800',
-    marginTop: 2,
-    lineHeight: 13,
-    textAlign: 'center',
   },
   modeRow: {
     minHeight: 40,

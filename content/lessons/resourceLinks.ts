@@ -18,7 +18,29 @@ export const resourceCategories: ResourceCategory[] = [
       },
     ],
   },
-    {
+  {
+    title: 'Create and Play',
+    icon: '\uD83C\uDFAE',
+    color: '#F4A261',
+    resources: [
+      {
+        title: 'Flashcards Auto',
+        description: 'Create flashcards quickly and practise vocabulary.',
+        url: 'https://flashcardsauto.netlify.app/',
+      },
+      {
+        title: 'Crosswords Auto',
+        description: 'Create crossword games from your own words.',
+        url: 'https://crosswordsauto.netlify.app/',
+      },
+      {
+        title: 'LearningApps',
+        description: 'Find or create small learning games and activities.',
+        url: 'https://learningapps.org/',
+      },
+    ],
+  },
+  {
     title: 'Improve pronunciation',
     icon: '🔊',
     color: '#CFA6E8',
@@ -62,7 +84,7 @@ export const resourceCategories: ResourceCategory[] = [
       },
     ],
   },
-    {
+  {
     title: 'Read in English',
     icon: '📖',
     color: '#8FB3C7',
@@ -79,5 +101,4 @@ export const resourceCategories: ResourceCategory[] = [
       },
     ],
   },
- 
 ];

@@ -167,7 +167,7 @@ For mobile testing, use the same hosted Supabase URL and run `npm start`.
 - No account is required.
 - XP is always saved locally on the device first.
 - Vocabulary learnt cards, grammar saved answers, timer bests, and Shiny Ellie unlocks are also saved locally on the device first.
-- Account preferences are also backed up: theme, practice modes, language, haptics, Today card, avatar, and avatar colour.
+- Account preferences are also backed up: theme, practice modes, language, Today card, avatar, and avatar colour.
 - The visible account display name is saved in the online profile. Changing it does not change the username used to log in.
 - Creating an account starts a fresh online progress record. It does not copy XP or unlocks left on the shared device.
 - Signing in loads the account's online XP onto the device.

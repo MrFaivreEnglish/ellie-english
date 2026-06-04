@@ -6,6 +6,11 @@ export const XP_REWARDS = {
   vocabularyTypingStrictModeBonus: 2,
   vocabularyTypingReviewBonus: 2,
   vocabularyMatchingPair: 1,
+  vocabularyMatchingCleanPair: 2,
+  vocabularyMatchingRetryPair: 1,
+  vocabularyMatchingTimerCleanPair: 3,
+  vocabularyMatchingTimerRetryPair: 1,
+  vocabularyMatchingTimerBestBonus: 5,
   flashcardLearned: 0,
   pronunciationPractice: 0,
 } as const;

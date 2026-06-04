@@ -7,21 +7,21 @@ const PresentIngInterrogativeGrammar = {
   {
     type: 'translate',
     question: 'Translate into English.',
-    prompt: "Sont-ils en train d'etudier ?",
+    prompt: "Sont-ils en train d'étudier ?",
     answer: "Are they studying?",
     wordBank: ["Are", "they", "studying?"]
   },
   {
     type: 'translate',
     question: 'Translate into English.',
-    prompt: "Est-elle en train de preparer le diner maintenant ?",
+    prompt: "Est-elle en train de préparer le dîner maintenant ?",
     answer: "Is she cooking dinner now?",
     wordBank: ["Is", "she", "cooking", "dinner", "now?"]
   },
   {
     type: 'translate',
     question: 'Translate into English.',
-    prompt: "Es-tu en train de regarder la television ?",
+    prompt: "Es-tu en train de regarder la télévision ?",
     answer: "Are you watching TV?",
     wordBank: ["Are", "you", "watching", "TV?"]
   },
@@ -35,7 +35,7 @@ const PresentIngInterrogativeGrammar = {
   {
     type: 'translate',
     question: 'Translate into English.',
-    prompt: "Allons-nous a la fete ce soir ?",
+    prompt: "Allons-nous à la fête ce soir ?",
     answer: "Are we going to the party tonight?",
     wordBank: ["Are", "we", "going", "to", "the party", "tonight?"]
   },
@@ -63,7 +63,7 @@ const PresentIngInterrogativeGrammar = {
   {
     type: 'translate',
     question: 'Translate into English.',
-    prompt: "Ton ami vient-il a la reunion ?",
+    prompt: "Ton ami vient-il à la réunion ?",
     answer: "Is your friend coming to the meeting?",
     wordBank: ["Is", "your friend", "coming", "to", "the meeting?"]
   },
@@ -91,7 +91,7 @@ const PresentIngInterrogativeGrammar = {
   {
     type: 'translate',
     question: 'Translate into English.',
-    prompt: "Es-tu en train d'apprecier le concert ?",
+    prompt: "Es-tu en train d'apprécier le concert ?",
     answer: "Are you enjoying the concert?",
     wordBank: ["Are", "you", "enjoying", "the concert?"]
   },
@@ -105,42 +105,42 @@ const PresentIngInterrogativeGrammar = {
   {
     type: 'translate',
     question: 'Translate into English.',
-    prompt: "Est-elle en train de s'entrainer au piano ?",
+    prompt: "Est-elle en train de s'entraîner au piano ?",
     answer: "Is she practicing the piano?",
     wordBank: ["Is", "she", "practicing", "the piano?"]
   },
   {
     type: 'translate',
     question: 'Translate into English.',
-    prompt: "Assistent-ils a la reunion ?",
+    prompt: "Assistent-ils à la réunion ?",
     answer: "Are they attending the meeting?",
     wordBank: ["Are", "they", "attending", "the meeting?"]
   },
   {
     type: 'translate',
     question: 'Translate into English.',
-    prompt: "Sommes-nous en train de diner maintenant ?",
+    prompt: "Sommes-nous en train de dîner maintenant ?",
     answer: "Are we having dinner now?",
     wordBank: ["Are", "we", "having", "dinner", "now?"]
   },
   {
     type: 'translate',
     question: 'Translate into English.',
-    prompt: "Les enfants regardent-ils des dessins animes ?",
+    prompt: "Les enfants regardent-ils des dessins animés ?",
     answer: "Are the kids watching cartoons?",
     wordBank: ["Are", "the kids", "watching", "cartoons?"]
   },
   {
     type: 'translate',
     question: 'Translate into English.',
-    prompt: "Est-ce que j'utilise le bon modele ?",
+    prompt: "Est-ce que j'utilise le bon modèle ?",
     answer: "Am I using the right template?",
     wordBank: ["Am", "I", "using", "the right", "template?"]
   },
   {
     type: 'translate',
     question: 'Translate into English.',
-    prompt: "Ton equipe est-elle en train de gagner le match ?",
+    prompt: "Ton équipe est-elle en train de gagner le match ?",
     answer: "Is your team winning the match?",
     wordBank: ["Is", "your team", "winning", "the match?"]
   }

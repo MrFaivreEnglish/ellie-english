@@ -1,11 +1,9 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { useAudioPlayer } from 'expo-audio';
 import { getXP, addXP, hasWordXpAwardedToday, markWordXpAwardedToday } from '../progress/xpStorage';
 import type { Word } from '../../types/VocabularyTypes';
 import { useTheme } from '../settings/ThemeContext';
-import { BEST_SUCCESS_SOUND, SOUND_EFFECT_OPTIONS, replaySoundEffect } from '../shared/soundEffects';
 import { getTypingAnswerXP } from '../progress/xpRewards';
-import { xpForLevel } from '../progress/xpLevels';
+import { getLevelDisplayLabel, xpForLevel } from '../progress/xpLevels';
 
 type FeedbackType = 'correct' | 'wrong' | 'close';
 
@@ -36,7 +34,7 @@ const normalizeLenientAnswer = (text: string) => {
     .replace(/^(a|an|the|to)\s+/, '')
     .replace(/[.,!?;:"()[\]{}]/g, '')
     .replace(/^to\s+/, '')
-    .replace(/['-]/g, ' ')
+    .replace(/[-'\/]/g, ' ')
     .replace(/\s+/g, ' ');
 };
 
@@ -86,9 +84,13 @@ const buildCorrectAnswers = (
   allowSlashAlternatives: boolean
 ) => {
   const fullAnswer = normalizeAnswer(answer);
+  const separatorlessAnswer = /[\/-]/.test(answer)
+    ? normalizeAnswer(answer.replace(/[\/-]+/g, ' '))
+    : '';
+  const baseAnswers = [fullAnswer, separatorlessAnswer].filter(Boolean);
 
   if (!allowSlashAlternatives || !answer.includes('/')) {
-    return [fullAnswer];
+    return Array.from(new Set(baseAnswers));
   }
 
   const alternatives = answer
@@ -96,7 +98,7 @@ const buildCorrectAnswers = (
     .map((part) => normalizeAnswer(part))
     .filter(Boolean);
 
-  return Array.from(new Set([fullAnswer, ...alternatives]));
+  return Array.from(new Set([...baseAnswers, ...alternatives]));
 };
 
 const shuffleArray = <T,>(items: T[]) => {
@@ -133,7 +135,6 @@ const buildRewardText = (attempts: number, comboLabel: string) => {
 export function useTypingGame(words: Word[], options: TypingGameOptions = {}) {
   const { isTypingStrictMode } = useTheme();
   const allowSlashAlternatives = options.allowSlashAlternatives ?? true;
-  const levelUpPlayer = useAudioPlayer(BEST_SUCCESS_SOUND, SOUND_EFFECT_OPTIONS);
   const [typedAnswer, setTypedAnswer] = useState('');
   const [typingIndex, setTypingIndex] = useState(0);
   const [gameWords, setGameWords] = useState<Word[]>(() => shuffleArray(words));
@@ -180,49 +181,6 @@ export function useTypingGame(words: Word[], options: TypingGameOptions = {}) {
     () => Object.values(attempts).reduce((total, count) => total + count, 0),
     [attempts]
   );
-  const mistakes = useMemo(
-    () => Object.values(difficultyByWord).reduce((total, stats) => total + stats.misses, 0),
-    [difficultyByWord]
-  );
-  const masteredCount = useMemo(
-    () => Object.values(difficultyByWord).filter((stats) => stats.correct > 0 && stats.misses === 0).length,
-    [difficultyByWord]
-  );
-  const rewardPreview = useMemo(() => {
-    if (!currentWordKey) return '';
-
-    const alreadyAnswered =
-      answeredWords.has(currentWordKey) || awardedWordKeysRef.current.has(currentWordKey);
-
-    if (alreadyAnswered) return 'Practice run';
-
-    const nextAttempt = (attempts[currentWordKey] || 0) + 1;
-    return nextAttempt === 1 ? 'Try from memory' : 'Fix this word';
-  }, [answeredWords, attempts, currentWordKey]);
-  const sessionHighlight = useMemo(() => {
-    const answeredKeys = Array.from(answeredWords);
-
-    if (answeredKeys.length === 0) return 'First perfect word is waiting';
-
-    const perfectWords = answeredKeys.filter((key) => (attempts[key] || 0) <= 1).length;
-    const recoveredKeys = answeredKeys
-      .filter((key) => (attempts[key] || 0) > 1)
-      .sort((a, b) => (attempts[b] || 0) - (attempts[a] || 0));
-
-    if (recoveredKeys.length > 0) {
-      const hardestWord = words.find((word) => wordKey(word) === recoveredKeys[0]);
-
-      if (hardestWord) {
-        return `Hardest word fixed: ${hardestWord.english}`;
-      }
-    }
-
-    return `Perfect words: ${perfectWords}`;
-  }, [answeredWords, attempts, words]);
-
-  const playLevelUpSound = useCallback(() => {
-    replaySoundEffect(levelUpPlayer);
-  }, [levelUpPlayer]);
 
   const clearPendingAdvance = useCallback(() => {
     answerLockedRef.current = false;
@@ -504,14 +462,13 @@ export function useTypingGame(words: Word[], options: TypingGameOptions = {}) {
   useEffect(() => {
     if (level <= previousLevel) return;
 
-    void playLevelUpSound();
-    setLevelUpMessage(`LEVEL ${level}`);
+    setLevelUpMessage(getLevelDisplayLabel(level));
     setPreviousLevel(level);
 
     const timeoutId = setTimeout(() => setLevelUpMessage(''), 1500);
 
     return () => clearTimeout(timeoutId);
-  }, [level, playLevelUpSound, previousLevel]);
+  }, [level, previousLevel]);
 
   return {
     typedAnswer,
@@ -520,8 +477,6 @@ export function useTypingGame(words: Word[], options: TypingGameOptions = {}) {
     typingFeedback,
     inlineMessage,
     feedback,
-    rewardPreview,
-    sessionHighlight,
     handleSubmit,
     xp,
     sessionXp,
@@ -532,8 +487,6 @@ export function useTypingGame(words: Word[], options: TypingGameOptions = {}) {
     attempts,
     totalAttempts,
     correctAnswers: answeredWords.size,
-    mistakes,
-    masteredCount,
     reset,
     goToNextWord,
     goToPreviousWord,

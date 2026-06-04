@@ -5,6 +5,8 @@ import { setNavigationBar } from './navigationBar';
 let immersiveLock = false;
 let systemChromeMode: 'app' | 'immersive' = 'app';
 let appStatusBarVisible = true;
+let immersiveNavigationBarColor = 'transparent';
+let immersiveNavigationBarButtonStyle: 'dark' | 'light' = 'light';
 export function setImmersiveLock(active: boolean) {
   immersiveLock = active;
 }
@@ -15,8 +17,13 @@ export function setImmersiveLock(active: boolean) {
  * - Hides the status bar where possible
  * - Hides Android navigation bar with overlay behavior and transparent background
  */
-export async function enterImmersive(): Promise<void> {
+export async function enterImmersive(
+  navigationBarColor = 'transparent',
+  navigationBarButtonStyle: 'dark' | 'light' = 'light'
+): Promise<void> {
   systemChromeMode = 'immersive';
+  immersiveNavigationBarColor = navigationBarColor;
+  immersiveNavigationBarButtonStyle = navigationBarButtonStyle;
 
   try {
     StatusBar.setHidden(true, 'fade');
@@ -32,8 +39,8 @@ export async function enterImmersive(): Promise<void> {
       await setNavigationBar({
         visibility: 'hidden',
         behavior: 'overlay-swipe',
-        color: 'transparent',
-        buttonStyle: 'light',
+        color: navigationBarColor,
+        buttonStyle: navigationBarButtonStyle,
       });
     } catch {}
   }
@@ -108,8 +115,13 @@ export async function applyAppChrome(
  * - On Android, respects immersiveLock: when true, keeps nav hidden with overlay-swipe;
  *   otherwise, leaves current nav bar configuration as-is (so screens can control it).
  */
-export async function applyImmersiveMode(): Promise<void> {
+export async function applyImmersiveMode(
+  navigationBarColor = 'transparent',
+  navigationBarButtonStyle: 'dark' | 'light' = 'light'
+): Promise<void> {
   systemChromeMode = 'immersive';
+  immersiveNavigationBarColor = navigationBarColor;
+  immersiveNavigationBarButtonStyle = navigationBarButtonStyle;
 
   try {
     StatusBar.setHidden(true, 'fade');
@@ -120,8 +132,8 @@ export async function applyImmersiveMode(): Promise<void> {
       await setNavigationBar({
         visibility: 'hidden',
         behavior: 'overlay-swipe',
-        color: 'transparent',
-        buttonStyle: 'light',
+        color: navigationBarColor,
+        buttonStyle: navigationBarButtonStyle,
       });
     } catch {}
   }
@@ -131,14 +143,17 @@ export async function applyImmersiveMode(): Promise<void> {
  * Attach a foreground listener so immersive mode is reapplied whenever the app
  * returns to the foreground (Android can sometimes reveal system bars on resume).
  */
-export function bindImmersiveOnForeground(): () => void {
+export function bindImmersiveOnForeground(
+  appBackgroundColor = '#000000',
+  appButtonStyle: 'dark' | 'light' = 'light'
+): () => void {
   const sub = AppState.addEventListener('change', (state) => {
     if (state === 'active') {
       // Fire and forget; no need to await
       if (systemChromeMode === 'immersive' || immersiveLock) {
-        applyImmersiveMode();
+        applyImmersiveMode(immersiveNavigationBarColor, immersiveNavigationBarButtonStyle);
       } else {
-        applyAppChrome('#000000', 'light', appStatusBarVisible);
+        applyAppChrome(appBackgroundColor, appButtonStyle, appStatusBarVisible);
       }
     }
   });

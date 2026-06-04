@@ -7,77 +7,77 @@ const PreteritGrammar = {
   {
     type: 'translate',
     question: 'Translate into English.',
-    prompt: "Hier, je suis alle au parc.",
+    prompt: "Hier, je suis allé au parc.",
     answer: "Yesterday, I went to the park.",
     wordBank: ["Yesterday,", "I", "went", "to", "the park."]
   },
   {
     type: 'translate',
     question: 'Translate into English.',
-    prompt: "Elle a mange son dejeuner a midi.",
+    prompt: "Elle a mangé son déjeuner à midi.",
     answer: "She ate her lunch at noon.",
     wordBank: ["She", "ate", "her lunch", "at", "noon."]
   },
   {
     type: 'translate',
     question: 'Translate into English.',
-    prompt: "Ils ont joue au football le week-end dernier.",
+    prompt: "Ils ont joué au football le week-end dernier.",
     answer: "They played football last weekend.",
     wordBank: ["They", "played", "football", "last", "weekend."]
   },
   {
     type: 'translate',
     question: 'Translate into English.',
-    prompt: "Il a regarde le film hier soir.",
+    prompt: "Il a regardé le film hier soir.",
     answer: "He watched the movie last night.",
     wordBank: ["He", "watched", "the movie", "last", "night."]
   },
   {
     type: 'translate',
     question: 'Translate into English.',
-    prompt: "Nous avons habite a Paris l'ete dernier.",
+    prompt: "Nous avons habité à Paris l'été dernier.",
     answer: "We lived in Paris last summer.",
     wordBank: ["We", "lived", "in", "Paris", "last", "summer."]
   },
   {
     type: 'translate',
     question: 'Translate into English.',
-    prompt: "La semaine derniere, elle a achete une nouvelle voiture.",
+    prompt: "La semaine dernière, elle a acheté une nouvelle voiture.",
     answer: "Last week, she bought a new car.",
     wordBank: ["Last", "week,", "she", "bought", "a new", "car."]
   },
   {
     type: 'translate',
     question: 'Translate into English.',
-    prompt: "Les enfants ont joue dans le jardin hier.",
+    prompt: "Les enfants ont joué dans le jardin hier.",
     answer: "The children played in the garden yesterday.",
     wordBank: ["The children", "played", "in", "the garden", "yesterday."]
   },
   {
     type: 'translate',
     question: 'Translate into English.',
-    prompt: "J'ai rendu visite a ma grand-mere le mois dernier.",
+    prompt: "J'ai rendu visite à ma grand-mère le mois dernier.",
     answer: "I visited my grandmother last month.",
     wordBank: ["I", "visited", "my grandmother", "last", "month."]
   },
   {
     type: 'translate',
     question: 'Translate into English.',
-    prompt: "Ils ont pris l'avion pour Londres l'annee derniere.",
+    prompt: "Ils ont pris l'avion pour Londres l'année dernière.",
     answer: "They flew to London last year.",
     wordBank: ["They", "flew", "to", "London", "last", "year."]
   },
   {
     type: 'translate',
     question: 'Translate into English.',
-    prompt: "Il a etudie l'anglais a l'ecole.",
+    prompt: "Il a étudié l'anglais à l'école.",
     answer: "He studied English at school.",
     wordBank: ["He", "studied", "English", "at", "school."]
   },
   {
     type: 'translate',
     question: 'Translate into English.',
-    prompt: "Nous sommes alles a la plage l'ete dernier.",
+    prompt: "Nous sommes allés à la plage l'été dernier.",
     answer: "We went to the beach last summer.",
     wordBank: ["We", "went", "to", "the beach", "last", "summer."]
   },
@@ -91,14 +91,14 @@ const PreteritGrammar = {
   {
     type: 'translate',
     question: 'Translate into English.',
-    prompt: "J'ai rencontre mon ami a la fete.",
+    prompt: "J'ai rencontré mon ami à la fête.",
     answer: "I met my friend at the party.",
     wordBank: ["I", "met", "my friend", "at", "the party."]
   },
   {
     type: 'translate',
     question: 'Translate into English.',
-    prompt: "Ils se sont bien amuses au concert.",
+    prompt: "Ils se sont bien amusés au concert.",
     answer: "They had a great time at the concert.",
     wordBank: ["They", "had", "a great", "time", "at", "the concert."]
   },
@@ -112,28 +112,28 @@ const PreteritGrammar = {
   {
     type: 'translate',
     question: 'Translate into English.',
-    prompt: "Le chien a dormi toute la journee.",
+    prompt: "Le chien a dormi toute la journée.",
     answer: "The dog slept all day.",
     wordBank: ["The dog", "slept", "all", "day."]
   },
   {
     type: 'translate',
     question: 'Translate into English.',
-    prompt: "Nous nous sommes bien amuses a la fete.",
+    prompt: "Nous nous sommes bien amusés à la fête.",
     answer: "We had a great time at the party.",
     wordBank: ["We", "had", "a great", "time", "at", "the party."]
   },
   {
     type: 'translate',
     question: 'Translate into English.',
-    prompt: "Elle a perdu ses cles ce matin.",
+    prompt: "Elle a perdu ses clés ce matin.",
     answer: "She lost her keys this morning.",
     wordBank: ["She", "lost", "her keys", "this morning."]
   },
   {
     type: 'translate',
     question: 'Translate into English.',
-    prompt: "Le professeur nous a raconte une histoire.",
+    prompt: "Le professeur nous a raconté une histoire.",
     answer: "The teacher told us a story.",
     wordBank: ["The teacher", "told", "us", "a story."]
   },

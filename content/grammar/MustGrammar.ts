@@ -6,7 +6,7 @@ const MustGrammar = {
   {
     type: 'translate',
     question: 'Translate into English.',
-    prompt: "Je dois aller a l'ecole.",
+    prompt: "Je dois aller à l'école.",
     answer: "I must go to school.",
     wordBank: ["I", "must", "go", "to", "school."]
   },
@@ -27,14 +27,14 @@ const MustGrammar = {
   {
     type: 'translate',
     question: 'Translate into English.',
-    prompt: "Les enfants doivent etre calmes.",
+    prompt: "Les enfants doivent être calmes.",
     answer: "The children must be quiet.",
     wordBank: ["The children", "must", "be", "quiet."]
   },
   {
     type: 'translate',
     question: 'Translate into English.',
-    prompt: "Ils doivent ecouter le professeur.",
+    prompt: "Ils doivent écouter le professeur.",
     answer: "They must listen to the teacher.",
     wordBank: ["They", "must", "listen", "to", "the teacher."]
   },
@@ -48,14 +48,14 @@ const MustGrammar = {
   {
     type: 'translate',
     question: 'Translate into English.',
-    prompt: "Il doit etre heureux.",
+    prompt: "Il doit être heureux.",
     answer: "He must be happy.",
     wordBank: ["He", "must", "be", "happy."]
   },
   {
     type: 'translate',
     question: 'Translate into English.',
-    prompt: "Nous devons prendre le petit dejeuner.",
+    prompt: "Nous devons prendre le petit déjeuner.",
     answer: "We must eat breakfast.",
     wordBank: ["We", "must", "eat", "breakfast."]
   },
@@ -90,7 +90,7 @@ const MustGrammar = {
   {
     type: 'translate',
     question: 'Translate into English.',
-    prompt: "Tu dois suivre les regles.",
+    prompt: "Tu dois suivre les règles.",
     answer: "You must follow the rules.",
     wordBank: ["You", "must", "follow", "the rules."]
   },
@@ -111,9 +111,9 @@ const MustGrammar = {
   {
     type: 'translate',
     question: 'Translate into English.',
-    prompt: "Ils doivent arriver a l'heure.",
-    answer: "They must come on time.",
-    wordBank: ["They", "must", "come", "on", "time."]
+    prompt: "Ils doivent arriver à l'heure.",
+    answer: "They must arrive on time.",
+    wordBank: ["They", "must", "arrive", "on", "time."]
   }
 ],
 
@@ -143,7 +143,7 @@ const MustGrammar = {
   { "question": "We must to leave now.", "answer": false, "explanation": "Incorrect: 'must' should not be followed by 'to'. Correct: 'must leave'." },
   { "question": "She must help her friend.", "answer": true, "explanation": "Correct: 'must' + base verb." },
   { "question": "I must to finish this.", "answer": false, "explanation": "Incorrect: 'must' should not be followed by 'to'. Correct: 'must finish'." },
-  { "question": "They must come on time.", "answer": true, "explanation": "Correct: 'must' + base verb for obligation." }
+  { "question": "They must arrive on time.", "answer": true, "explanation": "Correct: 'must' + base verb for obligation." }
 ]
 };
 

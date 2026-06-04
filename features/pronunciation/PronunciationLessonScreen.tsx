@@ -10,7 +10,6 @@ import {
 } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import * as Speech from 'expo-speech';
 import BackButton from '../shared/BackButton';
 import ImageWithCredit from '../shared/ImageWithCredit';
 import { useTheme } from '../settings/ThemeContext';
@@ -18,6 +17,12 @@ import { pronunciationCategories, type PronunciationLesson } from '../../content
 import { markPracticeActivityToday } from '../progress/xpStorage';
 
 const fallbackLesson = pronunciationCategories[0].lessons[0];
+
+type BrowserVoiceInfo = {
+  identifier?: string;
+  name?: string;
+  language?: string;
+};
 
 type PronunciationLessonScreenProps = {
   route: {
@@ -44,7 +49,7 @@ export default function PronunciationLessonScreen({
   const lesson = route.params?.lesson ?? fallbackLesson;
   const accentColor = route.params?.categoryColor ?? '#EF6F6C';
   const [speakingText, setSpeakingText] = useState<string | null>(null);
-  const [preferredVoice, setPreferredVoice] = useState<Speech.Voice | null>(null);
+  const [preferredVoice, setPreferredVoice] = useState<BrowserVoiceInfo | null>(null);
   const [selectedPracticeIndex, setSelectedPracticeIndex] = useState(0);
   const usefulPhrases = lesson.usefulPhrases ?? [];
   const mainPracticeItems = usefulPhrases.length > 0 ? usefulPhrases : lesson.examples;
@@ -57,7 +62,9 @@ export default function PronunciationLessonScreen({
 
   useEffect(() => {
     return () => {
-      Speech.stop();
+      if (Platform.OS === 'web' && typeof window !== 'undefined') {
+        window.speechSynthesis?.cancel();
+      }
     };
   }, []);
 
@@ -71,20 +78,24 @@ export default function PronunciationLessonScreen({
 
     const loadPreferredVoice = async () => {
       try {
-        const voices = await Speech.getAvailableVoicesAsync();
+        if (Platform.OS !== 'web' || typeof window === 'undefined') {
+          if (mounted) setPreferredVoice(null);
+          return;
+        }
+
+        const voices = window.speechSynthesis?.getVoices?.() ?? [];
         const englishVoices = voices.filter((voice) =>
-          voice.language?.toLowerCase().startsWith('en')
+          voice.lang?.toLowerCase().startsWith('en')
         );
 
-        const scoreVoice = (voice: Speech.Voice) => {
-          const language = voice.language?.toLowerCase() ?? '';
+        const scoreVoice = (voice: SpeechSynthesisVoice) => {
+          const language = voice.lang?.toLowerCase() ?? '';
           const name = voice.name?.toLowerCase() ?? '';
           let score = 0;
 
           if (language === 'en-gb') score += 50;
           if (language === 'en-us') score += 35;
           if (language.startsWith('en')) score += 20;
-          if (voice.quality === Speech.VoiceQuality.Enhanced) score += 30;
           if (name.includes('premium') || name.includes('enhanced')) score += 15;
           if (name.includes('neural') || name.includes('natural')) score += 15;
           if (name.includes('daniel') || name.includes('serena') || name.includes('samantha')) {
@@ -95,7 +106,13 @@ export default function PronunciationLessonScreen({
         };
 
         const bestVoice = englishVoices.sort((a, b) => scoreVoice(b) - scoreVoice(a))[0];
-        if (mounted && bestVoice) setPreferredVoice(bestVoice);
+        if (mounted && bestVoice) {
+          setPreferredVoice({
+            identifier: bestVoice.voiceURI,
+            name: bestVoice.name,
+            language: bestVoice.lang,
+          });
+        }
       } catch {
         if (mounted) setPreferredVoice(null);
       }
@@ -127,18 +144,32 @@ export default function PronunciationLessonScreen({
     const speechText = getSpeechText(text);
     if (!speechText) return;
 
-    await Speech.stop();
     setSpeakingText(text);
     void markPracticeActivityToday(`pronunciation:${lesson.title}:${text}`);
-    Speech.speak(speechText, {
-      language: 'en-GB',
-      voice: preferredVoice?.identifier,
-      rate: 0.78,
-      pitch: 1,
-      onDone: () => setSpeakingText(null),
-      onStopped: () => setSpeakingText(null),
-      onError: () => setSpeakingText(null),
-    });
+
+    if (
+      Platform.OS === 'web' &&
+      typeof window !== 'undefined' &&
+      typeof SpeechSynthesisUtterance !== 'undefined' &&
+      window.speechSynthesis
+    ) {
+      window.speechSynthesis.cancel();
+      const utterance = new SpeechSynthesisUtterance(speechText);
+      const voice = window.speechSynthesis
+        .getVoices()
+        .find((candidate) => candidate.voiceURI === preferredVoice?.identifier);
+
+      utterance.lang = 'en-GB';
+      utterance.voice = voice ?? null;
+      utterance.rate = 0.78;
+      utterance.pitch = 1;
+      utterance.onend = () => setSpeakingText(null);
+      utterance.onerror = () => setSpeakingText(null);
+      window.speechSynthesis.speak(utterance);
+      return;
+    }
+
+    setTimeout(() => setSpeakingText(null), 450);
   };
 
   const openImageModal = () => {
@@ -171,7 +202,7 @@ export default function PronunciationLessonScreen({
           styles.practicePanel,
           {
             backgroundColor: colors.card,
-            borderColor: isDarkMode ? '#415a77' : '#d9e2ec',
+            borderColor: isDarkMode ? colors.border : '#d9e2ec',
           },
         ]}
       >
@@ -211,19 +242,19 @@ export default function PronunciationLessonScreen({
           style={[
             styles.goalBox,
             {
-              backgroundColor: isDarkMode ? 'rgba(49,168,124,0.16)' : '#effaf5',
-              borderColor: isDarkMode ? 'rgba(255,255,255,0.72)' : '#cbeedd',
+              backgroundColor: isDarkMode ? colors.successSoft : '#effaf5',
+              borderColor: isDarkMode ? colors.success : '#cbeedd',
             },
           ]}
         >
-          <MaterialIcons name="flag" size={21} color="#31A87C" />
+          <MaterialIcons name="flag" size={21} color={isDarkMode ? colors.success : '#31A87C'} />
           <View style={styles.goalContent}>
-            <Text style={styles.goalLabel}>Today I can</Text>
+            <Text style={[styles.goalLabel, { color: isDarkMode ? colors.success : '#31A87C' }]}>Today I can</Text>
             <Text style={[styles.goalText, { color: colors.text }]}>{lesson.goal}</Text>
           </View>
         </View>
 
-        <View style={styles.focusBox}>
+        <View style={[styles.focusBox, { backgroundColor: colors.buttonBackground }]}>
           <Text style={styles.focusLabel}>Focus</Text>
           <Text style={styles.focusText}>{lesson.focus}</Text>
         </View>
@@ -240,14 +271,14 @@ export default function PronunciationLessonScreen({
                   styles.phraseButton,
                   {
                     backgroundColor: speakingText === phrase
-                      ? '#1671B6'
+                      ? colors.buttonBackground
                       : isDarkMode
-                        ? '#23324d'
+                        ? colors.surface
                         : '#f8fafc',
                     borderColor: speakingText === phrase
-                      ? '#1671B6'
+                      ? colors.buttonBackground
                       : isDarkMode
-                        ? 'rgba(255,255,255,0.72)'
+                        ? colors.border
                         : '#e6edf5',
                   },
                 ]}
@@ -261,7 +292,7 @@ export default function PronunciationLessonScreen({
                 <MaterialIcons
                   name={speakingText === phrase ? 'volume-up' : 'play-arrow'}
                   size={20}
-                  color={speakingText === phrase ? '#ffffff' : '#1671B6'}
+                  color={speakingText === phrase ? '#ffffff' : colors.primary}
                 />
                 <Text
                   style={[
@@ -285,8 +316,8 @@ export default function PronunciationLessonScreen({
                 style={[
                   styles.ruleCard,
                   {
-                    backgroundColor: isDarkMode ? '#23324d' : '#f8fafc',
-                    borderColor: isDarkMode ? 'rgba(255,255,255,0.72)' : '#e6edf5',
+                    backgroundColor: isDarkMode ? colors.surface : '#f8fafc',
+                    borderColor: isDarkMode ? colors.border : '#e6edf5',
                   },
                 ]}
               >
@@ -304,6 +335,18 @@ export default function PronunciationLessonScreen({
                         style={[
                           styles.ruleExampleChip,
                           speakingText === word && styles.wordChipActive,
+                          {
+                            backgroundColor: speakingText === word
+                              ? colors.buttonBackground
+                              : isDarkMode
+                                ? colors.surfaceAlt
+                                : '#ecf6ff',
+                            borderColor: speakingText === word
+                              ? colors.buttonBackground
+                              : isDarkMode
+                                ? colors.borderStrong
+                                : '#d0e7fb',
+                          },
                         ]}
                         onPress={() => speak(word)}
                         activeOpacity={0.85}
@@ -311,12 +354,13 @@ export default function PronunciationLessonScreen({
                         <MaterialIcons
                           name={speakingText === word ? 'volume-up' : 'play-arrow'}
                           size={16}
-                          color={speakingText === word ? '#ffffff' : '#1671B6'}
+                          color={speakingText === word ? '#ffffff' : colors.primary}
                         />
                         <Text
                           style={[
                             styles.ruleExampleText,
                             speakingText === word && styles.wordChipTextActive,
+                            { color: speakingText === word ? '#ffffff' : isDarkMode ? colors.text : '#134975' },
                           ]}
                         >
                           {word}
@@ -335,12 +379,12 @@ export default function PronunciationLessonScreen({
             style={[
               styles.mistakeBox,
               {
-                backgroundColor: isDarkMode ? 'rgba(239,111,108,0.16)' : '#fff1f1',
-                borderColor: '#EF6F6C',
+                backgroundColor: isDarkMode ? colors.dangerSoft : '#fff1f1',
+                borderColor: isDarkMode ? colors.danger : '#EF6F6C',
               },
             ]}
           >
-            <MaterialIcons name="error-outline" size={21} color="#EF6F6C" />
+            <MaterialIcons name="error-outline" size={21} color={isDarkMode ? colors.danger : '#EF6F6C'} />
             <Text style={[styles.mistakeText, { color: colors.text }]}>
               {lesson.commonMistake}
             </Text>
@@ -358,6 +402,18 @@ export default function PronunciationLessonScreen({
                 style={[
                   styles.wordChip,
                   speakingText === word && styles.wordChipActive,
+                  {
+                    backgroundColor: speakingText === word
+                      ? colors.buttonBackground
+                      : isDarkMode
+                        ? colors.surfaceAlt
+                        : '#ecf6ff',
+                    borderColor: speakingText === word
+                      ? colors.buttonBackground
+                      : isDarkMode
+                        ? colors.borderStrong
+                        : '#d0e7fb',
+                  },
                 ]}
                 onPress={() => speak(word)}
                 activeOpacity={0.85}
@@ -365,12 +421,13 @@ export default function PronunciationLessonScreen({
                 <MaterialIcons
                   name={speakingText === word ? 'volume-up' : 'play-arrow'}
                   size={18}
-                  color={speakingText === word ? '#ffffff' : '#1671B6'}
+                  color={speakingText === word ? '#ffffff' : colors.primary}
                 />
                 <Text
                   style={[
                     styles.wordChipText,
                     speakingText === word && styles.wordChipTextActive,
+                    { color: speakingText === word ? '#ffffff' : isDarkMode ? colors.text : '#134975' },
                   ]}
                 >
                   {word}
@@ -384,8 +441,8 @@ export default function PronunciationLessonScreen({
           style={[
             styles.tryBox,
             {
-              backgroundColor: isDarkMode ? '#23324d' : '#f8fafc',
-              borderColor: isDarkMode ? 'rgba(255,255,255,0.72)' : '#e6edf5',
+              backgroundColor: isDarkMode ? colors.surface : '#f8fafc',
+              borderColor: isDarkMode ? colors.border : '#e6edf5',
             },
           ]}
         >

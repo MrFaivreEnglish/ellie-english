@@ -65,7 +65,18 @@ export default function PronunciationScreen() {
         paddingBottom: insets.bottom + 24,
       }}
     >
-      <BackButton label="Back to Home" onPress={() => (navigation as any).navigate('Home')} />
+      <BackButton
+        label="Back to Home"
+        onPress={() => {
+          const parentNavigation = (navigation as any).getParent?.();
+          if (parentNavigation) {
+            parentNavigation.navigate('Home');
+            return;
+          }
+
+          (navigation as any).navigate('Home');
+        }}
+      />
 
       <View style={styles.header}>
         <Text style={[styles.headerTitle, { color: colors.text }]}>Pronunciation</Text>
@@ -79,12 +90,12 @@ export default function PronunciationScreen() {
           value={searchText}
           onChangeText={setSearchText}
           placeholder="Search a situation..."
-          placeholderTextColor={isDarkMode ? '#ffffff' : '#464646'}
+          placeholderTextColor={isDarkMode ? colors.secondaryText : '#464646'}
           style={[
             styles.searchInput,
             {
-              backgroundColor: isDarkMode ? '#3a5891' : '#ecf6ff',
-              borderColor: isDarkMode ? '#ffffff' : '#134975',
+              backgroundColor: isDarkMode ? colors.surfaceAlt : '#ecf6ff',
+              borderColor: isDarkMode ? colors.borderStrong : '#134975',
               color: colors.text,
             },
           ]}
@@ -94,7 +105,7 @@ export default function PronunciationScreen() {
             <MaterialIcons
               name="close"
               size={20}
-              color={isDarkMode ? '#ffffff' : '#134975'}
+              color={isDarkMode ? colors.primary : '#134975'}
             />
           </TouchableOpacity>
         )}
@@ -122,7 +133,7 @@ export default function PronunciationScreen() {
                   styles.lessonCard,
                   {
                     backgroundColor: colors.card,
-                    borderColor: isDarkMode ? '#415a77' : '#e6edf5',
+                    borderColor: isDarkMode ? colors.border : '#e6edf5',
                   },
                 ]}
                 onPress={() =>

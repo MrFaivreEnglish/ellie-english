@@ -119,8 +119,6 @@ type MenuCopy = {
     chapterFallback: string;
     cannotOpenUrl: string;
     openUrlError: string;
-    copied: string;
-    copyFailed: string;
     practice: string;
   };
   vocabulary: {
@@ -269,8 +267,6 @@ const copies: Record<MenuLanguage, MenuCopy> = {
       chapterFallback: 'Chapter',
       cannotOpenUrl: 'Cannot open this URL',
       openUrlError: 'An error occurred while opening the link',
-      copied: 'Link copied to clipboard',
-      copyFailed: 'Failed to copy link',
       practice: 'Practice',
     },
     vocabulary: {
@@ -417,8 +413,6 @@ const copies: Record<MenuLanguage, MenuCopy> = {
       chapterFallback: 'Chapter',
       cannotOpenUrl: 'Cannot open this URL',
       openUrlError: 'An error occurred while opening the link',
-      copied: 'Link copied to clipboard',
-      copyFailed: 'Failed to copy link',
       practice: 'Practice',
     },
     vocabulary: {
@@ -565,8 +559,6 @@ const copies: Record<MenuLanguage, MenuCopy> = {
       chapterFallback: 'Chapitre',
       cannotOpenUrl: 'Impossible d’ouvrir ce lien',
       openUrlError: 'Une erreur est survenue en ouvrant le lien',
-      copied: 'Lien copié',
-      copyFailed: 'Impossible de copier le lien',
       practice: 'Travailler',
     },
     vocabulary: {

@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { View, Text, Pressable, Modal, ScrollView, StyleSheet, Platform, Image, Animated, ImageStyle } from 'react-native';
-import { GameState } from '../../types/VocabularyTypes';
+import { MaterialIcons } from '@expo/vector-icons';
+import { GameState, Word } from '../../types/VocabularyTypes';
 import { useAudioPlayer } from 'expo-audio';
 import { LinearGradient } from 'expo-linear-gradient';
 
@@ -9,6 +10,9 @@ import ShootingStarImg from '../../assets/shooting-star.png';
 // Prefer importing compiled asset entries from the centralized assets registry.
 import Assets from '../../assets/index';
 import { SOUND_EFFECT_OPTIONS, replaySoundEffect } from '../shared/soundEffects';
+import { getXP } from '../progress/xpStorage';
+import LevelProgressSummary from '../progress/LevelProgressSummary';
+import type { ThemeColors } from '../settings/ThemeContext';
 
 interface CompletionModalProps {
   visible: boolean;
@@ -22,9 +26,11 @@ interface CompletionModalProps {
   startedTimerMode: boolean;
   bestTimeForActiveCategory?: number | null;
   matchingSessionXp?: number;
-  colors?: any;
+  colors: ThemeColors;
   primaryActionLabel?: string;
   onPrimaryAction?: () => void;
+  reviewWords?: Word[];
+  onReviewWords?: () => void;
 }
 
 export default function VocabularyCompletionModal({
@@ -34,7 +40,6 @@ export default function VocabularyCompletionModal({
   wordsLength,
   isDarkMode,
   onReplay,
-  isFirstCompletion,
   isPersonalBest,
   colors,
   startedTimerMode,
@@ -42,6 +47,8 @@ export default function VocabularyCompletionModal({
   matchingSessionXp = 0,
   primaryActionLabel,
   onPrimaryAction,
+  reviewWords = [],
+  onReviewWords,
 }: CompletionModalProps) {
   const bigSuccessPlayer = useAudioPlayer(Assets.bigsuccess, SOUND_EFFECT_OPTIONS);
   const bestSuccessPlayer = useAudioPlayer(Assets.bestsuccess, SOUND_EFFECT_OPTIONS);
@@ -51,12 +58,28 @@ export default function VocabularyCompletionModal({
   const contentScale = useRef(new Animated.Value(0.98)).current;
   const hasPlayedOpenSoundRef = useRef(false);
   const [displayedPersonalBest, setDisplayedPersonalBest] = useState(isPersonalBest);
+  const [currentXP, setCurrentXP] = useState(0);
+  const timerModeUnlocked = !timerMode && !startedTimerMode && gameState.hasCompletedOnce;
 
   useEffect(() => {
     if (visible) {
       setDisplayedPersonalBest(isPersonalBest);
     }
   }, [isPersonalBest, visible]);
+
+  useEffect(() => {
+    if (!visible) return;
+
+    let active = true;
+
+    getXP().then((xp) => {
+      if (active) setCurrentXP(xp);
+    });
+
+    return () => {
+      active = false;
+    };
+  }, [matchingSessionXp, visible]);
 
   useEffect(() => {
     if (!visible) {
@@ -145,65 +168,58 @@ export default function VocabularyCompletionModal({
             <View style={[styles.congratsCard, {
               backgroundColor: displayedPersonalBest ? '#f4b942' : '#45BB78',
               borderColor: displayedPersonalBest ? '#B9770E' : '#1b6a28',
-              padding: displayedPersonalBest ? 28 : 20,
+              padding: displayedPersonalBest ? 22 : 16,
             }, displayedPersonalBest && styles.personalBestCard]}>
               <Image
                 source={timerMode ? TimerfireImg : ShootingStarImg}
                 style={[
                   styles.congratsImage,
                   (displayedPersonalBest
-                    ? { width: Platform.OS === 'web' ? 112 : 132, height: Platform.OS === 'web' ? 112 : 132 }
-                    : (Platform.OS === 'web' ? { width: 80, height: 80 } : { width: 120, height: 120 })) as ImageStyle
+                    ? { width: Platform.OS === 'web' ? 96 : 96, height: Platform.OS === 'web' ? 96 : 96 }
+                    : (Platform.OS === 'web' ? { width: 72, height: 72 } : { width: 88, height: 88 })) as ImageStyle
                 ]}
               />
-              <Text style={[styles.congratsTitle, { color: '#fff', fontSize: 28, marginVertical: 10 }]}>
+              <Text style={[styles.congratsTitle, { color: '#fff', fontSize: 24, marginVertical: 6 }]}>
                 {displayedPersonalBest ? 'New Best Time!' : 'Great job!'}
               </Text>
-              <Text style={[styles.congratsDescription, { color: '#fff', fontSize: 16, marginBottom: 16 }]}>
+              <Text style={[styles.congratsDescription, { color: '#fff', fontSize: 15, marginBottom: 8 }]}>
                 {displayedPersonalBest ? 'That is your fastest match yet.' : `You've successfully matched all ${wordsLength} words!`}
               </Text>
             </View>
 
-            {matchingSessionXp > 0 && (
-              <View style={[
-                styles.xpSummaryPill,
-                {
-                  backgroundColor: isDarkMode ? (colors?.successSoft ?? '#1D3A2A') : '#E9F8EF',
-                  borderColor: isDarkMode ? (colors?.success ?? '#6FD08C') : '#42C67A',
-                },
-              ]}>
-                <Text style={[styles.xpSummaryText, { color: isDarkMode ? (colors?.successText ?? '#C4F4D1') : '#12663D' }]}>
-                  +{matchingSessionXp} XP
-                </Text>
-              </View>
-            )}
+            <LevelProgressSummary
+              totalXP={currentXP}
+              sessionXP={matchingSessionXp}
+              colors={colors}
+              isDarkMode={isDarkMode}
+            />
 
             {/* Unlock card (first completion) */}
-            {isFirstCompletion && !timerMode && !startedTimerMode && (
+            {timerModeUnlocked && (
               <View style={[styles.unlockCard, styles.goldenCard]}> 
-                <Text style={styles.unlockEmoji}>🏅</Text>
-                <Text style={[styles.unlockTitle, styles.goldenTitle]}>Timed matching unlocked</Text>
-                <Text style={styles.unlockDescription}>Optional challenge for extra retrieval practice.</Text>
+                <Text style={styles.unlockEmoji}>{'\uD83C\uDFC5'}</Text>
+                <Text style={[styles.unlockTitle, styles.goldenTitle]}>Timer Mode Unlocked!</Text>
+                <Text style={styles.unlockDescription}>Try timer mode for an extra challenge.</Text>
               </View>
             )}
 
             {/* Metrics display (timer mode) */}
             {timerMode && (
               <View style={[styles.metricsContainer, {
-                backgroundColor: isDarkMode ? colors.card : '#fff',
-                borderColor: isDarkMode ? '#415a77' : 'rgba(0,0,0,0.1)'
+                backgroundColor: colors.card,
+                borderColor: colors.border
               }]}>
                 <View style={styles.metricBox}>
-                  <Text style={[styles.metricLabel, { color: isDarkMode ? '#a5d6a7' : '#666' }]}>Score</Text>
-                  <Text style={[styles.metricValue, { color: isDarkMode ? '#fff' : '#333' }]}>{gameState.totalScore}</Text>
+                  <Text style={[styles.metricLabel, { color: colors.secondaryText }]}>Score</Text>
+                  <Text style={[styles.metricValue, { color: colors.text }]}>{gameState.totalScore}</Text>
                 </View>
                 <View style={styles.metricBox}>
-                  <Text style={[styles.metricLabel, { color: isDarkMode ? '#a5d6a7' : '#666' }]}>Time</Text>
-                  <Text style={[styles.metricValue, { color: isDarkMode ? '#fff' : '#333' }]}>{formatTime(gameState.timer)}</Text>
+                  <Text style={[styles.metricLabel, { color: colors.secondaryText }]}>Time</Text>
+                  <Text style={[styles.metricValue, { color: colors.text }]}>{formatTime(gameState.timer)}</Text>
                 </View>
                 <View style={styles.metricBox}>
-                  <Text style={[styles.metricLabel, { color: isDarkMode ? '#a5d6a7' : '#666' }]}>Best</Text>
-                  <Text style={[styles.metricValue, { color: isDarkMode ? '#fff' : '#333' }]}>
+                  <Text style={[styles.metricLabel, { color: colors.secondaryText }]}>Best</Text>
+                  <Text style={[styles.metricValue, { color: colors.text }]}>
                     {bestTimeForActiveCategory != null ? formatTime(bestTimeForActiveCategory) : '--:--'}
                   </Text>
                 </View>
@@ -215,7 +231,7 @@ export default function VocabularyCompletionModal({
               <View style={styles.tryAgainSpacer} />
             )}
 
-            {/* Replay / timed matching button */}
+            {/* Replay / Timer Mode button */}
             <Pressable
               style={({ pressed }) => [
                 styles.replayButton,
@@ -228,20 +244,71 @@ export default function VocabularyCompletionModal({
                   return;
                 }
 
-                const activateTimer = (isFirstCompletion && !timerMode) || timerMode;
+                const activateTimer = timerModeUnlocked || timerMode;
                 onReplay(activateTimer);
               }}
             >
               <Text style={styles.replayButtonText}>
                 {primaryActionLabel ?? (
-                  isFirstCompletion && !timerMode
-                    ? 'Try\nTimed Matching'
+                  timerModeUnlocked
+                    ? 'Try Timer Mode!'
                     : timerMode
-                      ? 'Improve Your Time'
-                      : 'Practise Again'
+                      ? 'Beat Your Time!'
+                      : 'Play Again'
                 )}
               </Text>
             </Pressable>
+
+            {reviewWords.length > 0 && (
+            <View style={[
+              styles.reviewCard,
+              {
+                backgroundColor: colors.card,
+                borderColor: colors.border,
+              },
+            ]}>
+              <View style={styles.reviewHeader}>
+                <MaterialIcons name="rate-review" size={18} color={colors?.primary ?? '#1671B6'} />
+                <Text style={[styles.reviewTitle, { color: colors.text }]}>
+                  Words to Try Again
+                </Text>
+              </View>
+
+              <View style={styles.reviewWordsList}>
+                {reviewWords.slice(0, 5).map((word) => (
+                  <View key={`${word.english}-${word.french}`} style={styles.reviewWordRow}>
+                    <Text style={[styles.reviewWordText, { color: colors.text }]} numberOfLines={1}>
+                      {word.english}
+                    </Text>
+                    <Text style={[styles.reviewWordDivider, { color: colors.secondaryText }]}>/</Text>
+                    <Text style={[styles.reviewWordText, { color: colors.text }]} numberOfLines={1}>
+                      {word.french}
+                    </Text>
+                  </View>
+                ))}
+                {reviewWords.length > 5 && (
+                  <Text style={[styles.reviewMoreText, { color: colors.secondaryText }]}>
+                    +{reviewWords.length - 5} more
+                  </Text>
+                )}
+              </View>
+
+              {!!onReviewWords && (
+                <Pressable
+                  onPress={onReviewWords}
+                  style={({ pressed }) => [
+                    styles.reviewActionButton,
+                    { borderColor: colors?.primary ?? '#1671B6' },
+                    pressed && { opacity: 0.76 },
+                  ]}
+                >
+                  <Text style={[styles.reviewActionText, { color: colors?.primary ?? '#1671B6' }]}>
+                    Review These Words
+                  </Text>
+                </Pressable>
+              )}
+            </View>
+            )}
           </ScrollView>
         </Animated.View>
       </Animated.View>
@@ -252,32 +319,32 @@ export default function VocabularyCompletionModal({
 const styles = StyleSheet.create({
   completionScrollView: {
     width: '100%',
-    // On web, constrain to viewport height so centering works and long content can still scroll
-    maxHeight: Platform.OS === 'web' ? ('90vh' as any) : '100%',
+    maxHeight: Platform.OS === 'web' ? ('100vh' as any) : '100%',
   },
   completionScrollViewContent: {
-    paddingVertical: 20,
-    paddingHorizontal: Platform.OS === 'web' ? 18 : 8,
+    paddingVertical: Platform.OS === 'web' ? 18 : 14,
+    paddingHorizontal: Platform.OS === 'web' ? 20 : 16,
     alignItems: 'center',
     justifyContent: 'center',
-    maxWidth: Platform.OS === 'web' ? 680 : '100%',
-    minHeight: Platform.OS === 'web' ? 'auto' : '100%',
-    // Ensure the content doesn't try to stretch vertically on web
+    width: '100%',
+    maxWidth: Platform.OS === 'web' ? 680 : 620,
+    minHeight: '100%',
     alignSelf: 'center',
   },
   congratsCard: {
     backgroundColor: '#E8F5E9',
-    borderRadius: 16,
+    borderRadius: 18,
     width: '100%',
     alignItems: 'center',
+    borderWidth: 2,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 5,
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.22,
+    shadowRadius: 16,
+    elevation: 7,
   },
   personalBestCard: {
-    minHeight: Platform.OS === 'web' ? 250 : 300,
+    minHeight: Platform.OS === 'web' ? 210 : 220,
     borderWidth: 3,
     shadowColor: '#f4b942',
     shadowOpacity: 0.45,
@@ -286,9 +353,9 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   congratsImage: {
-    width: 110,
-    height: 110,
-    marginBottom: 16,
+    width: 88,
+    height: 88,
+    marginBottom: 8,
     resizeMode: 'contain',
   },
   congratsTitle: {
@@ -303,16 +370,16 @@ const styles = StyleSheet.create({
     color: '#666',
     textAlign: 'center',
     marginBottom: 24,
-    lineHeight: 26,
+    lineHeight: 22,
   },
   metricsContainer: {
     flexDirection: 'row',
     justifyContent: 'space-around',
     width: '100%',
-    marginVertical: 16,
-    borderWidth: 1,
+    marginVertical: 10,
+    borderWidth: 1.5,
     borderRadius: 16,
-    paddingVertical: 16,
+    paddingVertical: 12,
     paddingHorizontal: 8,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
@@ -345,6 +412,8 @@ const styles = StyleSheet.create({
     borderWidth: 1.5,
     paddingHorizontal: 14,
     paddingVertical: 7,
+    flexDirection: 'row',
+    gap: 8,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -352,43 +421,73 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '800',
   },
+  levelUpBanner: {
+    minHeight: 42,
+    marginTop: 12,
+    paddingHorizontal: 16,
+    paddingVertical: 9,
+    borderRadius: 999,
+    backgroundColor: '#FFE8A3',
+    borderWidth: 1.5,
+    borderColor: '#F4B942',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 7,
+  },
+  levelUpBannerText: {
+    color: '#7A4B00',
+    fontSize: 15,
+    lineHeight: 18,
+    fontWeight: '900',
+    textAlign: 'center',
+  },
+  levelSummaryBadge: {
+    borderRadius: 999,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+  },
+  levelSummaryText: {
+    fontSize: 12,
+    fontWeight: '800',
+  },
   unlockCard: {
     backgroundColor: '#fff',
     borderRadius: 16,
-    padding: 24,
+    padding: 14,
     width: '100%',
     alignItems: 'center',
-    marginVertical: 16,
-    borderWidth: 4,
+    marginVertical: 8,
+    borderWidth: 2,
     borderColor: '#FFD700',
     shadowColor: '#FFD700',
-    shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.8,
-    shadowRadius: 15,
-    elevation: 10,
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.18,
+    shadowRadius: 8,
+    elevation: 5,
   },
   goldenCard: {
-    backgroundColor: '#FFD700',
-    borderWidth: 3,
-    borderColor: '#FFD700',
+    backgroundColor: '#FFF6DE',
+    borderWidth: 2,
+    borderColor: '#F4B942',
     shadowColor: '#FFD700',
-    shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.5,
-    shadowRadius: 0,
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.18,
+    shadowRadius: 8,
   },
   unlockEmoji: {
-    fontSize: 36,
-    marginBottom: 12,
+    fontSize: 32,
+    marginBottom: 8,
     textAlign: 'center',
     textShadowColor: 'rgba(0, 0, 0, 0.2)',
     textShadowOffset: { width: 0, height: 1 },
     textShadowRadius: 2,
   },
   unlockTitle: {
-    fontSize: 24,
+    fontSize: 20,
     fontWeight: 'bold',
     color: '#000000',
-    marginBottom: 12,
+    marginBottom: 8,
     textAlign: 'center',
   },
   goldenTitle: {
@@ -398,18 +497,20 @@ const styles = StyleSheet.create({
     textShadowRadius: 0,
   },
   unlockDescription: {
-    fontSize: 16,
+    fontSize: 15,
     color: '#666',
     textAlign: 'center',
     marginBottom: 8,
-    lineHeight: 24,
+    lineHeight: 21,
     paddingHorizontal: 8,
   },
   replayButton: {
     backgroundColor: '#1671B6',
+    minWidth: 220,
     paddingHorizontal: 32,
-    paddingVertical: 12,
-    borderRadius: 30,
+    paddingVertical: 14,
+    borderRadius: 999,
+    marginTop: 10,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.2,
@@ -419,9 +520,72 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   tryAgainSpacer: {
-    // Add extra breathing room specifically for the try-again flow on timer mode
-    height: Platform.OS === 'web' ? 40 : 24,
+    height: Platform.OS === 'web' ? 14 : 10,
     width: '100%',
+  },
+  reviewCard: {
+    width: '100%',
+    borderRadius: 16,
+    borderWidth: 1.5,
+    padding: 14,
+    marginTop: 14,
+    marginBottom: 14,
+  },
+  reviewHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 7,
+    marginBottom: 10,
+  },
+  reviewTitle: {
+    fontSize: 16,
+    fontWeight: '800',
+  },
+  reviewWordsList: {
+    gap: 7,
+  },
+  reviewWordRow: {
+    minHeight: 26,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 7,
+  },
+  reviewWordText: {
+    flexShrink: 1,
+    fontSize: 14,
+    fontWeight: '700',
+    textAlign: 'center',
+  },
+  reviewWordDivider: {
+    fontSize: 13,
+    fontWeight: '800',
+  },
+  reviewMoreText: {
+    marginTop: 2,
+    fontSize: 13,
+    fontWeight: '700',
+    textAlign: 'center',
+  },
+  reviewEmptyText: {
+    fontSize: 14,
+    fontWeight: '700',
+    textAlign: 'center',
+  },
+  reviewActionButton: {
+    alignSelf: 'center',
+    minHeight: 38,
+    marginTop: 12,
+    paddingHorizontal: 16,
+    borderRadius: 999,
+    borderWidth: 1.5,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  reviewActionText: {
+    fontSize: 14,
+    fontWeight: '800',
   },
   replayButtonText: {
     color: '#fff',

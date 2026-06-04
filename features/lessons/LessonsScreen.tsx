@@ -1,6 +1,5 @@
 import React, { useMemo, useState } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Linking, Platform } from 'react-native';
-import * as Clipboard from 'expo-clipboard';
 import BackButton from '../shared/BackButton';
 import { toast } from 'sonner-native';
 import { MaterialIcons } from '@expo/vector-icons';
@@ -106,15 +105,6 @@ export default function LessonsScreen() {
     }
   };
 
-  const copyToClipboard = async (text: string) => {
-    try {
-      await Clipboard.setStringAsync(text);
-      toast.success(copy.copied);
-    } catch (err) {
-      toast.error(copy.copyFailed);
-    }
-  };
-
   const showLink = (url: string) => {
     setSelectedLink(url);
     openLink(url);
@@ -136,7 +126,9 @@ export default function LessonsScreen() {
     }
 
     if (appLink.target === 'pronunciation') {
-      (navigation as any).navigate('Pronunciation', {
+      const rootNavigation = (navigation as any).getParent?.() ?? navigation;
+
+      rootNavigation.navigate('Pronunciation', {
         screen: 'PronunciationLesson',
         params: {
           lesson: appLink.lesson,
@@ -180,7 +172,7 @@ export default function LessonsScreen() {
           styles.modeToggle,
           {
             backgroundColor: isDarkMode ? colors.card : '#f6f9fc',
-            borderColor: isDarkMode ? 'rgba(255,255,255,0.72)' : '#d9e2ec',
+            borderColor: isDarkMode ? colors.borderStrong : '#d9e2ec',
           },
         ]}
       >
@@ -188,6 +180,7 @@ export default function LessonsScreen() {
           style={[
             styles.modeOption,
             viewMode === 'chapters' && styles.modeOptionActive,
+            viewMode === 'chapters' && { backgroundColor: colors.buttonBackground },
           ]}
           onPress={() => handleViewModeChange('chapters')}
           activeOpacity={0.86}
@@ -208,6 +201,7 @@ export default function LessonsScreen() {
           style={[
             styles.modeOption,
             viewMode === 'resources' && styles.modeOptionActive,
+            viewMode === 'resources' && { backgroundColor: colors.buttonBackground },
           ]}
           onPress={() => handleViewModeChange('resources')}
           activeOpacity={0.86}
@@ -273,11 +267,9 @@ export default function LessonsScreen() {
                 const displayLessonTitle = chapterLinkOverride?.displayTitle || lesson.title;
                 const chapter = parseChapterTitle(displayLessonTitle);
                 const appLinks = (lesson.appLinks ?? [])
+                  .filter((link) => SHOW_PRONUNCIATION_FEATURE || link.target !== 'pronunciation')
                   .map(resolveChapterAppLink)
-                  .filter((link): link is ResolvedChapterAppLink => {
-                    if (!link) return false;
-                    return SHOW_PRONUNCIATION_FEATURE || link.target !== 'pronunciation';
-                  });
+                  .filter((link): link is ResolvedChapterAppLink => !!link);
                 return (
                   <View
                     key={lessonIndex}
@@ -285,7 +277,7 @@ export default function LessonsScreen() {
                       styles.lessonItem,
                       appLinks && appLinks.length > 0 ? styles.lessonItemWithAppLinks : null,
                       {
-                        backgroundColor: isDarkMode ? '#23324d' : '#f8fafc',
+                        backgroundColor: isDarkMode ? colors.surface : '#f8fafc',
                         borderColor: isDarkMode ? colors.border : '#e6edf5',
                       },
                     ]}
@@ -306,10 +298,7 @@ export default function LessonsScreen() {
                         </Text>
                       </View>
                       <View style={styles.chapterTextBlock}>
-                        <Text style={[styles.lessonTitle, { color: colors.text }]}>{chapter.title}</Text>
-                        {!!appLinks?.length && (
-                          <Text style={[styles.revisionHint, { color: colors.secondaryText }]} />
-                        )}
+                        <Text style={[styles.lessonTitle, styles.chapterLessonTitle, { color: colors.text }]}>{chapter.title}</Text>
                       </View>
                       <View style={[styles.chapterArrow, { borderColor: isDarkMode ? colors.border : '#dbe6f2' }]}>
                         <MaterialIcons name="open-in-new" size={15} color={colors.secondaryText} />
@@ -318,7 +307,6 @@ export default function LessonsScreen() {
 
                     {!!appLinks?.length && (
                       <View style={styles.appLinksBlock}>
-                        <Text style={[styles.appLinksTitle, { color: colors.text }]} />
                         <View style={styles.appLinksGrid}>
                           {appLinks.map((appLink) => (
                             <TouchableOpacity
@@ -326,7 +314,7 @@ export default function LessonsScreen() {
                               style={[
                                 styles.appLinkButton,
                                 {
-                                  backgroundColor: isDarkMode ? '#1b2a42' : '#ffffff',
+                                  backgroundColor: isDarkMode ? colors.card : '#ffffff',
                                   borderColor: isDarkMode ? colors.border : '#dbe6f2',
                                 },
                               ]}
@@ -396,7 +384,7 @@ export default function LessonsScreen() {
                   style={[
                     styles.lessonItem,
                     {
-                      backgroundColor: isDarkMode ? '#23324d' : '#f8fafc',
+                      backgroundColor: isDarkMode ? colors.surface : '#f8fafc',
                       borderColor: isDarkMode ? colors.border : '#e6edf5',
                     },
                   ]}
@@ -540,8 +528,10 @@ const styles = StyleSheet.create({  container: {
   },
   chapterMainRow: {
     alignItems: 'center',
-    flex: 1,
+    alignSelf: 'stretch',
     flexDirection: 'row',
+    minHeight: 52,
+    width: '100%',
   },
   lessonNumberBadge: {
     width: 30,
@@ -589,8 +579,16 @@ const styles = StyleSheet.create({  container: {
     lineHeight: 22,
   },
   chapterTextBlock: {
+    alignSelf: 'stretch',
     flex: 1,
+    justifyContent: 'center',
     marginRight: 10,
+    minHeight: 52,
+  },
+  chapterLessonTitle: {
+    flex: 0,
+    includeFontPadding: false,
+    textAlignVertical: 'center',
   },
   revisionHint: {
     fontSize: 13,
@@ -607,7 +605,7 @@ const styles = StyleSheet.create({  container: {
     width: 32,
   },
   appLinksBlock: {
-    marginTop: 12,
+    marginTop: 6,
   },
   appLinksTitle: {
     fontSize: 14,

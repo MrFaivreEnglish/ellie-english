@@ -1,4 +1,4 @@
-import React, { useCallback, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   ScrollView,
   View,
@@ -9,7 +9,7 @@ import {
   Platform,
   TextInput
 } from 'react-native';
-import { useTheme } from '../settings/ThemeContext';
+import { useTheme, type ThemeColors } from '../settings/ThemeContext';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import { MaterialIcons } from '@expo/vector-icons';
@@ -17,6 +17,152 @@ import BackButton from '../shared/BackButton';
 import { grammarCategories } from '../../content/lessons/grammarRegistry';
 import { getGrammarLessonProgressCounts, getGrammarLessonProgressKey } from './grammarProgressStorage';
 import { getMenuCopy } from '../shared/menuCopy';
+import { getInsetSurfaceStyle, getPanelStyle, uiRadii } from '../shared/uiPrimitives';
+
+const isRemoteLessonImage = (imageUrl: any) =>
+  typeof imageUrl === 'string' && /^https?:\/\//i.test(imageUrl);
+
+const getLessonImageSource = (imageUrl: any) => {
+  if (!imageUrl) return null;
+  return typeof imageUrl === 'string' ? { uri: imageUrl } : imageUrl;
+};
+
+type GrammarLessonRowProps = {
+  lesson: any;
+  savedAnswerCount: number;
+  rowIndex: number;
+  staggerRemoteImageLoad: boolean;
+  colors: ThemeColors;
+  isDarkMode: boolean;
+  copy: any;
+  onSelectLesson: (lesson: any) => void;
+};
+
+const GrammarLessonRow = React.memo(({
+  lesson,
+  savedAnswerCount,
+  rowIndex,
+  staggerRemoteImageLoad,
+  colors,
+  isDarkMode,
+  copy,
+  onSelectLesson,
+}: GrammarLessonRowProps) => {
+  const handlePress = useCallback(() => onSelectLesson(lesson), [lesson, onSelectLesson]);
+  const imageSource = getLessonImageSource(lesson.imageUrl);
+  const isRemoteImage = isRemoteLessonImage(lesson.imageUrl);
+  const [canLoadRemoteImage, setCanLoadRemoteImage] = useState(!isRemoteImage || !staggerRemoteImageLoad);
+  const [imageLoaded, setImageLoaded] = useState(false);
+  const [imageLoadFailed, setImageLoadFailed] = useState(false);
+  const shouldRenderThumbnail = imageSource && (!isRemoteImage || canLoadRemoteImage);
+
+  useEffect(() => {
+    if (!isRemoteImage || !staggerRemoteImageLoad) {
+      setCanLoadRemoteImage(true);
+      return undefined;
+    }
+
+    setCanLoadRemoteImage(false);
+    const timeout = setTimeout(
+      () => setCanLoadRemoteImage(true),
+      80 + Math.min(rowIndex, 10) * 55
+    );
+
+    return () => clearTimeout(timeout);
+  }, [isRemoteImage, lesson.imageUrl, rowIndex, staggerRemoteImageLoad]);
+
+  useEffect(() => {
+    setImageLoaded(false);
+    setImageLoadFailed(false);
+  }, [lesson.imageUrl]);
+
+  return (
+    <TouchableOpacity
+      style={[
+        styles.lessonItem,
+        getInsetSurfaceStyle(colors, isDarkMode),
+        {
+          backgroundColor: isDarkMode ? colors.surface : '#F8FBFF',
+          borderColor: isDarkMode ? colors.borderStrong : '#D7E6F3',
+        },
+      ]}
+      activeOpacity={0.82}
+      onPress={handlePress}
+    >
+      <View
+        style={[
+          styles.lessonThumbnail,
+          {
+            backgroundColor: isDarkMode ? colors.surfaceAlt : '#EDF5FC',
+          },
+        ]}
+      >
+        {(!shouldRenderThumbnail || !imageLoaded) && (
+          <View style={styles.lessonThumbnailSkeleton}>
+            <View
+              style={[
+                styles.thumbnailSkeletonPanel,
+                { backgroundColor: isDarkMode ? colors.card : '#f8fafc' },
+              ]}
+            />
+            <View
+              style={[
+                styles.thumbnailSkeletonLine,
+                { backgroundColor: isDarkMode ? colors.borderStrong : 'rgba(255,255,255,0.82)' },
+              ]}
+            />
+            <View
+              style={[
+                styles.thumbnailSkeletonLine,
+                styles.thumbnailSkeletonLineShort,
+                { backgroundColor: isDarkMode ? colors.border : 'rgba(255,255,255,0.62)' },
+              ]}
+            />
+          </View>
+        )}
+
+        {shouldRenderThumbnail && !imageLoadFailed && (
+          <Image
+            source={imageSource}
+            style={[
+              styles.lessonThumbnailImage,
+              !imageLoaded && styles.lessonThumbnailImageLoading,
+            ]}
+            resizeMode="cover"
+            fadeDuration={0}
+            progressiveRenderingEnabled
+            onLoad={() => setImageLoaded(true)}
+            onError={() => setImageLoadFailed(true)}
+          />
+        )}
+
+        {imageLoadFailed && (
+          <MaterialIcons name="image-not-supported" size={22} color={colors.secondaryText} />
+        )}
+      </View>
+
+      <View style={styles.lessonInfo}>
+        <Text style={[styles.lessonTitle, { color: colors.text }]}>
+          {lesson.title}
+        </Text>
+        {savedAnswerCount > 0 && (
+          <View style={[styles.savedAnswersPill, { backgroundColor: colors.successSoft, borderColor: colors.success }]}>
+            <MaterialIcons name="check-circle" size={14} color={colors.success} />
+            <Text style={[styles.savedAnswersText, { color: colors.successText ?? colors.success }]}>
+              {savedAnswerCount} {savedAnswerCount === 1 ? copy.savedAnswerSingular : copy.savedAnswerPlural}
+            </Text>
+          </View>
+        )}
+      </View>
+
+      <MaterialIcons
+        name="arrow-forward-ios"
+        size={16}
+        color={colors.secondaryText}
+      />
+    </TouchableOpacity>
+  );
+});
 
 const subEmojiMap: Record<string, string> = {
   'Temps du pr\u00E9sent': '\u23F0',
@@ -25,6 +171,7 @@ const subEmojiMap: Record<string, string> = {
   'Pouvoir / Devoir': '\u2705',
   'Fr\u00E9quence': '\uD83D\uDD01',
   'Temps du pass\u00E9': '\uD83D\uDD70\uFE0F',
+  'Irregular Verbs': '\uD83D\uDCD3',
   'Futur': '\uD83D\uDD2E',
   'Modaux': '\uD83E\uDDF0',
   'Comparaisons': '\u2696\uFE0F',
@@ -140,6 +287,10 @@ const GrammarCategoryList: React.FC<{ onSelectLesson: (lesson: any) => void }> =
   return (
     <ScrollView
       style={[styles.container, { backgroundColor: colors.background }]}
+      removeClippedSubviews={Platform.OS !== 'web'}
+      overScrollMode="never"
+      bounces={false}
+      alwaysBounceVertical={false}
       contentContainerStyle={{
         paddingTop: topContentInset
       }}
@@ -153,9 +304,12 @@ const GrammarCategoryList: React.FC<{ onSelectLesson: (lesson: any) => void }> =
       <View
         style={[
           styles.searchShell,
+          getInsetSurfaceStyle(colors, isDarkMode),
           {
-            backgroundColor: colors.surface,
-            borderColor: colors.border,
+            backgroundColor: colors.surfaceAlt,
+            borderColor: search.trim() ? colors.primary : colors.borderStrong,
+            borderWidth: search.trim() ? 2 : 1.5,
+            borderRadius: uiRadii.control,
           },
         ]}
       >
@@ -167,14 +321,12 @@ const GrammarCategoryList: React.FC<{ onSelectLesson: (lesson: any) => void }> =
           style={[
             styles.searchInput,
             {
-              backgroundColor: colors.surfaceAlt,
+              backgroundColor: 'transparent',
               color: colors.text,
-              borderWidth: 2,
-              borderColor: search.trim() ? colors.primary : colors.borderStrong,
+              borderWidth: 0,
               paddingRight: 45,
               paddingLeft: 44,
               paddingVertical: 14,
-              borderRadius: 12,
               fontSize: 16,
             },
           ]}
@@ -230,12 +382,12 @@ const GrammarCategoryList: React.FC<{ onSelectLesson: (lesson: any) => void }> =
                 key={key}
                 style={[
                   styles.categoryContainer,
+                  getPanelStyle(colors, isDarkMode, open ? 'raised' : 'soft'),
                   open && styles.categoryContainerActive,
                   {
                     backgroundColor: colors.card,
-                    borderColor: open ? subColor : 'transparent',
-                    shadowColor: '#000',
-                    shadowOpacity: open ? (isDarkMode ? 0.28 : 0.16) : (isDarkMode ? 0.2 : 0.1)
+                    borderColor: isDarkMode ? 'rgba(255,255,255,0.68)' : '#FFFFFF',
+                    borderWidth: 1.5,
                   }
                 ]}
               >
@@ -266,49 +418,20 @@ const GrammarCategoryList: React.FC<{ onSelectLesson: (lesson: any) => void }> =
                   <View style={styles.lessonsContainer}>
                     {lessons.map((lesson: any, li: number) => {
                       const savedAnswerCount = grammarProgressCounts[getGrammarLessonProgressKey(lesson)] ?? 0;
+                      const rowKey = lesson.id ? String(lesson.id) : `${lesson.title}-${li}`;
 
                       return (
-                        <TouchableOpacity
-                          key={li}
-                          style={[
-                            styles.lessonItem,
-                            {
-                              backgroundColor: isDarkMode ? '#23324d' : '#f8fafc',
-                              borderColor: isDarkMode ? '#34495e' : '#e6edf5',
-                            },
-                          ]}
-                          activeOpacity={0.82}
-                          onPress={() => onSelectLesson(lesson)}
-                        >
-                          <Image
-                            source={
-                              typeof lesson.imageUrl === 'string'
-                                ? { uri: lesson.imageUrl }
-                                : lesson.imageUrl
-                            }
-                            style={styles.lessonThumbnail}
-                          />
-
-                          <View style={styles.lessonInfo}>
-                            <Text style={[styles.lessonTitle, { color: colors.text }]}>
-                              {lesson.title}
-                            </Text>
-                            {savedAnswerCount > 0 && (
-                              <View style={[styles.savedAnswersPill, { backgroundColor: colors.successSoft, borderColor: colors.success }]}>
-                                <MaterialIcons name="check-circle" size={14} color={colors.success} />
-                                <Text style={[styles.savedAnswersText, { color: colors.successText ?? colors.success }]}>
-                                  {savedAnswerCount} {savedAnswerCount === 1 ? copy.savedAnswerSingular : copy.savedAnswerPlural}
-                                </Text>
-                              </View>
-                            )}
-                          </View>
-
-                          <MaterialIcons
-                            name="arrow-forward-ios"
-                            size={16}
-                            color={colors.secondaryText}
-                          />
-                        </TouchableOpacity>
+                        <GrammarLessonRow
+                          key={rowKey}
+                          lesson={lesson}
+                          savedAnswerCount={savedAnswerCount}
+                          rowIndex={li}
+                          staggerRemoteImageLoad={lessons.length > 6 || !!search.trim()}
+                          colors={colors}
+                          isDarkMode={isDarkMode}
+                          copy={copy}
+                          onSelectLesson={onSelectLesson}
+                        />
                       );
                     })}
                   </View>
@@ -340,11 +463,11 @@ const styles = StyleSheet.create({
     marginTop: 10,
     marginBottom: 14,
     borderWidth: 1.5,
-    borderRadius: 14,
+    borderRadius: 12,
     overflow: 'hidden',
     position: 'relative',
   },
-  searchInput: { minHeight: 44, padding: 14, borderRadius: 12, fontSize: 16 },
+  searchInput: { minHeight: 46, padding: 14, fontSize: 16 },
   searchIconWrap: {
     position: 'absolute',
     left: 16,
@@ -378,17 +501,11 @@ const styles = StyleSheet.create({
   categoryContainer: {
     marginBottom: 16,
     marginHorizontal: 16,
-    borderRadius: 16,
+    borderRadius: uiRadii.card,
     overflow: 'hidden',
-    borderWidth: 2,
-    shadowOffset: { width: 0, height: 2 },
-    shadowRadius: 4,
-    elevation: 3
   },
   categoryContainerActive: {
-    shadowOffset: { width: 0, height: 5 },
-    shadowRadius: 10,
-    elevation: 6,
+    borderWidth: 1.5,
   },
 
   categoryHeader: {
@@ -439,15 +556,42 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingVertical: 12,
     paddingHorizontal: 12,
-    borderRadius: 12,
-    borderWidth: 1,
+    borderRadius: uiRadii.panel,
   },
 
   lessonThumbnail: {
-    width: 60,
-    height: 60,
-    borderRadius: 8,
-    marginRight: 8
+    width: 64,
+    height: 64,
+    borderRadius: uiRadii.thumbnail,
+    marginRight: 6,
+    alignItems: 'center',
+    justifyContent: 'center',
+    overflow: 'hidden',
+  },
+  lessonThumbnailImage: {
+    width: '100%',
+    height: '100%',
+  },
+  lessonThumbnailImageLoading: {
+    opacity: 0,
+  },
+  lessonThumbnailSkeleton: {
+    ...StyleSheet.absoluteFillObject,
+    padding: 8,
+    justifyContent: 'flex-end',
+  },
+  thumbnailSkeletonPanel: {
+    ...StyleSheet.absoluteFillObject,
+    opacity: 0.88,
+  },
+  thumbnailSkeletonLine: {
+    width: 34,
+    height: 5,
+    borderRadius: 999,
+    marginTop: 4,
+  },
+  thumbnailSkeletonLineShort: {
+    width: 22,
   },
 
   lessonInfo: {

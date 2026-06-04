@@ -1,4 +1,3 @@
-import { pronunciationCategories } from '../pronunciationLessons';
 import { grammarLessons } from './grammarRegistry';
 import type {
   ChapterAppLinkDefinition,
@@ -14,13 +13,6 @@ const normalizeTitle = (title: string) =>
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, ' ')
     .trim();
-
-const pronunciationLessons = pronunciationCategories.flatMap((category) =>
-  category.lessons.map((lesson) => ({
-    lesson,
-    categoryColor: category.color,
-  }))
-);
 
 const defaultIconByTarget: Record<ChapterAppLinkDefinition['target'], MaterialIconName> = {
   vocabulary: 'style',
@@ -57,17 +49,5 @@ export const resolveChapterAppLink = (
     };
   }
 
-  const pronunciationMatch = pronunciationLessons.find(
-    (item) => normalizeTitle(item.lesson.title) === wantedTitle
-  );
-
-  if (!pronunciationMatch) return null;
-
-  return {
-    label: appLink.label,
-    icon: appLink.icon ?? defaultIconByTarget.pronunciation,
-    target: appLink.target,
-    lesson: pronunciationMatch.lesson,
-    categoryColor: pronunciationMatch.categoryColor,
-  };
+  return null;
 };

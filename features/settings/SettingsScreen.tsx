@@ -1,8 +1,8 @@
 import React, { useMemo, useState } from 'react';
-import { Alert, View, Text, StyleSheet, Switch, Platform, ScrollView, Pressable, Modal, TextInput, TouchableOpacity } from 'react-native';
+import { Alert, View, Text, StyleSheet, Switch, Platform, ScrollView, Pressable, Modal, TextInput, TouchableOpacity, Linking, useWindowDimensions } from 'react-native';
 import BackButton from '../shared/BackButton';
 import { useNavigation } from '@react-navigation/native';
-import { MaterialIcons } from '@expo/vector-icons';
+import { FontAwesome, MaterialIcons } from '@expo/vector-icons';
 import { useTheme } from './ThemeContext';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { clearVocabularyTimerBests } from '../vocabulary/vocabularyTimerStorage';
@@ -16,6 +16,8 @@ const SETTINGS_FONT_FAMILY = Platform.select({
   web: 'Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
   default: undefined,
 });
+
+const ANDROID_APK_DOWNLOAD_URL = 'https://github.com/MrFaivreEnglish/ellie-english/releases/latest/download/ellie-latest.apk';
 
 export default function SettingsScreen() {
   const ADMIN_PIN = '241711';
@@ -45,33 +47,52 @@ export default function SettingsScreen() {
     toggleAndroidStatusBar,
     isShinyEllieUnlocked,
     isShinyEllieMode,
-    toggleShinyEllieMode
+    toggleShinyEllieMode,
   } = useTheme();
   const navigation = useNavigation<any>();
   const insets = useSafeAreaInsets();
+  const { width: windowWidth } = useWindowDimensions();
   const topContentInset = Platform.OS === 'ios'
     ? (insets.top > 0 ? insets.top : 0)
     : Platform.OS === 'android' && isAndroidStatusBarEnabled
       ? insets.top
       : 0;
-  const [adminTapCount, setAdminTapCount] = useState(0);
+  const [, setAdminTapCount] = useState(0);
   const [adminModalVisible, setAdminModalVisible] = useState(false);
+  const [installGuideVisible, setInstallGuideVisible] = useState(false);
   const [adminPinInput, setAdminPinInput] = useState('');
   const [adminPinError, setAdminPinError] = useState('');
+  const adminAccessEnabled = Platform.OS === 'web';
+  const showInstallBadge = Platform.OS === 'web' && windowWidth < 768;
   const isPinValid = useMemo(() => adminPinInput.trim() === ADMIN_PIN, [adminPinInput]);
   const appCopy = getMenuCopy(menuLanguage);
   const copy = appCopy.settings;
   const commonCopy = appCopy.common;
-  const settingsCardBackground = isDarkMode ? colors.card : '#FFFFFF';
-  const settingsCardBorder = isDarkMode ? 'rgba(255,255,255,0.10)' : 'rgba(31,41,55,0.10)';
-  const settingsRowBorder = isDarkMode ? 'rgba(255,255,255,0.08)' : 'rgba(31,41,55,0.08)';
-  const settingsIconBackground = isDarkMode ? 'rgba(255,255,255,0.07)' : '#F3F5F7';
+  const settingsCardBackground = colors.card;
+  const settingsCardBorder = colors.border;
+  const settingsRowBorder = colors.border;
+  const settingsIconBackground = colors.surfaceAlt;
   const settingsIconColor = isDarkMode ? colors.secondaryText : '#56616D';
-  const settingsControlBackground = isDarkMode ? colors.surface : '#F6F7F9';
-  const settingsSubsectionBackground = isDarkMode ? 'rgba(255,255,255,0.05)' : '#F7F8FA';
+  const settingsControlBackground = colors.surface;
+  const settingsSubsectionBackground = colors.surface;
   const settingsSubsectionText = isDarkMode ? colors.text : '#4B5563';
 
+  const openAndroidDownload = () => {
+    if (!ANDROID_APK_DOWNLOAD_URL) {
+      Alert.alert('APK pas encore disponible', 'Le lien prive sera ajoute ici.');
+      return;
+    }
+
+    Linking.openURL(ANDROID_APK_DOWNLOAD_URL).catch(() => {
+      Alert.alert('Download unavailable', 'The Android APK link could not be opened.');
+    });
+  };
+
   const handleAdminVersionPress = () => {
+    if (!adminAccessEnabled) {
+      return;
+    }
+
     setAdminTapCount((current) => {
       const next = current + 1;
       if (next >= 7) {
@@ -89,6 +110,11 @@ export default function SettingsScreen() {
   };
 
   const submitAdminPin = () => {
+    if (!adminAccessEnabled) {
+      closeAdminModal();
+      return;
+    }
+
     if (!isPinValid) {
       setAdminPinError(copy.wrongPin);
       return;
@@ -169,10 +195,39 @@ export default function SettingsScreen() {
     >
       <BackButton label={commonCopy.backToHome} onPress={() => navigation.navigate('Home')} />
 
-      <Text style={[styles.headerTitle, { color: colors.text }]}>{copy.header}</Text>
+      <View style={styles.headerTitleRow}>
+        <Text style={[styles.headerTitle, { color: colors.text }]} numberOfLines={1}>
+          {copy.header}
+        </Text>
+        {showInstallBadge && (
+          <View style={[styles.headerInstallPill, { backgroundColor: colors.card, borderColor: colors.border }]}>
+            <Text style={[styles.headerInstallText, { color: colors.secondaryText }]}>Install Ellie!</Text>
+            <View style={styles.headerInstallButtons}>
+              <TouchableOpacity
+                onPress={() => setInstallGuideVisible(true)}
+                activeOpacity={0.84}
+                accessibilityRole="button"
+                accessibilityLabel="Installer Ellie sur iPhone"
+                style={[styles.headerInstallButton, { backgroundColor: colors.surface, borderColor: colors.border }]}
+              >
+                <FontAwesome name="apple" size={18} color={colors.secondaryText} />
+              </TouchableOpacity>
+              <TouchableOpacity
+                onPress={openAndroidDownload}
+                activeOpacity={0.84}
+                accessibilityRole="button"
+                accessibilityLabel="Installer Ellie sur Android"
+                style={[styles.headerInstallButton, styles.headerInstallButtonAndroid]}
+              >
+                <MaterialIcons name="android" size={19} color="#258B62" />
+              </TouchableOpacity>
+            </View>
+          </View>
+        )}
+      </View>
 
       <View style={styles.section}>
-        <Text style={[styles.sectionTitle, { color: colors.secondaryText }]}>{copy.appearance}</Text>
+        <Text style={[styles.sectionTitle, { color: colors.secondaryText }]}>Display</Text>
         <View style={[styles.sectionCard, { backgroundColor: settingsCardBackground, borderColor: settingsCardBorder }]}>
           {renderSetting({
             icon: 'brightness-6',
@@ -180,6 +235,32 @@ export default function SettingsScreen() {
             description: copy.darkModeDescription,
             value: isDarkMode,
             onValueChange: toggleTheme,
+            activeColor: colors.primary,
+          })}
+          {renderSetting({
+            icon: 'today',
+            title: copy.todayCardTitle,
+            description: copy.todayCardDescription,
+            value: isTodayCardEnabled,
+            onValueChange: toggleTodayCard,
+            activeColor: colors.primary,
+          })}
+          {renderSetting({
+            icon: 'volume-up',
+            title: copy.soundEffectsTitle,
+            description: copy.soundEffectsDescription,
+            value: isSoundEffectsEnabled,
+            onValueChange: toggleSoundEffects,
+            activeColor: colors.primary,
+          })}
+          {hapticsAreSupported && renderSetting({
+            icon: 'vibration',
+            title: copy.hapticsTitle,
+            description: Platform.OS === 'web'
+              ? copy.hapticsWebDescription
+              : copy.hapticsDescription,
+            value: isHapticsEnabled,
+            onValueChange: toggleHaptics,
             activeColor: colors.primary,
           })}
           {Platform.OS === 'android' && renderSetting({
@@ -208,17 +289,18 @@ export default function SettingsScreen() {
                 <TouchableOpacity
                   key={option}
                   onPress={() => updateMenuLanguage(option)}
+                  activeOpacity={0.82}
                   accessibilityRole="button"
                   accessibilityLabel={copy.languageOptions[option]}
                   accessibilityState={{ selected: menuLanguage === option }}
                   style={[
                     styles.inlineChoiceButton,
                     styles.languageChoiceButton,
-                    { borderColor: settingsCardBorder, backgroundColor: settingsCardBackground },
+                    { borderColor: settingsCardBorder, backgroundColor: settingsControlBackground },
                     menuLanguage === option && [styles.inlineChoiceButtonActive, { backgroundColor: colors.primary }],
                   ]}
                 >
-                  <Text style={[styles.inlineChoiceText, { color: colors.primary }, menuLanguage === option && styles.inlineChoiceTextActive]}>
+                  <Text style={[styles.inlineChoiceText, { color: colors.primary }, menuLanguage === option && [styles.inlineChoiceTextActive, { color: colors.buttonText }]]}>
                     {copy.languageOptions[option]}
                   </Text>
                 </TouchableOpacity>
@@ -226,20 +308,6 @@ export default function SettingsScreen() {
             </View>
           </View>
           )}
-        </View>
-      </View>
-
-      <View style={styles.section}>
-        <Text style={[styles.sectionTitle, { color: colors.secondaryText }]}>{copy.home}</Text>
-        <View style={[styles.sectionCard, { backgroundColor: settingsCardBackground, borderColor: settingsCardBorder }]}>
-          {renderSetting({
-            icon: 'today',
-            title: copy.todayCardTitle,
-            description: copy.todayCardDescription,
-            value: isTodayCardEnabled,
-            onValueChange: toggleTodayCard,
-            activeColor: colors.primary,
-          })}
         </View>
       </View>
 
@@ -261,6 +329,7 @@ export default function SettingsScreen() {
             <View style={[styles.segmentedControl, { backgroundColor: settingsControlBackground, borderColor: settingsCardBorder }]}>
               <TouchableOpacity
                 onPress={() => updateVocabLessonCardView('list')}
+                activeOpacity={0.82}
                 accessibilityRole="button"
                 accessibilityLabel={copy.list}
                 accessibilityState={{ selected: vocabLessonCardView === 'list' }}
@@ -269,10 +338,11 @@ export default function SettingsScreen() {
                   vocabLessonCardView === 'list' && { backgroundColor: colors.primary },
                 ]}
               >
-                <Text style={[styles.segmentedText, { color: colors.primary }, vocabLessonCardView === 'list' && styles.inlineChoiceTextActive]}>{copy.list}</Text>
+                <Text style={[styles.segmentedText, { color: colors.primary }, vocabLessonCardView === 'list' && [styles.inlineChoiceTextActive, { color: colors.buttonText }]]}>{copy.list}</Text>
               </TouchableOpacity>
               <TouchableOpacity
                 onPress={() => updateVocabLessonCardView('tile')}
+                activeOpacity={0.82}
                 accessibilityRole="button"
                 accessibilityLabel={copy.tiles}
                 accessibilityState={{ selected: vocabLessonCardView === 'tile' }}
@@ -281,7 +351,7 @@ export default function SettingsScreen() {
                   vocabLessonCardView === 'tile' && { backgroundColor: colors.primary },
                 ]}
               >
-                <Text style={[styles.segmentedText, { color: colors.primary }, vocabLessonCardView === 'tile' && styles.inlineChoiceTextActive]}>{copy.tiles}</Text>
+                <Text style={[styles.segmentedText, { color: colors.primary }, vocabLessonCardView === 'tile' && [styles.inlineChoiceTextActive, { color: colors.buttonText }]]}>{copy.tiles}</Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -371,30 +441,6 @@ export default function SettingsScreen() {
         </View>
       </View>
 
-      <View style={styles.section}>
-        <Text style={[styles.sectionTitle, { color: colors.secondaryText }]}>{copy.interaction}</Text>
-        <View style={[styles.sectionCard, { backgroundColor: settingsCardBackground, borderColor: settingsCardBorder }]}>
-          {renderSetting({
-            icon: 'volume-up',
-            title: copy.soundEffectsTitle,
-            description: copy.soundEffectsDescription,
-            value: isSoundEffectsEnabled,
-            onValueChange: toggleSoundEffects,
-            activeColor: colors.primary,
-          })}
-          {hapticsAreSupported && renderSetting({
-            icon: 'vibration',
-            title: copy.hapticsTitle,
-            description: Platform.OS === 'web'
-              ? copy.hapticsWebDescription
-              : copy.hapticsDescription,
-            value: isHapticsEnabled,
-            onValueChange: toggleHaptics,
-            activeColor: colors.primary,
-          })}
-        </View>
-      </View>
-
       {ENABLE_SHINY_ELLIE_COLOR_MODE && isShinyEllieUnlocked && (
         <View style={styles.section}>
           <Text style={[styles.sectionTitle, { color: colors.secondaryText }]}>{copy.extras}</Text>
@@ -429,7 +475,7 @@ export default function SettingsScreen() {
         </Pressable>
       </View>
 
-      <Modal visible={adminModalVisible} transparent animationType="fade" onRequestClose={closeAdminModal}>
+      <Modal visible={adminAccessEnabled && adminModalVisible} transparent animationType="fade" onRequestClose={closeAdminModal}>
         <View style={styles.adminModalBackdrop}>
           <View style={[styles.adminModalCard, { backgroundColor: colors.card }]}>
             <Text style={[styles.adminModalTitle, { color: colors.text }]}>{copy.adminAccessTitle}</Text>
@@ -450,8 +496,8 @@ export default function SettingsScreen() {
                 styles.adminModalInput,
                 {
                   color: colors.text,
-                  borderColor: adminPinError ? '#C62828' : (isDarkMode ? '#415a77' : '#DDE5EE'),
-                  backgroundColor: isDarkMode ? '#132033' : '#fff',
+                  borderColor: adminPinError ? colors.danger : colors.border,
+                  backgroundColor: colors.surface,
                 },
               ]}
             />
@@ -477,6 +523,48 @@ export default function SettingsScreen() {
           </View>
         </View>
       </Modal>
+
+      <Modal visible={installGuideVisible} transparent animationType="fade" onRequestClose={() => setInstallGuideVisible(false)}>
+        <View style={styles.adminModalBackdrop}>
+          <View style={[styles.installModalCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
+            <View style={[styles.installModalIcon, { backgroundColor: colors.primarySoft }]}>
+              <MaterialIcons name="add-to-home-screen" size={30} color={colors.primary} />
+            </View>
+            <Text style={[styles.adminModalTitle, { color: colors.text }]}>Installer Ellie</Text>
+            <View style={styles.installSteps}>
+              <View style={styles.installStepRow}>
+                <Text style={[styles.installStepNumber, { backgroundColor: colors.primary, color: colors.buttonText }]}>1</Text>
+                <Text style={[styles.installStepText, { color: colors.text }]}>Ouvre Ellie dans Safari.</Text>
+              </View>
+              <View style={styles.installStepRow}>
+                <Text style={[styles.installStepNumber, { backgroundColor: colors.primary, color: colors.buttonText }]}>2</Text>
+                <Text style={[styles.installStepText, { color: colors.text }]}>Appuie sur Partager.</Text>
+              </View>
+              <View style={styles.installStepRow}>
+                <Text style={[styles.installStepNumber, { backgroundColor: colors.primary, color: colors.buttonText }]}>3</Text>
+                <Text style={[styles.installStepText, { color: colors.text }]}>Choisis Sur l'ecran d'accueil.</Text>
+              </View>
+              <View style={styles.installStepRow}>
+                <Text style={[styles.installStepNumber, { backgroundColor: colors.primary, color: colors.buttonText }]}>4</Text>
+                <Text style={[styles.installStepText, { color: colors.text }]}>Appuie sur Ajouter.</Text>
+              </View>
+            </View>
+            {!ANDROID_APK_DOWNLOAD_URL && (
+              <Text style={[styles.installModalNote, { color: colors.secondaryText }]}>
+                Le bouton Android fonctionnera quand le lien APK sera ajoute.
+              </Text>
+            )}
+            <TouchableOpacity
+              onPress={() => setInstallGuideVisible(false)}
+              style={[styles.adminPrimaryButton, styles.installModalDoneButton, { backgroundColor: colors.primary }]}
+              accessibilityRole="button"
+              accessibilityLabel="Close install guide"
+            >
+              <Text style={styles.adminPrimaryButtonText}>Done</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
     </ScrollView>
   );
 }
@@ -490,8 +578,49 @@ const styles = StyleSheet.create({
     fontSize: 30,
     lineHeight: 34,
     fontWeight: '800',
+    flex: 1,
+    minWidth: 0,
+  },
+  headerTitleRow: {
     paddingHorizontal: 20,
     paddingBottom: 14,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 12,
+  },
+  headerInstallButtons: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+  },
+  headerInstallPill: {
+    minHeight: 40,
+    borderRadius: 999,
+    borderWidth: 1.5,
+    paddingLeft: 12,
+    paddingRight: 5,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  headerInstallText: {
+    fontFamily: SETTINGS_FONT_FAMILY,
+    fontSize: 12,
+    lineHeight: 15,
+    fontWeight: '800',
+  },
+  headerInstallButton: {
+    width: 32,
+    height: 32,
+    borderRadius: 999,
+    borderWidth: 1.5,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  headerInstallButtonAndroid: {
+    backgroundColor: '#E9F8EF',
+    borderColor: '#258B62',
   },
   section: {
     marginBottom: 14,
@@ -595,11 +724,11 @@ const styles = StyleSheet.create({
     paddingVertical: 7,
   },
   inlineChoiceButtonActive: {
-    backgroundColor: '#5F8F6A',
+    backgroundColor: '#1671B6',
   },
   inlineChoiceText: {
     fontFamily: SETTINGS_FONT_FAMILY,
-    color: '#5F8F6A',
+    color: '#1671B6',
     fontSize: 12,
     fontWeight: '700',
   },
@@ -635,13 +764,13 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     backgroundColor: '#EAF5FF',
     borderWidth: 1.5,
-    borderColor: '#5F8F6A',
+    borderColor: '#1671B6',
     alignItems: 'center',
     justifyContent: 'center',
   },
   actionButtonText: {
     fontFamily: SETTINGS_FONT_FAMILY,
-    color: '#5F8F6A',
+    color: '#1671B6',
     fontSize: 13,
     fontWeight: '700',
   },
@@ -686,6 +815,61 @@ const styles = StyleSheet.create({
     padding: 20,
     borderWidth: 1.5,
     borderColor: '#DDE5EE',
+  },
+  installModalCard: {
+    width: '100%',
+    maxWidth: 390,
+    borderRadius: 16,
+    padding: 20,
+    borderWidth: 1.5,
+  },
+  installModalIcon: {
+    width: 56,
+    height: 56,
+    borderRadius: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 12,
+  },
+  installSteps: {
+    gap: 10,
+    marginTop: 6,
+  },
+  installStepRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 10,
+  },
+  installStepNumber: {
+    width: 24,
+    height: 24,
+    borderRadius: 8,
+    textAlign: 'center',
+    fontFamily: SETTINGS_FONT_FAMILY,
+    fontSize: 13,
+    lineHeight: 24,
+    fontWeight: '900',
+    overflow: 'hidden',
+  },
+  installStepText: {
+    flex: 1,
+    minWidth: 0,
+    fontFamily: SETTINGS_FONT_FAMILY,
+    fontSize: 14,
+    lineHeight: 20,
+    fontWeight: '600',
+  },
+  installModalNote: {
+    fontFamily: SETTINGS_FONT_FAMILY,
+    fontSize: 12,
+    lineHeight: 17,
+    fontWeight: '600',
+    marginTop: 14,
+  },
+  installModalDoneButton: {
+    marginTop: 16,
+    alignSelf: 'stretch',
+    alignItems: 'center',
   },
   adminModalTitle: {
     fontFamily: SETTINGS_FONT_FAMILY,
@@ -738,7 +922,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 11,
     borderRadius: 12,
-    backgroundColor: '#5F8F6A',
+    backgroundColor: '#1671B6',
   },
   adminPrimaryButtonText: {
     fontFamily: SETTINGS_FONT_FAMILY,

@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import GrammarCategoryList from './GrammarCategoryList';
 import GrammarQuiz from './GrammarQuiz';
 import { useTheme } from '../settings/ThemeContext';
@@ -19,25 +19,41 @@ const GrammarScreen: React.FC<any> = ({ route, navigation }) => {
   const [selectedLesson, setSelectedLesson] = useState<any | null>(null);
   const [selectedLessonBack, setSelectedLessonBack] = useState<SelectedLessonBack>(defaultLessonBack);
 
+  const openVocabularyPracticeLesson = useCallback((lesson: any, back: SelectedLessonBack) => {
+    navigation.navigate('Vocabulary', {
+      screen: 'VocabularyLesson',
+      params: {
+        lesson,
+        backLabel: back.label,
+        backTarget: back.target ?? 'Grammar',
+      },
+    });
+  }, [navigation]);
+
   useEffect(() => {
     if (!route?.params?.lesson) return;
 
-    setSelectedLesson(route.params.lesson);
-    setSelectedLessonBack({
+    const nextBack = {
       label: route.params.backLabel ?? defaultLessonBack.label,
       target: route.params.backTarget ?? null,
-    });
-  }, [route?.params?.lesson, route?.params?.openKey, route?.params?.backLabel, route?.params?.backTarget, defaultLessonBack.label]);
+    };
+
+    if (route.params.lesson?.practiceType === 'vocabulary') {
+      setSelectedLesson(null);
+      setSelectedLessonBack(nextBack);
+      openVocabularyPracticeLesson(route.params.lesson, nextBack);
+      return;
+    }
+
+    setSelectedLesson(route.params.lesson);
+    setSelectedLessonBack(nextBack);
+  }, [route?.params?.lesson, route?.params?.openKey, route?.params?.backLabel, route?.params?.backTarget, defaultLessonBack.label, openVocabularyPracticeLesson]);
 
   const handleSelectLesson = (lesson: any) => {
     if (lesson?.practiceType === 'vocabulary') {
-      navigation.navigate('Vocabulary', {
-          screen: 'VocabularyLesson',
-          params: {
-            lesson,
-          backLabel: commonCopy.backToGrammar,
-          backTarget: 'Grammar',
-        },
+      openVocabularyPracticeLesson(lesson, {
+        label: commonCopy.backToGrammar,
+        target: 'Grammar',
       });
       return;
     }

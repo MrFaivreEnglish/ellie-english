@@ -1,22 +1,25 @@
 import React from 'react';
 import { View, Text, Pressable, StyleSheet, useWindowDimensions, Platform, LayoutAnimation, UIManager } from 'react-native';
 import { GameCard, MatchingGamePairs, GameState } from '../../types/VocabularyTypes';
+import type { Word } from '../../types/VocabularyTypes';
 import { getMatchingSetCount } from './vocabularyUtils';
 import { clampNumber, getWebLessonScale } from '../shared/responsiveLayout';
+import type { ThemeColors } from '../settings/ThemeContext';
 
 interface MatchingProps {
   gameState: GameState;
   matchingGamePairs: MatchingGamePairs;
   onCardPress: (card: GameCard) => void;
-  colors: any;
+  colors: ThemeColors;
   isDarkMode: boolean;
-  words: any[];
+  words: Word[];
   timerMode: boolean;
   bestTimeForActiveCategory?: number | null;
   matchingSessionXp?: number;
   lastMatchingXpGain?: number;
   belowTitleContent?: React.ReactNode;
   availableHeight?: number;
+  forceAndroidLayout?: boolean;
 }
 
 export default function VocabularyMatching({
@@ -24,7 +27,6 @@ export default function VocabularyMatching({
   matchingGamePairs,
   onCardPress,
   colors,
-  isDarkMode,
   words,
   timerMode,
   bestTimeForActiveCategory,
@@ -32,40 +34,107 @@ export default function VocabularyMatching({
   lastMatchingXpGain = 0,
   belowTitleContent,
   availableHeight,
+  forceAndroidLayout = false,
 }: MatchingProps) {
   const { width, height } = useWindowDimensions();
-  const isDesktop = Platform.OS === 'web' && width >= 640;
+  const [shellWidth, setShellWidth] = React.useState(0);
+  const layoutWidth = Math.max(shellWidth || width, 320);
+  const isAndroid = Platform.OS === 'android' || forceAndroidLayout;
+  const isDesktop = Platform.OS === 'web' && !forceAndroidLayout && width >= 640;
   const layoutHeight = Math.max(availableHeight ?? height, 320);
   const webScale = getWebLessonScale(width, layoutHeight);
-  const isPortrait = layoutHeight >= width;
+  const isPortrait = layoutHeight >= layoutWidth;
+  const isHorizontalDesktop = isDesktop && !isPortrait;
   const isCompact = !isDesktop && (layoutHeight < 760 || width < 390);
   const isVeryCompact = !isDesktop && width < 360;
   const isLarge = (!isDesktop && layoutHeight > 900 && width >= 400) || (isDesktop && webScale > 1.04);
+  const desktopBoardScale = isDesktop
+    ? clampNumber(Math.min(layoutWidth / 1040, layoutHeight / 560), 0.94, 1.55)
+    : 1;
   const shellHeight = layoutHeight;
   const titleHeight = 0;
-  const footerBaseHeight = timerMode && bestTimeForActiveCategory != null
-    ? (isVeryCompact ? 92 : isCompact ? 82 : 90)
-    : timerMode
-      ? (isVeryCompact ? 78 : isCompact ? 72 : 80)
-      : (isVeryCompact ? 70 : 68);
-  const footerHeight = isDesktop ? Math.round(footerBaseHeight * webScale) : footerBaseHeight;
-  const boardTopSpacing = isCompact ? 4 : isDesktop ? Math.round(6 * webScale) : 6;
-  const boardBottomSpacing = isCompact ? 6 : isDesktop ? Math.round(8 * webScale) : 8;
-  const boardHeight = Math.max(264, shellHeight - titleHeight - footerHeight - boardTopSpacing - boardBottomSpacing);
-  const cardGap = isDesktop ? Math.round(14 * webScale) : isCompact ? 6 : isLarge ? 10 : 8;
-  const baseCardHeight = Math.max(36, Math.floor((boardHeight - cardGap * 5) / 6));
+  const footerBaseHeight = (
+    timerMode && bestTimeForActiveCategory != null
+      ? (isVeryCompact ? 92 : isCompact ? 82 : 90)
+      : timerMode
+        ? (isVeryCompact ? 78 : isCompact ? 72 : 80)
+        : (isVeryCompact ? 70 : 68)
+  ) + 8;
+  const footerHeight = isDesktop ? Math.round(footerBaseHeight * desktopBoardScale) : footerBaseHeight;
+  const boardTopSpacing = isAndroid ? 0 : isCompact ? 4 : isDesktop ? Math.round(6 * desktopBoardScale) : 6;
+  const fullSetSize = matchingGamePairs?.english?.length || 0;
+  const cardGap = isAndroid ? (isVeryCompact ? 6 : 7) : isDesktop ? Math.round(14 * desktopBoardScale) : isCompact ? 8 : isLarge ? 12 : 10;
+  const footerBottomGapBase = isDesktop ? Math.round(8 * desktopBoardScale) : 7;
+  const footerBottomGap = isDesktop ? footerBottomGapBase - 10 : footerBottomGapBase;
+  const footerVisualDrop = 30;
+  const mobileFooterTopGap = Math.round(clampNumber(cardGap * 1.35, isVeryCompact ? 14 : 16, isCompact ? 24 : 30));
+  const footerTopGapBase = fullSetSize >= 6
+    ? isDesktop
+      ? Math.round(cardGap * 1.15)
+      : mobileFooterTopGap
+    : Math.max(6, Math.round(cardGap * 0.9));
+  const footerTopGap = Math.max(0, footerTopGapBase - (isDesktop ? 20 : 10));
+  const rowCount = Math.max(1, fullSetSize || 6);
+  const sizingRowCount = Math.max(6, rowCount);
+  const availableBoardHeight = Math.max(
+    0,
+    shellHeight - titleHeight - footerHeight - footerBottomGap - boardTopSpacing - footerTopGap
+  );
+  const rawCardHeight = Math.max(
+    1,
+    Math.floor((availableBoardHeight - cardGap * (sizingRowCount - 1)) / sizingRowCount)
+  );
+  const desiredDesktopCardHeight = Math.round(
+    clampNumber(rawCardHeight * 0.98, 66 * desktopBoardScale, 150 * desktopBoardScale)
+  );
+  const androidCardWidth = Math.round(clampNumber((layoutWidth - 40) / 2, isVeryCompact ? 128 : 138, isLarge ? 210 : 184));
+  const androidAspectMaxHeight = Math.round(androidCardWidth * (isCompact ? 0.42 : 0.44));
+  const shortSetMobileMaxHeight = isVeryCompact ? 64 : isCompact ? 70 : isLarge ? 92 : 82;
   const cardHeight = isDesktop && !isPortrait
-    ? Math.min(Math.round(92 * webScale), Math.max(58, Math.floor(baseCardHeight * 0.84)))
-    : Math.max(34, Math.floor(baseCardHeight * 0.95));
-  const cardTextSize = isDesktop ? Math.round(18 * webScale) : isCompact ? 16 : isLarge ? 20 : 18;
-  const desktopColumnWidth = Math.round(clampNumber(width * 0.16, 272, 380));
-  const cardWidth = isDesktop ? Math.round(desktopColumnWidth * 0.94) : isPortrait ? (isCompact ? '86%' : '88%') : '90%';
-  const desktopColumnGap = Math.round(clampNumber(width * 0.022, 32, 54));
-  const summaryPaddingVertical = isCompact ? 5 : isLarge ? Math.round(7 * webScale) : 6;
-  const summaryPaddingHorizontal = isVeryCompact ? 8 : isCompact ? 10 : isLarge ? Math.round(14 * webScale) : 12;
-  const selectedBorderColor = colors.primary === '#1671B6' || colors.primary === '#45B7D1'
-    ? '#45B7D1'
-    : colors.primary;
+    ? Math.min(rawCardHeight, desiredDesktopCardHeight)
+    : isAndroid
+      ? Math.max(
+          isVeryCompact ? 43 : 47,
+          Math.min(rawCardHeight, androidAspectMaxHeight)
+        )
+      : fullSetSize > 0 && fullSetSize < 6
+        ? Math.min(rawCardHeight, shortSetMobileMaxHeight)
+        : rawCardHeight;
+  const boardHeight = cardHeight * rowCount + cardGap * (rowCount - 1);
+  const centeredBoardTopSpacing = isAndroid
+    ? (isVeryCompact ? 5 : 6)
+    : boardTopSpacing;
+  const mobileCardTextSize = Math.round(clampNumber(cardHeight * 0.48, isVeryCompact ? 11 : 12, isCompact ? 16 : 20));
+  const cardTextSize = isDesktop ? Math.round(clampNumber(19 * desktopBoardScale, 17, 28)) : mobileCardTextSize;
+  const desktopColumnGap = isDesktop
+    ? isHorizontalDesktop
+      ? Math.round(clampNumber(96 * desktopBoardScale, 86, 114))
+      : Math.round(clampNumber(104 * desktopBoardScale, 84, Math.max(84, layoutWidth * 0.18)))
+    : Math.round(clampNumber(width * 0.002, 0, 5 * desktopBoardScale));
+  const desktopFittingColumnWidth = Math.max(180, Math.floor((layoutWidth - desktopColumnGap) / 2));
+  const desktopColumnWidth = isHorizontalDesktop
+    ? Math.max(210, Math.min(288, desktopFittingColumnWidth))
+    : Math.round(clampNumber(desktopFittingColumnWidth, 210, 340));
+  const desktopRowWidth = desktopColumnWidth * 2 + desktopColumnGap;
+  const cardWidth = isDesktop
+    ? '100%'
+    : isAndroid
+      ? androidCardWidth
+    : isPortrait
+      ? (isCompact ? '82%' : '84%')
+      : '88%';
+  const desktopCardMaxWidth = isAndroid ? androidCardWidth : desktopColumnWidth;
+  const summaryPaddingVertical = isCompact ? 5 : isDesktop ? Math.round(7 * desktopBoardScale) : isLarge ? Math.round(7 * webScale) : 6;
+  const summaryPaddingHorizontal = isVeryCompact ? 8 : isCompact ? 10 : isDesktop ? Math.round(14 * desktopBoardScale) : isLarge ? Math.round(14 * webScale) : 12;
+  const handleShellLayout = React.useCallback((event: any) => {
+    const nextWidth = Math.round(event.nativeEvent.layout.width);
+    if (nextWidth <= 0) return;
+
+    setShellWidth((currentWidth) => (
+      Math.abs(currentWidth - nextWidth) > 1 ? nextWidth : currentWidth
+    ));
+  }, []);
+
   React.useEffect(() => {
     if (Platform.OS === 'android') {
       UIManager.setLayoutAnimationEnabledExperimental?.(true);
@@ -78,7 +147,7 @@ export default function VocabularyMatching({
         LayoutAnimation.Properties.scaleXY
       )
     );
-  }, [cardHeight, footerHeight, isCompact]);
+  }, [cardHeight, centeredBoardTopSpacing, footerHeight, footerTopGap, isCompact]);
 
   const formatTime = (totalMs: number) => {
     const safeMs = Math.max(0, Math.floor(totalMs));
@@ -105,27 +174,38 @@ export default function VocabularyMatching({
         android_ripple={{ color: 'rgba(0,0,0,0.06)' }}
         accessibilityRole="button"
         accessibilityLabel={`Card: ${card.text}`}
-        style={[
+        style={({ pressed }) => [
           styles.matchingCard,
           isDesktop && styles.matchingCardDesktop,
           isSelected && styles.selectedMatchingCard,
           isMatched && styles.matchedCard,
           isIncorrect && styles.incorrectCard,
+          pressed && !isMatched && !isLocked && styles.pressedMatchingCard,
           isLocked && { opacity: 0.6 },
           {
             backgroundColor: isIncorrect
               ? colors.dangerSoft
               : isMatched
-                ? (isDarkMode ? '#173F27' : '#EAF7ED')
-                : (isDarkMode ? '#112c48' : '#FFFFFF'),
+                ? colors.successSoft
+                : isSelectedState
+                  ? colors.primarySoft
+                : colors.card,
             borderColor: isIncorrect
               ? colors.danger
               : isMatched
-                ? '#58B965'
-                : (isSelectedState ? selectedBorderColor : (isDarkMode ? colors.border : '#E1E1E1')),
+                ? colors.success
+                : (isSelectedState ? colors.primary : colors.border),
             borderWidth: isSelectedState || isMatched || isIncorrect ? 3 : 1,
             height: cardHeight,
             marginBottom: index === list.length - 1 ? 0 : cardGap,
+            maxWidth: isDesktop ? desktopCardMaxWidth : 360,
+            shadowColor: isIncorrect
+              ? colors.danger
+              : isMatched
+                ? colors.success
+                : isSelectedState
+                  ? colors.primary
+                  : '#000',
             width: cardWidth,
           },
         ]}
@@ -139,12 +219,15 @@ export default function VocabularyMatching({
               color: isIncorrect
                 ? colors.dangerText
                 : isMatched
-                  ? (isDarkMode ? '#9BE4A7' : '#2F7D3F')
-                  : (isDarkMode ? colors.text : '#2D2F33'),
+                  ? colors.successText
+                  : colors.text,
               fontSize: cardTextSize,
-              lineHeight: isDesktop ? Math.round(cardTextSize * 1.14) : isCompact ? 18 : isLarge ? 22 : 20,
+              lineHeight: isDesktop ? Math.round(cardTextSize * 1.16) : isCompact ? 18 : isLarge ? 22 : 20,
             },
           ]}
+          numberOfLines={2}
+          adjustsFontSizeToFit
+          minimumFontScale={isAndroid ? 0.74 : 0.82}
         >
           {card.text}
         </Text>
@@ -157,29 +240,37 @@ export default function VocabularyMatching({
     ? (gameState.matchedPairs.length / totalCards) * 100
     : 0;
   const totalSets = getMatchingSetCount(words.length);
+  const hasMultipleSets = totalSets > 1;
+  const completedWordCount = Math.min(gameState.totalScore, words.length);
 
   return (
-    <View style={[styles.matchingShell, { height: shellHeight, minHeight: shellHeight }]}>
+    <View
+      onLayout={handleShellLayout}
+      style={[styles.matchingShell, { height: shellHeight, minHeight: shellHeight }]}
+    >
       {belowTitleContent}
 
       <View
         style={[
           styles.matchingContainer,
           isDesktop && styles.matchingContainerDesktop,
-          { height: boardHeight, marginTop: boardTopSpacing, marginBottom: boardBottomSpacing },
+          isDesktop && !isHorizontalDesktop && { width: desktopRowWidth },
+          isAndroid && styles.matchingContainerAndroid,
+          { height: boardHeight, marginTop: centeredBoardTopSpacing, marginBottom: footerTopGap },
         ]}
       >
         <View style={[
           styles.matchingColumn,
           isDesktop && styles.matchingColumnDesktop,
-          isDesktop && { width: desktopColumnWidth, marginHorizontal: desktopColumnGap },
+          isDesktop && { width: desktopColumnWidth },
         ]}>
           {matchingGamePairs.english?.map(renderCard)}
         </View>
+        {isDesktop && <View style={{ width: desktopColumnGap, flexShrink: 0 }} />}
         <View style={[
           styles.matchingColumn,
           isDesktop && styles.matchingColumnDesktop,
-          isDesktop && { width: desktopColumnWidth, marginHorizontal: desktopColumnGap },
+          isDesktop && { width: desktopColumnWidth },
         ]}>
           {matchingGamePairs.french?.map(renderCard)}
         </View>
@@ -190,10 +281,11 @@ export default function VocabularyMatching({
           styles.summaryCard,
           isCompact && styles.summaryCardCompact,
           {
-            backgroundColor: isDarkMode ? colors.background : colors.card,
+            backgroundColor: colors.card,
           },
           {
             height: footerHeight,
+            bottom: footerBottomGap - footerVisualDrop,
             paddingVertical: summaryPaddingVertical,
             paddingHorizontal: summaryPaddingHorizontal,
           },
@@ -203,7 +295,7 @@ export default function VocabularyMatching({
           {timerMode && (
             <View style={[styles.summaryItem, styles.timerSummaryItem, isVeryCompact && styles.timerSummaryItemVeryCompact, { backgroundColor: colors.primarySoft }]}>
               <View style={[styles.timerValuesRow, isVeryCompact && styles.timerValuesRowVeryCompact]}>
-                <Text style={[styles.summaryLabel, { color: colors.primary, fontSize: isDesktop ? Math.round(12 * webScale) : 12 }]}>Time</Text>
+                <Text style={[styles.summaryLabel, { color: colors.primary, fontSize: isDesktop ? Math.round(12 * desktopBoardScale) : 12 }]}>Time</Text>
                 <Text style={[styles.summaryValue, styles.timerValue, isCompact && styles.summaryValueCompact, { color: colors.primary, fontSize: cardTextSize }]}>
                   {formatTime(gameState.timer)}
                 </Text>
@@ -211,8 +303,8 @@ export default function VocabularyMatching({
                   <>
                     <View style={[styles.timerDivider, { backgroundColor: colors.border }]} />
                     <View style={styles.bestValueGroup}>
-                      <Text style={[styles.bestLabel, { color: colors.secondaryText, fontSize: isDesktop ? Math.round(11 * webScale) : 11 }]}>Best</Text>
-                      <Text style={[styles.bestValue, { color: colors.successText, fontSize: isDesktop ? Math.round(14 * webScale) : 14 }]}>
+                      <Text style={[styles.bestLabel, { color: colors.secondaryText, fontSize: isDesktop ? Math.round(11 * desktopBoardScale) : 11 }]}>Best</Text>
+                      <Text style={[styles.bestValue, { color: colors.successText, fontSize: isDesktop ? Math.round(14 * desktopBoardScale) : 14 }]}>
                         {formatTime(bestTimeForActiveCategory)}
                       </Text>
                     </View>
@@ -223,45 +315,69 @@ export default function VocabularyMatching({
           )}
 
           <View style={[styles.summaryItem, styles.statusSummaryItem, isVeryCompact && styles.summaryItemVeryCompact, { backgroundColor: colors.surface }]}>
-            <View style={styles.statusMetric}>
-              <Text style={[styles.summaryLabel, { color: colors.secondaryText, fontSize: isDesktop ? Math.round(13 * webScale) : isCompact ? 12 : 13 }]}>
+            <View style={[styles.statusMetric, styles.wordsStatusMetric]}>
+              <Text style={[styles.summaryLabel, { color: colors.secondaryText, fontSize: isDesktop ? Math.round(13 * desktopBoardScale) : isCompact ? 12 : 13 }]}>
                 Words
               </Text>
-              <Text style={[styles.summaryValue, isCompact && styles.summaryValueCompact, { color: colors.text, fontSize: isCompact ? 15 : cardTextSize }]}>
-                {gameState.totalScore}/{words.length}
+              <Text
+                style={[
+                  styles.summaryValue,
+                  isCompact && styles.summaryValueCompact,
+                  {
+                    color: completedWordCount >= words.length && words.length > 0 ? colors.successText : colors.text,
+                    fontSize: isCompact ? 15 : cardTextSize,
+                  },
+                ]}
+                numberOfLines={1}
+                adjustsFontSizeToFit
+                minimumFontScale={0.84}
+              >
+                {completedWordCount}/{words.length}
               </Text>
             </View>
-            <View style={[styles.statusDivider, { backgroundColor: colors.border }]} />
-            <View style={styles.statusMetric}>
-              <Text style={[styles.summaryLabel, { color: colors.secondaryText, fontSize: isDesktop ? Math.round(13 * webScale) : isCompact ? 12 : 13 }]}>
-                Set
-              </Text>
-              <Text style={[styles.summaryValue, isCompact && styles.summaryValueCompact, { color: colors.text, fontSize: isCompact ? 15 : cardTextSize }]}>
-                {gameState.currentSet + 1}/{totalSets}
-              </Text>
-            </View>
-            {matchingSessionXp > 0 && (
+            {hasMultipleSets && (
               <>
                 <View style={[styles.statusDivider, { backgroundColor: colors.border }]} />
                 <View style={styles.statusMetric}>
-                  <Text style={[styles.summaryLabel, { color: colors.secondaryText, fontSize: isDesktop ? Math.round(13 * webScale) : isCompact ? 12 : 13 }]}>
-                    XP
+                  <Text style={[styles.summaryLabel, { color: colors.secondaryText, fontSize: isDesktop ? Math.round(13 * desktopBoardScale) : isCompact ? 12 : 13 }]}>
+                    Set
                   </Text>
                   <Text
                     style={[
                       styles.summaryValue,
                       isCompact && styles.summaryValueCompact,
                       {
-                        color: lastMatchingXpGain > 0 ? colors.successText : colors.text,
+                        color: colors.text,
                         fontSize: isCompact ? 15 : cardTextSize,
                       },
                     ]}
+                    numberOfLines={1}
+                    adjustsFontSizeToFit
+                    minimumFontScale={0.84}
                   >
-                    +{matchingSessionXp}
+                    {gameState.currentSet + 1}/{totalSets}
                   </Text>
                 </View>
               </>
             )}
+            <View style={[styles.statusDivider, { backgroundColor: colors.border }]} />
+            <View style={styles.statusMetric}>
+              <Text style={[styles.summaryLabel, { color: colors.secondaryText, fontSize: isDesktop ? Math.round(13 * desktopBoardScale) : isCompact ? 12 : 13 }]}>
+                XP
+              </Text>
+              <Text
+                style={[
+                  styles.summaryValue,
+                  isCompact && styles.summaryValueCompact,
+                  {
+                    color: lastMatchingXpGain > 0 || matchingSessionXp > 0 ? colors.successText : colors.secondaryText,
+                    fontSize: isCompact ? 15 : cardTextSize,
+                  },
+                ]}
+              >
+                +{matchingSessionXp}
+              </Text>
+            </View>
           </View>
         </View>
 
@@ -278,15 +394,21 @@ export default function VocabularyMatching({
 const styles = StyleSheet.create({
   matchingShell: {
     width: '100%',
-    justifyContent: 'space-between',
+    position: 'relative',
+    justifyContent: 'flex-start',
   },
   matchingContainer: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     paddingHorizontal: 8,
   },
+  matchingContainerAndroid: {
+    paddingHorizontal: 0,
+  },
   matchingContainerDesktop: {
+    alignSelf: 'stretch',
     justifyContent: 'center',
+    paddingHorizontal: 0,
   },
   matchingColumn: {
     flex: 1,
@@ -294,9 +416,12 @@ const styles = StyleSheet.create({
     justifyContent: 'flex-start',
   },
   matchingColumnDesktop: {
+    flexGrow: 0,
+    flexShrink: 0,
+    flexBasis: 'auto',
     width: 272,
     alignItems: 'center',
-    marginHorizontal: 32,
+    marginHorizontal: 0,
   },
   matchingCard: {
     width: '92%',
@@ -316,8 +441,11 @@ const styles = StyleSheet.create({
   matchingCardDesktop: {
     width: 300,
   },
+  pressedMatchingCard: {
+    opacity: 0.9,
+  },
   selectedMatchingCard: {
-    borderColor: '#45B7D1',
+    borderColor: '#7CB7FF',
     backgroundColor: '#FFFFFF',
   },
   matchedCard: {
@@ -344,10 +472,12 @@ const styles = StyleSheet.create({
   },
   progressContainer: {
     paddingHorizontal: 2,
-    marginTop: 3,
+    marginTop: 4,
+    paddingBottom: 5,
   },
   progressContainerCompact: {
-    marginTop: 2,
+    marginTop: 3,
+    paddingBottom: 5,
   },
   progressBar: {
     height: 6,
@@ -365,7 +495,10 @@ const styles = StyleSheet.create({
     borderRadius: 999,
   },
   summaryCard: {
-    marginHorizontal: 8,
+    position: 'absolute',
+    left: 8,
+    right: 8,
+    marginHorizontal: 0,
     marginTop: 0,
     marginBottom: 0,
     paddingHorizontal: 14,
@@ -413,6 +546,9 @@ const styles = StyleSheet.create({
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  wordsStatusMetric: {
+    flex: 1.3,
   },
   statusDivider: {
     width: 1,

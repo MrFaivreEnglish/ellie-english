@@ -38,6 +38,9 @@ const ignoredDirectories = new Set([
 const textExtensions = new Set(['.js', '.json', '.md', '.ts', '.tsx']);
 const allowedChapterTargets = new Set(['vocabulary', 'grammar', 'pronunciation']);
 const lessonTargets = ['vocabulary', 'grammar', 'pronunciation'];
+const maxLessonTitleLength = 90;
+const maxChapterLinkLabelLength = 70;
+const maxVocabularyWordLength = 80;
 
 const mojibakeMarkers = [
   { value: String.fromCharCode(0x00c3), label: 'mojibake marker "C3"' },
@@ -63,6 +66,15 @@ const normalizeTitle = (title) =>
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, ' ')
     .trim();
+
+const normalizeWordPairKey = (english, french) =>
+  `${String(english).trim().toLowerCase()}|${String(french).trim().toLowerCase()}`;
+
+const validateMaxLength = (filePath, line, context, value, maxLength) => {
+  if (typeof value === 'string' && value.length > maxLength) {
+    addProblem(filePath, line, `${context} is too long (${value.length}/${maxLength} characters)`);
+  }
+};
 
 const collectFiles = (entryPath, files = []) => {
   if (!fs.existsSync(entryPath)) return files;
@@ -444,6 +456,7 @@ const addLessonCatalogEntry = (catalog, target, filePath, sourceFile, objectNode
     id,
   };
 
+  validateMaxLength(filePath, entry.line, `${target} lesson title "${title}"`, title, maxLessonTitleLength);
   addCatalogValue(catalog[target].titles, normalizeTitle(title), entry);
   addCatalogValue(catalog[target].ids, id, entry);
 };
@@ -525,8 +538,14 @@ const buildLessonCatalog = (parsedFiles) => {
 };
 
 const validateWordObject = (filePath, sourceFile, objectNode, context) => {
-  const english = requireStringProperty(filePath, sourceFile, objectNode, 'english', `${context} word`);
-  const french = requireStringProperty(filePath, sourceFile, objectNode, 'french', `${context} word`);
+  const englishInfo = getRequiredStringPropertyInfo(filePath, sourceFile, objectNode, 'english', `${context} word`);
+  const frenchInfo = getRequiredStringPropertyInfo(filePath, sourceFile, objectNode, 'french', `${context} word`);
+
+  if (englishInfo) validateMaxLength(filePath, englishInfo.line, `${context} English word`, englishInfo.value, maxVocabularyWordLength);
+  if (frenchInfo) validateMaxLength(filePath, frenchInfo.line, `${context} French word`, frenchInfo.value, maxVocabularyWordLength);
+
+  const english = englishInfo?.value ?? null;
+  const french = frenchInfo?.value ?? null;
   return { english, french };
 };
 
@@ -542,6 +561,8 @@ const validateFlashcards = (filePath, sourceFile, lessonNode, context) => {
     addProblem(filePath, getLineForOffset(sourceFile, flashcardsProperty.getStart(sourceFile)), `${context} has no flashcards`);
     return;
   }
+
+  const seenLessonWordPairs = new Map();
 
   flashcards.forEach((entry, entryIndex) => {
     if (!ts.isObjectLiteralExpression(entry)) {
@@ -575,7 +596,7 @@ const validateFlashcards = (filePath, sourceFile, lessonNode, context) => {
       if (!english || !french) return;
 
       const englishKey = english.trim().toLowerCase();
-      const pairKey = `${englishKey}|${french.trim().toLowerCase()}`;
+      const pairKey = normalizeWordPairKey(english, french);
 
       if (seenEnglishWords.has(englishKey)) {
         addProblem(
@@ -596,12 +617,43 @@ const validateFlashcards = (filePath, sourceFile, lessonNode, context) => {
       } else {
         seenWordPairs.set(pairKey, wordIndex + 1);
       }
+
+      if (seenLessonWordPairs.has(pairKey)) {
+        const first = seenLessonWordPairs.get(pairKey);
+        addProblem(
+          filePath,
+          getLineForOffset(sourceFile, word.getStart(sourceFile)),
+          `${context} repeats word pair "${english} / ${french}" also seen in group ${first.group} word ${first.word}`
+        );
+      } else {
+        seenLessonWordPairs.set(pairKey, { group: entryIndex + 1, word: wordIndex + 1 });
+      }
     });
   });
 };
 
 const validateExerciseObject = (filePath, sourceFile, objectNode) => {
   const type = getStringValue(getProperty(objectNode, 'type')?.initializer);
+  const optionsProperty = getProperty(objectNode, 'options');
+  const answerProperty = getProperty(objectNode, 'answer');
+
+  if (optionsProperty && answerProperty) {
+    const options = requireStringArray(filePath, sourceFile, optionsProperty.initializer, 'Exercise options');
+    const answer = getStringValue(answerProperty.initializer);
+
+    if (
+      typeof answer === 'string' &&
+      options &&
+      !options.some((option) => normalizeExerciseSentence(option.value) === normalizeExerciseSentence(answer))
+    ) {
+      addProblem(
+        filePath,
+        getLineForOffset(sourceFile, optionsProperty.getStart(sourceFile)),
+        'Exercise options must include the string answer'
+      );
+    }
+  }
+
   if (!type) return;
 
   if (type === 'translate') {
@@ -669,27 +721,12 @@ const validateExerciseObject = (filePath, sourceFile, objectNode) => {
     }
   }
 
-  const optionsProperty = getProperty(objectNode, 'options');
-  if (optionsProperty) {
-    const options = requireStringArray(filePath, sourceFile, optionsProperty.initializer, 'Exercise options');
-    const answer = getStringValue(getProperty(objectNode, 'answer')?.initializer);
-
-    if (
-      typeof answer === 'string' &&
-      options &&
-      !options.some((option) => normalizeExerciseSentence(option.value) === normalizeExerciseSentence(answer))
-    ) {
-      addProblem(
-        filePath,
-        getLineForOffset(sourceFile, optionsProperty.getStart(sourceFile)),
-        'Exercise options must include the string answer'
-      );
-    }
-  }
 };
 
 const validateChapterLink = (filePath, sourceFile, objectNode, context, lessonCatalog) => {
-  requireStringProperty(filePath, sourceFile, objectNode, 'label', `${context} app link`);
+  const label = getRequiredStringPropertyInfo(filePath, sourceFile, objectNode, 'label', `${context} app link`);
+  if (label) validateMaxLength(filePath, label.line, `${context} app link label`, label.value, maxChapterLinkLabelLength);
+
   const lessonTitle = getRequiredStringPropertyInfo(filePath, sourceFile, objectNode, 'lessonTitle', `${context} app link`);
 
   const targetProperty = getProperty(objectNode, 'target');
@@ -710,7 +747,9 @@ const validateChapterLink = (filePath, sourceFile, objectNode, context, lessonCa
 };
 
 const validateChapterLesson = (filePath, sourceFile, objectNode, context, lessonCatalog) => {
-  requireStringProperty(filePath, sourceFile, objectNode, 'title', context);
+  const title = getRequiredStringPropertyInfo(filePath, sourceFile, objectNode, 'title', context);
+  if (title) validateMaxLength(filePath, title.line, `${context} title`, title.value, maxLessonTitleLength);
+
   requireStringProperty(filePath, sourceFile, objectNode, 'url', context);
 
   const appLinksProperty = getProperty(objectNode, 'appLinks');

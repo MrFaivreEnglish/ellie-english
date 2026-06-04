@@ -1,16 +1,11 @@
-import { Platform } from 'react-native';
+import { Platform, Vibration } from 'react-native';
 import * as Haptics from 'expo-haptics';
 
 type WebNavigatorWithVibrate = Navigator & {
   vibrate?: (pattern: number | number[]) => boolean;
 };
 
-const canUseNativeHaptics = Platform.OS === 'ios' || Platform.OS === 'android';
-
-export const hapticsAreSupported = canUseNativeHaptics || Platform.OS === 'web';
-let hapticsEnabled = hapticsAreSupported;
-
-const triggerWebVibration = (pattern: number | number[]) => {
+const vibrateWeb = (pattern: number | number[]) => {
   if (Platform.OS !== 'web') return;
   if (typeof globalThis === 'undefined') return;
 
@@ -22,30 +17,46 @@ const triggerWebVibration = (pattern: number | number[]) => {
   } catch {}
 };
 
-const trigger = (effect: () => Promise<void>, webPattern: number | number[]) => {
-  if (!hapticsAreSupported || !hapticsEnabled) return;
+const canUseNativeHaptics = Platform.OS === 'ios' || Platform.OS === 'android';
 
-  if (!canUseNativeHaptics) {
-    triggerWebVibration(webPattern);
-    return;
-  }
-
-  void effect().catch(() => {});
-};
+export const hapticsAreSupported = canUseNativeHaptics || Platform.OS === 'web';
+let hapticsEnabled = hapticsAreSupported;
 
 export const setHapticsEnabled = (enabled: boolean) => {
   hapticsEnabled = hapticsAreSupported && enabled;
-  if (!enabled) triggerWebVibration(0);
+  if (!enabled) vibrateWeb(0);
+};
+
+const runNativeHaptic = (effect: () => Promise<void>, webPattern: number | number[]) => {
+  if (!hapticsAreSupported || !hapticsEnabled) return;
+
+  if (Platform.OS === 'web') {
+    vibrateWeb(webPattern);
+    return;
+  }
+
+  void effect().catch(() => {
+    Vibration.vibrate(webPattern);
+  });
 };
 
 export const triggerSelectionHaptic = () => {
-  trigger(() => Haptics.selectionAsync(), 30);
+  runNativeHaptic(
+    () => Haptics.selectionAsync(),
+    18
+  );
 };
 
 export const triggerSuccessHaptic = () => {
-  trigger(() => Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success), [30, 35, 45]);
+  runNativeHaptic(
+    () => Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light),
+    [18, 22, 18]
+  );
 };
 
 export const triggerWarningHaptic = () => {
-  trigger(() => Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning), [50, 35, 50]);
+  runNativeHaptic(
+    () => Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light),
+    [22, 28, 22]
+  );
 };

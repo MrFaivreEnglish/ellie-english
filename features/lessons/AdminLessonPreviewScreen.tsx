@@ -11,9 +11,6 @@ import {
   View,
 } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
-import * as Clipboard from 'expo-clipboard';
-import * as DocumentPicker from 'expo-document-picker';
-import * as FileSystem from 'expo-file-system';
 import { useNavigation } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import BackButton from '../shared/BackButton';
@@ -165,6 +162,72 @@ const exportableLesson = (lesson: CustomVocabularyLesson) => ({
     french: word.french,
   })),
 });
+
+const copyTextToClipboard = async (text: string) => {
+  if (Platform.OS !== 'web' || typeof document === 'undefined') {
+    throw new Error('Clipboard export is only available on web.');
+  }
+
+  if (typeof navigator !== 'undefined' && navigator.clipboard?.writeText) {
+    await navigator.clipboard.writeText(text);
+    return;
+  }
+
+  const textArea = document.createElement('textarea');
+  textArea.value = text;
+  textArea.style.position = 'fixed';
+  textArea.style.opacity = '0';
+  textArea.style.pointerEvents = 'none';
+  document.body.appendChild(textArea);
+  textArea.focus();
+  textArea.select();
+
+  try {
+    document.execCommand('copy');
+  } finally {
+    document.body.removeChild(textArea);
+  }
+};
+
+const pickTextFile = async (): Promise<{ contents: string; name?: string } | null> => {
+  if (Platform.OS !== 'web' || typeof document === 'undefined') {
+    Alert.alert('Import unavailable', 'File import is only available in the web admin tool.');
+    return null;
+  }
+
+  return new Promise((resolve) => {
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = '.json,.txt,.csv,text/plain,text/csv,application/json';
+    input.style.display = 'none';
+
+    const cleanup = () => {
+      if (input.parentNode) input.parentNode.removeChild(input);
+    };
+
+    input.addEventListener('change', async () => {
+      const file = input.files?.[0];
+      cleanup();
+
+      if (!file) {
+        resolve(null);
+        return;
+      }
+
+      try {
+        resolve({
+          contents: await file.text(),
+          name: file.name,
+        });
+      } catch {
+        resolve(null);
+      }
+    }, { once: true });
+
+    document.body.appendChild(input);
+    input.click();
+  });
+};
 
 export default function AdminLessonPreviewScreen() {
   const navigation = useNavigation<any>();
@@ -532,7 +595,7 @@ export default function AdminLessonPreviewScreen() {
       url: override.url,
     }));
 
-    await Clipboard.setStringAsync(JSON.stringify(payload, null, 2));
+    await copyTextToClipboard(JSON.stringify(payload, null, 2));
     Alert.alert(
       'Copied',
       'Chapter link JSON copied to clipboard. Paste it into content/lessons/customChapterLinks.json before building.'
@@ -556,7 +619,7 @@ export default function AdminLessonPreviewScreen() {
       customVocabularyLessons: lessons.map(exportableLesson),
     };
 
-    await Clipboard.setStringAsync(JSON.stringify(payload, null, 2));
+    await copyTextToClipboard(JSON.stringify(payload, null, 2));
     Alert.alert(
       'Copied',
       'Build bundle copied. Use customChapterLinks for content/lessons/customChapterLinks.json and customVocabularyLessons for content/lessons/customVocabularyLessons.json.'
@@ -598,19 +661,10 @@ export default function AdminLessonPreviewScreen() {
 
   const handleImportPairs = async () => {
     try {
-      const result = await DocumentPicker.getDocumentAsync({
-        type: ['application/json', 'text/plain', 'text/csv'],
-        copyToCacheDirectory: true,
-        multiple: false,
-      });
+      const file = await pickTextFile();
+      if (!file) return;
 
-      if (result.canceled || !result.assets?.length) {
-        return;
-      }
-
-      const asset = result.assets[0];
-      const fileContents = await FileSystem.readAsStringAsync(asset.uri);
-      const importedPairs = parseImportedPairs(fileContents, asset.name);
+      const importedPairs = parseImportedPairs(file.contents, file.name);
 
       if (!importedPairs.length) {
         Alert.alert('Import failed', 'No English/French pairs were found in that file.');
@@ -674,13 +728,13 @@ export default function AdminLessonPreviewScreen() {
       2
     );
 
-    await Clipboard.setStringAsync(json);
+    await copyTextToClipboard(json);
     Alert.alert('Copied', 'Current lesson JSON copied to clipboard.');
   };
 
   const handleCopyAllLessonsJson = async () => {
     const payload = lessons.map(exportableLesson);
-    await Clipboard.setStringAsync(JSON.stringify(payload, null, 2));
+    await copyTextToClipboard(JSON.stringify(payload, null, 2));
     Alert.alert(
       'Copied',
       'Bundled lessons JSON copied to clipboard. Paste it into content/lessons/customVocabularyLessons.json before building.'
@@ -735,7 +789,7 @@ export default function AdminLessonPreviewScreen() {
           styles.statusCard,
           {
             backgroundColor: colors.card,
-            borderColor: isDarkMode ? 'rgba(255,255,255,0.10)' : 'rgba(31,41,55,0.10)',
+            borderColor: isDarkMode ? colors.border : 'rgba(31,41,55,0.10)',
           },
         ]}
       >
@@ -760,7 +814,7 @@ export default function AdminLessonPreviewScreen() {
         </View>
 
         <View style={styles.statusGrid}>
-          <View style={[styles.statusMetric, { backgroundColor: isDarkMode ? '#111A27' : '#F6F7F9' }]}>
+          <View style={[styles.statusMetric, { backgroundColor: isDarkMode ? colors.surface : '#F6F7F9' }]}>
             <MaterialIcons name="link" size={20} color="#1671B6" />
             <View>
               <Text style={[styles.statusMetricValue, { color: colors.text }]}>
@@ -769,14 +823,14 @@ export default function AdminLessonPreviewScreen() {
               <Text style={[styles.statusMetricLabel, { color: colors.secondaryText }]}>Custom links</Text>
             </View>
           </View>
-          <View style={[styles.statusMetric, { backgroundColor: isDarkMode ? '#111A27' : '#F6F7F9' }]}>
+          <View style={[styles.statusMetric, { backgroundColor: isDarkMode ? colors.surface : '#F6F7F9' }]}>
             <MaterialIcons name="library-books" size={20} color="#1671B6" />
             <View>
               <Text style={[styles.statusMetricValue, { color: colors.text }]}>{lessons.length}</Text>
               <Text style={[styles.statusMetricLabel, { color: colors.secondaryText }]}>Custom lessons</Text>
             </View>
           </View>
-          <View style={[styles.statusMetric, { backgroundColor: isDarkMode ? '#111A27' : '#F6F7F9' }]}>
+          <View style={[styles.statusMetric, { backgroundColor: isDarkMode ? colors.surface : '#F6F7F9' }]}>
             <MaterialIcons name="edit-note" size={22} color="#D97706" />
             <View>
               <Text style={[styles.statusMetricValue, { color: colors.text }]}>
@@ -793,7 +847,7 @@ export default function AdminLessonPreviewScreen() {
           styles.adminTabBar,
           {
             backgroundColor: isDarkMode ? colors.card : '#F6F9FC',
-            borderColor: isDarkMode ? '#415a77' : '#DDE5EE',
+            borderColor: isDarkMode ? colors.border : '#DDE5EE',
           },
         ]}
       >
@@ -851,7 +905,7 @@ export default function AdminLessonPreviewScreen() {
           styles.editorCard,
           {
             backgroundColor: colors.card,
-            borderColor: isDarkMode ? 'rgba(255,255,255,0.10)' : 'rgba(31,41,55,0.10)',
+            borderColor: isDarkMode ? colors.border : 'rgba(31,41,55,0.10)',
           },
         ]}
       >
@@ -881,8 +935,8 @@ export default function AdminLessonPreviewScreen() {
                 style={[
                   styles.chapterLevelGroup,
                   {
-                    backgroundColor: isDarkMode ? '#111A27' : '#F6F7F9',
-                    borderColor: isDarkMode ? 'rgba(255,255,255,0.10)' : 'rgba(31,41,55,0.10)',
+                    backgroundColor: isDarkMode ? colors.surface : '#F6F7F9',
+                    borderColor: isDarkMode ? colors.border : 'rgba(31,41,55,0.10)',
                   },
                 ]}
               >
@@ -951,8 +1005,8 @@ export default function AdminLessonPreviewScreen() {
                           style={[
                             styles.chapterLinkRow,
                             {
-                              backgroundColor: isDarkMode ? '#0E1828' : '#FFFFFF',
-                              borderColor: isDarkMode ? 'rgba(255,255,255,0.10)' : 'rgba(31,41,55,0.10)',
+                              backgroundColor: isDarkMode ? colors.card : '#FFFFFF',
+                              borderColor: isDarkMode ? colors.border : 'rgba(31,41,55,0.10)',
                             },
                           ]}
                         >
@@ -1004,8 +1058,8 @@ export default function AdminLessonPreviewScreen() {
                                     styles.input,
                                     {
                                       color: colors.text,
-                                      borderColor: isDarkMode ? 'rgba(255,255,255,0.12)' : '#DDE5EE',
-                                      backgroundColor: isDarkMode ? '#0E1828' : '#fff',
+                                      borderColor: isDarkMode ? colors.borderStrong : '#DDE5EE',
+                                      backgroundColor: isDarkMode ? colors.card : '#fff',
                                     },
                                   ]}
                                 />
@@ -1025,8 +1079,8 @@ export default function AdminLessonPreviewScreen() {
                                     styles.chapterLinkInput,
                                     {
                                       color: colors.text,
-                                      borderColor: isDarkMode ? 'rgba(255,255,255,0.12)' : '#DDE5EE',
-                                      backgroundColor: isDarkMode ? '#0E1828' : '#fff',
+                                      borderColor: isDarkMode ? colors.borderStrong : '#DDE5EE',
+                                      backgroundColor: isDarkMode ? colors.card : '#fff',
                                     },
                                   ]}
                                 />
@@ -1075,7 +1129,7 @@ export default function AdminLessonPreviewScreen() {
             styles.editorCard,
             {
               backgroundColor: colors.card,
-              borderColor: isDarkMode ? 'rgba(255,255,255,0.10)' : 'rgba(31,41,55,0.10)',
+              borderColor: isDarkMode ? colors.border : 'rgba(31,41,55,0.10)',
             },
           ]}
         >
@@ -1106,8 +1160,8 @@ export default function AdminLessonPreviewScreen() {
                 style={[
                   styles.previewCard,
                   {
-                    backgroundColor: isDarkMode ? '#111A27' : '#F6F7F9',
-                    borderColor: isDarkMode ? 'rgba(255,255,255,0.10)' : 'rgba(31,41,55,0.10)',
+                    backgroundColor: isDarkMode ? colors.surface : '#F6F7F9',
+                    borderColor: isDarkMode ? colors.border : 'rgba(31,41,55,0.10)',
                   },
                 ]}
               >
@@ -1157,8 +1211,8 @@ export default function AdminLessonPreviewScreen() {
                     styles.input,
                     {
                       color: colors.text,
-                      borderColor: isDarkMode ? 'rgba(255,255,255,0.12)' : '#DDE5EE',
-                      backgroundColor: isDarkMode ? '#111A27' : '#fff',
+                      borderColor: isDarkMode ? colors.borderStrong : '#DDE5EE',
+                      backgroundColor: isDarkMode ? colors.surface : '#fff',
                     },
                   ]}
                 />
@@ -1175,8 +1229,8 @@ export default function AdminLessonPreviewScreen() {
                     styles.input,
                     {
                       color: colors.text,
-                      borderColor: isDarkMode ? 'rgba(255,255,255,0.12)' : '#DDE5EE',
-                      backgroundColor: isDarkMode ? '#111A27' : '#fff',
+                      borderColor: isDarkMode ? colors.borderStrong : '#DDE5EE',
+                      backgroundColor: isDarkMode ? colors.surface : '#fff',
                     },
                   ]}
                 />
@@ -1194,8 +1248,8 @@ export default function AdminLessonPreviewScreen() {
                       styles.input,
                       {
                         color: colors.text,
-                        borderColor: isDarkMode ? 'rgba(255,255,255,0.12)' : '#DDE5EE',
-                        backgroundColor: isDarkMode ? '#111A27' : '#fff',
+                        borderColor: isDarkMode ? colors.borderStrong : '#DDE5EE',
+                        backgroundColor: isDarkMode ? colors.surface : '#fff',
                       },
                     ]}
                   />
@@ -1213,8 +1267,8 @@ export default function AdminLessonPreviewScreen() {
                       styles.input,
                       {
                         color: colors.text,
-                        borderColor: isDarkMode ? 'rgba(255,255,255,0.12)' : '#DDE5EE',
-                        backgroundColor: isDarkMode ? '#111A27' : '#fff',
+                        borderColor: isDarkMode ? colors.borderStrong : '#DDE5EE',
+                        backgroundColor: isDarkMode ? colors.surface : '#fff',
                       },
                     ]}
                   />
@@ -1281,8 +1335,8 @@ export default function AdminLessonPreviewScreen() {
                         styles.wordInput,
                         {
                           color: colors.text,
-                          borderColor: isDarkMode ? 'rgba(255,255,255,0.12)' : '#DDE5EE',
-                          backgroundColor: isDarkMode ? '#111A27' : '#fff',
+                          borderColor: isDarkMode ? colors.borderStrong : '#DDE5EE',
+                          backgroundColor: isDarkMode ? colors.surface : '#fff',
                         },
                       ]}
                     />
@@ -1295,8 +1349,8 @@ export default function AdminLessonPreviewScreen() {
                         styles.wordInput,
                         {
                           color: colors.text,
-                          borderColor: isDarkMode ? 'rgba(255,255,255,0.12)' : '#DDE5EE',
-                          backgroundColor: isDarkMode ? '#111A27' : '#fff',
+                          borderColor: isDarkMode ? colors.borderStrong : '#DDE5EE',
+                          backgroundColor: isDarkMode ? colors.surface : '#fff',
                         },
                       ]}
                     />
@@ -1342,7 +1396,7 @@ export default function AdminLessonPreviewScreen() {
                 styles.lessonCard,
                 {
                   backgroundColor: colors.card,
-                  borderColor: isDarkMode ? '#415a77' : '#DDE5EE',
+                  borderColor: isDarkMode ? colors.border : '#DDE5EE',
                 },
               ]}
             >
