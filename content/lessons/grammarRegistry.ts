@@ -40,7 +40,13 @@ import SuperlativeGrammar from '../grammar/SuperlativeGrammar';
 import SuperlativeInferiorityGrammar from '../grammar/SuperlativeInferiorityGrammar';
 import WordTypesGrammar from '../grammar/WordTypesGrammar';
 import WouldLikeGrammar from '../grammar/WouldLikeGrammar';
-import { ExerciseMode, isReorderExercise, tokenizeTranslateAnswer } from '../../features/grammar/grammarExercises/GrammarExerciseUtils';
+import type { Exercise, ExerciseMode } from '../../features/grammar/grammarExercises/GrammarExerciseUtils';
+import {
+  isFillExercise,
+  isReorderExercise,
+  isTranslateExercise,
+  tokenizeTranslateAnswer,
+} from '../../features/grammar/grammarExercises/GrammarExerciseUtils';
 
 type LessonModeConfig = {
   fill: boolean;
@@ -216,6 +222,126 @@ const buildLessonExercises = (lesson: any, modeConfig: LessonModeConfig) => {
 
   return [...baseExercises, ...reorderExercises, ...translateExercises];
 };
+
+const getGrammarLessonProgressId = (lesson: any) =>
+  String(lesson.id ?? lesson.title ?? 'grammar-lesson');
+
+const slugifyGrammarLessonId = (value: string) =>
+  value
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '') || 'mixed';
+
+const MIXED_GRAMMAR_FALLBACK_IMAGE_URL = 'https://i.ibb.co/wNYxhH6t/Groupes-de-mots.png';
+const MIXED_GRAMMAR_IMAGE_URL_FIELD = 'imageUrl';
+
+const getLessonImageUrl = (lesson: any) =>
+  typeof lesson.imageUrl === 'string' && lesson.imageUrl.trim().length > 0
+    ? lesson.imageUrl
+    : null;
+
+const getStableImageIndex = (seed: string, itemCount: number) => {
+  if (itemCount <= 1) return 0;
+
+  let hash = 0;
+  for (let index = 0; index < seed.length; index += 1) {
+    hash = (hash * 31 + seed.charCodeAt(index)) >>> 0;
+  }
+
+  return hash % itemCount;
+};
+
+const prepareGrammarLesson = (lesson: any) => {
+  const modeConfig = grammarLessonModes[lesson.id] ?? defaultLessonModeConfig;
+
+  return {
+    ...lesson,
+    availableModes: buildAvailableModes(modeConfig),
+    exercises: buildLessonExercises(lesson, modeConfig),
+  };
+};
+
+const tagExerciseSourceLesson = (exercise: Exercise, lesson: any): Exercise => ({
+  ...exercise,
+  sourceLesson: {
+    id: lesson.id,
+    title: lesson.title,
+  },
+});
+
+export const createMixedGrammarLesson = ({
+  idSeed,
+  title,
+  description,
+  sourceLessons: requestedSourceLessons,
+}: {
+  idSeed: string;
+  title: string;
+  description: string;
+  sourceLessons: any[];
+}) => {
+  const sourceLessons = requestedSourceLessons.filter(
+    (lesson) =>
+      lesson.practiceType !== 'vocabulary' &&
+      Array.isArray(lesson.exercises) &&
+      lesson.exercises.length > 0
+  );
+
+  if (sourceLessons.length < 2) return null;
+
+  const exercises = sourceLessons.flatMap((lesson) =>
+    lesson.exercises.map((exercise: Exercise) => tagExerciseSourceLesson(exercise, lesson))
+  );
+
+  if (exercises.length === 0) return null;
+
+  const sourceLessonImageCards = sourceLessons
+    .map((lesson) => {
+      const imageUrl = getLessonImageUrl(lesson);
+
+      return imageUrl
+        ? {
+            id: getGrammarLessonProgressId(lesson),
+            title: lesson.title,
+            imageUrl,
+          }
+        : null;
+    })
+    .filter((imageCard): imageCard is { id: string; title: string; imageUrl: string } => !!imageCard);
+  const sourceLessonImages = sourceLessonImageCards.map((imageCard) => imageCard.imageUrl);
+  const selectedImageUrl =
+    sourceLessonImages[getStableImageIndex(idSeed, sourceLessonImages.length)] ??
+    MIXED_GRAMMAR_FALLBACK_IMAGE_URL;
+
+  return {
+    id: `grammar-mix-${slugifyGrammarLessonId(idSeed)}`,
+    title,
+    description,
+    [MIXED_GRAMMAR_IMAGE_URL_FIELD]: selectedImageUrl,
+    isMixedGrammarLesson: true,
+    sourceLessonCount: sourceLessons.length,
+    sourceLessonImageCards,
+    sourceLessonImages,
+    sourceLessonProgressKeys: sourceLessons.map(getGrammarLessonProgressId),
+    availableModes: {
+      quiz: true,
+      fill: exercises.some(isFillExercise),
+      reorder: exercises.some(isReorderExercise),
+      translate: exercises.some(isTranslateExercise),
+    },
+    exercises,
+  };
+};
+
+const buildMixedGrammarLesson = (subcategoryTitle: string, lessons: any[]) =>
+  createMixedGrammarLesson({
+    idSeed: subcategoryTitle,
+    title: `Mixed practice: ${subcategoryTitle}`,
+    description: `Mix sentences from ${lessons.length} grammar lessons.`,
+    sourceLessons: lessons,
+  });
 
 const irregularVerbPracticeOptions = {
   flashcardLabels: {
@@ -450,17 +576,15 @@ const rawGrammarCategories: Array<{
 
 export const grammarCategories = rawGrammarCategories.map((level) => ({
   ...level,
-  subcategories: level.subcategories.map((subcategory) => ({
-    ...subcategory,
-    lessons: subcategory.lessons.map((lesson) => ({
-      ...lesson,
-      availableModes: buildAvailableModes(grammarLessonModes[lesson.id] ?? defaultLessonModeConfig),
-      exercises: buildLessonExercises(
-        lesson,
-        grammarLessonModes[lesson.id] ?? defaultLessonModeConfig
-      ),
-    })),
-  })),
+  subcategories: level.subcategories.map((subcategory) => {
+    const lessons = subcategory.lessons.map(prepareGrammarLesson);
+
+    return {
+      ...subcategory,
+      lessons,
+      mixedLesson: buildMixedGrammarLesson(subcategory.title, lessons),
+    };
+  }),
 }));
 
 export const grammarLessons: any[] = grammarCategories.flatMap((level) =>

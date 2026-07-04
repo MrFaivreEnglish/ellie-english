@@ -25,7 +25,7 @@ const EmotionsLevel2Vocab = {
         { english: 'Touched', french: 'Ému' },
         { english: 'Relieved', french: 'Soulagé' },
         { english: 'Calm', french: 'Calme' },
-        { english: 'Hopeful', french: "Pleins d'espoir" },
+        { english: 'Hopeful', french: "Plein d'espoir" },
         { english: 'Grateful', french: 'Reconnaissant' }
       ]
     },
@@ -33,13 +33,13 @@ const EmotionsLevel2Vocab = {
       category: 'Negative Emotions 😟',
       words: [
         { english: 'Sad', french: 'Triste' },
-        { english: 'Unhappy', french: 'Mécontent' },
+        { english: 'Unhappy', french: 'Malheureux' },
         { english: 'Angry', french: 'En colère' },
         { english: 'Furious', french: 'Furieux' },
         { english: 'Grumpy', french: 'Râleur' },
         { english: 'Jealous', french: 'Jaloux' },
         { english: 'Scared', french: 'Effrayé' },
-        { english: 'Fearful', french: 'Peur' },
+        { english: 'Fearful', french: 'Craintif' },
         { english: 'Frightened', french: 'Effrayé' },
         { english: 'Nervous', french: 'Nerveux' },
         { english: 'Anxious', french: 'Anxieux' },

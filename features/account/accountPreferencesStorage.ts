@@ -1,7 +1,6 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { hapticsAreSupported } from '../shared/haptics';
-import { ACTIVE_MENU_LANGUAGE, isMenuLanguage, type MenuLanguage } from '../shared/menuCopy';
-import { ENABLE_MENU_LANGUAGE_SELECTOR, ENABLE_SHINY_ELLIE_COLOR_MODE } from '../../lib/featureFlags';
+import { ENABLE_SHINY_ELLIE_COLOR_MODE } from '../../lib/featureFlags';
 import {
   DEFAULT_ACCOUNT_AVATAR_COLOR_ID,
   DEFAULT_ACCOUNT_AVATAR_ID,
@@ -22,10 +21,10 @@ import {
 
 export const THEME_STORAGE_KEY = '@app_theme';
 export const GRAMMAR_GAME_MODE_KEY = '@grammar_game_mode';
+export const GRAMMAR_SPEECH_ENABLED_KEY = '@grammar_speech_enabled';
 export const VOCAB_TIMER_MODE_KEY = '@vocab_timer_mode';
 export const VOCAB_TIMER_RECORD_SAVING_KEY = '@vocab_timer_record_saving';
 export const VOCAB_LESSON_CARD_VIEW_KEY = '@vocab_lesson_card_view';
-export const MENU_LANGUAGE_KEY = '@menu_language';
 export const TYPING_STRICT_MODE_KEY = '@typing_strict_mode';
 export const HAPTICS_ENABLED_KEY = '@haptics_enabled';
 export const SOUND_EFFECTS_ENABLED_KEY = '@sound_effects_enabled';
@@ -43,7 +42,6 @@ export type AccountPreferenceSnapshot = {
   vocabTimerMode: boolean;
   vocabTimerRecordSaving: boolean;
   vocabLessonCardView: 'list' | 'tile';
-  menuLanguage: MenuLanguage;
   typingStrictMode: boolean;
   hapticsEnabled: boolean;
   soundEffectsEnabled: boolean;
@@ -64,11 +62,6 @@ const asTheme = (value: unknown): 'light' | 'dark' => value === 'dark' ? 'dark' 
 const asVocabLessonCardView = (value: unknown): 'list' | 'tile' =>
   value === 'tile' ? 'tile' : 'list';
 
-const asMenuLanguage = (value: unknown): MenuLanguage => {
-  const candidate = typeof value === 'string' ? value : null;
-  return ENABLE_MENU_LANGUAGE_SELECTOR && isMenuLanguage(candidate) ? candidate : ACTIVE_MENU_LANGUAGE;
-};
-
 const normalizeSnapshot = (value: unknown): AccountPreferenceSnapshot => {
   const record = value && typeof value === 'object' && !Array.isArray(value)
     ? value as Record<string, unknown>
@@ -83,7 +76,6 @@ const normalizeSnapshot = (value: unknown): AccountPreferenceSnapshot => {
     vocabTimerMode: asBoolean(record.vocabTimerMode),
     vocabTimerRecordSaving: asBoolean(record.vocabTimerRecordSaving),
     vocabLessonCardView: asVocabLessonCardView(record.vocabLessonCardView),
-    menuLanguage: asMenuLanguage(record.menuLanguage),
     typingStrictMode: asBoolean(record.typingStrictMode),
     hapticsEnabled: hapticsAreSupported && asBoolean(record.hapticsEnabled, hapticsAreSupported),
     soundEffectsEnabled: asBoolean(record.soundEffectsEnabled, true),
@@ -108,7 +100,6 @@ export const getLocalAccountPreferenceSnapshot = async (
     savedVocabMode,
     savedVocabTimerRecordSaving,
     savedVocabLessonCardView,
-    savedMenuLanguage,
     savedTypingStrictMode,
     savedHapticsEnabled,
     savedSoundEffectsEnabled,
@@ -124,7 +115,6 @@ export const getLocalAccountPreferenceSnapshot = async (
     AsyncStorage.getItem(VOCAB_TIMER_MODE_KEY),
     AsyncStorage.getItem(VOCAB_TIMER_RECORD_SAVING_KEY),
     AsyncStorage.getItem(VOCAB_LESSON_CARD_VIEW_KEY),
-    AsyncStorage.getItem(MENU_LANGUAGE_KEY),
     AsyncStorage.getItem(TYPING_STRICT_MODE_KEY),
     AsyncStorage.getItem(HAPTICS_ENABLED_KEY),
     AsyncStorage.getItem(SOUND_EFFECTS_ENABLED_KEY),
@@ -143,7 +133,6 @@ export const getLocalAccountPreferenceSnapshot = async (
     vocabTimerMode: savedVocabMode === 'true',
     vocabTimerRecordSaving: savedVocabTimerRecordSaving === 'true',
     vocabLessonCardView: savedVocabLessonCardView === 'tile' ? 'tile' : 'list',
-    menuLanguage: asMenuLanguage(savedMenuLanguage),
     typingStrictMode: savedTypingStrictMode === 'true',
     hapticsEnabled: hapticsAreSupported && savedHapticsEnabled !== 'false',
     soundEffectsEnabled: savedSoundEffectsEnabled !== 'false',
@@ -168,7 +157,6 @@ export const saveLocalAccountPreferenceSnapshot = async (
       [VOCAB_TIMER_MODE_KEY, snapshot.vocabTimerMode ? 'true' : 'false'],
       [VOCAB_TIMER_RECORD_SAVING_KEY, snapshot.vocabTimerRecordSaving ? 'true' : 'false'],
       [VOCAB_LESSON_CARD_VIEW_KEY, snapshot.vocabLessonCardView],
-      [MENU_LANGUAGE_KEY, snapshot.menuLanguage],
       [TYPING_STRICT_MODE_KEY, snapshot.typingStrictMode ? 'true' : 'false'],
       [HAPTICS_ENABLED_KEY, snapshot.hapticsEnabled ? 'true' : 'false'],
       [SOUND_EFFECTS_ENABLED_KEY, snapshot.soundEffectsEnabled ? 'true' : 'false'],

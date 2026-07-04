@@ -1,23 +1,32 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
-  ScrollView,
+  SectionList,
   View,
   Text,
   TouchableOpacity,
   Image,
   StyleSheet,
   Platform,
-  TextInput
+  TextInput,
+  useWindowDimensions
 } from 'react-native';
 import { useTheme, type ThemeColors } from '../settings/ThemeContext';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import { MaterialIcons } from '@expo/vector-icons';
 import BackButton from '../shared/BackButton';
-import { grammarCategories } from '../../content/lessons/grammarRegistry';
-import { getGrammarLessonProgressCounts, getGrammarLessonProgressKey } from './grammarProgressStorage';
+import { createMixedGrammarLesson, grammarCategories } from '../../content/lessons/grammarRegistry';
+import { getGrammarLessonProgressCounts, getGrammarLessonProgressKey, getGrammarLessonKeysPracticedToday } from './grammarProgressStorage';
 import { getMenuCopy } from '../shared/menuCopy';
-import { getInsetSurfaceStyle, getPanelStyle, uiRadii } from '../shared/uiPrimitives';
+import {
+  getInsetSurfaceStyle,
+  getPanelStyle,
+  getSelectionTrayColors,
+  getSoftShadow,
+  getStudySurfaceColors,
+  uiRadii,
+} from '../shared/uiPrimitives';
+import type { GrammarLesson } from '../../types/lessonTypes';
 
 const isRemoteLessonImage = (imageUrl: any) =>
   typeof imageUrl === 'string' && /^https?:\/\//i.test(imageUrl);
@@ -28,33 +37,70 @@ const getLessonImageSource = (imageUrl: any) => {
 };
 
 type GrammarLessonRowProps = {
-  lesson: any;
+  lesson: GrammarLesson;
   savedAnswerCount: number;
+  practicedToday: boolean;
   rowIndex: number;
   staggerRemoteImageLoad: boolean;
   colors: ThemeColors;
   isDarkMode: boolean;
   copy: any;
-  onSelectLesson: (lesson: any) => void;
+  onSelectLesson: (lesson: GrammarLesson) => void;
+  selectionMode?: boolean;
+  selected?: boolean;
+  selectable?: boolean;
+  onToggleLesson?: (lesson: GrammarLesson) => void;
+};
+
+type GrammarSubcategoryListItem = {
+  key: string;
+  sub: {
+    title: string;
+    lessons: GrammarLesson[];
+  };
+  lessons: GrammarLesson[];
+  subIndex: number;
+  levelTitle: string;
 };
 
 const GrammarLessonRow = React.memo(({
   lesson,
   savedAnswerCount,
+  practicedToday,
   rowIndex,
   staggerRemoteImageLoad,
   colors,
   isDarkMode,
   copy,
   onSelectLesson,
+  selectionMode = false,
+  selected = false,
+  selectable = true,
+  onToggleLesson,
 }: GrammarLessonRowProps) => {
-  const handlePress = useCallback(() => onSelectLesson(lesson), [lesson, onSelectLesson]);
+  const handlePress = useCallback(() => {
+    if (selectionMode && selectable && onToggleLesson) {
+      onToggleLesson(lesson);
+      return;
+    }
+
+    onSelectLesson(lesson);
+  }, [lesson, onSelectLesson, onToggleLesson, selectable, selectionMode]);
+  const isMixedGrammarLesson = !!lesson.isMixedGrammarLesson;
+  const mixedLessonImageUrls: string[] = Array.isArray(lesson.sourceLessonImages)
+    ? lesson.sourceLessonImages.filter((imageUrl: unknown): imageUrl is string => typeof imageUrl === 'string' && imageUrl.trim().length > 0)
+    : [];
   const imageSource = getLessonImageSource(lesson.imageUrl);
   const isRemoteImage = isRemoteLessonImage(lesson.imageUrl);
   const [canLoadRemoteImage, setCanLoadRemoteImage] = useState(!isRemoteImage || !staggerRemoteImageLoad);
   const [imageLoaded, setImageLoaded] = useState(false);
   const [imageLoadFailed, setImageLoadFailed] = useState(false);
-  const shouldRenderThumbnail = imageSource && (!isRemoteImage || canLoadRemoteImage);
+  const shouldRenderThumbnail = !isMixedGrammarLesson && imageSource && (!isRemoteImage || canLoadRemoteImage);
+  const studySurface = getStudySurfaceColors(colors, isDarkMode);
+  const mixedLessonSurface = isDarkMode ? colors.surface : '#F8FAFF';
+  const mixedLessonBorder = isDarkMode ? '#FFFFFF' : colors.border;
+  const mixedLessonIconSurface = studySurface.control;
+  const mixedLessonMetaSurface = studySurface.control;
 
   useEffect(() => {
     if (!isRemoteImage || !staggerRemoteImageLoad) {
@@ -81,85 +127,165 @@ const GrammarLessonRow = React.memo(({
       style={[
         styles.lessonItem,
         getInsetSurfaceStyle(colors, isDarkMode),
+        isMixedGrammarLesson && styles.mixedLessonItem,
+        selected && styles.selectedLessonItem,
         {
-          backgroundColor: isDarkMode ? colors.surface : '#F8FBFF',
-          borderColor: isDarkMode ? colors.borderStrong : '#D7E6F3',
+          backgroundColor: isMixedGrammarLesson
+            ? selected ? colors.primarySoft : mixedLessonSurface
+            : selected ? colors.primarySoft
+            : isDarkMode ? colors.surface : '#F8FBFF',
+          borderColor: isMixedGrammarLesson
+            ? selected ? colors.primary : mixedLessonBorder
+            : selected ? colors.primary
+            : colors.border,
+          borderBottomColor: selected ? colors.primary : colors.border,
+          borderBottomWidth: selected ? 3 : 1.5,
         },
       ]}
       activeOpacity={0.82}
       onPress={handlePress}
+      accessibilityRole="button"
+      accessibilityLabel={lesson.title}
+      accessibilityState={{ selected }}
     >
       <View
         style={[
           styles.lessonThumbnail,
+          isMixedGrammarLesson && styles.mixedLessonThumbnail,
           {
-            backgroundColor: isDarkMode ? colors.surfaceAlt : '#EDF5FC',
+            backgroundColor: isMixedGrammarLesson ? 'transparent' : studySurface.photoFrame,
+            borderColor: isMixedGrammarLesson ? 'transparent' : studySurface.photoFrameBorder,
+            borderWidth: isMixedGrammarLesson ? 0 : 2.5,
+            shadowColor: isDarkMode ? '#000000' : '#6C8EAA',
+            shadowOpacity: isMixedGrammarLesson ? 0 : isDarkMode ? 0.25 : 0.14,
           },
         ]}
       >
-        {(!shouldRenderThumbnail || !imageLoaded) && (
-          <View style={styles.lessonThumbnailSkeleton}>
-            <View
-              style={[
-                styles.thumbnailSkeletonPanel,
-                { backgroundColor: isDarkMode ? colors.card : '#f8fafc' },
-              ]}
-            />
-            <View
-              style={[
-                styles.thumbnailSkeletonLine,
-                { backgroundColor: isDarkMode ? colors.borderStrong : 'rgba(255,255,255,0.82)' },
-              ]}
-            />
-            <View
-              style={[
-                styles.thumbnailSkeletonLine,
-                styles.thumbnailSkeletonLineShort,
-                { backgroundColor: isDarkMode ? colors.border : 'rgba(255,255,255,0.62)' },
-              ]}
-            />
+        {isMixedGrammarLesson ? (
+          <View style={[styles.mixedLessonIcon, { backgroundColor: mixedLessonIconSurface, borderColor: mixedLessonBorder }]}>
+            {mixedLessonImageUrls.length > 0 ? (
+              <View style={styles.mixedLessonImageStack}>
+                {mixedLessonImageUrls.slice(0, 3).map((imageUrl, index) => (
+                  <Image
+                    key={`${imageUrl}-${index}`}
+                    source={{ uri: imageUrl }}
+                    style={[
+                      styles.mixedLessonStackImage,
+                      {
+                        left: index * 13,
+                        transform: [{ rotate: index === 0 ? '-6deg' : index === 1 ? '3deg' : '9deg' }],
+                      },
+                    ]}
+                    resizeMode="cover"
+                  />
+                ))}
+              </View>
+            ) : null}
+            <View style={[styles.mixedLessonShuffleBadge, { backgroundColor: colors.buttonBackground, borderColor: '#FFFFFF' }]}>
+              <MaterialIcons name="shuffle" size={17} color={colors.buttonText} />
+            </View>
           </View>
-        )}
+        ) : (
+          <>
+            {(!shouldRenderThumbnail || !imageLoaded) && (
+              <View style={styles.lessonThumbnailSkeleton}>
+                <View
+                  style={[
+                    styles.thumbnailSkeletonPanel,
+                    { backgroundColor: isDarkMode ? colors.card : '#F8FAFF' },
+                  ]}
+                />
+                <View
+                  style={[
+                    styles.thumbnailSkeletonLine,
+                    { backgroundColor: isDarkMode ? colors.borderStrong : 'rgba(255,255,255,0.82)' },
+                  ]}
+                />
+                <View
+                  style={[
+                    styles.thumbnailSkeletonLine,
+                    styles.thumbnailSkeletonLineShort,
+                    { backgroundColor: isDarkMode ? colors.border : 'rgba(255,255,255,0.62)' },
+                  ]}
+                />
+              </View>
+            )}
 
-        {shouldRenderThumbnail && !imageLoadFailed && (
-          <Image
-            source={imageSource}
-            style={[
-              styles.lessonThumbnailImage,
-              !imageLoaded && styles.lessonThumbnailImageLoading,
-            ]}
-            resizeMode="cover"
-            fadeDuration={0}
-            progressiveRenderingEnabled
-            onLoad={() => setImageLoaded(true)}
-            onError={() => setImageLoadFailed(true)}
-          />
-        )}
+            {shouldRenderThumbnail && !imageLoadFailed && (
+              <Image
+                source={imageSource}
+                style={[
+                  styles.lessonThumbnailImage,
+                  !imageLoaded && styles.lessonThumbnailImageLoading,
+                ]}
+                resizeMode="cover"
+                fadeDuration={0}
+                progressiveRenderingEnabled
+                onLoad={() => setImageLoaded(true)}
+                onError={() => setImageLoadFailed(true)}
+              />
+            )}
 
-        {imageLoadFailed && (
-          <MaterialIcons name="image-not-supported" size={22} color={colors.secondaryText} />
+            {imageLoadFailed && (
+              <MaterialIcons name="image-not-supported" size={22} color={colors.secondaryText} />
+            )}
+          </>
         )}
       </View>
 
       <View style={styles.lessonInfo}>
-        <Text style={[styles.lessonTitle, { color: colors.text }]}>
+        <Text style={[styles.lessonTitle, { color: colors.text }]} numberOfLines={2}>
           {lesson.title}
         </Text>
-        {savedAnswerCount > 0 && (
-          <View style={[styles.savedAnswersPill, { backgroundColor: colors.successSoft, borderColor: colors.success }]}>
-            <MaterialIcons name="check-circle" size={14} color={colors.success} />
-            <Text style={[styles.savedAnswersText, { color: colors.successText ?? colors.success }]}>
-              {savedAnswerCount} {savedAnswerCount === 1 ? copy.savedAnswerSingular : copy.savedAnswerPlural}
-            </Text>
+        {isMixedGrammarLesson && typeof lesson.description === 'string' && (
+          <Text
+            style={[styles.lessonSubtitle, { color: colors.secondaryText }]}
+            numberOfLines={1}
+          >
+            {lesson.description}
+          </Text>
+        )}
+        {isMixedGrammarLesson && (
+          <View style={styles.mixedMetaRow}>
+            <View style={[styles.mixedMetaPill, { backgroundColor: mixedLessonMetaSurface, borderColor: colors.primary }]}>
+              <MaterialIcons name="auto-awesome" size={13} color={colors.primary} />
+              <Text style={[styles.mixedMetaText, { color: colors.primary }]}>
+                {lesson.sourceLessonCount ?? mixedLessonImageUrls.length} {lesson.sourceLessonCount === 1 ? copy.lessonSingular : copy.lessonPlural}
+              </Text>
+            </View>
           </View>
         )}
+        <View style={styles.lessonPillRow}>
+          {practicedToday && (
+            <View style={[styles.todayPill, { backgroundColor: colors.primarySoft, borderColor: colors.primary }]}>
+              <MaterialIcons name="today" size={12} color={colors.primary} />
+              <Text style={[styles.todayPillText, { color: colors.primary }]}>Today</Text>
+            </View>
+          )}
+          {savedAnswerCount > 0 && (
+            <View style={[styles.savedAnswersPill, { backgroundColor: colors.successSoft, borderColor: colors.success }]}>
+              <MaterialIcons name="check-circle" size={14} color={colors.success} />
+              <Text style={[styles.savedAnswersText, { color: colors.successText ?? colors.success }]}>
+                {savedAnswerCount} {savedAnswerCount === 1 ? copy.savedAnswerSingular : copy.savedAnswerPlural}
+              </Text>
+            </View>
+          )}
+        </View>
       </View>
 
-      <MaterialIcons
-        name="arrow-forward-ios"
-        size={16}
-        color={colors.secondaryText}
-      />
+      {selectionMode && selectable ? (
+        <MaterialIcons
+          name={selected ? 'check-box' : 'check-box-outline-blank'}
+          size={24}
+          color={selected ? colors.primary : colors.secondaryText}
+        />
+      ) : (
+        <MaterialIcons
+          name="arrow-forward-ios"
+          size={16}
+          color={colors.secondaryText}
+        />
+      )}
     </TouchableOpacity>
   );
 });
@@ -192,14 +318,16 @@ const subColors = [
   '#92c490ff',
 ];
 
-const GrammarCategoryList: React.FC<{ onSelectLesson: (lesson: any) => void }> =
+const GrammarCategoryList: React.FC<{ onSelectLesson: (lesson: GrammarLesson) => void }> =
 ({ onSelectLesson }) => {
   const insets = useSafeAreaInsets();
   const navigation = useNavigation();
-  const { colors, isDarkMode, isAndroidStatusBarEnabled, menuLanguage } = useTheme();
-  const appCopy = getMenuCopy(menuLanguage);
+  const { width: windowWidth } = useWindowDimensions();
+  const { colors, isDarkMode, isAndroidStatusBarEnabled } = useTheme();
+  const appCopy = getMenuCopy();
   const copy = appCopy.grammar;
   const commonCopy = appCopy.common;
+  const isSelectionTrayCompact = windowWidth < 430;
   const topContentInset = Platform.OS === 'ios'
     ? (insets.top ?? 0)
     : Platform.OS === 'android' && isAndroidStatusBarEnabled
@@ -209,6 +337,29 @@ const GrammarCategoryList: React.FC<{ onSelectLesson: (lesson: any) => void }> =
   const [expandedSub, setExpandedSub] = useState<Record<string, boolean>>({});
   const [search, setSearch] = useState('');
   const [grammarProgressCounts, setGrammarProgressCounts] = useState<Record<string, number>>({});
+  const [practicedTodayKeys, setPracticedTodayKeys] = useState<Set<string>>(() => new Set());
+  const [selectionMode, setSelectionMode] = useState(false);
+  const [selectedLessonKeys, setSelectedLessonKeys] = useState<Set<string>>(() => new Set());
+  const selectableGrammarLessons = useMemo(
+    () =>
+      grammarCategories.flatMap((level) =>
+        level.subcategories.flatMap((subcategory) =>
+          subcategory.lessons.filter((lesson) =>
+            lesson.practiceType !== 'vocabulary' &&
+            Array.isArray(lesson.exercises) &&
+            lesson.exercises.length > 0
+          )
+        )
+      ),
+    []
+  );
+  const selectedLessons = useMemo(
+    () =>
+      selectableGrammarLessons.filter((lesson) =>
+        selectedLessonKeys.has(getGrammarLessonProgressKey(lesson))
+      ),
+    [selectableGrammarLessons, selectedLessonKeys]
+  );
   const lessonProgressKeys = useMemo(
     () =>
       grammarCategories.flatMap((level) =>
@@ -223,9 +374,14 @@ const GrammarCategoryList: React.FC<{ onSelectLesson: (lesson: any) => void }> =
     useCallback(() => {
       let active = true;
 
-      getGrammarLessonProgressCounts(lessonProgressKeys).then((counts) => {
-        if (active) setGrammarProgressCounts(counts);
-      });
+      Promise.all([
+        getGrammarLessonProgressCounts(lessonProgressKeys),
+        getGrammarLessonKeysPracticedToday(),
+      ]).then(([counts, todayKeys]) => {
+        if (!active) return;
+        setGrammarProgressCounts(counts);
+        setPracticedTodayKeys(todayKeys);
+      }).catch(() => {});
 
       return () => {
         active = false;
@@ -235,6 +391,66 @@ const GrammarCategoryList: React.FC<{ onSelectLesson: (lesson: any) => void }> =
 
   const toggleSub = (key: string) =>
     setExpandedSub(prev => ({ ...prev, [key]: !prev[key] }));
+
+  const canSelectLessonForMix = (lesson: any) =>
+    lesson.practiceType !== 'vocabulary' &&
+    Array.isArray(lesson.exercises) &&
+    lesson.exercises.length > 0 &&
+    !lesson.isMixedGrammarLesson;
+
+  const toggleSelectionMode = () => {
+    if (selectionMode) {
+      setSelectedLessonKeys(new Set());
+    }
+
+    setSelectionMode((current) => !current);
+  };
+
+  const clearSelection = () => {
+    setSelectedLessonKeys(new Set());
+  };
+
+  const closeSelectionMode = () => {
+    setSelectedLessonKeys(new Set());
+    setSelectionMode(false);
+  };
+
+  const toggleLessonSelection = useCallback((lesson: any) => {
+    const lessonKey = getGrammarLessonProgressKey(lesson);
+
+    setSelectedLessonKeys((current) => {
+      const next = new Set(current);
+
+      if (next.has(lessonKey)) {
+        next.delete(lessonKey);
+      } else {
+        next.add(lessonKey);
+      }
+
+      return next;
+    });
+  }, []);
+
+  const startSelectedMix = () => {
+    if (selectedLessons.length < 2) return;
+
+    const selectedKeys = selectedLessons
+      .map((lesson) => getGrammarLessonProgressKey(lesson))
+      .sort()
+      .join('-');
+    const mixedLesson = createMixedGrammarLesson({
+      idSeed: `selected-${selectedKeys}`,
+      title: `${copy.mixedPracticeTitle}: ${copy.selectedMixTitle}`,
+      description: copy.mixedPracticeSubtitle.replace('{count}', String(selectedLessons.length)),
+      sourceLessons: selectedLessons,
+    });
+
+    if (!mixedLesson) return;
+
+    setSelectionMode(false);
+    setSelectedLessonKeys(new Set());
+    onSelectLesson(mixedLesson);
+  };
 
   const normalizeSearchText = (value: string) =>
     value
@@ -284,186 +500,464 @@ const GrammarCategoryList: React.FC<{ onSelectLesson: (lesson: any) => void }> =
     return lessons.filter((lesson) => matchesSearch(lesson.title || '', search));
   };
 
+  const getSavedAnswerCount = (lesson: any) => {
+    if (Array.isArray(lesson.sourceLessonProgressKeys)) {
+      return lesson.sourceLessonProgressKeys.reduce(
+        (total: number, lessonKey: string) => total + (grammarProgressCounts[lessonKey] ?? 0),
+        0
+      );
+    }
+
+    return grammarProgressCounts[getGrammarLessonProgressKey(lesson)] ?? 0;
+  };
+  const selectionTrayBottomPadding = Platform.OS === 'web' ? 16 : Math.max(insets.bottom, 12);
+  const studySurface = useMemo(() => getStudySurfaceColors(colors, isDarkMode), [colors, isDarkMode]);
+  const trayColors = useMemo(() => getSelectionTrayColors(colors, isDarkMode), [colors, isDarkMode]);
+  const traySurfaceColor = trayColors.surface;
+  const trayControlColor = trayColors.control;
+  const trayBorderColor = trayColors.border;
+  const trayTextColor = trayColors.text;
+  const trayMutedColor = trayColors.muted;
+  const trayActionColor = trayColors.action;
+  const trayStartEnabledBackground = trayColors.startBackground;
+  const trayStartEnabledText = trayColors.startText;
+  const searchSurfaceColor = studySurface.search;
+  const searchBorderColor = studySurface.searchBorder;
+  const searchActiveColor = studySurface.searchActive;
+  const visibleGrammarSections = grammarCategories
+    .map((level) => ({
+      key: level.group,
+      title: level.title,
+      data: level.subcategories
+        .map((sub, subIndex) => ({
+          key: `${level.group}-${subIndex}`,
+          sub,
+          subIndex,
+          levelTitle: level.title,
+          lessons: filterLessons(sub.lessons, `${level.title} ${sub.title}`),
+        }))
+        .filter(({ lessons }) => !search.trim() || lessons.length > 0),
+    }))
+    .filter((section) => !search.trim() || section.data.length > 0);
+  const hasGrammarLessons = grammarCategories.some((level) =>
+    level.subcategories.some((subcategory) => subcategory.lessons.length > 0)
+  );
+  const hasSearchResults = !search.trim() || visibleGrammarSections.some((section) => section.data.length > 0);
+
   return (
-    <ScrollView
-      style={[styles.container, { backgroundColor: colors.background }]}
+    <View style={[styles.screen, { backgroundColor: colors.background }]}>
+    <SectionList
+      style={styles.container}
+      sections={hasGrammarLessons ? visibleGrammarSections : []}
+      keyExtractor={(item: GrammarSubcategoryListItem) => item.key}
       removeClippedSubviews={Platform.OS !== 'web'}
       overScrollMode="never"
       bounces={false}
       alwaysBounceVertical={false}
+      stickySectionHeadersEnabled={false}
       contentContainerStyle={{
-        paddingTop: topContentInset
+        paddingTop: topContentInset,
+        paddingBottom: selectionMode ? 142 : 18,
       }}
-    >
-      <BackButton label={commonCopy.backToHome} onPress={() => navigation.goBack()} />
+      ListHeaderComponent={(
+        <>
+          <BackButton label={commonCopy.backToHome} onPress={() => navigation.goBack()} />
 
-      <Text style={[styles.headerTitle, { color: colors.text }]}>
-        {copy.header}
-      </Text>
+          <View style={styles.headerRow}>
+            <Text style={[styles.headerTitle, { color: colors.text }]}>
+              {copy.header}
+            </Text>
+            <TouchableOpacity
+              activeOpacity={0.84}
+              onPress={toggleSelectionMode}
+              style={[
+              styles.headerSelectButton,
+              {
+                  backgroundColor: selectionMode ? colors.primarySoft : studySurface.control,
+                  borderColor: selectionMode ? colors.primary : studySurface.controlBorder,
+                },
+              ]}
+              accessibilityRole="button"
+              accessibilityState={{ selected: selectionMode }}
+            >
+              <MaterialIcons
+                name={selectionMode ? 'close' : 'checklist'}
+                size={18}
+                color={selectionMode ? colors.primary : colors.secondaryText}
+              />
+              <Text
+                style={[styles.headerSelectText, { color: selectionMode ? colors.primary : colors.text }]}
+                numberOfLines={1}
+              >
+                {selectionMode ? copy.cancelSelection : copy.selectLessons}
+              </Text>
+            </TouchableOpacity>
+          </View>
 
+          <View
+            style={[
+              styles.searchShell,
+              getInsetSurfaceStyle(colors, isDarkMode),
+              {
+                backgroundColor: searchSurfaceColor,
+                borderColor: search.trim() ? searchActiveColor : searchBorderColor,
+                borderWidth: search.trim() ? 2 : 1.5,
+                borderRadius: uiRadii.control,
+              },
+            ]}
+          >
+            <TextInput
+              value={search}
+              onChangeText={setSearch}
+              placeholder={copy.searchPlaceholder}
+              placeholderTextColor={colors.secondaryText}
+              style={[
+                styles.searchInput,
+                {
+                  backgroundColor: 'transparent',
+                  color: colors.text,
+                  borderWidth: 0,
+                  paddingRight: 45,
+                  paddingLeft: 44,
+                  paddingVertical: 14,
+                  fontSize: 16,
+                },
+              ]}
+            />
+
+            <View style={styles.searchIconWrap}>
+              <MaterialIcons name="search" size={20} color={searchActiveColor} />
+            </View>
+
+            {search.length > 0 && (
+              <TouchableOpacity
+                onPress={() => setSearch('')}
+                style={styles.searchClearButton}
+                hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+              >
+                <MaterialIcons name="close" size={20} color={searchActiveColor} />
+              </TouchableOpacity>
+            )}
+          </View>
+
+          {!hasGrammarLessons && (
+            <View style={[styles.searchEmptyState, { backgroundColor: colors.card, borderColor: colors.border }]}>
+              <MaterialIcons name="menu-book" size={28} color={colors.secondaryText} />
+              <Text style={[styles.searchEmptyTitle, { color: colors.text }]}>{copy.noLessonTitle}</Text>
+              <Text style={[styles.searchEmptySubtitle, { color: colors.secondaryText }]}>
+                {copy.noLessonText}
+              </Text>
+            </View>
+          )}
+
+          {hasGrammarLessons && !hasSearchResults && (
+            <View style={[styles.searchEmptyState, { backgroundColor: colors.card, borderColor: colors.border }]}>
+              <MaterialIcons name="search-off" size={28} color={colors.secondaryText} />
+              <Text style={[styles.searchEmptyTitle, { color: colors.text }]}>{copy.noSearchTitle}</Text>
+              <Text style={[styles.searchEmptySubtitle, { color: colors.secondaryText }]}>
+                {copy.noSearchText}
+              </Text>
+            </View>
+          )}
+        </>
+      )}
+      renderSectionHeader={({ section }) => (
+        <View style={styles.levelHeader}>
+          <Text style={[styles.levelTitle, { color: colors.text }]}>
+            {section.title}
+          </Text>
+        </View>
+      )}
+      renderSectionFooter={() => <View style={styles.levelFooterSpacer} />}
+      renderItem={({ item }: { item: GrammarSubcategoryListItem }) => {
+        const { key, sub, lessons, subIndex } = item;
+        const open = search ? true : expandedSub[key];
+        const subColor = subColors[subIndex % subColors.length];
+        const emoji = subEmojiMap[sub.title] || '\uD83D\uDCD8';
+
+        return (
+          <View
+            style={[
+              styles.categoryContainer,
+              getPanelStyle(colors, isDarkMode, open ? 'raised' : 'soft'),
+              open && styles.categoryContainerActive,
+              {
+                backgroundColor: colors.card,
+                borderColor: '#FFFFFF',
+                borderWidth: 2,
+              }
+            ]}
+          >
+            <TouchableOpacity
+              style={[
+                styles.categoryHeader,
+                { backgroundColor: subColor },
+              ]}
+              onPress={() => toggleSub(key)}
+            >
+              <Text style={styles.categoryIcon}>{emoji}</Text>
+              <View style={styles.categoryTitleBlock}>
+                <Text style={styles.categoryTitle}>{sub.title}</Text>
+              </View>
+              <View style={styles.lessonCountPill}>
+                <Text style={styles.lessonCountText}>
+                  {lessons.length} {lessons.length > 1 ? copy.lessonPlural : copy.lessonSingular}
+                </Text>
+              </View>
+
+              {!search && (
+                <MaterialIcons
+                  name={open ? 'expand-less' : 'expand-more'}
+                  size={20}
+                  color="#FFFFFF"
+                />
+              )}
+            </TouchableOpacity>
+
+            {open && (
+              <View style={styles.lessonsContainer}>
+                {lessons.map((lesson: any, li: number) => {
+                  const selectable = canSelectLessonForMix(lesson);
+                  const savedAnswerCount = getSavedAnswerCount(lesson);
+                  const lessonKey = getGrammarLessonProgressKey(lesson);
+                  const rowKey = lesson.id ? String(lesson.id) : `${lesson.title}-${li}`;
+
+                  return (
+                    <GrammarLessonRow
+                      key={rowKey}
+                      lesson={lesson}
+                      savedAnswerCount={savedAnswerCount}
+                      practicedToday={practicedTodayKeys.has(getGrammarLessonProgressKey(lesson))}
+                      rowIndex={li}
+                      staggerRemoteImageLoad={lessons.length > 6 || !!search.trim()}
+                      colors={colors}
+                      isDarkMode={isDarkMode}
+                      copy={copy}
+                      onSelectLesson={onSelectLesson}
+                      selectionMode={selectionMode}
+                      selected={selectedLessonKeys.has(lessonKey)}
+                      selectable={selectable}
+                      onToggleLesson={toggleLessonSelection}
+                    />
+                  );
+                })}
+              </View>
+            )}
+          </View>
+        );
+      }}
+    />
+
+    {selectionMode && (
       <View
+        pointerEvents="box-none"
         style={[
-          styles.searchShell,
-          getInsetSurfaceStyle(colors, isDarkMode),
+          styles.selectionTrayWrap,
           {
-            backgroundColor: colors.surfaceAlt,
-            borderColor: search.trim() ? colors.primary : colors.borderStrong,
-            borderWidth: search.trim() ? 2 : 1.5,
-            borderRadius: uiRadii.control,
+            paddingBottom: selectionTrayBottomPadding,
           },
         ]}
       >
-        <TextInput
-          value={search}
-          onChangeText={setSearch}
-          placeholder={copy.searchPlaceholder}
-          placeholderTextColor={colors.secondaryText}
+        <View
           style={[
-            styles.searchInput,
+            styles.selectionControls,
+            getSoftShadow(isDarkMode, 'raised'),
             {
-              backgroundColor: 'transparent',
-              color: colors.text,
-              borderWidth: 0,
-              paddingRight: 45,
-              paddingLeft: 44,
-              paddingVertical: 14,
-              fontSize: 16,
+              backgroundColor: traySurfaceColor,
+              borderColor: trayBorderColor,
             },
           ]}
-        />
-
-        <View style={styles.searchIconWrap}>
-          <MaterialIcons name="search" size={20} color={colors.primary} />
-        </View>
-
-        {search.length > 0 && (
-          <TouchableOpacity
-            onPress={() => setSearch('')}
-            style={styles.searchClearButton}
-            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-          >
-            <MaterialIcons name="close" size={20} color={colors.primary} />
-          </TouchableOpacity>
-        )}
-      </View>
-
-      {grammarCategories.map((level) => {
-        const visibleSubcategories = level.subcategories
-          .map((sub, si) => ({
-            sub,
-            si,
-            lessons: filterLessons(
-              sub.lessons,
-              `${level.title} ${sub.title}`
-            ),
-          }))
-          .filter(({ lessons }) => !search.trim() || lessons.length > 0);
-
-        if (search.trim() && visibleSubcategories.length === 0) return null;
-
-        return (
-        <View key={level.group} style={{ marginBottom: 32 }}>
-          <View style={styles.levelHeader}>
-            <Text style={[styles.levelTitle, { color: colors.text }]}>
-              {level.title}
-            </Text>
+        >
+          <View style={styles.selectionActionRow}>
+            <TouchableOpacity
+              activeOpacity={selectedLessons.length > 0 ? 0.82 : 1}
+              onPress={clearSelection}
+              disabled={selectedLessons.length === 0}
+              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+              style={[
+                styles.trayIconButton,
+                selectedLessons.length === 0 && styles.trayIconButtonDisabled,
+                {
+                  backgroundColor: trayControlColor,
+                  borderColor: trayBorderColor,
+                },
+              ]}
+              accessibilityRole="button"
+              accessibilityLabel={copy.clearSelection}
+              accessibilityState={{ disabled: selectedLessons.length === 0 }}
+            >
+              <MaterialIcons
+                name="delete-sweep"
+                size={19}
+                color={selectedLessons.length > 0 ? trayActionColor : trayMutedColor}
+              />
+            </TouchableOpacity>
+            <View style={styles.selectionCountPill}>
+              <MaterialIcons name="view-carousel" size={19} color={trayActionColor} />
+              <View style={styles.selectionDeckCopy}>
+                <Text style={[styles.selectionDeckTitle, { color: trayTextColor }]} numberOfLines={1}>
+                  {copy.selectedMixTitle}
+                </Text>
+                <Text style={[styles.selectedCountText, { color: trayMutedColor }]} numberOfLines={1}>
+                  {copy.selectionCount.replace('{count}', String(selectedLessons.length))}
+                </Text>
+              </View>
+            </View>
+            <TouchableOpacity
+              activeOpacity={0.82}
+              onPress={closeSelectionMode}
+              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+              style={[
+                styles.trayIconButton,
+                {
+                  backgroundColor: trayControlColor,
+                  borderColor: trayBorderColor,
+                },
+              ]}
+              accessibilityRole="button"
+              accessibilityLabel={copy.cancelSelection}
+            >
+              <MaterialIcons name="close" size={19} color={trayActionColor} />
+            </TouchableOpacity>
           </View>
+          {selectedLessons.length > 0 && (
+            <View style={[styles.selectedMixPreviewRow, isSelectionTrayCompact && styles.selectedMixPreviewRowCompact, { borderTopColor: trayBorderColor }]}>
+              <View style={[styles.selectedMixStackCanvas, isSelectionTrayCompact && styles.selectedMixStackCanvasCompact]}>
+                {selectedLessons.slice(0, 4).map((selectedLesson: any, stackIndex: number) => {
+                  const selectedLessonImageSource = getLessonImageSource(selectedLesson.imageUrl);
+                  const selectedLessonKey = getGrammarLessonProgressKey(selectedLesson);
 
-          {visibleSubcategories.map(({ sub, si, lessons }) => {
-            const key = `${level.group}-${si}`;
-            const open = search ? true : expandedSub[key];
-
-            const subIdx = level.subcategories.findIndex(s => s === sub);
-            const subColor = subColors[subIdx % subColors.length];
-            const emoji = subEmojiMap[sub.title] || '\uD83D\uDCD8';
-
-            return (
-              <View
-                key={key}
-                style={[
-                  styles.categoryContainer,
-                  getPanelStyle(colors, isDarkMode, open ? 'raised' : 'soft'),
-                  open && styles.categoryContainerActive,
-                  {
-                    backgroundColor: colors.card,
-                    borderColor: isDarkMode ? 'rgba(255,255,255,0.68)' : '#FFFFFF',
-                    borderWidth: 1.5,
-                  }
-                ]}
-              >
-                <TouchableOpacity
-                  style={[styles.categoryHeader, { backgroundColor: subColor }]}
-                  onPress={() => toggleSub(key)}
-                >
-                  <Text style={styles.categoryIcon}>{emoji}</Text>
-                  <View style={styles.categoryTitleBlock}>
-                    <Text style={styles.categoryTitle}>{sub.title}</Text>
-                  </View>
-                  <View style={styles.lessonCountPill}>
-                    <Text style={styles.lessonCountText}>
-                      {lessons.length} {lessons.length > 1 ? copy.lessonPlural : copy.lessonSingular}
-                    </Text>
-                  </View>
-
-                  {!search && (
-                    <MaterialIcons
-                      name={open ? 'expand-less' : 'expand-more'}
-                      size={20}
-                      color={colors.text}
-                    />
-                  )}
-                </TouchableOpacity>
-
-                {open && (
-                  <View style={styles.lessonsContainer}>
-                    {lessons.map((lesson: any, li: number) => {
-                      const savedAnswerCount = grammarProgressCounts[getGrammarLessonProgressKey(lesson)] ?? 0;
-                      const rowKey = lesson.id ? String(lesson.id) : `${lesson.title}-${li}`;
-
-                      return (
-                        <GrammarLessonRow
-                          key={rowKey}
-                          lesson={lesson}
-                          savedAnswerCount={savedAnswerCount}
-                          rowIndex={li}
-                          staggerRemoteImageLoad={lessons.length > 6 || !!search.trim()}
-                          colors={colors}
-                          isDarkMode={isDarkMode}
-                          copy={copy}
-                          onSelectLesson={onSelectLesson}
+                  return (
+                    <View
+                      key={selectedLessonKey}
+                      style={[
+                        styles.selectedMixStackCard,
+                        isSelectionTrayCompact && styles.selectedMixStackCardCompact,
+                        {
+                          left: stackIndex * (isSelectionTrayCompact ? 20 : 23),
+                          zIndex: stackIndex + 1,
+                          transform: [{ rotate: stackIndex === 0 ? '-7deg' : stackIndex === 1 ? '-1deg' : stackIndex === 2 ? '5deg' : '10deg' }],
+                          backgroundColor: trayColors.stackFrame,
+                        },
+                      ]}
+                    >
+                      {selectedLessonImageSource ? (
+                        <Image
+                          source={selectedLessonImageSource}
+                          style={styles.selectedMixStackImage}
+                          resizeMode="cover"
                         />
-                      );
-                    })}
+                      ) : (
+                        <MaterialIcons name="image-not-supported" size={19} color={colors.secondaryText} />
+                      )}
+                    </View>
+                  );
+                })}
+                {selectedLessons.length > 4 && (
+                  <View style={[styles.selectedMixMoreBadge, { backgroundColor: trayStartEnabledBackground, borderColor: trayColors.stackFrame }]}>
+                    <Text style={[styles.selectedMixMoreText, { color: trayStartEnabledText }]}>
+                      +{selectedLessons.length - 4}
+                    </Text>
                   </View>
                 )}
               </View>
-            );
-          })}
+              <View style={styles.selectedMixPreviewTextBlock}>
+                <Text
+                  style={[styles.selectedMixPreviewTitle, isSelectionTrayCompact && styles.selectedMixPreviewTitleCompact, { color: trayTextColor }]}
+                  numberOfLines={1}
+                >
+                  {selectedLessons.slice(0, 3).map((selectedLesson: any) => selectedLesson.title).join(' + ')}
+                  {selectedLessons.length > 3 ? ` + ${selectedLessons.length - 3} more` : ''}
+                </Text>
+                {selectedLessons.length === 1 && (
+                  <Text style={[styles.selectedMixHint, { color: trayMutedColor }]}>
+                    Select 1 more to start
+                  </Text>
+                )}
+              </View>
+              <TouchableOpacity
+                activeOpacity={selectedLessons.length >= 2 ? 0.84 : 1}
+                onPress={startSelectedMix}
+                disabled={selectedLessons.length < 2}
+                style={[
+                  styles.startMixButton,
+                  isSelectionTrayCompact && styles.startMixButtonCompact,
+                  {
+                    backgroundColor: selectedLessons.length >= 2 ? trayStartEnabledBackground : trayControlColor,
+                    borderColor: selectedLessons.length >= 2 ? trayStartEnabledBackground : trayBorderColor,
+                  },
+                ]}
+                accessibilityRole="button"
+                accessibilityState={{ disabled: selectedLessons.length < 2 }}
+              >
+                <MaterialIcons
+                  name="shuffle"
+                  size={18}
+                  color={selectedLessons.length >= 2 ? trayStartEnabledText : trayMutedColor}
+                />
+                {!isSelectionTrayCompact && (
+                  <Text
+                    style={[
+                      styles.startMixText,
+                      { color: selectedLessons.length >= 2 ? trayStartEnabledText : trayMutedColor },
+                    ]}
+                    numberOfLines={1}
+                  >
+                    {copy.startMixedPractice}
+                  </Text>
+                )}
+              </TouchableOpacity>
+            </View>
+          )}
         </View>
-        );
-      })}
-    </ScrollView>
+      </View>
+    )}
+    </View>
   );
 };
 
 export default GrammarCategoryList;
 
 const styles = StyleSheet.create({
+  screen: {
+    flex: 1,
+  },
   container: { flex: 1 },
 
+  headerRow: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    gap: 12,
+    paddingBottom: 14,
+    paddingHorizontal: 24,
+  },
   headerTitle: {
+    flex: 1,
     fontSize: 32,
     fontWeight: 'bold',
-    paddingHorizontal: 24,
-    paddingBottom: 16,
+    minWidth: 0,
   },
-
+  headerSelectButton: {
+    alignItems: 'center',
+    borderRadius: uiRadii.control,
+    borderWidth: 1.5,
+    flexDirection: 'row',
+    gap: 7,
+    minHeight: 42,
+    maxWidth: 174,
+    paddingHorizontal: 12,
+  },
+  headerSelectText: {
+    flexShrink: 1,
+    fontSize: 14,
+    fontWeight: '800',
+  },
   searchShell: {
     marginHorizontal: 16,
     marginTop: 10,
     marginBottom: 14,
     borderWidth: 1.5,
-    borderRadius: 12,
+    borderRadius: uiRadii.control,
     overflow: 'hidden',
     position: 'relative',
   },
@@ -488,7 +982,185 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
-
+  searchEmptyState: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    marginHorizontal: 12,
+    marginTop: 24,
+    paddingVertical: 32,
+    paddingHorizontal: 24,
+    borderRadius: 16,
+    borderWidth: 1.5,
+  },
+  searchEmptyTitle: {
+    fontSize: 17,
+    fontWeight: '600',
+    textAlign: 'center',
+  },
+  searchEmptySubtitle: {
+    fontSize: 14,
+    textAlign: 'center',
+  },
+  selectionControls: {
+    alignItems: 'stretch',
+    borderRadius: 28,
+    borderWidth: 2,
+    gap: 7,
+    marginHorizontal: 10,
+    minHeight: 46,
+    paddingHorizontal: 12,
+    paddingTop: 10,
+    paddingBottom: 8,
+  },
+  selectionTrayWrap: {
+    backgroundColor: 'transparent',
+    bottom: 0,
+    elevation: 20,
+    left: 0,
+    paddingTop: 10,
+    position: 'absolute',
+    right: 0,
+    zIndex: 20,
+  },
+  selectionActionRow: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    gap: 8,
+  },
+  selectionCountPill: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    flexGrow: 1,
+    gap: 7,
+    justifyContent: 'flex-start',
+    minHeight: 34,
+    minWidth: 0,
+    paddingHorizontal: 3,
+  },
+  selectionDeckCopy: {
+    flex: 1,
+    minWidth: 0,
+  },
+  selectionDeckTitle: {
+    fontSize: 12,
+    fontWeight: '900',
+    lineHeight: 14,
+  },
+  selectedCountText: {
+    fontSize: 11,
+    fontWeight: '700',
+    lineHeight: 13,
+  },
+  trayIconButton: {
+    alignItems: 'center',
+    borderRadius: 999,
+    borderWidth: 1.5,
+    height: 34,
+    justifyContent: 'center',
+    width: 34,
+  },
+  trayIconButtonDisabled: {
+    opacity: 0.55,
+  },
+  startMixButton: {
+    alignItems: 'center',
+    borderRadius: 13,
+    borderWidth: 1.5,
+    borderBottomWidth: 2.5,
+    flexDirection: 'row',
+    gap: 6,
+    justifyContent: 'center',
+    minHeight: 40,
+    minWidth: 116,
+    paddingHorizontal: 12,
+  },
+  startMixButtonCompact: {
+    minWidth: 44,
+    paddingHorizontal: 10,
+  },
+  startMixText: {
+    fontSize: 13,
+    fontWeight: '800',
+  },
+  selectedMixPreviewRow: {
+    alignItems: 'center',
+    borderTopWidth: StyleSheet.hairlineWidth,
+    flexDirection: 'row',
+    gap: 12,
+    minHeight: 78,
+    paddingHorizontal: 0,
+    paddingTop: 8,
+  },
+  selectedMixPreviewRowCompact: {
+    gap: 8,
+  },
+  selectedMixStackCanvas: {
+    height: 78,
+    position: 'relative',
+    width: 156,
+  },
+  selectedMixStackCanvasCompact: {
+    width: 112,
+  },
+  selectedMixStackCard: {
+    alignItems: 'center',
+    borderRadius: 10,
+    borderColor: '#FFFFFF',
+    borderWidth: 2.5,
+    elevation: 3,
+    height: 72,
+    justifyContent: 'center',
+    overflow: 'hidden',
+    position: 'absolute',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.16,
+    shadowRadius: 5,
+    top: 3,
+    width: 56,
+  },
+  selectedMixStackCardCompact: {
+    height: 64,
+    width: 50,
+  },
+  selectedMixStackImage: {
+    borderRadius: 7,
+    bottom: 3,
+    left: 3,
+    position: 'absolute',
+    right: 3,
+    top: 3,
+  },
+  selectedMixMoreBadge: {
+    alignItems: 'center',
+    borderRadius: 999,
+    borderWidth: 2,
+    bottom: 0,
+    height: 28,
+    justifyContent: 'center',
+    position: 'absolute',
+    right: 0,
+    width: 28,
+    zIndex: 8,
+  },
+  selectedMixMoreText: {
+    fontSize: 10,
+    fontWeight: '900',
+  },
+  selectedMixPreviewTextBlock: {
+    flex: 1,
+    minWidth: 0,
+  },
+  selectedMixPreviewTitle: {
+    fontSize: 15,
+    fontWeight: '800',
+    lineHeight: 18,
+  },
+  selectedMixPreviewTitleCompact: {
+    fontSize: 13,
+    lineHeight: 16,
+  },
   levelHeader: {
     marginHorizontal: 16,
     marginBottom: 16,
@@ -496,6 +1168,9 @@ const styles = StyleSheet.create({
   levelTitle: {
     fontSize: 25,
     fontWeight: 'bold',
+  },
+  levelFooterSpacer: {
+    height: 16,
   },
 
   categoryContainer: {
@@ -505,7 +1180,7 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
   },
   categoryContainerActive: {
-    borderWidth: 1.5,
+    borderWidth: 2,
   },
 
   categoryHeader: {
@@ -522,6 +1197,7 @@ const styles = StyleSheet.create({
     flex: 1,
     marginLeft: 12,
     minHeight: 39,
+    minWidth: 0,
     justifyContent: 'center',
   },
   categoryTitle: {
@@ -538,8 +1214,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     marginRight: 8,
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.28)',
+    borderWidth: 1.5,
+    borderColor: '#FFFFFF',
   },
   lessonCountText: {
     color: '#fff',
@@ -557,23 +1233,74 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     paddingHorizontal: 12,
     borderRadius: uiRadii.panel,
+    borderBottomWidth: 2,
+  },
+  mixedLessonItem: {
+    borderWidth: 1.5,
+    paddingVertical: 14,
+  },
+  selectedLessonItem: {
+    borderWidth: 2,
   },
 
   lessonThumbnail: {
-    width: 64,
-    height: 64,
+    width: 70,
+    height: 70,
     borderRadius: uiRadii.thumbnail,
     marginRight: 6,
     alignItems: 'center',
     justifyContent: 'center',
     overflow: 'hidden',
+    elevation: 2,
+    shadowOffset: { width: 0, height: 2 },
+    shadowRadius: 5,
+  },
+  mixedLessonThumbnail: {
+    backgroundColor: 'transparent',
+    overflow: 'visible',
   },
   lessonThumbnailImage: {
     width: '100%',
     height: '100%',
+    borderRadius: 10,
   },
   lessonThumbnailImageLoading: {
     opacity: 0,
+  },
+  mixedLessonIcon: {
+    width: '100%',
+    height: '100%',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: uiRadii.thumbnail,
+    borderWidth: 1.5,
+    overflow: 'visible',
+  },
+  mixedLessonImageStack: {
+    width: 58,
+    height: 52,
+    position: 'relative',
+  },
+  mixedLessonStackImage: {
+    position: 'absolute',
+    top: 4,
+    width: 36,
+    height: 44,
+    borderRadius: 8,
+    borderWidth: 2.5,
+    borderColor: '#FFFFFF',
+    backgroundColor: '#EAF0F6',
+  },
+  mixedLessonShuffleBadge: {
+    position: 'absolute',
+    right: -4,
+    bottom: -4,
+    width: 27,
+    height: 27,
+    borderRadius: 11,
+    borderWidth: 2,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   lessonThumbnailSkeleton: {
     ...StyleSheet.absoluteFillObject,
@@ -604,9 +1331,55 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     lineHeight: 22,
   },
-  savedAnswersPill: {
-    alignSelf: 'flex-start',
+  lessonSubtitle: {
+    marginTop: 3,
+    fontSize: 13,
+    fontWeight: '700',
+  },
+  mixedMetaRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 7,
+    marginTop: 7,
+  },
+  mixedMetaPill: {
+    alignItems: 'center',
+    borderRadius: 10,
+    borderWidth: 1.5,
+    flexDirection: 'row',
+    gap: 4,
+    minHeight: 24,
+    paddingHorizontal: 8,
+  },
+  mixedMetaText: {
+    fontSize: 12,
+    fontWeight: '900',
+  },
+  lessonPillRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 5,
     marginTop: 8,
+  },
+  todayPill: {
+    minHeight: 24,
+    borderRadius: 999,
+    borderWidth: 1,
+    paddingHorizontal: 8,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  todayPillText: {
+    fontSize: 11,
+    fontWeight: '900',
+  },
+  selectedMixHint: {
+    fontSize: 11,
+    fontWeight: '700',
+    marginTop: 2,
+  },
+  savedAnswersPill: {
     minHeight: 26,
     borderRadius: 999,
     borderWidth: 1,

@@ -26,7 +26,7 @@ check:
 pages:
   stage: deploy
   script:
-    - npx expo export --platform web
+    - npm run predeploy
     - rm -rf public
     - cp -r dist public
   artifacts:

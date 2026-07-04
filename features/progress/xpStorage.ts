@@ -139,6 +139,7 @@ export const clearLocalXPProgress = async () => {
 
 // ➕ Add XP
 export const addXP = async (amount: number): Promise<number> => {
+  if (!Number.isFinite(amount)) return getXP();
   const currentXP = await getXP();
   const newXP = normalizeXP(currentXP + amount);
   await setXP(newXP);

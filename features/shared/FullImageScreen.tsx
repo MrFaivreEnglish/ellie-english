@@ -3,8 +3,12 @@ import { View, StyleSheet, Platform } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import PinchZoomImage from './PinchZoomImage';
+import type { NativeStackScreenProps } from '@react-navigation/native-stack';
+import type { RootStackParamList } from '../../types/navigationTypes';
 
-export default function FullImageScreen({ route, navigation }: any) {
+type Props = NativeStackScreenProps<RootStackParamList, 'FullImageModal'>;
+
+export default function FullImageScreen({ route, navigation }: Props) {
   const insets = useSafeAreaInsets();
   const { source, uri } = route.params || {};
 

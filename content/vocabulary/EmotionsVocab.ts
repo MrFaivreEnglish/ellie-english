@@ -19,11 +19,11 @@ const EmotionsVocab = {
       category: 'Negative Emotions 😟',
       words: [
         { english: 'Sad', french: 'triste' },
-        { english: 'Unhappy', french: 'mécontent' },
+        { english: 'Unhappy', french: 'malheureux' },
         { english: 'Angry', french: 'en colère' },
         { english: 'Furious', french: 'furieux' },
         { english: 'Scared', french: 'effrayé' },
-        { english: 'Afraid', french: 'peur' },
+        { english: 'Afraid', french: 'apeuré' },
         { english: 'Nervous', french: 'nerveux' },
         { english: 'Tired', french: 'fatigué' }
       ]

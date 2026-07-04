@@ -1,17 +1,20 @@
 import React from 'react';
 import { ActivityIndicator, Alert, Platform, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
+import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import type { RootStackParamList } from '../../types/navigationTypes';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { MaterialIcons } from '@expo/vector-icons';
 import AccountPanel from './AccountPanel';
 import BackButton from '../shared/BackButton';
 import { useAccount } from './AccountContext';
 import { useTheme } from '../settings/ThemeContext';
+import { getButtonStyle, getButtonTextColor } from '../shared/uiPrimitives';
 
 const cleanDisplayName = (value: string) => value.trim().replace(/\s+/g, ' ');
 
 export default function AccountScreen() {
-  const navigation = useNavigation<any>();
+  const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const { colors, isDarkMode, isAndroidStatusBarEnabled } = useTheme();
   const {
     session,
@@ -30,13 +33,25 @@ export default function AccountScreen() {
     : Platform.OS === 'android' && isAndroidStatusBarEnabled
       ? insets.top
       : 0;
+  const warningButtonStyle = getButtonStyle(colors, isDarkMode, 'warning');
+  const warningButtonTextColor = getButtonTextColor(colors, isDarkMode, 'warning');
+  const dangerButtonStyle = getButtonStyle(colors, isDarkMode, 'danger');
+  const dangerButtonTextColor = getButtonTextColor(colors, isDarkMode, 'danger');
+  const resetToHome = React.useCallback(() => {
+    navigation.reset({
+      index: 0,
+      routes: [{ name: 'Home' }],
+    });
+  }, [navigation]);
+
   const runDeleteAccount = React.useCallback(async () => {
     try {
       await deleteAccount();
+      resetToHome();
     } catch {
       // AccountContext exposes the readable error in the panel.
     }
-  }, [deleteAccount]);
+  }, [deleteAccount, resetToHome]);
 
   const runResetSavedProgress = React.useCallback(async () => {
     setResetMessage('');
@@ -54,10 +69,11 @@ export default function AccountScreen() {
 
     try {
       await signOut();
+      resetToHome();
     } catch {
       // AccountContext exposes the readable error in the panel.
     }
-  }, [signOut]);
+  }, [resetToHome, signOut]);
 
   const confirmSignOut = React.useCallback(() => {
     if (!session) return;
@@ -208,14 +224,14 @@ export default function AccountScreen() {
               <TouchableOpacity
                 onPress={confirmResetSavedProgress}
                 disabled={isSyncing}
-                style={[styles.resetWorkButton, { backgroundColor: colors.warningSoft, borderColor: colors.warning }]}
+                style={[styles.resetWorkButton, warningButtonStyle]}
                 accessibilityRole="button"
                 accessibilityLabel="Reset saved work"
               >
                 {isSyncing ? (
                   <ActivityIndicator color={colors.warning} />
                 ) : (
-                  <Text style={[styles.deleteButtonText, { color: colors.warning }]}>Reset</Text>
+                  <Text style={[styles.deleteButtonText, { color: warningButtonTextColor }]}>Reset</Text>
                 )}
               </TouchableOpacity>
             </View>
@@ -234,14 +250,14 @@ export default function AccountScreen() {
                 <TouchableOpacity
                   onPress={confirmDeleteAccount}
                   disabled={isSyncing}
-                  style={[styles.deleteButton, { backgroundColor: colors.dangerSoft, borderColor: colors.danger }]}
+                  style={[styles.deleteButton, dangerButtonStyle]}
                   accessibilityRole="button"
                   accessibilityLabel="Delete online account"
                 >
                   {isSyncing ? (
                     <ActivityIndicator color={colors.danger} />
                   ) : (
-                    <Text style={[styles.deleteButtonText, { color: colors.danger }]}>Delete</Text>
+                    <Text style={[styles.deleteButtonText, { color: dangerButtonTextColor }]}>Delete</Text>
                   )}
                 </TouchableOpacity>
               </View>

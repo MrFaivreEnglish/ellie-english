@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { getXP, addXP, hasWordXpAwardedToday, markWordXpAwardedToday } from '../progress/xpStorage';
 import type { Word } from '../../types/VocabularyTypes';
 import { useTheme } from '../settings/ThemeContext';
-import { getTypingAnswerXP } from '../progress/xpRewards';
+import { getTypingAnswerXP, getTypingComboReward } from '../progress/xpRewards';
 import { getLevelDisplayLabel, xpForLevel } from '../progress/xpLevels';
 
 type FeedbackType = 'correct' | 'wrong' | 'close';
@@ -81,24 +81,30 @@ const isCloseMatch = (user: string, correct: string) => {
 const buildCorrectAnswers = (
   answer: string,
   normalizeAnswer: (text: string) => string,
-  allowSlashAlternatives: boolean
+  allowSlashAlternatives: boolean,
+  wordAlternatives: string[] = []
 ) => {
   const fullAnswer = normalizeAnswer(answer);
   const separatorlessAnswer = /[\/-]/.test(answer)
     ? normalizeAnswer(answer.replace(/[\/-]+/g, ' '))
     : '';
-  const baseAnswers = [fullAnswer, separatorlessAnswer].filter(Boolean);
+  // Accept the answer without a leading article so e.g. "witch" matches "A witch"
+  const articleStripped = /^(a|an|the)\s+/i.test(answer)
+    ? normalizeAnswer(answer.replace(/^(a|an|the)\s+/i, ''))
+    : '';
+  const baseAnswers = [fullAnswer, separatorlessAnswer, articleStripped].filter(Boolean);
 
-  if (!allowSlashAlternatives || !answer.includes('/')) {
-    return Array.from(new Set(baseAnswers));
-  }
+  const slashAlts = allowSlashAlternatives && answer.includes('/')
+    ? answer.split('/').map((part) => normalizeAnswer(part)).filter(Boolean)
+    : [];
 
-  const alternatives = answer
-    .split('/')
-    .map((part) => normalizeAnswer(part))
-    .filter(Boolean);
+  const altAnswers = wordAlternatives.flatMap((alt) => {
+    const altFull = normalizeAnswer(alt);
+    const altSep = /[\/-]/.test(alt) ? normalizeAnswer(alt.replace(/[\/-]+/g, ' ')) : '';
+    return [altFull, altSep].filter(Boolean);
+  });
 
-  return Array.from(new Set([...baseAnswers, ...alternatives]));
+  return Array.from(new Set([...baseAnswers, ...slashAlts, ...altAnswers]));
 };
 
 const shuffleArray = <T,>(items: T[]) => {
@@ -151,6 +157,7 @@ export function useTypingGame(words: Word[], options: TypingGameOptions = {}) {
   const [missedWordKeys, setMissedWordKeys] = useState<Set<string>>(new Set());
   const [attempts, setAttempts] = useState<Record<string, number>>({});
   const [closeAttempts, setCloseAttempts] = useState<Record<string, number>>({});
+  const [hintsUsed, setHintsUsed] = useState<Record<string, number>>({});
   const [difficultyByWord, setDifficultyByWord] = useState<Record<string, DifficultyStats>>({});
   const [previousLevel, setPreviousLevel] = useState(1);
   const [levelUpMessage, setLevelUpMessage] = useState('');
@@ -175,8 +182,28 @@ export function useTypingGame(words: Word[], options: TypingGameOptions = {}) {
     return lvl;
   }, [xp]);
 
+  const comboBonus = useMemo(() => getTypingComboReward(streak).bonus, [streak]);
+
+  const firstTryCount = useMemo(
+    () => Array.from(answeredWords).filter(
+      (key) => (attempts[key] ?? 0) === 1 && !(hintsUsed[key] > 0)
+    ).length,
+    [answeredWords, attempts, hintsUsed]
+  );
+
   const currentWord = gameWords[typingIndex] ?? null;
   const currentWordKey = currentWord ? wordKey(currentWord) : null;
+
+  const currentHintCount = currentWordKey ? (hintsUsed[currentWordKey] ?? 0) : 0;
+
+  const currentHintText = useMemo(() => {
+    if (!currentWord || currentHintCount === 0) return '';
+    const primary = currentWord.english.split('/')[0].trim().replace(/^\(?to\)?\s+/, '');
+    return primary
+      .split('')
+      .map((char, i) => (i < currentHintCount ? char : char === ' ' ? ' ' : '_'))
+      .join(' ');
+  }, [currentWord, currentHintCount]);
   const totalAttempts = useMemo(
     () => Object.values(attempts).reduce((total, count) => total + count, 0),
     [attempts]
@@ -200,6 +227,18 @@ export function useTypingGame(words: Word[], options: TypingGameOptions = {}) {
     setFeedbackEvent(null);
   }, []);
 
+  const requestHint = useCallback(() => {
+    if (!currentWord || !currentWordKey) return;
+    const primary = currentWord.english.split('/')[0].trim().replace(/^\(?to\)?\s+/, '');
+    const maxHints = primary.length - 1;
+    const current = hintsUsed[currentWordKey] ?? 0;
+    if (current >= maxHints) return;
+    const next = current + 1;
+    setHintsUsed((prev) => ({ ...prev, [currentWordKey]: next }));
+    setTypedAnswer(primary.slice(0, next));
+    setMissedWordKeys((prev) => new Set(prev).add(currentWordKey));
+  }, [currentWord, currentWordKey, hintsUsed]);
+
   const reset = useCallback(() => {
     clearPendingAdvance();
     clearCurrentPrompt();
@@ -214,6 +253,7 @@ export function useTypingGame(words: Word[], options: TypingGameOptions = {}) {
     setMissedWordKeys(new Set());
     setAttempts({});
     setCloseAttempts({});
+    setHintsUsed({});
     setSessionXp(0);
   }, [clearCurrentPrompt, clearPendingAdvance, words, difficultyByWord]);
 
@@ -253,6 +293,17 @@ export function useTypingGame(words: Word[], options: TypingGameOptions = {}) {
     words,
   ]);
 
+  const reshuffleRemaining = useCallback(() => {
+    clearCurrentPrompt();
+    setGameWords((prev) => {
+      const nextIndex = typingIndex + 1;
+      if (nextIndex >= prev.length) return prev;
+      const done = prev.slice(0, nextIndex);
+      const remaining = shuffleArray(prev.slice(nextIndex));
+      return [...done, ...remaining];
+    });
+  }, [clearCurrentPrompt, typingIndex]);
+
   const moveNext = useCallback(() => {
     clearPendingAdvance();
     advanceToNextWord();
@@ -274,12 +325,12 @@ export function useTypingGame(words: Word[], options: TypingGameOptions = {}) {
     if (answerLockedRef.current) return;
 
     const normalizeAnswer = isTypingStrictMode ? normalizeStrictAnswer : normalizeLenientAnswer;
-    const correctAnswers = buildCorrectAnswers(currentWord.english, normalizeAnswer, allowSlashAlternatives);
+    const correctAnswers = buildCorrectAnswers(currentWord.english, normalizeAnswer, allowSlashAlternatives, currentWord.alternatives);
     const user = isTypingStrictMode
       ? normalizeStrictAnswer(typedAnswer)
       : normalizeLenientAnswer(typedAnswer);
     const closeUser = normalizeLenientAnswer(typedAnswer);
-    const closeCorrect = normalizeLenientAnswer(currentWord.english);
+    const closeCorrects = [currentWord.english, ...(currentWord.alternatives ?? [])].map(normalizeLenientAnswer);
     const alreadyAnswered =
       answeredWords.has(currentWordKey) || awardedWordKeysRef.current.has(currentWordKey);
     const newAttempts = (attempts[currentWordKey] || 0) + 1;
@@ -303,8 +354,9 @@ export function useTypingGame(words: Word[], options: TypingGameOptions = {}) {
         return rest;
       });
       const newStreak = streak + 1;
+      const hintsForWord = hintsUsed[currentWordKey] ?? 0;
       const { xpGain, comboReward } = getTypingAnswerXP({
-        attempts: newAttempts,
+        attempts: hintsForWord > 0 ? Math.max(newAttempts, 2) : newAttempts,
         streak: newStreak,
         isStrictMode: isTypingStrictMode,
         isReviewMode,
@@ -360,7 +412,7 @@ export function useTypingGame(words: Word[], options: TypingGameOptions = {}) {
       return;
     }
 
-    const close = isCloseMatch(closeUser, closeCorrect);
+    const close = closeCorrects.some((cc) => isCloseMatch(closeUser, cc));
 
     if (close) {
       const closeCount = (closeAttempts[currentWordKey] || 0) + 1;
@@ -369,18 +421,10 @@ export function useTypingGame(words: Word[], options: TypingGameOptions = {}) {
 
       setCloseAttempts((prev) => ({ ...prev, [currentWordKey]: closeCount }));
       setTypingFeedback('close');
-      setFeedbackEvent({
-        type: 'close',
-        text: shouldBreakCombo
-          ? 'Combo lost'
-          : isTypingStrictMode
-            ? 'Almost. Strict mode checks accents and punctuation.'
-            : 'Almost right. Check spelling.',
-        streak: shouldBreakCombo ? 0 : streak,
-      });
 
       if (shouldBreakCombo) {
-        setInlineMessage('Still close. This word will return in review.');
+        setFeedbackEvent({ type: 'close', text: `Answer: ${currentWord.english}`, streak: 0 });
+        setInlineMessage('');
         setDifficultyByWord((prev) => ({
           ...prev,
           [currentWordKey]: {
@@ -391,9 +435,24 @@ export function useTypingGame(words: Word[], options: TypingGameOptions = {}) {
         }));
         setMissedWordKeys((prev) => new Set(prev).add(currentWordKey));
         setStreak(0);
+        answerLockedRef.current = true;
+        setIsAdvancing(true);
+        pendingAdvanceTimeoutRef.current = setTimeout(() => {
+          pendingAdvanceTimeoutRef.current = null;
+          answerLockedRef.current = false;
+          setIsAdvancing(false);
+          advanceToNextWord();
+        }, 1500);
         return;
       }
 
+      setFeedbackEvent({
+        type: 'close',
+        text: isTypingStrictMode
+          ? 'Almost — check accents and punctuation.'
+          : 'Almost! Check your spelling.',
+        streak,
+      });
       if (streak > 0) {
         setInlineMessage(
           `${remainingCloseTries} more close ${remainingCloseTries === 1 ? 'try' : 'tries'} before losing combo.`
@@ -402,12 +461,14 @@ export function useTypingGame(words: Word[], options: TypingGameOptions = {}) {
         setInlineMessage('Almost. Try once more.');
       }
       return;
-    } else {
-      setTypingFeedback('wrong');
-      setFeedbackEvent({ type: 'wrong', text: newAttempts > 2 ? 'Answer revealed' : 'Keep trying', streak: 0 });
-      setInlineMessage(newAttempts > 2 ? `Answer: ${currentWord.english}` : 'This word will return in review');
     }
 
+    // Wrong — reveal answer and auto-advance
+    answerLockedRef.current = true;
+    setIsAdvancing(true);
+    setTypingFeedback('wrong');
+    setFeedbackEvent({ type: 'wrong', text: `Answer: ${currentWord.english}`, streak: 0 });
+    setInlineMessage('');
     setDifficultyByWord((prev) => ({
       ...prev,
       [currentWordKey]: {
@@ -418,6 +479,12 @@ export function useTypingGame(words: Word[], options: TypingGameOptions = {}) {
     }));
     setMissedWordKeys((prev) => new Set(prev).add(currentWordKey));
     setStreak(0);
+    pendingAdvanceTimeoutRef.current = setTimeout(() => {
+      pendingAdvanceTimeoutRef.current = null;
+      answerLockedRef.current = false;
+      setIsAdvancing(false);
+      advanceToNextWord();
+    }, 1500);
 
   }, [
     advanceToNextWord,
@@ -443,7 +510,7 @@ export function useTypingGame(words: Word[], options: TypingGameOptions = {}) {
       }
 
       setPreviousLevel(lvl);
-    });
+    }).catch(() => {});
   }, []);
 
   useEffect(() => {
@@ -475,6 +542,7 @@ export function useTypingGame(words: Word[], options: TypingGameOptions = {}) {
     setTypedAnswer,
     typingIndex,
     typingFeedback,
+    firstTryCount,
     inlineMessage,
     feedback,
     handleSubmit,
@@ -491,7 +559,7 @@ export function useTypingGame(words: Word[], options: TypingGameOptions = {}) {
     goToNextWord,
     goToPreviousWord,
     canGoPrevious: typingIndex > 0,
-    canGoNext: !!currentWord && !isSessionComplete,
+    canGoNext: typingIndex < gameWords.length - 1,
     isAdvancing,
     feedbackEvent,
     currentWord,
@@ -500,5 +568,10 @@ export function useTypingGame(words: Word[], options: TypingGameOptions = {}) {
     isSessionComplete,
     strictMode: isTypingStrictMode,
     difficultyByWord,
+    reshuffleRemaining,
+    comboBonus,
+    requestHint,
+    currentHintCount,
+    currentHintText,
   };
 }

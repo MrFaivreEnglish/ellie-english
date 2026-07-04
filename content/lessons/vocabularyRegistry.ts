@@ -1,6 +1,9 @@
 import ActivityVocab from '../vocabulary/ActivityVocab';
+import ChristmasVocab from '../vocabulary/ChristmasVocab';
+import HalloweenVocab from '../vocabulary/HalloweenVocab';
+import SchoolSubjectsVocab from '../vocabulary/SchoolSubjectsVocab';
+import SchoolSuppliesVocab from '../vocabulary/SchoolSuppliesVocab';
 import AnimalsVocab from '../vocabulary/AnimalsVocab';
-import AtSchoolVocab from '../vocabulary/AtSchoolVocab';
 import BodyVocab from '../vocabulary/BodyVocab';
 import BreakfastVocab from '../vocabulary/BreakfastVocab';
 import BullyingVocab from '../vocabulary/BullyingVocab';
@@ -34,6 +37,7 @@ import JobsVocab from '../vocabulary/JobsVocab';
 import LegendsVocab from '../vocabulary/LegendsVocab';
 import LocationVocab from '../vocabulary/LocationVocab';
 import LoveVocab from '../vocabulary/LoveVocab';
+import MoreFoodBasicsVocab from '../vocabulary/MoreFoodBasicsVocab';
 import NationalityVocab from '../vocabulary/NationalityVocab';
 import NourritureVocab from '../vocabulary/NourritureVocab';
 import OpinionLevel1Vocab from '../vocabulary/OpinionLevel1Vocab';
@@ -107,7 +111,8 @@ export const vocabularyCategories: Array<{ title: string; lessons: any[] }> = [
     title: 'Daily Life',
     lessons: [
       withDescription(DailyRoutineVocab, 'Talk about your day.'),
-      withDescription(AtSchoolVocab, 'Use words for school life.'),
+      withDescription(SchoolSubjectsVocab, 'Name the subjects you study.'),
+      withDescription(SchoolSuppliesVocab, 'Name the things you need for school.'),
       withDescription(SchoolLvl2Vocab, 'Talk more about school and class.'),
       withDescription(ClothesVocab, 'Name clothes and what people wear.'),
       withDescription(FashionVocab, 'Talk about fashion and style.'),
@@ -122,6 +127,7 @@ export const vocabularyCategories: Array<{ title: string; lessons: any[] }> = [
       withDescription(BreakfastVocab, 'Talk about breakfast food.'),
       withDescription(CookingVocab, 'Use common cooking words.'),
       withDescription(NourritureVocab, 'Talk more about meals and food.'),
+      withDescription(MoreFoodBasicsVocab, 'Go further with everyday food words.'),
     ],
   },
   {
@@ -134,6 +140,8 @@ export const vocabularyCategories: Array<{ title: string; lessons: any[] }> = [
       withDescription(ExtremeSportsVocab, 'Talk about exciting sports.'),
       withDescription(LegendsVocab, 'Read and talk about legends.'),
       withDescription(UKVocab, 'Learn key words about the UK.'),
+      withDescription(ChristmasVocab, 'Talk about Christmas traditions.'),
+      withDescription(HalloweenVocab, 'Talk about Halloween traditions.'),
     ],
   },
   {

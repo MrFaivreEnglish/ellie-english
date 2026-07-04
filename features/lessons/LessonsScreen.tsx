@@ -1,16 +1,19 @@
 import React, { useMemo, useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Linking, Platform } from 'react-native';
+import { Alert, View, Text, StyleSheet, ScrollView, TouchableOpacity, Linking, Platform } from 'react-native';
 import BackButton from '../shared/BackButton';
-import { toast } from 'sonner-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
+import type { CompositeNavigationProp } from '@react-navigation/native';
+import type { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
+import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import type { TabParamList, RootStackParamList } from '../../types/navigationTypes';
 import { useTheme } from '../settings/ThemeContext';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { lessonCategories as chapterCategories } from '../../content/lessons/chapterData';
 import { resourceCategories as resourceLinkCategories } from '../../content/lessons/resourceLinks';
 import { resolveChapterAppLink } from '../../content/lessons/appLessonRegistry';
+import { createMixedGrammarLesson } from '../../content/lessons/grammarRegistry';
 import type { ResolvedChapterAppLink } from '../../content/lessons/lessonTypes';
-import { SHOW_PRONUNCIATION_FEATURE } from '../../lib/featureFlags';
 import { getMenuCopy } from '../shared/menuCopy';
 import {
   getCustomChapterLinkOverrides,
@@ -18,6 +21,7 @@ import {
   normalizeChapterLinkOverrides,
   type ChapterLinkOverride,
 } from './chapterLinkStorage';
+import { getStudySurfaceColors } from '../shared/uiPrimitives';
 
 const bundledCustomChapterLinks = require('../../content/lessons/customChapterLinks.json') as any[];
 
@@ -43,10 +47,16 @@ const parseChapterTitle = (title: string) => {
   };
 };
 
+type LessonsNavigationProp = CompositeNavigationProp<
+  BottomTabNavigationProp<TabParamList, 'Lessons'>,
+  NativeStackNavigationProp<RootStackParamList>
+>;
+
 export default function LessonsScreen() {
-  const navigation = useNavigation();
-  const { isDarkMode, colors, isAndroidStatusBarEnabled, menuLanguage } = useTheme();
-  const appCopy = getMenuCopy(menuLanguage);
+  const navigation = useNavigation<LessonsNavigationProp>();
+  const { isDarkMode, colors, isAndroidStatusBarEnabled } = useTheme();
+  const studySurface = useMemo(() => getStudySurfaceColors(colors, isDarkMode), [colors, isDarkMode]);
+  const appCopy = getMenuCopy();
   const copy = appCopy.lessons;
   const commonCopy = appCopy.common;
   const insets = useSafeAreaInsets();
@@ -58,7 +68,6 @@ export default function LessonsScreen() {
   const [viewMode, setViewMode] = useState<'chapters' | 'resources'>('chapters');
   const [selectedCategory, setSelectedCategory] = useState<number | null>(null);
   const [selectedResourceCategory, setSelectedResourceCategory] = useState<number | null>(null);
-  const [selectedLink, setSelectedLink] = useState<string | null>(null);
   const bundledChapterLinkOverrides = useMemo(
     () => normalizeChapterLinkOverrides(bundledCustomChapterLinks),
     []
@@ -98,23 +107,16 @@ export default function LessonsScreen() {
       if (supported) {
         await Linking.openURL(url);
       } else {
-        toast.error(copy.cannotOpenUrl);
+        Alert.alert(copy.cannotOpenUrl);
       }
-    } catch (err) {
-      toast.error(copy.openUrlError);
+    } catch {
+      Alert.alert(copy.openUrlError);
     }
   };
 
-  const showLink = (url: string) => {
-    setSelectedLink(url);
-    openLink(url);
-  };
-
   const openAppLink = (appLink: ResolvedChapterAppLink) => {
-    setSelectedLink(null);
-
     if (appLink.target === 'vocabulary') {
-      (navigation as any).navigate('Vocabulary', {
+      navigation.navigate('Vocabulary', {
         screen: 'VocabularyLesson',
         params: {
           lesson: appLink.lesson,
@@ -125,21 +127,35 @@ export default function LessonsScreen() {
       return;
     }
 
-    if (appLink.target === 'pronunciation') {
-      const rootNavigation = (navigation as any).getParent?.() ?? navigation;
+    if (appLink.target !== 'grammar') return;
 
-      rootNavigation.navigate('Pronunciation', {
-        screen: 'PronunciationLesson',
-        params: {
-          lesson: appLink.lesson,
-          categoryColor: appLink.categoryColor,
-        },
-      });
-      return;
-    }
-
-    (navigation as any).navigate('Grammar', {
+    navigation.navigate('Grammar', {
       lesson: appLink.lesson,
+      backLabel: commonCopy.backToChapters,
+      backTarget: 'Lessons',
+      openKey: Date.now(),
+    });
+  };
+
+  const openMixedGrammarPractice = (
+    displayLessonTitle: string,
+    chapterTitle: string,
+    grammarAppLinks: ResolvedChapterAppLink[]
+  ) => {
+    const mixedLesson = createMixedGrammarLesson({
+      idSeed: `chapter-${displayLessonTitle}`,
+      title: `${copy.mixedGrammarPractice}: ${chapterTitle}`,
+      description: appCopy.grammar.mixedPracticeSubtitle.replace(
+        '{count}',
+        String(grammarAppLinks.length)
+      ),
+      sourceLessons: grammarAppLinks.map((appLink) => appLink.lesson),
+    });
+
+    if (!mixedLesson) return;
+
+    navigation.navigate('Grammar', {
+      lesson: mixedLesson,
       backLabel: commonCopy.backToChapters,
       backTarget: 'Lessons',
       openKey: Date.now(),
@@ -150,7 +166,6 @@ export default function LessonsScreen() {
     setViewMode(mode);
     setSelectedCategory(null);
     setSelectedResourceCategory(null);
-    setSelectedLink(null);
   };
 
   return (
@@ -161,7 +176,7 @@ export default function LessonsScreen() {
       ]}
       contentContainerStyle={{
         paddingTop: topContentInset,
-        paddingBottom: selectedLink ? 96 : 24,
+        paddingBottom: 24,
       }}
     >
       <BackButton label={commonCopy.backToHome} onPress={() => (navigation as any).navigate('Home')} />
@@ -171,8 +186,8 @@ export default function LessonsScreen() {
         style={[
           styles.modeToggle,
           {
-            backgroundColor: isDarkMode ? colors.card : '#f6f9fc',
-            borderColor: isDarkMode ? colors.borderStrong : '#d9e2ec',
+            backgroundColor: studySurface.panel,
+            borderColor: studySurface.panelBorder,
           },
         ]}
       >
@@ -191,7 +206,7 @@ export default function LessonsScreen() {
           <Text
             style={[
               styles.modeOptionText,
-              { color: viewMode === 'chapters' ? '#fff' : colors.text },
+              { color: viewMode === 'chapters' ? colors.buttonText : colors.text },
             ]}
           >
             {copy.chapters}
@@ -212,7 +227,7 @@ export default function LessonsScreen() {
           <Text
             style={[
               styles.modeOptionText,
-              { color: viewMode === 'resources' ? '#fff' : colors.text },
+              { color: viewMode === 'resources' ? colors.buttonText : colors.text },
             ]}
           >
             {copy.resources}
@@ -228,7 +243,9 @@ export default function LessonsScreen() {
             selectedCategory === index && styles.categoryContainerActive,
             {
               backgroundColor: colors.card,
-              borderColor: selectedCategory === index ? category.color : 'transparent',
+              borderColor: category.color,
+              borderBottomColor: category.color,
+              borderBottomWidth: selectedCategory === index ? 4 : 3,
               shadowColor: '#000000',
               shadowOpacity: selectedCategory === index ? (isDarkMode ? 0.28 : 0.16) : (isDarkMode ? 0.2 : 0.1),
             },
@@ -267,9 +284,12 @@ export default function LessonsScreen() {
                 const displayLessonTitle = chapterLinkOverride?.displayTitle || lesson.title;
                 const chapter = parseChapterTitle(displayLessonTitle);
                 const appLinks = (lesson.appLinks ?? [])
-                  .filter((link) => SHOW_PRONUNCIATION_FEATURE || link.target !== 'pronunciation')
+                  .filter((link) => link.target !== 'pronunciation')
                   .map(resolveChapterAppLink)
                   .filter((link): link is ResolvedChapterAppLink => !!link);
+                const grammarAppLinks = appLinks.filter(
+                  (appLink) => appLink.target === 'grammar' && appLink.lesson?.practiceType !== 'vocabulary'
+                );
                 return (
                   <View
                     key={lessonIndex}
@@ -277,8 +297,8 @@ export default function LessonsScreen() {
                       styles.lessonItem,
                       appLinks && appLinks.length > 0 ? styles.lessonItemWithAppLinks : null,
                       {
-                        backgroundColor: isDarkMode ? colors.surface : '#f8fafc',
-                        borderColor: isDarkMode ? colors.border : '#e6edf5',
+                        backgroundColor: isDarkMode ? colors.surface : '#F8FAFF',
+                        borderColor: colors.border,
                       },
                     ]}
                   >
@@ -300,7 +320,7 @@ export default function LessonsScreen() {
                       <View style={styles.chapterTextBlock}>
                         <Text style={[styles.lessonTitle, styles.chapterLessonTitle, { color: colors.text }]}>{chapter.title}</Text>
                       </View>
-                      <View style={[styles.chapterArrow, { borderColor: isDarkMode ? colors.border : '#dbe6f2' }]}>
+                      <View style={[styles.chapterArrow, { borderColor: colors.border }]}>
                         <MaterialIcons name="open-in-new" size={15} color={colors.secondaryText} />
                       </View>
                     </TouchableOpacity>
@@ -314,8 +334,8 @@ export default function LessonsScreen() {
                               style={[
                                 styles.appLinkButton,
                                 {
-                                  backgroundColor: isDarkMode ? colors.card : '#ffffff',
-                                  borderColor: isDarkMode ? colors.border : '#dbe6f2',
+                                  backgroundColor: studySurface.control,
+                                  borderColor: colors.border,
                                 },
                               ]}
                               onPress={() => openAppLink(appLink)}
@@ -329,6 +349,38 @@ export default function LessonsScreen() {
                               </Text>
                             </TouchableOpacity>
                           ))}
+                          {grammarAppLinks.length >= 2 && (
+                            <TouchableOpacity
+                              key={`${lesson.title}-grammar-mix`}
+                              style={[
+                                styles.appLinkButton,
+                                styles.mixedGrammarButton,
+                                {
+                                  backgroundColor: isDarkMode ? colors.surface : '#F8FAFF',
+                                  borderColor: colors.primary,
+                                },
+                              ]}
+                              onPress={() => openMixedGrammarPractice(displayLessonTitle, chapter.title, grammarAppLinks)}
+                              activeOpacity={0.86}
+                              accessibilityRole="button"
+                              accessibilityLabel={`${copy.practice} ${copy.mixedGrammarPractice}`}
+                            >
+                              <View
+                                style={[
+                                  styles.mixedGrammarIconBadge,
+                                  {
+                                    backgroundColor: colors.buttonBackground,
+                                    borderColor: '#FFFFFF',
+                                  },
+                                ]}
+                              >
+                                <MaterialIcons name="shuffle" size={17} color={colors.buttonText} />
+                              </View>
+                              <Text style={[styles.appLinkText, { color: colors.text }]}>
+                                {copy.mixedGrammarPractice}
+                              </Text>
+                            </TouchableOpacity>
+                          )}
                         </View>
                       </View>
                     )}
@@ -347,7 +399,9 @@ export default function LessonsScreen() {
             selectedResourceCategory === index && styles.categoryContainerActive,
             {
               backgroundColor: colors.card,
-              borderColor: selectedResourceCategory === index ? category.color : 'transparent',
+              borderColor: category.color,
+              borderBottomColor: category.color,
+              borderBottomWidth: selectedResourceCategory === index ? 4 : 3,
               shadowColor: '#000000',
               shadowOpacity: selectedResourceCategory === index ? (isDarkMode ? 0.28 : 0.16) : (isDarkMode ? 0.2 : 0.1),
             },
@@ -384,12 +438,12 @@ export default function LessonsScreen() {
                   style={[
                     styles.lessonItem,
                     {
-                      backgroundColor: isDarkMode ? colors.surface : '#f8fafc',
-                      borderColor: isDarkMode ? colors.border : '#e6edf5',
+                      backgroundColor: isDarkMode ? colors.surface : '#F8FAFF',
+                      borderColor: colors.border,
                     },
                   ]}
                   activeOpacity={0.82}
-                  onPress={() => showLink(resource.url)}
+                  onPress={() => openLink(resource.url)}
                   accessibilityRole="link"
                   accessibilityLabel={`Open ${resource.title}`}
                 >
@@ -416,15 +470,9 @@ export default function LessonsScreen() {
   );
 }
 
-const styles = StyleSheet.create({  container: {
+const styles = StyleSheet.create({
+  container: {
     flex: 1,
-  },  backButton: {
-    marginTop: 4,
-    paddingVertical: 6,
-    paddingHorizontal: 0,
-    alignSelf: 'flex-start',
-    flexDirection: 'row',
-    alignItems: 'center',
   },
   headerTitle: {
     fontSize: 32,
@@ -448,17 +496,11 @@ const styles = StyleSheet.create({  container: {
     minHeight: 44,
   },
   modeOptionActive: {
-    backgroundColor: '#1671B6',
+    backgroundColor: '#1F7AD1',
   },
   modeOptionText: {
     fontSize: 16,
     fontWeight: '800',
-  },
-  backText: {
-    fontSize: 16,
-    color: '#007AFF',
-    fontWeight: '600',
-    marginLeft: 4,
   },
   categoryContainer: {
     marginBottom: 16,
@@ -501,8 +543,8 @@ const styles = StyleSheet.create({  container: {
     alignItems: 'center',
     justifyContent: 'center',
     marginRight: 8,
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.28)',
+    borderWidth: 1.5,
+    borderColor: '#FFFFFF',
   },
   lessonCountText: {
     color: '#fff',
@@ -521,6 +563,7 @@ const styles = StyleSheet.create({  container: {
     paddingHorizontal: 12,
     borderRadius: 12,
     borderWidth: 1,
+    borderBottomWidth: 2,
   },
   lessonItemWithAppLinks: {
     alignItems: 'stretch',
@@ -590,12 +633,6 @@ const styles = StyleSheet.create({  container: {
     includeFontPadding: false,
     textAlignVertical: 'center',
   },
-  revisionHint: {
-    fontSize: 13,
-    fontWeight: '700',
-    lineHeight: 18,
-    marginTop: 3,
-  },
   chapterArrow: {
     alignItems: 'center',
     borderRadius: 999,
@@ -607,11 +644,6 @@ const styles = StyleSheet.create({  container: {
   appLinksBlock: {
     marginTop: 6,
   },
-  appLinksTitle: {
-    fontSize: 14,
-    fontWeight: '600',
-    marginBottom: 8,
-  },
   appLinksGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
@@ -621,10 +653,27 @@ const styles = StyleSheet.create({  container: {
     alignItems: 'center',
     borderRadius: 8,
     borderWidth: 1,
+    borderBottomWidth: 2,
     flexDirection: 'row',
     minHeight: 40,
     paddingHorizontal: 10,
     paddingVertical: 8,
+  },
+  mixedGrammarButton: {
+    borderWidth: 1.5,
+    borderBottomWidth: 3,
+    minHeight: 44,
+    paddingLeft: 9,
+    paddingRight: 12,
+  },
+  mixedGrammarIconBadge: {
+    alignItems: 'center',
+    borderRadius: 10,
+    borderWidth: 1.5,
+    borderBottomWidth: 2,
+    height: 26,
+    justifyContent: 'center',
+    width: 26,
   },
   appLinkText: {
     fontSize: 13,
@@ -640,26 +689,5 @@ const styles = StyleSheet.create({  container: {
     fontWeight: '600',
     lineHeight: 18,
     marginTop: 4,
-  },
-  linkContainer: {
-    position: 'absolute',
-    bottom: 20,
-    left: 16,
-    right: 16,
-    borderRadius: 12,
-    shadowOffset: { width: 0, height: 2 },
-    shadowRadius: 4,
-    elevation: 3,
-  },
-  linkCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    padding: 16,
-  },
-  linkText: {
-    flex: 1,
-    fontSize: 14,
-    marginRight: 12,
   },
 });

@@ -2,7 +2,7 @@ const FashionVocab = {
   id: '314',
   title: 'Fashion',
   description: 'Learn vocabulary related to fashion and clothing trends',
-  imageUrl: 'https://i.ibb.co/CLcnMwH/Fashion-vocab-1.webp',
+  imageUrl: 'https://i.ibb.co/vCTjy8NM/Fashion-vocab.webp',
   thumbnail: require('../../assets/thumbnails/fashion-thumbnail.png'),
   flashcards: [
     {
@@ -23,7 +23,7 @@ const FashionVocab = {
         { english: 'Basic', french: 'Basique' },
         { english: 'Colourful', french: 'Coloré' },
         { english: 'Worn out', french: 'Usé' },
-        { english: 'Slim, Tight', french: 'Mince, Serré' },
+        { english: 'Slim, Tight', french: 'Ajusté, Serré' },
         { english: 'Loose, Baggy', french: 'Ample, Large' },
       ]
     },

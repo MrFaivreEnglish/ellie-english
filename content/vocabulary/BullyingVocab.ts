@@ -5,7 +5,7 @@ const BullyingVocab = {
   thumbnail: require('../../assets/thumbnails/bullying-thumbnail.png'),
   flashcards: [
   { english: `Be nice to`, french: `Être gentil avec` },
-    { english: `Hang out with`, french: `Sortir avec quelqu'un` },
+    { english: `Hang out with`, french: `Passer du temps avec quelqu'un` },
     { english: `Be together`, french: `Être ensemble` },
     { english: `Get along with`, french: `S'entendre avec` },
     { english: `Belong to a group`, french: `Appartenir à un groupe` },

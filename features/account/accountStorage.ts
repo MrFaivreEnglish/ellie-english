@@ -512,11 +512,24 @@ export const loadAccountSession = async (): Promise<AccountSession | null> => {
     await AsyncStorage.removeItem(LEGACY_ACCOUNT_SESSION_KEY);
     const authSession = await getActiveAuthSession();
 
-    if (!authSession) {
-      return null;
-    }
+    if (!authSession) return null;
 
-    return buildAccountSession(authSession);
+    // Build from locally cached auth metadata — no network call needed.
+    // The startup effect will refresh from the DB in the background.
+    const metadata = getAuthMetadata(authSession.user);
+    const username = normalizeUsername(metadata.username || authSession.user.email?.split('@')[0] || '');
+
+    if (!username) return null;
+
+    return {
+      token: authSession.access_token,
+      user: {
+        id: authSession.user.id,
+        username,
+        displayName: metadata.displayName || username,
+        xp: 0,
+      },
+    };
   } catch {
     return null;
   }

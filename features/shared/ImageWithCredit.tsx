@@ -9,54 +9,53 @@ import {
   View,
   ViewStyle,
   Animated,
-  ActivityIndicator,
 } from 'react-native';
+import { useTheme } from '../settings/ThemeContext';
 
 interface ImageWithCreditProps {
   source?: ImageSourcePropType;
   uri?: string;
   style?: ViewStyle[];
+  imageScale?: number;
   onPress?: () => void;
   showCredit?: boolean;
   creditLabel?: string;
   accessibilityLabel?: string;
 }
 
+const LOADING_MESSAGES = [
+  'Loading picture… 👀',
+  'Teaching the pixels 🎓',
+  'Organising visuals ✨',
+  'Almost ready… 💪',
+  'Summoning the image 🪄',
+  'Preparing something beautiful 🎨',
+  'Get ready to be wowed ✨',
+  'How are you today?',
+  'Get ready!',
+];
+
 const ImageWithCredit: React.FC<ImageWithCreditProps> = ({
   source,
   uri,
   style,
+  imageScale = 1,
   onPress,
   showCredit = true,
   creditLabel = 'Mr Faivre',
   accessibilityLabel = 'Lesson image',
 }) => {
-  const [loading, setLoading] = useState(true);
+  const { colors } = useTheme();
+  const isLocalBundledAsset = typeof source === 'number';
+  const [loading, setLoading] = useState(!isLocalBundledAsset && (!!source || !!uri));
   const [loadingText, setLoadingText] = useState('');
   const [hasImageError, setHasImageError] = useState(false);
 
   const [containerSize, setContainerSize] = useState({ width: 0, height: 0 });
   const [naturalSize, setNaturalSize] = useState<{ width: number; height: number } | null>(null);
 
-  const fadeAnim = useRef(new Animated.Value(0)).current;
-
-  // ----------------------------
-  // Loading messages
-  // ----------------------------
-  const loadingMessages = [
-    'Loading picture… 👀',
-    'Teaching the pixels 🎓',
-    'Organizing visuals ✨',
-    'Almost ready… 💪',
-    'Summoning the image 🪄',
-    'Preparing something beautiful 🎨',
-    'Get ready to be wowed ✨',
-    'How are you today?',
-    'Get ready!'
-  ];
-
-  const getRandomMessage = () =>
-    loadingMessages[Math.floor(Math.random() * loadingMessages.length)];
+  const fadeAnim = useRef(new Animated.Value(isLocalBundledAsset ? 1 : 0)).current;
+  const safeImageScale = Number.isFinite(imageScale) ? Math.max(1, imageScale) : 1;
 
   // ----------------------------
   // Image source
@@ -72,11 +71,20 @@ const ImageWithCredit: React.FC<ImageWithCreditProps> = ({
   // ----------------------------
   useEffect(() => {
     const hasImageSource = !!source || !!uri;
+    const isLocal = typeof source === 'number';
+
+    if (isLocal) {
+      setLoading(false);
+      setHasImageError(false);
+      fadeAnim.setValue(1);
+      return;
+    }
+
     setLoading(hasImageSource);
     setHasImageError(!hasImageSource);
-    setLoadingText(getRandomMessage());
+    setLoadingText(LOADING_MESSAGES[Math.floor(Math.random() * LOADING_MESSAGES.length)]);
     fadeAnim.setValue(0);
-  }, [uri, source]);
+  }, [uri, source]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // ----------------------------
   // Resolve natural size
@@ -143,14 +151,13 @@ const ImageWithCredit: React.FC<ImageWithCreditProps> = ({
     };
   }, [containerSize, naturalSize]);
 
-  const horizontalInset = Math.max(
+  const creditHorizontalInset = Math.max(
     0,
-    (containerSize.width - fittedBox.width) / 2
+    (containerSize.width - fittedBox.width * safeImageScale) / 2
   );
-
-  const verticalInset = Math.max(
+  const creditVerticalInset = Math.max(
     0,
-    (containerSize.height - fittedBox.height) / 2
+    (containerSize.height - fittedBox.height * safeImageScale) / 2
   );
 
   // ----------------------------
@@ -160,11 +167,13 @@ const ImageWithCredit: React.FC<ImageWithCreditProps> = ({
     setLoading(false);
     setHasImageError(false);
 
-    Animated.timing(fadeAnim, {
-      toValue: 1,
-      duration: 500,
-      useNativeDriver: true,
-    }).start();
+    if (typeof source !== 'number') {
+      Animated.timing(fadeAnim, {
+        toValue: 1,
+        duration: 400,
+        useNativeDriver: true,
+      }).start();
+    }
   };
 
   const handleError = () => {
@@ -177,40 +186,56 @@ const ImageWithCredit: React.FC<ImageWithCreditProps> = ({
   // Content
   // ----------------------------
   const content = (
-    <View onLayout={onLayout} style={[styles.container, style as any]}>
-      
+    <View
+      onLayout={onLayout}
+      style={[
+        styles.container,
+        safeImageScale > 1 && styles.scaledImageContainer,
+        style as any,
+      ]}
+    >
+      {loading && !hasImageError && (
+        <View
+          pointerEvents="none"
+          style={[styles.placeholder, styles.placeholderContent]}
+        >
+          {!!loadingText && (
+            <View style={styles.loadingBadge}>
+              <Text style={styles.placeholderText}>
+                {loadingText}
+              </Text>
+            </View>
+          )}
+        </View>
+      )}
+
       {/* IMAGE */}
       {!!imgSource && !hasImageError && (
         <Animated.Image
           source={imgSource}
-          style={[styles.image, { opacity: fadeAnim }]}
+          style={[
+            styles.image,
+            safeImageScale > 1 && { transform: [{ scale: safeImageScale }] },
+            { opacity: fadeAnim },
+          ]}
           resizeMode="contain"
           onLoad={handleLoad}
           onError={handleError}
-          blurRadius={loading ? 8 : 0}
           accessible
           accessibilityRole="image"
           accessibilityLabel={accessibilityLabel}
         />
       )}
 
-      {/* LOADER */}
-      {loading && !hasImageError && (
-        <View style={styles.loader}>
-          <ActivityIndicator size="large" color="#1671B6" />
-          <Text style={styles.loadingText}>{loadingText}</Text>
-        </View>
-      )}
-
       {hasImageError && (
         <View
-          style={styles.fallback}
+          style={[styles.fallback, { backgroundColor: colors.surface, borderColor: colors.border }]}
           accessible
           accessibilityRole="image"
           accessibilityLabel={`${accessibilityLabel} unavailable`}
         >
-          <Text style={styles.fallbackTitle}>Image unavailable</Text>
-          <Text style={styles.fallbackText}>This lesson can still be practised.</Text>
+          <Text style={[styles.fallbackTitle, { color: colors.text }]}>Image unavailable</Text>
+          <Text style={[styles.fallbackText, { color: colors.secondaryText }]}>This lesson can still be practised.</Text>
         </View>
       )}
 
@@ -222,8 +247,8 @@ const ImageWithCredit: React.FC<ImageWithCreditProps> = ({
             styles.creditBadge,
             {
               position: 'absolute',
-              top: verticalInset + 12,
-              right: horizontalInset + 12,
+              top: creditVerticalInset + 12,
+              right: creditHorizontalInset + 12,
             },
           ]}
         >
@@ -257,25 +282,36 @@ const styles = StyleSheet.create({
     position: 'relative',
     backgroundColor: 'transparent',
   },
+  scaledImageContainer: {
+    overflow: 'hidden',
+  },
   image: {
     width: '100%',
     height: '100%',
   },
-  loader: {
+  placeholder: {
     position: 'absolute',
     top: 0,
     left: 0,
     right: 0,
     bottom: 0,
+  },
+  placeholderContent: {
     justifyContent: 'center',
     alignItems: 'center',
+    paddingHorizontal: 16,
   },
-  loadingText: {
-    marginTop: 10,
-    fontSize: 14,
-    color: '#666',
-    fontWeight: '500',
+  loadingBadge: {
+    backgroundColor: 'rgba(0,0,0,0.28)',
+    borderRadius: 12,
+    paddingVertical: 6,
+    paddingHorizontal: 14,
+  },
+  placeholderText: {
+    fontSize: 13,
+    fontWeight: '600',
     textAlign: 'center',
+    color: '#fff',
   },
   fallback: {
     position: 'absolute',
@@ -286,6 +322,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     paddingHorizontal: 24,
+    borderWidth: StyleSheet.hairlineWidth,
   },
   fallbackTitle: {
     fontSize: 17,

@@ -30,8 +30,14 @@ import {
   saveCustomChapterLinkOverride,
   type ChapterLinkOverride,
 } from './chapterLinkStorage';
+import { getXP } from '../progress/xpStorage';
+import { clearLocalStudentProgress } from '../progress/studentProgressStorage';
+import { getGrammarProgressSummary } from '../grammar/grammarProgressStorage';
+import { getLearnedFlashcardSummary } from '../vocabulary/flashcardProgressStorage';
+import { getVocabularyTimerBests } from '../vocabulary/vocabularyTimerStorage';
 
 const bundledCustomChapterLinks = require('../../content/lessons/customChapterLinks.json') as any[];
+const packageInfo = require('../../package.json') as { version?: string };
 type MaterialIconName = React.ComponentProps<typeof MaterialIcons>['name'];
 
 type EditableWord = {
@@ -54,6 +60,25 @@ type ChapterLinkDraft = {
 };
 
 type ValidationTone = 'success' | 'warning' | 'error' | 'neutral';
+type AdminTab = 'chapterLinks' | 'vocabularyLessons' | 'qa';
+
+type QaSnapshot = {
+  xp: number;
+  learnedWords: number;
+  learnedLessons: number;
+  grammarAnswers: number;
+  grammarLessons: number;
+  timerBestCount: number;
+};
+
+const emptyQaSnapshot: QaSnapshot = {
+  xp: 0,
+  learnedWords: 0,
+  learnedLessons: 0,
+  grammarAnswers: 0,
+  grammarLessons: 0,
+  timerBestCount: 0,
+};
 
 const emptyWord = (): EditableWord => ({ english: '', french: '' });
 
@@ -235,13 +260,15 @@ export default function AdminLessonPreviewScreen() {
   const { width } = useWindowDimensions();
   const { colors, isDarkMode } = useTheme();
   const isWideLayout = width >= 820;
-  const [activeAdminTab, setActiveAdminTab] = useState<'chapterLinks' | 'vocabularyLessons'>('chapterLinks');
+  const [activeAdminTab, setActiveAdminTab] = useState<AdminTab>('chapterLinks');
   const [lessons, setLessons] = useState<CustomVocabularyLesson[]>([]);
   const [draft, setDraft] = useState(createEmptyDraft());
   const [isSaving, setIsSaving] = useState(false);
+  const [qaSnapshot, setQaSnapshot] = useState<QaSnapshot>(emptyQaSnapshot);
+  const [qaMessage, setQaMessage] = useState('');
   const [editingChapterLinkIds, setEditingChapterLinkIds] = useState<Record<string, boolean>>({});
   const [expandedChapterLevels, setExpandedChapterLevels] = useState<Record<string, boolean>>({
-    '6e': true,
+    '6e': false,
     '5e': false,
     '4e': false,
     '3e': false,
@@ -415,6 +442,24 @@ export default function AdminLessonPreviewScreen() {
     [draft.flashcards]
   );
 
+  const loadQaSnapshot = async () => {
+    const [xp, learnedSummary, grammarSummary, timerBests] = await Promise.all([
+      getXP(),
+      getLearnedFlashcardSummary(),
+      getGrammarProgressSummary(),
+      getVocabularyTimerBests(),
+    ]);
+
+    setQaSnapshot({
+      xp,
+      learnedWords: learnedSummary.totalLearned,
+      learnedLessons: learnedSummary.lessonCount,
+      grammarAnswers: grammarSummary.totalCorrectAnswers,
+      grammarLessons: grammarSummary.lessonCount,
+      timerBestCount: Object.keys(timerBests).length,
+    });
+  };
+
   const loadLessons = async () => {
     const nextLessons = await getCustomVocabularyLessons();
     setLessons(nextLessons);
@@ -447,6 +492,7 @@ export default function AdminLessonPreviewScreen() {
   useEffect(() => {
     void loadLessons();
     void loadChapterLinks();
+    void loadQaSnapshot();
   }, []);
 
   const resetDraft = () => {
@@ -477,6 +523,18 @@ export default function AdminLessonPreviewScreen() {
         },
       },
     ]);
+  };
+
+  const handleClearLocalProgress = () => {
+    confirmDestructive(
+      'Clear local progress',
+      'Clear XP, learnt words, grammar answers, timer records, and Shiny Ellie progress on this device?',
+      async () => {
+        await clearLocalStudentProgress();
+        await loadQaSnapshot();
+        setQaMessage('Local student progress cleared.');
+      }
+    );
   };
 
   const handleResetDraftPress = () => {
@@ -855,7 +913,7 @@ export default function AdminLessonPreviewScreen() {
           onPress={() => setActiveAdminTab('chapterLinks')}
           style={[
             styles.adminTabButton,
-            activeAdminTab === 'chapterLinks' && { backgroundColor: colors.primary },
+            activeAdminTab === 'chapterLinks' && { backgroundColor: colors.buttonBackground },
           ]}
           accessibilityRole="button"
           accessibilityState={{ selected: activeAdminTab === 'chapterLinks' }}
@@ -878,7 +936,7 @@ export default function AdminLessonPreviewScreen() {
           onPress={() => setActiveAdminTab('vocabularyLessons')}
           style={[
             styles.adminTabButton,
-            activeAdminTab === 'vocabularyLessons' && { backgroundColor: colors.primary },
+            activeAdminTab === 'vocabularyLessons' && { backgroundColor: colors.buttonBackground },
           ]}
           accessibilityRole="button"
           accessibilityState={{ selected: activeAdminTab === 'vocabularyLessons' }}
@@ -897,7 +955,98 @@ export default function AdminLessonPreviewScreen() {
             Vocabulary
           </Text>
         </TouchableOpacity>
+        <TouchableOpacity
+          onPress={() => setActiveAdminTab('qa')}
+          style={[
+            styles.adminTabButton,
+            activeAdminTab === 'qa' && { backgroundColor: colors.buttonBackground },
+          ]}
+          accessibilityRole="button"
+          accessibilityState={{ selected: activeAdminTab === 'qa' }}
+        >
+          <MaterialIcons
+            name="bug-report"
+            size={18}
+            color={activeAdminTab === 'qa' ? colors.buttonText : colors.primary}
+          />
+          <Text
+            style={[
+              styles.adminTabText,
+              { color: activeAdminTab === 'qa' ? colors.buttonText : colors.primary },
+            ]}
+          >
+            QA
+          </Text>
+        </TouchableOpacity>
       </View>
+
+      {activeAdminTab === 'qa' && (
+        <View
+          style={[
+            styles.editorCard,
+            {
+              backgroundColor: colors.card,
+              borderColor: isDarkMode ? colors.border : 'rgba(31,41,55,0.10)',
+            },
+          ]}
+        >
+          <View style={styles.sectionHeaderRow}>
+            <View style={styles.chapterLinksTitleBlock}>
+              <Text style={[styles.sectionTitle, { color: colors.text }]}>QA Snapshot</Text>
+              <Text style={[styles.chapterLinksSubtitle, { color: colors.secondaryText }]}>
+                Quick diagnostics for builds, theme checks, and saved-progress testing.
+              </Text>
+            </View>
+            <TouchableOpacity onPress={loadQaSnapshot} style={styles.exportButton}>
+              <MaterialIcons name="refresh" size={18} color="#1671B6" />
+              <Text style={styles.exportButtonText}>Refresh</Text>
+            </TouchableOpacity>
+          </View>
+
+          <View style={styles.qaGrid}>
+            {[
+              ['Version', packageInfo.version ?? 'unknown'],
+              ['Platform', Platform.OS],
+              ['Theme', isDarkMode ? 'Dark' : 'Light'],
+              ['Width', `${Math.round(width)} px`],
+              ['XP', String(qaSnapshot.xp)],
+              ['Learnt words', `${qaSnapshot.learnedWords} / ${qaSnapshot.learnedLessons} lessons`],
+              ['Grammar answers', `${qaSnapshot.grammarAnswers} / ${qaSnapshot.grammarLessons} lessons`],
+              ['Timer records', String(qaSnapshot.timerBestCount)],
+              ['Custom links', String(chapterLinkOverrides.length)],
+              ['Custom vocab lessons', String(lessons.length)],
+              ['Open edits', String(unsavedChapterLinkCount + openDraftCount)],
+            ].map(([label, value]) => (
+              <View
+                key={label}
+                style={[
+                  styles.qaMetric,
+                  {
+                    backgroundColor: isDarkMode ? colors.surface : '#F6F7F9',
+                    borderColor: isDarkMode ? colors.border : '#E2E8F0',
+                  },
+                ]}
+              >
+                <Text style={[styles.qaMetricLabel, { color: colors.secondaryText }]}>{label}</Text>
+                <Text style={[styles.qaMetricValue, { color: colors.text }]}>{value}</Text>
+              </View>
+            ))}
+          </View>
+
+          {!!qaMessage && (
+            <Text style={[styles.qaMessage, { color: colors.success }]}>{qaMessage}</Text>
+          )}
+
+          <View style={styles.qaActionRow}>
+            <TouchableOpacity onPress={loadQaSnapshot} style={styles.secondaryButton}>
+              <Text style={styles.secondaryButtonText}>Reload Counts</Text>
+            </TouchableOpacity>
+            <TouchableOpacity onPress={handleClearLocalProgress} style={styles.deleteLessonButton}>
+              <Text style={styles.deleteLessonButtonText}>Clear Local Progress</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      )}
 
       {activeAdminTab === 'chapterLinks' && (
       <View
@@ -1967,6 +2116,41 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: '600',
     lineHeight: 18,
+  },
+  qaGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 10,
+  },
+  qaMetric: {
+    flexGrow: 1,
+    flexBasis: 180,
+    borderRadius: 14,
+    borderWidth: 1,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+  },
+  qaMetricLabel: {
+    fontSize: 12,
+    fontWeight: '800',
+    marginBottom: 5,
+    textTransform: 'uppercase',
+  },
+  qaMetricValue: {
+    fontSize: 17,
+    fontWeight: '800',
+  },
+  qaMessage: {
+    marginTop: 14,
+    fontSize: 13,
+    fontWeight: '800',
+  },
+  qaActionRow: {
+    marginTop: 18,
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'flex-end',
+    gap: 10,
   },
   actionRow: {
     marginTop: 18,

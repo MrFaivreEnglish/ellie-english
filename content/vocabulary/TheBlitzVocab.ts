@@ -25,7 +25,7 @@ const TheBlitzVocab = {
     { english: 'A target', french: 'Une cible' },
     { english: '(to) target', french: 'Cibler' },
     { english: 'Rubble', french: 'Décombres' },
-    { english: 'A blackout', french: "Un couvre-feu / une panne d'électricité" },
+    { english: 'A blackout', french: "Un black-out / une extinction des lumières" },
     { english: 'A gas mask', french: 'Un masque à gaz' },
     { english: 'Rationing', french: 'Rationnement' },
 

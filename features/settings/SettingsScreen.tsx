@@ -2,13 +2,16 @@ import React, { useMemo, useState } from 'react';
 import { Alert, View, Text, StyleSheet, Switch, Platform, ScrollView, Pressable, Modal, TextInput, TouchableOpacity, Linking, useWindowDimensions } from 'react-native';
 import BackButton from '../shared/BackButton';
 import { useNavigation } from '@react-navigation/native';
+import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import type { RootStackParamList } from '../../types/navigationTypes';
 import { FontAwesome, MaterialIcons } from '@expo/vector-icons';
 import { useTheme } from './ThemeContext';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { clearVocabularyTimerBests } from '../vocabulary/vocabularyTimerStorage';
-import { getMenuCopy, menuLanguageOptions } from '../shared/menuCopy';
-import { ENABLE_MENU_LANGUAGE_SELECTOR, ENABLE_SHINY_ELLIE_COLOR_MODE } from '../../lib/featureFlags';
+import { getMenuCopy } from '../shared/menuCopy';
+import { ENABLE_SHINY_ELLIE_COLOR_MODE } from '../../lib/featureFlags';
 import { hapticsAreSupported } from '../shared/haptics';
+import { getButtonStyle, getButtonTextColor } from '../shared/uiPrimitives';
 
 const SETTINGS_FONT_FAMILY = Platform.select({
   ios: 'System',
@@ -27,14 +30,14 @@ export default function SettingsScreen() {
     colors,
     isGrammarGameMode,
     toggleGrammarGameMode,
+    isGrammarSpeechEnabled,
+    toggleGrammarSpeech,
     isVocabTimerMode,
     toggleVocabTimerMode,
     isVocabTimerRecordSavingEnabled,
     toggleVocabTimerRecordSaving,
     vocabLessonCardView,
     updateVocabLessonCardView,
-    menuLanguage,
-    updateMenuLanguage,
     isTypingStrictMode,
     toggleTypingStrictMode,
     isHapticsEnabled,
@@ -49,7 +52,7 @@ export default function SettingsScreen() {
     isShinyEllieMode,
     toggleShinyEllieMode,
   } = useTheme();
-  const navigation = useNavigation<any>();
+  const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const insets = useSafeAreaInsets();
   const { width: windowWidth } = useWindowDimensions();
   const topContentInset = Platform.OS === 'ios'
@@ -65,7 +68,7 @@ export default function SettingsScreen() {
   const adminAccessEnabled = Platform.OS === 'web';
   const showInstallBadge = Platform.OS === 'web' && windowWidth < 768;
   const isPinValid = useMemo(() => adminPinInput.trim() === ADMIN_PIN, [adminPinInput]);
-  const appCopy = getMenuCopy(menuLanguage);
+  const appCopy = getMenuCopy();
   const copy = appCopy.settings;
   const commonCopy = appCopy.common;
   const settingsCardBackground = colors.card;
@@ -76,10 +79,14 @@ export default function SettingsScreen() {
   const settingsControlBackground = colors.surface;
   const settingsSubsectionBackground = colors.surface;
   const settingsSubsectionText = isDarkMode ? colors.text : '#4B5563';
+  const primaryButtonStyle = getButtonStyle(colors, isDarkMode, 'primary');
+  const primaryButtonTextColor = getButtonTextColor(colors, isDarkMode, 'primary');
+  const secondaryButtonStyle = getButtonStyle(colors, isDarkMode, 'secondary');
+  const secondaryButtonTextColor = getButtonTextColor(colors, isDarkMode, 'secondary');
 
   const openAndroidDownload = () => {
     if (!ANDROID_APK_DOWNLOAD_URL) {
-      Alert.alert('APK pas encore disponible', 'Le lien prive sera ajoute ici.');
+      Alert.alert('Download unavailable', 'The Android APK link is not available yet.');
       return;
     }
 
@@ -180,7 +187,9 @@ export default function SettingsScreen() {
         onValueChange={onValueChange}
         trackColor={{ false: '#767577', true: activeColor }}
         thumbColor={value ? '#fff' : '#f4f3f4'}
+        accessibilityRole="switch"
         accessibilityLabel={title}
+        accessibilityState={{ checked: value }}
       />
     </View>
   );
@@ -271,43 +280,6 @@ export default function SettingsScreen() {
             onValueChange: toggleAndroidStatusBar,
             activeColor: colors.primary,
           })}
-          {ENABLE_MENU_LANGUAGE_SELECTOR && (
-          <View style={[styles.settingItem, { borderBottomColor: settingsRowBorder }]}>
-            <View style={styles.settingTextContainer}>
-              <View style={[styles.settingIconBox, { backgroundColor: settingsIconBackground }]}>
-                <MaterialIcons name="translate" size={20} color={settingsIconColor} />
-              </View>
-              <View style={styles.settingCopy}>
-                <Text style={[styles.settingText, { color: colors.text }]}>{copy.languageTitle}</Text>
-                <Text style={[styles.settingDescription, { color: colors.secondaryText }]}>
-                  {copy.languageDescription}
-                </Text>
-              </View>
-            </View>
-            <View style={styles.languageChoiceGroup}>
-              {menuLanguageOptions.map((option) => (
-                <TouchableOpacity
-                  key={option}
-                  onPress={() => updateMenuLanguage(option)}
-                  activeOpacity={0.82}
-                  accessibilityRole="button"
-                  accessibilityLabel={copy.languageOptions[option]}
-                  accessibilityState={{ selected: menuLanguage === option }}
-                  style={[
-                    styles.inlineChoiceButton,
-                    styles.languageChoiceButton,
-                    { borderColor: settingsCardBorder, backgroundColor: settingsControlBackground },
-                    menuLanguage === option && [styles.inlineChoiceButtonActive, { backgroundColor: colors.primary }],
-                  ]}
-                >
-                  <Text style={[styles.inlineChoiceText, { color: colors.primary }, menuLanguage === option && [styles.inlineChoiceTextActive, { color: colors.buttonText }]]}>
-                    {copy.languageOptions[option]}
-                  </Text>
-                </TouchableOpacity>
-              ))}
-            </View>
-          </View>
-          )}
         </View>
       </View>
 
@@ -335,7 +307,7 @@ export default function SettingsScreen() {
                 accessibilityState={{ selected: vocabLessonCardView === 'list' }}
                 style={[
                   styles.segmentedButton,
-                  vocabLessonCardView === 'list' && { backgroundColor: colors.primary },
+                  vocabLessonCardView === 'list' && { backgroundColor: colors.buttonBackground },
                 ]}
               >
                 <Text style={[styles.segmentedText, { color: colors.primary }, vocabLessonCardView === 'list' && [styles.inlineChoiceTextActive, { color: colors.buttonText }]]}>{copy.list}</Text>
@@ -348,7 +320,7 @@ export default function SettingsScreen() {
                 accessibilityState={{ selected: vocabLessonCardView === 'tile' }}
                 style={[
                   styles.segmentedButton,
-                  vocabLessonCardView === 'tile' && { backgroundColor: colors.primary },
+                  vocabLessonCardView === 'tile' && { backgroundColor: colors.buttonBackground },
                 ]}
               >
                 <Text style={[styles.segmentedText, { color: colors.primary }, vocabLessonCardView === 'tile' && [styles.inlineChoiceTextActive, { color: colors.buttonText }]]}>{copy.tiles}</Text>
@@ -438,6 +410,14 @@ export default function SettingsScreen() {
             onValueChange: toggleGrammarGameMode,
             activeColor: '#9575CD',
           })}
+          {renderSetting({
+            icon: 'record-voice-over',
+            title: copy.grammarSpeechTitle,
+            description: copy.grammarSpeechDescription,
+            value: isGrammarSpeechEnabled,
+            onValueChange: toggleGrammarSpeech,
+            activeColor: '#9575CD',
+          })}
         </View>
       </View>
 
@@ -505,19 +485,19 @@ export default function SettingsScreen() {
             <View style={styles.adminModalActions}>
               <TouchableOpacity
                 onPress={closeAdminModal}
-                style={styles.adminSecondaryButton}
+                style={[styles.adminSecondaryButton, secondaryButtonStyle]}
                 accessibilityRole="button"
                 accessibilityLabel={copy.cancel}
               >
-                <Text style={styles.adminSecondaryButtonText}>{copy.cancel}</Text>
+                <Text style={[styles.adminSecondaryButtonText, { color: secondaryButtonTextColor }]}>{copy.cancel}</Text>
               </TouchableOpacity>
               <TouchableOpacity
                 onPress={submitAdminPin}
-                style={[styles.adminPrimaryButton, { backgroundColor: colors.primary }]}
+                style={[styles.adminPrimaryButton, primaryButtonStyle]}
                 accessibilityRole="button"
                 accessibilityLabel={copy.openAdmin}
               >
-                <Text style={styles.adminPrimaryButtonText}>{copy.openAdmin}</Text>
+                <Text style={[styles.adminPrimaryButtonText, { color: primaryButtonTextColor }]}>{copy.openAdmin}</Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -533,19 +513,19 @@ export default function SettingsScreen() {
             <Text style={[styles.adminModalTitle, { color: colors.text }]}>Installer Ellie</Text>
             <View style={styles.installSteps}>
               <View style={styles.installStepRow}>
-                <Text style={[styles.installStepNumber, { backgroundColor: colors.primary, color: colors.buttonText }]}>1</Text>
+                <Text style={[styles.installStepNumber, { backgroundColor: colors.buttonBackground, color: colors.buttonText }]}>1</Text>
                 <Text style={[styles.installStepText, { color: colors.text }]}>Ouvre Ellie dans Safari.</Text>
               </View>
               <View style={styles.installStepRow}>
-                <Text style={[styles.installStepNumber, { backgroundColor: colors.primary, color: colors.buttonText }]}>2</Text>
+                <Text style={[styles.installStepNumber, { backgroundColor: colors.buttonBackground, color: colors.buttonText }]}>2</Text>
                 <Text style={[styles.installStepText, { color: colors.text }]}>Appuie sur Partager.</Text>
               </View>
               <View style={styles.installStepRow}>
-                <Text style={[styles.installStepNumber, { backgroundColor: colors.primary, color: colors.buttonText }]}>3</Text>
+                <Text style={[styles.installStepNumber, { backgroundColor: colors.buttonBackground, color: colors.buttonText }]}>3</Text>
                 <Text style={[styles.installStepText, { color: colors.text }]}>Choisis Sur l'ecran d'accueil.</Text>
               </View>
               <View style={styles.installStepRow}>
-                <Text style={[styles.installStepNumber, { backgroundColor: colors.primary, color: colors.buttonText }]}>4</Text>
+                <Text style={[styles.installStepNumber, { backgroundColor: colors.buttonBackground, color: colors.buttonText }]}>4</Text>
                 <Text style={[styles.installStepText, { color: colors.text }]}>Appuie sur Ajouter.</Text>
               </View>
             </View>
@@ -556,11 +536,11 @@ export default function SettingsScreen() {
             )}
             <TouchableOpacity
               onPress={() => setInstallGuideVisible(false)}
-              style={[styles.adminPrimaryButton, styles.installModalDoneButton, { backgroundColor: colors.primary }]}
+              style={[styles.adminPrimaryButton, styles.installModalDoneButton, primaryButtonStyle]}
               accessibilityRole="button"
               accessibilityLabel="Close install guide"
             >
-              <Text style={styles.adminPrimaryButtonText}>Done</Text>
+              <Text style={[styles.adminPrimaryButtonText, { color: primaryButtonTextColor }]}>Done</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -724,11 +704,11 @@ const styles = StyleSheet.create({
     paddingVertical: 7,
   },
   inlineChoiceButtonActive: {
-    backgroundColor: '#1671B6',
+    backgroundColor: '#1F7AD1',
   },
   inlineChoiceText: {
     fontFamily: SETTINGS_FONT_FAMILY,
-    color: '#1671B6',
+    color: '#1F7AD1',
     fontSize: 12,
     fontWeight: '700',
   },
@@ -762,15 +742,15 @@ const styles = StyleSheet.create({
     minWidth: 72,
     paddingHorizontal: 12,
     borderRadius: 10,
-    backgroundColor: '#EAF5FF',
+    backgroundColor: '#EAF1FF',
     borderWidth: 1.5,
-    borderColor: '#1671B6',
+    borderColor: '#1F7AD1',
     alignItems: 'center',
     justifyContent: 'center',
   },
   actionButtonText: {
     fontFamily: SETTINGS_FONT_FAMILY,
-    color: '#1671B6',
+    color: '#1F7AD1',
     fontSize: 13,
     fontWeight: '700',
   },
@@ -922,7 +902,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 11,
     borderRadius: 12,
-    backgroundColor: '#1671B6',
+    backgroundColor: '#1F7AD1',
   },
   adminPrimaryButtonText: {
     fontFamily: SETTINGS_FONT_FAMILY,

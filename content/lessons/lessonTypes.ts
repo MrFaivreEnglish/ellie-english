@@ -1,5 +1,7 @@
 import type React from 'react';
 import type { MaterialIcons } from '@expo/vector-icons';
+import type { GrammarLesson, VocabularyLesson } from '../../types/lessonTypes';
+import type { PronunciationLesson } from '../pronunciation/pronunciationTypes';
 
 export type AppLessonTarget = 'vocabulary' | 'grammar' | 'pronunciation';
 export type MaterialIconName = React.ComponentProps<typeof MaterialIcons>['name'];
@@ -11,13 +13,10 @@ export type ChapterAppLinkDefinition = {
   icon?: MaterialIconName;
 };
 
-export type ResolvedChapterAppLink = {
-  label: string;
-  icon: MaterialIconName;
-  target: AppLessonTarget;
-  lesson: any;
-  categoryColor?: string;
-};
+export type ResolvedChapterAppLink =
+  | { label: string; icon: MaterialIconName; target: 'grammar';       lesson: GrammarLesson;       categoryColor?: string }
+  | { label: string; icon: MaterialIconName; target: 'vocabulary';    lesson: VocabularyLesson;    categoryColor?: string }
+  | { label: string; icon: MaterialIconName; target: 'pronunciation'; lesson: PronunciationLesson; categoryColor?: string };
 
 export type ChapterLesson = {
   title: string;

@@ -18,7 +18,7 @@ const OpinionLevel1Vocab = {
     { "english": "Crazy", "french": "fou" },
     { "english": "Silly", "french": "bête" },
     { "english": "Embarrassing", "french": "gênant" },
-    { "english": "Disgusting", "french": "dégoutant" }
+    { "english": "Disgusting", "french": "dégoûtant" }
   ]
 };
 

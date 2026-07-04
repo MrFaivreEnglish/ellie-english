@@ -77,7 +77,7 @@ const GrammarModeTabs: React.FC<GrammarModeTabsProps> = ({
             <MaterialIcons
               name={grammarModeIcons[mode.key]}
               size={compactModeButtons ? 15 : 18}
-              color={active ? '#FFFFFF' : colors.primary}
+              color={active ? colors.buttonText : colors.primary}
             />
             <Text
               style={[
@@ -86,6 +86,7 @@ const GrammarModeTabs: React.FC<GrammarModeTabsProps> = ({
                 { color: colors.text, fontSize: scaleValue(compactModeButtons ? 14 : 16, layoutScale) },
                 isDesktopWeb && styles.exerciseModeButtonTextDesktopWeb,
                 active && styles.activeExerciseModeButtonText,
+                active && { color: colors.buttonText },
               ]}
               numberOfLines={1}
               ellipsizeMode="tail"
@@ -100,7 +101,7 @@ const GrammarModeTabs: React.FC<GrammarModeTabsProps> = ({
   );
 };
 
-export default GrammarModeTabs;
+export default React.memo(GrammarModeTabs);
 
 const styles = StyleSheet.create({
   exerciseModeButtons: {
@@ -144,14 +145,14 @@ const styles = StyleSheet.create({
     maxWidth: '100%',
     fontSize: 16,
     lineHeight: 19,
-    fontWeight: '500',
+    fontWeight: '400',
   },
   exerciseModeButtonTextCompact: {
     fontSize: 14,
     lineHeight: 17,
   },
   exerciseModeButtonTextDesktopWeb: {
-    fontWeight: '800',
+    fontWeight: '600',
   },
   activeExerciseModeButtonText: {
     color: '#fff',

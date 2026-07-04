@@ -1,58 +1,53 @@
-const FoodVocab = {  id: '35',  title: 'American Dishes',
-  description: 'Learn vocabulary related to food, cooking, and dining',  imageUrl: 'https://i.ibb.co/q3TvXbSD/American-dishes.webp',
+const FoodVocab = {
+  id: '35',
+  title: 'American Dishes',
+  description: 'Learn American food vocabulary: side dishes, meat-based dishes, desserts, and drinks',
+  imageUrl: 'https://i.ibb.co/xyKD8nK/American-dishes.webp',
   thumbnail: require('../../assets/thumbnails/american-dishes-thumbnail.png'),
   flashcards: [
     {
-      category: 'Fruits & Vegetables 🥗',
+      category: 'Vegetables and side dishes',
       words: [
-        { english: 'Apple', french: 'Pomme' },
-        { english: 'Corn', french: 'Maïs' },
-        { english: 'Potato', french: 'Pomme De Terre' },
-        { english: 'Vegetables', french: 'Légumes' },
-        { english: 'Salad', french: 'Salade' }
-      ]
+        { english: 'French fries', french: 'Frites' },
+        { english: 'Sweet potato', french: 'Patate douce' },
+        { english: 'Mac and cheese', french: 'Macaronis au fromage' },
+        { english: 'Mashed potatoes', french: 'Purée de pommes de terre' },
+        { english: 'Baked beans', french: 'Haricots blancs à la sauce tomate' },
+      ],
     },
     {
-      category: 'Meats 🍖',
-      words: [
-        { english: 'Beef', french: 'Boeuf' },
-        { english: 'Chicken', french: 'Poulet' },
-        { english: 'Pork', french: 'Porc' },
-        { english: 'Turkey', french: 'Dinde' },
-        { english: 'Meatloaf', french: 'Pain De Viande' }
-      ]
-    },
-    {
-      category: 'Seafood 🦞',
+      category: 'Meat-based dishes',
       words: [
         { english: 'Crab', french: 'Crabe' },
-        { english: 'Oysters', french: 'Huîtres' },
-        { english: 'Prawn', french: 'Crevette' },
-        { english: 'Shrimp', french: 'Crevette' }
-      ]
+        { english: 'Chicken pot pie', french: 'Tourte au poulet' },
+        { english: 'Meatloaf', french: 'Pain de viande' },
+        { english: 'Shrimp / Prawn', french: 'Crevette' },
+        { english: 'BBQ ribs', french: 'Travers de porc barbecue' },
+      ],
     },
     {
-      category: 'Dishes & Sides 🍽️',
+      category: 'Desserts',
       words: [
-        { english: 'Mac And Cheese', french: 'Macaronis Au Fromage' },
-        { english: 'Baked Beans', french: 'Haricots Blancs Cuits' },
-        { english: 'Chicken Pot Pie', french: 'Tourte Au Poulet' },
-        { english: 'Noodles', french: 'Nouilles' },
-        { english: 'Onion Rings', french: 'Oignons Frits' },
-       { english: 'Dressing', french: 'Vinaigrette' }
-      ]
-    },
-    {
-      category: 'Desserts & Sweets 🍰',
-      words: [
-        { english: 'Carrot Cake', french: 'Gâteau Aux Carottes' },
+        { english: 'Milkshake', french: 'Milk-shake' },
+        { english: 'Apple pie', french: 'Tarte aux pommes' },
+        { english: 'Carrot cake', french: 'Gâteau aux carottes' },
         { english: 'Cheesecake', french: 'Cheesecake' },
-        { english: 'Sweet', french: 'Dessert / Sucré' },
-         { english: 'Milkshake', french: 'Milk-Shake' }
-      ]
+        { english: 'Walnut brownie', french: 'Brownie aux noix' },
+        { english: 'Pumpkin pie', french: 'Tarte à la citrouille' },
+        { english: 'Cupcake', french: 'Cupcake' },
+        { english: 'Doughnut / Donut', french: 'Beignet' },
+      ],
     },
-]
-
+    {
+      category: 'Drinks',
+      words: [
+        { english: 'Lemonade', french: 'Citronnade' },
+        { english: 'Iced tea', french: 'Thé glacé' },
+        { english: 'Soda', french: 'Soda' },
+        { english: 'Cranberry juice', french: 'Jus de canneberge' },
+      ],
+    },
+  ],
 };
 
 export default FoodVocab;

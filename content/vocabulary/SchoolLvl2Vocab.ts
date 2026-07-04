@@ -15,8 +15,7 @@ const SchoolLvl2Vocab = {
   { "english": "A classroom", "french": "Une salle de classe" },
   { "english": "Recess", "french": "Récréation" },
   { "english": "The bell", "french": "La sonnerie" },
-  { "english": "A playground (UK)", "french": "Une cour de récréation" },
-  { "english": "A schoolyard (US)", "french": "Une cour d'école" },
+  { "english": "A playground", alternatives: ["A schoolyard"], "french": "Une cour de récréation" },
   { "english": "The cafeteria", "french": "La cafétéria" },
   { "english": "A library", "french": "Une bibliothèque" },
   { "english": "A gym", "french": "Un gymnase" },
@@ -36,7 +35,7 @@ const SchoolLvl2Vocab = {
   { "english": "Film", "french": "Cinéma" },
   { "english": "Yearbook", "french": "Le livre de fin d'année" },
   { "english": "School newspaper", "french": "Journal scolaire" },
-  { "english": "Mock trial", "french": "Faux procès" },
+  { "english": "Mock trial", "french": "Procès fictif" },
   { "english": "Debate club", "french": "Club de débat" },
   { "english": "Marching band", "french": "Fanfare" }
 ]

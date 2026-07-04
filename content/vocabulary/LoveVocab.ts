@@ -8,7 +8,7 @@ const LoveVocab = {
         { english: 'To fall in love with', french: 'Tomber amoureux de' },
         { english: 'To have a crush on', french: 'Avoir le béguin pour' },
         { english: 'To fall for', french: 'Craquer pour' },
-        { english: 'To confess', french: 'Confesser' },
+        { english: 'To confess', french: 'Avouer ses sentiments' },
         { english: 'To go on a date', french: 'Sortir avec quelqu\'un' },
         { english: 'To get together', french: 'Se mettre ensemble' },
         { english: 'To kiss', french: 'S\'embrasser' },

@@ -11,6 +11,7 @@ export const fourthGradeChapters: ChapterCategory = {
       appLinks: [
         { label: 'American dishes', target: 'vocabulary', lessonTitle: 'American Dishes' },
         { label: 'Food basics', target: 'vocabulary', lessonTitle: 'Food Basics' },
+        { label: 'Food +', target: 'vocabulary', lessonTitle: 'Food +' },
         { label: 'Would like', target: 'grammar', lessonTitle: 'Would Like' },
         { label: 'Likes', target: 'pronunciation', lessonTitle: 'Talk about likes' },
       ],

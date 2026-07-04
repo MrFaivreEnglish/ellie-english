@@ -3,19 +3,17 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Platform } from 'react-native';
 import { hapticsAreSupported, setHapticsEnabled } from '../shared/haptics';
 import { setSoundEffectsEnabled } from '../shared/soundEffects';
-import type { MenuLanguage } from '../shared/menuCopy';
-import { ACTIVE_MENU_LANGUAGE, isMenuLanguage } from '../shared/menuCopy';
 import {
   saveShinyEllieProgress,
   SHINY_ELLIE_MODE_KEY,
   SHINY_ELLIE_UNLOCKED_KEY,
 } from '../progress/shinyEllieStorage';
-import { ENABLE_MENU_LANGUAGE_SELECTOR, ENABLE_SHINY_ELLIE_COLOR_MODE } from '../../lib/featureFlags';
+import { ENABLE_SHINY_ELLIE_COLOR_MODE } from '../../lib/featureFlags';
 import {
   ANDROID_STATUS_BAR_ENABLED_KEY,
   GRAMMAR_GAME_MODE_KEY,
+  GRAMMAR_SPEECH_ENABLED_KEY,
   HAPTICS_ENABLED_KEY,
-  MENU_LANGUAGE_KEY,
   SOUND_EFFECTS_ENABLED_KEY,
   THEME_STORAGE_KEY,
   TODAY_CARD_ENABLED_KEY,
@@ -59,6 +57,9 @@ type ThemeContextType = {
   isGrammarGameMode: boolean;
   toggleGrammarGameMode: () => void;
   updateGrammarGameMode: (value: boolean) => void;
+  isGrammarSpeechEnabled: boolean;
+  toggleGrammarSpeech: () => void;
+  updateGrammarSpeech: (value: boolean) => void;
   isVocabTimerMode: boolean;
   toggleVocabTimerMode: () => void;
   updateVocabTimerMode: (value: boolean) => void;
@@ -67,9 +68,7 @@ type ThemeContextType = {
   updateVocabTimerRecordSaving: (value: boolean) => void;
   vocabLessonCardView: 'list' | 'tile';
   updateVocabLessonCardView: (value: 'list' | 'tile') => void;
-  menuLanguage: MenuLanguage;
-  updateMenuLanguage: (value: MenuLanguage) => void;
-  isTypingStrictMode: boolean;
+isTypingStrictMode: boolean;
   toggleTypingStrictMode: () => void;
   updateTypingStrictMode: (value: boolean) => void;
   isHapticsEnabled: boolean;
@@ -94,48 +93,48 @@ type ThemeContextType = {
 };
 
 const lightColors: ThemeColors = {
-  background: '#f5f5f5',
+  background: '#F3F6FA',
   card: '#ffffff',
-  surface: '#F4F8FC',
-  surfaceAlt: '#ECF6FF',
-  text: '#333333',
-  secondaryText: '#666666',
+  surface: '#F8FAFF',
+  surfaceAlt: '#EAF5FF',
+  text: '#243041',
+  secondaryText: '#607089',
   border: '#D6E2EE',
-  borderStrong: '#BCD2E4',
-  primary: '#1671B6',
+  borderStrong: '#7ABCF2',
+  primary: '#1F7AD1',
   primarySoft: '#EAF5FF',
-  success: '#42C67A',
+  success: '#2FBF72',
   successSoft: '#E9F8EF',
-  successText: '#12663D',
+  successText: '#11633B',
   danger: '#F06A7F',
   dangerSoft: '#FFE8EC',
   dangerText: '#8F2234',
   warning: '#F4B740',
   warningSoft: '#FFF6DE',
-  buttonBackground: '#1671B6',
+  buttonBackground: '#1F7AD1',
   buttonText: '#ffffff',
 };
 
 const darkColors: ThemeColors = {
-  background: '#071A2D',
-  card: '#0D2742',
-  surface: '#123B61',
-  surfaceAlt: '#1B527F',
+  background: '#070F1C',
+  card: '#0D1A28',
+  surface: '#162436',
+  surfaceAlt: '#1E3450',
   text: '#F7FAFF',
-  secondaryText: '#C9DDF0',
-  border: '#2A5C84',
-  borderStrong: '#5BA9DD',
-  primary: '#86D1FF',
-  primarySoft: '#143A67',
-  success: '#7ADB9E',
-  successSoft: '#123E36',
-  successText: '#D6FBE4',
-  danger: '#FF8BA1',
-  dangerSoft: '#4F2135',
-  dangerText: '#FFE0E7',
-  warning: '#FFD36D',
-  warningSoft: '#493912',
-  buttonBackground: '#276EE6',
+  secondaryText: '#C8D5EA',
+  border: '#334D68',
+  borderStrong: '#78C7F8',
+  primary: '#8ED2FF',
+  primarySoft: '#123657',
+  success: '#8FF2B3',
+  successSoft: '#153F31',
+  successText: '#EFFFF4',
+  danger: '#FFB4C2',
+  dangerSoft: '#5B2737',
+  dangerText: '#FFF3F6',
+  warning: '#FFD166',
+  warningSoft: '#FCC30B',
+  buttonBackground: '#126EC6',
   buttonText: '#FFFFFF',
 };
 
@@ -146,6 +145,9 @@ export const ThemeContext = createContext<ThemeContextType>({
   isGrammarGameMode: false,
   toggleGrammarGameMode: () => {},
   updateGrammarGameMode: () => {},
+  isGrammarSpeechEnabled: false,
+  toggleGrammarSpeech: () => {},
+  updateGrammarSpeech: () => {},
   isVocabTimerMode: false,
   toggleVocabTimerMode: () => {},
   updateVocabTimerMode: () => {},
@@ -154,9 +156,7 @@ export const ThemeContext = createContext<ThemeContextType>({
   updateVocabTimerRecordSaving: () => {},
   vocabLessonCardView: 'list',
   updateVocabLessonCardView: () => {},
-  menuLanguage: ACTIVE_MENU_LANGUAGE,
-  updateMenuLanguage: () => {},
-  isTypingStrictMode: false,
+isTypingStrictMode: false,
   toggleTypingStrictMode: () => {},
   updateTypingStrictMode: () => {},
   isHapticsEnabled: hapticsAreSupported,
@@ -184,11 +184,11 @@ export const ThemeProvider = ({ children }: { children: React.ReactNode }) => {
   const [isDarkMode, setIsDarkMode] = useState(false);
   const [isThemeLoaded, setIsThemeLoaded] = useState(false);
   const [isGrammarGameMode, setIsGrammarGameMode] = useState(false);
+  const [isGrammarSpeechEnabled, setIsGrammarSpeechEnabled] = useState(false);
   const [isVocabTimerMode, setIsVocabTimerMode] = useState(false);
   const [isVocabTimerRecordSavingEnabled, setIsVocabTimerRecordSavingEnabled] = useState(false);
   const [vocabLessonCardView, setVocabLessonCardView] = useState<'list' | 'tile'>('list');
-  const [menuLanguage, setMenuLanguage] = useState<MenuLanguage>(ACTIVE_MENU_LANGUAGE);
-  const [isTypingStrictMode, setIsTypingStrictMode] = useState(false);
+const [isTypingStrictMode, setIsTypingStrictMode] = useState(false);
   const [isHapticsEnabled, setIsHapticsEnabled] = useState(hapticsAreSupported);
   const [isSoundEffectsEnabled, setIsSoundEffectsEnabled] = useState(true);
   const [isTodayCardEnabled, setIsTodayCardEnabled] = useState(false);
@@ -206,7 +206,6 @@ export const ThemeProvider = ({ children }: { children: React.ReactNode }) => {
           savedVocabMode,
           savedVocabTimerRecordSaving,
           savedVocabLessonCardView,
-          savedMenuLanguage,
           savedTypingStrictMode,
           savedHapticsEnabled,
           savedSoundEffectsEnabled,
@@ -216,13 +215,13 @@ export const ThemeProvider = ({ children }: { children: React.ReactNode }) => {
           savedAndroidStatusBarEnabled,
           savedShinyEllieUnlocked,
           savedShinyEllieMode,
+          savedGrammarSpeech,
         ] = await Promise.all([
           AsyncStorage.getItem(THEME_STORAGE_KEY),
           AsyncStorage.getItem(GRAMMAR_GAME_MODE_KEY),
           AsyncStorage.getItem(VOCAB_TIMER_MODE_KEY),
           AsyncStorage.getItem(VOCAB_TIMER_RECORD_SAVING_KEY),
           AsyncStorage.getItem(VOCAB_LESSON_CARD_VIEW_KEY),
-          AsyncStorage.getItem(MENU_LANGUAGE_KEY),
           AsyncStorage.getItem(TYPING_STRICT_MODE_KEY),
           AsyncStorage.getItem(HAPTICS_ENABLED_KEY),
           AsyncStorage.getItem(SOUND_EFFECTS_ENABLED_KEY),
@@ -231,7 +230,8 @@ export const ThemeProvider = ({ children }: { children: React.ReactNode }) => {
           AsyncStorage.getItem(TODAY_CARD_OPT_IN_KEY),
           AsyncStorage.getItem(ANDROID_STATUS_BAR_ENABLED_KEY),
           AsyncStorage.getItem(SHINY_ELLIE_UNLOCKED_KEY),
-          AsyncStorage.getItem(SHINY_ELLIE_MODE_KEY)
+          AsyncStorage.getItem(SHINY_ELLIE_MODE_KEY),
+          AsyncStorage.getItem(GRAMMAR_SPEECH_ENABLED_KEY),
         ]);
         
         if (savedTheme !== null) {
@@ -240,6 +240,10 @@ export const ThemeProvider = ({ children }: { children: React.ReactNode }) => {
         
         if (savedGrammarMode !== null) {
           setIsGrammarGameMode(savedGrammarMode === 'true');
+        }
+
+        if (savedGrammarSpeech !== null) {
+          setIsGrammarSpeechEnabled(savedGrammarSpeech === 'true');
         }
         
         if (savedVocabMode !== null) {
@@ -252,17 +256,6 @@ export const ThemeProvider = ({ children }: { children: React.ReactNode }) => {
 
         if (savedVocabLessonCardView === 'list' || savedVocabLessonCardView === 'tile') {
           setVocabLessonCardView(savedVocabLessonCardView);
-        }
-
-        if (ENABLE_MENU_LANGUAGE_SELECTOR && isMenuLanguage(savedMenuLanguage)) {
-          setMenuLanguage(savedMenuLanguage);
-        } else {
-          setMenuLanguage(ACTIVE_MENU_LANGUAGE);
-          if (savedMenuLanguage !== ACTIVE_MENU_LANGUAGE) {
-            AsyncStorage.setItem(MENU_LANGUAGE_KEY, ACTIVE_MENU_LANGUAGE).catch((error) => {
-              console.error('Failed to reset menu language preference:', error);
-            });
-          }
         }
 
         if (savedTypingStrictMode !== null) {
@@ -384,6 +377,14 @@ export const ThemeProvider = ({ children }: { children: React.ReactNode }) => {
     });
   }, []);
 
+  const toggleGrammarSpeech = useCallback(() => {
+    setIsGrammarSpeechEnabled(prev => {
+      const next = !prev;
+      persistBoolean(GRAMMAR_SPEECH_ENABLED_KEY, next);
+      return next;
+    });
+  }, []);
+
   const toggleVocabTimerMode = useCallback(() => {
     setIsVocabTimerMode(prev => {
       const next = !prev;
@@ -413,12 +414,6 @@ export const ThemeProvider = ({ children }: { children: React.ReactNode }) => {
   const updateVocabLessonCardView = useCallback((value: 'list' | 'tile') => {
     setVocabLessonCardView(value);
     persistStringPreference(VOCAB_LESSON_CARD_VIEW_KEY, value);
-  }, []);
-
-  const updateMenuLanguage = useCallback((value: MenuLanguage) => {
-    const next = ENABLE_MENU_LANGUAGE_SELECTOR ? value : ACTIVE_MENU_LANGUAGE;
-    setMenuLanguage(next);
-    persistStringPreference(MENU_LANGUAGE_KEY, next);
   }, []);
 
   const toggleTypingStrictMode = useCallback(() => {
@@ -547,13 +542,17 @@ export const ThemeProvider = ({ children }: { children: React.ReactNode }) => {
     persistBoolean(GRAMMAR_GAME_MODE_KEY, value);
   }, []);
 
+  const updateGrammarSpeech = useCallback((value: boolean) => {
+    setIsGrammarSpeechEnabled(value);
+    persistBoolean(GRAMMAR_SPEECH_ENABLED_KEY, value);
+  }, []);
+
   const applyAccountPreferences = useCallback((snapshot: AccountPreferenceSnapshot) => {
     setIsDarkMode(snapshot.theme === 'dark');
     setIsGrammarGameMode(snapshot.grammarGameMode);
     setIsVocabTimerMode(snapshot.vocabTimerMode);
     setIsVocabTimerRecordSavingEnabled(snapshot.vocabTimerRecordSaving);
     setVocabLessonCardView(snapshot.vocabLessonCardView);
-    setMenuLanguage(ENABLE_MENU_LANGUAGE_SELECTOR ? snapshot.menuLanguage : ACTIVE_MENU_LANGUAGE);
     setIsTypingStrictMode(snapshot.typingStrictMode);
     const nextHapticsEnabled = hapticsAreSupported && snapshot.hapticsEnabled;
     setIsHapticsEnabled(nextHapticsEnabled);
@@ -594,6 +593,9 @@ export const ThemeProvider = ({ children }: { children: React.ReactNode }) => {
       isGrammarGameMode,
       toggleGrammarGameMode,
       updateGrammarGameMode,
+      isGrammarSpeechEnabled,
+      toggleGrammarSpeech,
+      updateGrammarSpeech,
       isVocabTimerMode,
       toggleVocabTimerMode,
       updateVocabTimerMode,
@@ -602,8 +604,6 @@ export const ThemeProvider = ({ children }: { children: React.ReactNode }) => {
       updateVocabTimerRecordSaving,
       vocabLessonCardView,
       updateVocabLessonCardView,
-      menuLanguage,
-      updateMenuLanguage,
       isTypingStrictMode,
       toggleTypingStrictMode,
       updateTypingStrictMode,

@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
-import { useAudioPlayer } from 'expo-audio';
+import { createAudioPlayer } from 'expo-audio';
+import type { AudioPlayer } from 'expo-audio';
 import { Word, GameCard, MatchingGamePairs, GameState } from '../../types/VocabularyTypes';
 import { getMatchingSetCount, getMatchingSetWords, shuffleArray } from './vocabularyUtils';
 import { getVocabularyTimerBests, saveVocabularyTimerBest } from './vocabularyTimerStorage';
@@ -42,7 +43,14 @@ export const useVocabularyGame = (
   categoryKey: string = 'default',
   saveTimerRecords: boolean = false
 ) => {
-  const setCompletePlayer = useAudioPlayer(SUCCESS_SOUND, SOUND_EFFECT_OPTIONS);
+  const setCompletePlayerRef = useRef<AudioPlayer | null>(null);
+
+  useEffect(() => {
+    return () => {
+      setCompletePlayerRef.current?.remove();
+      setCompletePlayerRef.current = null;
+    };
+  }, []);
 
   // ---------------- STATE ----------------
   const [gameState, setGameState] = useState<GameState>({
@@ -103,8 +111,11 @@ export const useVocabularyGame = (
   }, []);
 
   const playSetCompleteSound = useCallback(() => {
-    replaySoundEffect(setCompletePlayer);
-  }, [setCompletePlayer]);
+    if (!setCompletePlayerRef.current) {
+      setCompletePlayerRef.current = createAudioPlayer(SUCCESS_SOUND, SOUND_EFFECT_OPTIONS);
+    }
+    replaySoundEffect(setCompletePlayerRef.current);
+  }, []);
 
   const key = categoryKey || "All";
 
@@ -186,7 +197,7 @@ export const useVocabularyGame = (
           ...bests,
         },
       }));
-    });
+    }).catch(() => {});
 
     return () => {
       active = false;

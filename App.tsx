@@ -23,6 +23,7 @@ import AdminLessonPreviewScreen from "./features/lessons/AdminLessonPreviewScree
 import { Asset } from 'expo-asset';
 import { applyAppChrome, applyImmersiveMode, bindImmersiveOnForeground } from './lib/immersive';
 import FullImageScreen from './features/shared/FullImageScreen';
+import ErrorBoundary from './features/shared/ErrorBoundary';
 import { StatusBar } from 'expo-status-bar';
 import { getWebAppContentMaxWidth } from './features/shared/responsiveLayout';
 import { getMenuCopy } from './features/shared/menuCopy';
@@ -36,9 +37,11 @@ import {
 } from './features/shared/homeMenuColors';
 import { getAndroidBottomBarButtonStyle, getAndroidBottomBarColor } from './features/shared/appChromeColors';
 import { getApkPreviewContentMaxWidth, isApkLayoutPreviewEnabled } from './features/shared/apkPreview';
+import type { RootStackParamList, TabParamList, VocabularyStackParamList } from './types/navigationTypes';
 
-const Tab = createBottomTabNavigator();
-const Stack = createNativeStackNavigator();
+const Tab = createBottomTabNavigator<TabParamList>();
+const VocabStack = createNativeStackNavigator<VocabularyStackParamList>();
+const RootStackNav = createNativeStackNavigator<RootStackParamList>();
 type MaterialIconName = React.ComponentProps<typeof MaterialIcons>['name'];
 
 const tabIcons: Record<string, MaterialIconName> = {
@@ -60,29 +63,57 @@ const tabIdentityBorderColors: Record<string, string> = {
   Settings: 'rgba(183,198,213,0.34)',
 };
 
+function VocabularyLessonBoundaryScreen(props: any) {
+  const goBack = React.useCallback(() => {
+    if (props.navigation?.canGoBack?.()) {
+      props.navigation.goBack();
+      return;
+    }
+
+    props.navigation?.navigate?.('VocabularyList');
+  }, [props.navigation]);
+
+  const goHome = React.useCallback(() => {
+    const rootNavigation = props.navigation?.getParent?.()?.getParent?.();
+
+    if (rootNavigation?.navigate) {
+      rootNavigation.navigate('Home');
+      return;
+    }
+
+    goBack();
+  }, [goBack, props.navigation]);
+
+  return (
+    <ErrorBoundary onBack={goBack} onHome={goHome}>
+      <VocabularyLessonScreen {...props} />
+    </ErrorBoundary>
+  );
+}
+
 function VocabularyStack(): React.JSX.Element {
   return (
-    <Stack.Navigator>
-      <Stack.Screen 
-        name="VocabularyList" 
+    <VocabStack.Navigator>
+      <VocabStack.Screen
+        name="VocabularyList"
         component={VocabularyScreen}
         options={{ headerShown: false }}
       />
-      <Stack.Screen 
-        name="VocabularyLesson" 
-        component={VocabularyLessonScreen}
+      <VocabStack.Screen
+        name="VocabularyLesson"
+        component={VocabularyLessonBoundaryScreen}
         options={{ headerShown: false }}
       />
-    </Stack.Navigator>
+    </VocabStack.Navigator>
   );
 }
 
 function MainTabNavigator() {
-  const { isDarkMode, colors, menuLanguage, isShinyEllieMode } = useTheme();
-  const copy = getMenuCopy(menuLanguage);
+  const { isDarkMode, colors, isShinyEllieMode } = useTheme();
+  const copy = getMenuCopy();
   const insets = useSafeAreaInsets();
   const { width } = useWindowDimensions();
-  const [tabState, setTabState] = React.useState<any>(null);
+  const [tabState, setTabState] = React.useState<{ routes: any[]; index: number } | null>(null);
   const isCompactTabBar = width < 430;
   const isLargeTabBar = width >= 900;
   const useApkPreviewLayout = isApkLayoutPreviewEnabled();
@@ -241,54 +272,48 @@ function MainTabNavigator() {
 
 function RootStack() {
   return (
-    <Stack.Navigator
+    <RootStackNav.Navigator
       initialRouteName="Splash"
-      screenOptions={{ 
+      screenOptions={{
         headerShown: false,
         gestureEnabled: true,
         gestureDirection: 'horizontal'
       }}
     >
-      <Stack.Screen 
-        name="Splash" 
+      <RootStackNav.Screen
+        name="Splash"
         component={SplashScreen}
-        options={{
-          gestureEnabled: false
-        }} 
+        options={{ gestureEnabled: false }}
       />
-      <Stack.Screen 
-        name="Home" 
+      <RootStackNav.Screen
+        name="Home"
         component={HomeScreen}
-        options={{
-          gestureEnabled: false
-        }}
+        options={{ gestureEnabled: false }}
       />
-      <Stack.Screen
+      <RootStackNav.Screen
         name="Account"
         component={AccountScreen}
         options={{ headerShown: false }}
       />
       {/* Root-level full image modal so it overlays headers */}
-      <Stack.Screen
+      <RootStackNav.Screen
         name="FullImageModal"
         component={FullImageScreen}
         options={{ presentation: 'transparentModal', headerShown: false }}
       />
-      <Stack.Screen 
-        name="MainTabs" 
+      <RootStackNav.Screen
+        name="MainTabs"
         component={MainTabNavigator}
-        options={{
-          gestureEnabled: true
-        }}
+        options={{ gestureEnabled: true, animation: 'none' }}
       />
       {Platform.OS === 'web' && (
-        <Stack.Screen
+        <RootStackNav.Screen
           name="AdminLessonPreview"
           component={AdminLessonPreviewScreen}
           options={{ headerShown: false }}
         />
       )}
-    </Stack.Navigator>
+    </RootStackNav.Navigator>
   );
 }
 
@@ -373,7 +398,6 @@ function AppInner() {
 
         if (tasks.length) await Promise.all(tasks);
       } catch (err) {
-        console.warn('Error preloading lesson thumbnails', err);
       }
     };
 
@@ -393,21 +417,44 @@ function AppInner() {
     applyRouteChrome(currentRoute);
   }, [applyRouteChrome, currentRoute]);
 
-  // Central back navigation logic for native hardware back.
+  // Central back navigation logic for native hardware back and web popstate.
   const onBackRequested = React.useCallback(() => {
     const nav = navigationRef.current;
+    if (!nav) return false;
+
     const route = nav?.getCurrentRoute()?.name;
 
+    if (Platform.OS === 'web') {
+      // Only allow the browser to exit from Home or Splash.
+      if (route === 'Home' || route === 'Splash') return false;
+      // During navigation transitions, route may be undefined — stay in app.
+      if (!route) return true;
+      // Navigate back within the app stack, falling back to Home.
+      if (nav.canGoBack()) {
+        nav.goBack();
+      } else {
+        nav.navigate('Home');
+      }
+      return true;
+    }
+
+    // Native: from any top-level tab, go back to Home
     if (route && ['MainTabs', 'Grammar', 'Vocabulary', 'VocabularyList', 'Lessons', 'Settings'].includes(route)) {
-      // From any tab, go back to Home
       nav.navigate('Home');
       return true;
     }
-    if (nav?.canGoBack()) {
+
+    if (nav.canGoBack()) {
       nav.goBack();
       return true;
     }
-    return false; // allow default behavior (exit app on native / leave page on web)
+
+    if (route && route !== 'Home' && route !== 'Splash') {
+      nav.navigate('Home');
+      return true;
+    }
+
+    return false;
   }, []);
 
   // Global hardware back press handler (native)

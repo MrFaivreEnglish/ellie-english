@@ -53,13 +53,7 @@ export default function VocabularyMatching({
     : 1;
   const shellHeight = layoutHeight;
   const titleHeight = 0;
-  const footerBaseHeight = (
-    timerMode && bestTimeForActiveCategory != null
-      ? (isVeryCompact ? 92 : isCompact ? 82 : 90)
-      : timerMode
-        ? (isVeryCompact ? 78 : isCompact ? 72 : 80)
-        : (isVeryCompact ? 70 : 68)
-  ) + 8;
+  const footerBaseHeight = isVeryCompact ? 60 : isCompact ? 62 : 70;
   const footerHeight = isDesktop ? Math.round(footerBaseHeight * desktopBoardScale) : footerBaseHeight;
   const boardTopSpacing = isAndroid ? 0 : isCompact ? 4 : isDesktop ? Math.round(6 * desktopBoardScale) : 6;
   const fullSetSize = matchingGamePairs?.english?.length || 0;
@@ -105,7 +99,7 @@ export default function VocabularyMatching({
     ? (isVeryCompact ? 5 : 6)
     : boardTopSpacing;
   const mobileCardTextSize = Math.round(clampNumber(cardHeight * 0.48, isVeryCompact ? 11 : 12, isCompact ? 16 : 20));
-  const cardTextSize = isDesktop ? Math.round(clampNumber(19 * desktopBoardScale, 17, 28)) : mobileCardTextSize;
+  const cardTextSize = isDesktop ? Math.round(clampNumber(22 * desktopBoardScale, 19, 32)) : mobileCardTextSize;
   const desktopColumnGap = isDesktop
     ? isHorizontalDesktop
       ? Math.round(clampNumber(96 * desktopBoardScale, 86, 114))
@@ -124,7 +118,7 @@ export default function VocabularyMatching({
       ? (isCompact ? '82%' : '84%')
       : '88%';
   const desktopCardMaxWidth = isAndroid ? androidCardWidth : desktopColumnWidth;
-  const summaryPaddingVertical = isCompact ? 5 : isDesktop ? Math.round(7 * desktopBoardScale) : isLarge ? Math.round(7 * webScale) : 6;
+  const summaryPaddingVertical = isCompact ? 4 : isDesktop ? Math.round(6 * desktopBoardScale) : isLarge ? Math.round(6 * webScale) : 5;
   const summaryPaddingHorizontal = isVeryCompact ? 8 : isCompact ? 10 : isDesktop ? Math.round(14 * desktopBoardScale) : isLarge ? Math.round(14 * webScale) : 12;
   const handleShellLayout = React.useCallback((event: any) => {
     const nextWidth = Math.round(event.nativeEvent.layout.width);
@@ -173,7 +167,8 @@ export default function VocabularyMatching({
         disabled={isMatched || isLocked}
         android_ripple={{ color: 'rgba(0,0,0,0.06)' }}
         accessibilityRole="button"
-        accessibilityLabel={`Card: ${card.text}`}
+        accessibilityLabel={isMatched ? `Matched: ${card.text}` : `Card: ${card.text}`}
+        accessibilityState={{ disabled: isMatched || isLocked, selected: isSelected }}
         style={({ pressed }) => [
           styles.matchingCard,
           isDesktop && styles.matchingCardDesktop,
@@ -195,7 +190,7 @@ export default function VocabularyMatching({
               : isMatched
                 ? colors.success
                 : (isSelectedState ? colors.primary : colors.border),
-            borderWidth: isSelectedState || isMatched || isIncorrect ? 3 : 1,
+            borderWidth: isSelectedState || isMatched || isIncorrect ? 3 : (isDesktop ? 2 : 1),
             height: cardHeight,
             marginBottom: index === list.length - 1 ? 0 : cardGap,
             maxWidth: isDesktop ? desktopCardMaxWidth : 360,
@@ -222,7 +217,7 @@ export default function VocabularyMatching({
                   ? colors.successText
                   : colors.text,
               fontSize: cardTextSize,
-              lineHeight: isDesktop ? Math.round(cardTextSize * 1.16) : isCompact ? 18 : isLarge ? 22 : 20,
+              lineHeight: isDesktop ? Math.round(cardTextSize * 1.22) : isCompact ? 20 : isLarge ? 24 : 22,
             },
           ]}
           numberOfLines={2}
@@ -465,6 +460,7 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     textAlign: 'center',
     paddingHorizontal: 4,
+    paddingVertical: 4,
   },
   matchedCardText: {
     color: '#2F7D3F',
@@ -472,21 +468,21 @@ const styles = StyleSheet.create({
   },
   progressContainer: {
     paddingHorizontal: 2,
-    marginTop: 4,
-    paddingBottom: 5,
+    marginTop: 2,
+    paddingBottom: 3,
   },
   progressContainerCompact: {
-    marginTop: 3,
-    paddingBottom: 5,
+    marginTop: 2,
+    paddingBottom: 3,
   },
   progressBar: {
-    height: 6,
+    height: 5,
     backgroundColor: '#e0e0e0',
     borderRadius: 4,
     overflow: 'hidden',
   },
   progressBarCompact: {
-    height: 8,
+    height: 6,
     borderRadius: 999,
   },
   progressFill: {
@@ -505,6 +501,7 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     borderRadius: 12,
     borderWidth: 0,
+    justifyContent: 'space-between',
   },
   summaryCardCompact: {
     paddingHorizontal: 12,
@@ -523,14 +520,14 @@ const styles = StyleSheet.create({
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    minHeight: 38,
+    minHeight: 34,
     borderRadius: 10,
     borderWidth: 0,
-    paddingVertical: 4,
+    paddingVertical: 3,
     paddingHorizontal: 6,
   },
   summaryItemVeryCompact: {
-    minHeight: 34,
+    minHeight: 30,
     paddingHorizontal: 4,
   },
   inlineSummaryItem: {

@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Image, ScrollView, Platform, useWindowDimensions, Modal, KeyboardAvoidingView, Keyboard, LayoutAnimation, UIManager } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Image, ScrollView, Platform, useWindowDimensions, Modal, KeyboardAvoidingView, Keyboard } from 'react-native';
 import BackButton from '../shared/BackButton';
 import ImageWithCredit from '../shared/ImageWithCredit';
 import VocabularyFlashcard from './VocabularyFlashcard';
@@ -13,10 +13,9 @@ import { Word } from '../../types/VocabularyTypes';
 import { useTypingGame } from './useTypingGame';
 import VocabularyTyping from './TypingView';
 import { useFocusEffect } from '@react-navigation/native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { MaterialIcons } from '@expo/vector-icons';
-import { clampNumber, getWebLessonImageScale, getWebLessonScale, scaleValue } from '../shared/responsiveLayout';
-import { getApkPreviewStatusBarInset, isApkLayoutPreviewEnabled } from '../shared/apkPreview';
+import { scaleValue } from '../shared/responsiveLayout';
+import { useLessonLayout, VocabularyMode } from './useLessonLayout';
 import { markPracticeActivityToday } from '../progress/xpStorage';
 import { saveLastLesson } from '../progress/lastLessonStorage';
 import { getLevelDisplayLabel, isMasterLevel } from '../progress/xpLevels';
@@ -27,141 +26,94 @@ import {
   saveLearnedFlashcardKeys,
 } from './flashcardProgressStorage';
 import { getSoftShadow, uiRadii } from '../shared/uiPrimitives';
+import type { CompositeScreenProps } from '@react-navigation/native';
+import type { NativeStackScreenProps } from '@react-navigation/native-stack';
+import type { VocabularyStackParamList, RootStackParamList } from '../../types/navigationTypes';
+import type { VocabGroup } from '../../types/lessonTypes';
 
 const shuffleWordList = (words: Word[]) => shuffleArray(words);
-const LESSON_MODE_ENABLED = false;
 const MAIN_TAB_TARGETS = ['Grammar', 'Vocabulary', 'Lessons', 'Settings'];
-const ANDROID_SECOND_VIEW_LAYOUT = {
-  modeRowTopGap: 18,
-  modeRowTopGapWithStatusBar: 4,
-  bodyTopGapCompact: 10,
-  bodyTopGapRegular: 14,
-  toolbarHeightCompact: 52,
-  toolbarHeightRegular: 56,
-  gameTopGap: 2,
-};
-type VocabularyMode = 'flashcards' | 'matching' | 'typing';
 const vocabularyWordKey = (word: Word) => `${word.english.trim().toLowerCase()}|${word.french.trim().toLowerCase()}`;
 const resolveVocabularyMode = (value: any): VocabularyMode =>
   value === 'matching' || value === 'typing' || value === 'flashcards' ? value : 'flashcards';
 const getInitialReverseDirection = (lesson: any) => !!lesson?.initialReverseDirection;
-type FlashcardLessonPhase = 'initial' | 'review';
+type MixedVocabularyImageCard = {
+  id: string;
+  title?: string;
+  imageUrl: string;
+};
 
-export default function VocabularyLessonScreen({ route, navigation }: any): any {
+type Props = CompositeScreenProps<
+  NativeStackScreenProps<VocabularyStackParamList, 'VocabularyLesson'>,
+  NativeStackScreenProps<RootStackParamList>
+>;
+
+export default function VocabularyLessonScreen({ route, navigation }: Props) {
   const { isDarkMode, colors, isVocabTimerMode, isVocabTimerRecordSavingEnabled, isAndroidStatusBarEnabled } = useTheme();
-  const insets = useSafeAreaInsets();
   const initialRouteMode = resolveVocabularyMode(route?.params?.initialMode);
-
   const { width: screenWidth, height: rawScreenHeight } = useWindowDimensions();
   const [mode, setMode] = useState<VocabularyMode>(initialRouteMode);
   const [viewportHeight, setViewportHeight] = useState(rawScreenHeight);
   const [isSecondViewActive, setIsSecondViewActive] = useState(false);
   const [stableScreenHeight, setStableScreenHeight] = useState(rawScreenHeight);
   const [keyboardHeight, setKeyboardHeight] = useState(0);
-  const useApkPreviewLayout = isApkLayoutPreviewEnabled();
-  const isAndroidLesson = Platform.OS === 'android' || useApkPreviewLayout;
-  const isWebLessonLayout = Platform.OS === 'web' && !useApkPreviewLayout;
-  const useReservedModeShell = isAndroidLesson || isWebLessonLayout;
-  const lessonLayoutWidth = useApkPreviewLayout ? Math.min(screenWidth, 430) : screenWidth;
-  const keyboardHeightDrop = stableScreenHeight - rawScreenHeight;
-  const isTypingKeyboardOpen = mode === 'typing' && (keyboardHeight > 0 || keyboardHeightDrop > 120);
-  const screenHeight = isTypingKeyboardOpen ? stableScreenHeight : rawScreenHeight;
-  const lessonViewportHeight = viewportHeight > 0 ? viewportHeight : screenHeight;
-  const isCompactScreen = lessonViewportHeight < 760 || lessonLayoutWidth < 390;
-  const isLargeScreen = lessonViewportHeight > 900 && lessonLayoutWidth >= 400;
-  const webLessonScale = getWebLessonScale(lessonLayoutWidth, lessonViewportHeight);
-  const webLessonImageScale = getWebLessonImageScale(lessonLayoutWidth, lessonViewportHeight);
-  const isDesktopWebLesson = isWebLessonLayout && lessonLayoutWidth >= 768;
-  const isScaledWebLesson = isDesktopWebLesson && webLessonScale > 1;
-  const webLessonMediaMaxWidth = isWebLessonLayout
-    ? Math.round(clampNumber(lessonLayoutWidth * 0.78, 860, 1320))
-    : undefined;
-  const webLessonGameMaxWidth = isWebLessonLayout
-    ? isDesktopWebLesson
-      ? Math.round(clampNumber(lessonLayoutWidth * 0.62, 840, 1040))
-      : scaleValue(760, webLessonScale)
-    : undefined;
-  const webTypingGameMaxWidth = isWebLessonLayout
-    ? Math.round(clampNumber(lessonLayoutWidth * 0.7, 820, 1060))
-    : undefined;
-  const webMatchingGameMaxWidth = isWebLessonLayout
-    ? Math.round(clampNumber(lessonLayoutWidth * 0.82, 820, 1240))
-    : undefined;
-  const androidTopInsetValue = useApkPreviewLayout ? getApkPreviewStatusBarInset() : insets.top;
-  const layoutTopInset = Platform.OS === 'ios'
-    ? (insets.top > 0 ? insets.top : 0)
-    : isAndroidLesson && isAndroidStatusBarEnabled
-      ? androidTopInsetValue
-      : 0;
-  const layoutBottomInset = isAndroidLesson ? 0 : insets.bottom;
-  const stickyHeaderTopPadding = isWebLessonLayout ? 4 : 6;
-  const androidSecondViewTopInset = isAndroidLesson && isAndroidStatusBarEnabled ? layoutTopInset : 0;
-  const androidModeRowTopGap = isAndroidLesson && isAndroidStatusBarEnabled
-    ? ANDROID_SECOND_VIEW_LAYOUT.modeRowTopGapWithStatusBar
-    : ANDROID_SECOND_VIEW_LAYOUT.modeRowTopGap;
-  const stickyHeaderPinnedTopPadding = isAndroidLesson
-    ? androidSecondViewTopInset + androidModeRowTopGap
-    : stickyHeaderTopPadding;
-  const STICKY_TOP_SNAP_OFFSET = 0;
-  const FLASHCARDS_VIEW_SNAP_EXTRA = 0;
-  const TYPING_VIEW_SNAP_EXTRA = isAndroidLesson ? 0 : isTypingKeyboardOpen ? (isCompactScreen ? 42 : 28) : 0;
-  const FLASHCARDS_VIEWPORT_TRIM = isAndroidLesson
-    ? isCompactScreen ? 12 : 18
-    : isCompactScreen ? 44 : 68;
-  const TYPING_VIEWPORT_TRIM = isWebLessonLayout && lessonLayoutWidth >= 768
-    ? (isCompactScreen ? 8 : 14)
-    : isAndroidLesson
-      ? (isCompactScreen ? 4 : 8)
-      : FLASHCARDS_VIEWPORT_TRIM;
-  const BOTTOM_NAVIGATION_RESERVE = isWebLessonLayout
-    ? (lessonLayoutWidth >= 768 ? 58 : 58)
-    : isAndroidLesson
-      ? Math.max(insets.bottom, 12)
-      : 50 + Math.max(insets.bottom, 0);
-  const hasMatchingCategoryControls = Array.isArray(route?.params?.lesson?.flashcards?.[0]?.words);
-  const hasAndroidGameToolbar = isAndroidLesson && (hasMatchingCategoryControls || mode === 'flashcards');
-  const MATCHING_CATEGORY_CONTROLS_HEIGHT = hasMatchingCategoryControls
-    ? isWebLessonLayout && lessonLayoutWidth >= 768
-      ? 38
-      : 46
-    : 0;
-  const MATCHING_GAME_TOP_SPACE = isAndroidLesson
-    ? 0
-    : (isWebLessonLayout && lessonLayoutWidth >= 768 ? 4 : 0) + 2;
-  const FIRST_VIEW_BOTTOM_SPACE = isCompactScreen ? 20 : 28;
-  const FIRST_VIEW_PEEK = 0;
-  const SECOND_VIEW_CONTROLS_HEIGHT = isCompactScreen ? 46 : 50;
-  const ANDROID_GAME_TOOLBAR_HEIGHT = hasAndroidGameToolbar
-    ? isCompactScreen
-      ? ANDROID_SECOND_VIEW_LAYOUT.toolbarHeightCompact
-      : ANDROID_SECOND_VIEW_LAYOUT.toolbarHeightRegular
-    : 0;
-  const ANDROID_GAME_CONTENT_TOP_PADDING = isAndroidLesson ? ANDROID_SECOND_VIEW_LAYOUT.gameTopGap : 0;
-  const LESSON_BODY_TOP_BUFFER = isAndroidLesson
-    ? isCompactScreen ? ANDROID_SECOND_VIEW_LAYOUT.bodyTopGapCompact : ANDROID_SECOND_VIEW_LAYOUT.bodyTopGapRegular
-    : mode === 'matching'
-      ? isCompactScreen ? 3 : 5
-      : isCompactScreen ? 6 : 8;
-  const flashcardModuleTopDrop = mode === 'flashcards' && !isDesktopWebLesson
-    ? isAndroidLesson
-      ? (isCompactScreen ? 10 : 12)
-      : (isCompactScreen ? 14 : 18)
-    : 0;
-  const flashcardSectionTopSpace = (isAndroidLesson ? 0 : 8) + flashcardModuleTopDrop;
-  const typingKeyboardInset = isTypingKeyboardOpen
-    ? isWebLessonLayout
-      ? 12
-      : (isCompactScreen ? 24 : 32)
-    : 0;
-  const secondViewBottomReserve =
-    isWebLessonLayout || isTypingKeyboardOpen ? 0 : BOTTOM_NAVIGATION_RESERVE;
-  const scrollBottomPadding =
-    isAndroidLesson && !isTypingKeyboardOpen ? 0 : Math.max(insets.bottom, 4);
-  const compactModeButtons = lessonLayoutWidth < 390;
-  const [titleBlockHeight, setTitleBlockHeight] = useState(72);
-  const [stickyHeaderHeight, setStickyHeaderHeight] = useState(112);
 
   const { lesson, backLabel = 'Back to Vocabulary', backTarget } = route.params;
+  const hasMatchingCategoryControls = Array.isArray((lesson?.flashcards?.[0] as any)?.words);
+
+  const {
+    insets,
+    useApkPreviewLayout,
+    isAndroidLesson,
+    isWebLessonLayout,
+    useReservedModeShell,
+    lessonLayoutWidth,
+    isTypingKeyboardOpen,
+    lessonViewportHeight,
+    webLessonScale,
+    isDesktopWebLesson,
+    isScaledWebLesson,
+    webLessonMediaMaxWidth,
+    lessonMediaWidth,
+    lessonImageContentScale,
+    webLessonGameMaxWidth,
+    webTypingGameMaxWidth,
+    webMatchingGameMaxWidth,
+    layoutTopInset,
+    stickyHeaderPinnedTopPadding,
+    STICKY_TOP_SNAP_OFFSET,
+    FLASHCARDS_VIEW_SNAP_EXTRA,
+    TYPING_VIEW_SNAP_EXTRA,
+    FIRST_VIEW_SECOND_VIEW_GUARD,
+    LESSON_BODY_TOP_BUFFER,
+    ANDROID_GAME_TOOLBAR_HEIGHT,
+    hasAndroidGameToolbar,
+    flashcardModuleTopDrop,
+    compactModeButtons,
+    typingKeyboardInset,
+    scrollBottomPadding,
+    setTitleBlockHeight,
+    stickyHeaderHeight,
+    setStickyHeaderHeight,
+    overviewMinHeight,
+    lessonImageHeight,
+    secondViewMinHeight,
+    secondViewShellMinHeight,
+    gameViewportMinHeight,
+    flashcardLayoutHeight,
+    matchingViewportMinHeight,
+    typingViewportMinHeight,
+    matchingViewSnapExtra,
+  } = useLessonLayout({
+    mode,
+    viewportHeight,
+    screenWidth,
+    rawScreenHeight,
+    keyboardHeight,
+    stableScreenHeight,
+    hasMatchingCategoryControls,
+    isAndroidStatusBarEnabled,
+  });
   const lessonIdentity = useMemo(
     () => String(lesson?.id || lesson?.title || 'lesson'),
     [lesson?.id, lesson?.title]
@@ -195,23 +147,23 @@ export default function VocabularyLessonScreen({ route, navigation }: any): any 
     const parentRouteNames = parentNavigation?.getState?.()?.routeNames ?? [];
     const isMainTabTarget = MAIN_TAB_TARGETS.includes(backTarget);
 
-    if (isMainTabTarget && typeof parentNavigation?.jumpTo === 'function') {
+    if (isMainTabTarget && typeof (parentNavigation as any)?.jumpTo === 'function') {
       resetBorrowedVocabularyLesson();
-      parentNavigation.jumpTo(backTarget);
+      (parentNavigation as any).jumpTo(backTarget);
       return;
     }
 
     if (parentNavigation && parentRouteNames.includes(backTarget)) {
-      parentNavigation.navigate(backTarget);
+      (parentNavigation as any).navigate(backTarget);
       return;
     }
 
     if (parentNavigation && isMainTabTarget && parentRouteNames.includes('MainTabs')) {
-      parentNavigation.navigate('MainTabs', { screen: backTarget });
+      (parentNavigation as any).navigate('MainTabs', { screen: backTarget });
       return;
     }
 
-    navigation.navigate(backTarget);
+    (navigation as any).navigate(backTarget);
   }, [backTarget, navigation, resetBorrowedVocabularyLesson]);
 
   useEffect(() => {
@@ -220,7 +172,7 @@ export default function VocabularyLessonScreen({ route, navigation }: any): any 
     const parentNavigation = navigation.getParent?.();
     if (!parentNavigation?.addListener) return undefined;
 
-    return parentNavigation.addListener('tabPress', (event: any) => {
+    return (parentNavigation as any).addListener('tabPress', (event: any) => {
       const parentState = parentNavigation.getState?.();
       const pressedRoute = parentState?.routes?.find((tabRoute: any) => tabRoute.key === event.target);
 
@@ -263,11 +215,6 @@ export default function VocabularyLessonScreen({ route, navigation }: any): any 
 
     return Math.max(0, overviewHeightRef.current + snapExtra);
   }, [isAndroidLesson, layoutTopInset]);
-  const overviewMinHeight = Math.max(
-    isCompactScreen ? 420 : 500,
-    lessonViewportHeight - layoutTopInset - layoutBottomInset - stickyHeaderHeight - FIRST_VIEW_PEEK
-  );
-
   useEffect(() => {
     if (lesson?.isLearnedMix) return;
 
@@ -282,19 +229,7 @@ export default function VocabularyLessonScreen({ route, navigation }: any): any 
     });
   }, [backTarget, lesson?.id, lesson?.isLearnedMix, lesson?.practiceType, lesson.title]);
 
-  const scheduleSoftLayoutChange = useCallback(() => {
-    if (Platform.OS === 'android') {
-      UIManager.setLayoutAnimationEnabledExperimental?.(true);
-    }
-
-    LayoutAnimation.configureNext(
-      LayoutAnimation.create(
-        260,
-        LayoutAnimation.Types.easeInEaseOut,
-        LayoutAnimation.Properties.scaleXY
-      )
-    );
-  }, []);
+  const scheduleSoftLayoutChange = useCallback(() => {}, []);
 
   useEffect(() => {
     const heightDrop = stableScreenHeight - rawScreenHeight;
@@ -304,174 +239,6 @@ export default function VocabularyLessonScreen({ route, navigation }: any): any 
       setStableScreenHeight(rawScreenHeight);
     }
   }, [isTypingKeyboardOpen, rawScreenHeight, scheduleSoftLayoutChange, stableScreenHeight]);
-
-  const lessonImageHeight = useMemo(() => {
-    const imageReservedGap = isWebLessonLayout
-      ? (isCompactScreen ? 62 : 70)
-      : (isCompactScreen ? 64 : 72);
-    const availableHeight =
-      overviewMinHeight - titleBlockHeight - FIRST_VIEW_BOTTOM_SPACE - imageReservedGap;
-
-    const minHeight = Math.round(clampNumber(
-      lessonViewportHeight * (isCompactScreen ? 0.42 : 0.5),
-      isCompactScreen ? 280 : 380,
-      isCompactScreen ? 380 : 520
-    ));
-    const maxByViewport = Math.round(clampNumber(
-      lessonViewportHeight * (isCompactScreen ? 0.72 : isLargeScreen ? 0.82 : 0.78),
-      isCompactScreen ? 430 : 560,
-      isLargeScreen ? 1060 : 900
-    ));
-    const maxByWidth = isWebLessonLayout
-      ? Math.round(clampNumber(lessonLayoutWidth * 0.95, 680, 1260) * webLessonImageScale)
-      : Math.round(clampNumber(lessonLayoutWidth * 1.8, 500, isLargeScreen ? 940 : 820));
-    const maxHeight = Math.max(minHeight, Math.min(maxByViewport, maxByWidth));
-
-    return Math.round(clampNumber(availableHeight, minHeight, maxHeight));
-  }, [FIRST_VIEW_BOTTOM_SPACE, isCompactScreen, isLargeScreen, isWebLessonLayout, lessonLayoutWidth, lessonViewportHeight, overviewMinHeight, titleBlockHeight, webLessonImageScale]);
-
-  const secondViewMinHeight = useMemo(() => {
-    const availableHeight =
-      lessonViewportHeight -
-      layoutBottomInset -
-      stickyHeaderHeight -
-      secondViewBottomReserve -
-      (isCompactScreen ? 8 : 12);
-    const minHeight = isCompactScreen ? 250 : 280;
-    return Math.max(minHeight, availableHeight);
-  }, [
-    isCompactScreen,
-    layoutBottomInset,
-    lessonViewportHeight,
-    secondViewBottomReserve,
-    stickyHeaderHeight,
-  ]);
-  const secondViewShellMinHeight = isAndroidLesson
-    ? lessonViewportHeight
-    : stickyHeaderHeight + secondViewMinHeight;
-
-  const androidPracticeViewportHeight = useMemo(() => {
-    if (!isAndroidLesson) return undefined;
-
-    const availableHeight =
-      secondViewMinHeight -
-      LESSON_BODY_TOP_BUFFER -
-      ANDROID_GAME_TOOLBAR_HEIGHT -
-      ANDROID_GAME_CONTENT_TOP_PADDING -
-      FLASHCARDS_VIEWPORT_TRIM;
-
-    return Math.max(isCompactScreen ? 220 : 260, availableHeight);
-  }, [
-    ANDROID_GAME_CONTENT_TOP_PADDING,
-    ANDROID_GAME_TOOLBAR_HEIGHT,
-    FLASHCARDS_VIEWPORT_TRIM,
-    LESSON_BODY_TOP_BUFFER,
-    isCompactScreen,
-    isAndroidLesson,
-    secondViewMinHeight,
-  ]);
-
-  const gameViewportMinHeight = useMemo(() => {
-    if (isAndroidLesson) {
-      return androidPracticeViewportHeight ?? (isCompactScreen ? 220 : 260);
-    }
-
-    const baseHeight =
-      secondViewMinHeight - SECOND_VIEW_CONTROLS_HEIGHT - FLASHCARDS_VIEWPORT_TRIM - (isCompactScreen ? 6 : 10);
-    return Math.max(isCompactScreen ? 170 : 190, baseHeight);
-  }, [
-    androidPracticeViewportHeight,
-    FLASHCARDS_VIEWPORT_TRIM,
-    SECOND_VIEW_CONTROLS_HEIGHT,
-    isCompactScreen,
-    isAndroidLesson,
-    secondViewMinHeight,
-  ]);
-  const flashcardLayoutHeight = Math.max(150, gameViewportMinHeight - flashcardSectionTopSpace);
-
-  const matchingViewportMinHeight = useMemo(() => {
-    if (isAndroidLesson) {
-      return androidPracticeViewportHeight ?? (isCompactScreen ? 260 : 320);
-    }
-
-    const availableHeight = lessonViewportHeight
-      - stickyHeaderHeight
-      - BOTTOM_NAVIGATION_RESERVE
-      - LESSON_BODY_TOP_BUFFER
-      - MATCHING_CATEGORY_CONTROLS_HEIGHT
-      - MATCHING_GAME_TOP_SPACE;
-
-    return Math.max(
-      isCompactScreen ? 260 : 320,
-      availableHeight
-    );
-  }, [
-    androidPracticeViewportHeight,
-    BOTTOM_NAVIGATION_RESERVE,
-    LESSON_BODY_TOP_BUFFER,
-    MATCHING_CATEGORY_CONTROLS_HEIGHT,
-    MATCHING_GAME_TOP_SPACE,
-    isCompactScreen,
-    isAndroidLesson,
-    lessonViewportHeight,
-    stickyHeaderHeight,
-  ]);
-
-  const typingViewportMinHeight = useMemo(() => {
-    if (isAndroidLesson) {
-      return androidPracticeViewportHeight ?? (isCompactScreen ? 220 : 260);
-    }
-
-    const availableHeight =
-      secondViewMinHeight - SECOND_VIEW_CONTROLS_HEIGHT - TYPING_VIEWPORT_TRIM - (isCompactScreen ? 2 : 8);
-    const minHeight = isCompactScreen ? 320 : 420;
-
-    return Math.max(minHeight, availableHeight);
-  }, [
-    androidPracticeViewportHeight,
-    TYPING_VIEWPORT_TRIM,
-    SECOND_VIEW_CONTROLS_HEIGHT,
-    isCompactScreen,
-    isAndroidLesson,
-    secondViewMinHeight,
-  ]);
-
-  const matchingViewSnapExtra = useMemo(() => {
-    if (isAndroidLesson) return 0;
-
-    const bottomNavigationReserve = isWebLessonLayout
-      ? (lessonLayoutWidth >= 768 ? 64 : 58)
-      : isAndroidLesson
-        ? Math.max(insets.bottom, 12)
-        : Math.max(insets.bottom, 42);
-    const gameTopSpace = isAndroidLesson
-      ? MATCHING_GAME_TOP_SPACE
-      : (isWebLessonLayout && lessonLayoutWidth >= 768 ? 4 : 0) + 2;
-    const visiblePracticeHeight = Math.max(
-      1,
-      lessonViewportHeight - stickyHeaderHeight - bottomNavigationReserve
-    );
-    const matchingTopChromeHeight = isAndroidLesson
-      ? ANDROID_GAME_TOOLBAR_HEIGHT + ANDROID_GAME_CONTENT_TOP_PADDING
-      : MATCHING_CATEGORY_CONTROLS_HEIGHT + gameTopSpace;
-    const matchingContentHeight =
-      LESSON_BODY_TOP_BUFFER + matchingTopChromeHeight + matchingViewportMinHeight;
-
-    return Math.max(0, matchingContentHeight - visiblePracticeHeight);
-  }, [
-    ANDROID_GAME_CONTENT_TOP_PADDING,
-    ANDROID_GAME_TOOLBAR_HEIGHT,
-    LESSON_BODY_TOP_BUFFER,
-    MATCHING_CATEGORY_CONTROLS_HEIGHT,
-    MATCHING_GAME_TOP_SPACE,
-    insets.bottom,
-    isAndroidLesson,
-    isWebLessonLayout,
-    lessonLayoutWidth,
-    lessonViewportHeight,
-    matchingViewportMinHeight,
-    stickyHeaderHeight,
-  ]);
 
   // Flashcards state
   const [currentWordIndex, setCurrentWordIndex] = useState(0);
@@ -484,21 +251,20 @@ export default function VocabularyLessonScreen({ route, navigation }: any): any 
   const [isFirstCompletion, setIsFirstCompletion] = useState(false);
   const [isPersonalBest, setIsPersonalBest] = useState(false);
   const [completionVisible, setCompletionVisible] = useState(false);
+  const [completionModalReady, setCompletionModalReady] = useState(false);
   const [startedTimerMode, setStartedTimerMode] = useState(isVocabTimerMode);
-  const [lessonModeEnabled, setLessonModeEnabled] = useState(false);
   const [learnedFlashcardKeys, setLearnedFlashcardKeys] = useState<Set<string>>(new Set());
+  const [learnedFlashcardKeysLoaded, setLearnedFlashcardKeysLoaded] = useState(false);
   const [knownFlashcardKeys, setKnownFlashcardKeys] = useState<Set<string>>(new Set());
   const [reviewFlashcardKeys, setReviewFlashcardKeys] = useState<Set<string>>(new Set());
   const [seenBackFlashcardKeys, setSeenBackFlashcardKeys] = useState<Set<string>>(new Set());
-  const [flashcardLessonPhase, setFlashcardLessonPhase] = useState<FlashcardLessonPhase>('initial');
   const [flashcardProgressModeEnabled, setFlashcardProgressModeEnabled] = useState(false);
-  const [lessonSummaryVisible, setLessonSummaryVisible] = useState(false);
   const [categoryPickerOpen, setCategoryPickerOpen] = useState(false);
 
   // Words
   const allWords = useMemo(() => {
     if (!lesson?.flashcards) return [];
-    return Array.isArray(lesson.flashcards[0]?.words)
+    return Array.isArray((lesson.flashcards[0] as any)?.words)
       ? lesson.flashcards.flatMap((c: any) => c.words)
       : lesson.flashcards;
   }, [lesson?.flashcards]);
@@ -507,7 +273,7 @@ const categories = useMemo<string[]>(() => {
   if (!lesson?.flashcards) return [];
 
   // grouped format
-  if (Array.isArray(lesson.flashcards[0]?.words)) {
+  if (Array.isArray((lesson.flashcards[0] as any)?.words)) {
     return lesson.flashcards
       .map((c: any) => c.category)
       .filter(Boolean);
@@ -537,12 +303,40 @@ const categories = useMemo<string[]>(() => {
   }, [lessonIdentity]);
 
   const selectedCategoryGroup = useMemo(() => {
-    if (!Array.isArray(lesson?.flashcards?.[0]?.words)) return null;
+    if (!Array.isArray((lesson?.flashcards?.[0] as any)?.words)) return null;
     if (selectedCategories.length !== 1) return null;
 
-    return lesson.flashcards.find((group: any) => group.category === selectedCategories[0]) ?? null;
+    return (lesson.flashcards.find((group: any) => group.category === selectedCategories[0]) as VocabGroup) ?? null;
   }, [lesson?.flashcards, selectedCategories]);
   const selectedCategoryImage = selectedCategoryGroup?.imageUrl ?? selectedCategoryGroup?.image;
+  const mixedLessonImageCards = useMemo<MixedVocabularyImageCard[]>(() => {
+    if (!lesson?.isVocabularyMix) return [];
+
+    if (Array.isArray(lesson.sourceLessonImageCards)) {
+      return lesson.sourceLessonImageCards
+        .filter((imageCard: { id?: string | number; title?: string; imageUrl?: string } | null | undefined): imageCard is { id?: string | number; title?: string; imageUrl: string } =>
+          typeof imageCard?.imageUrl === 'string' && imageCard.imageUrl.trim().length > 0
+        )
+        .map((imageCard: { id?: string | number; title?: string; imageUrl: string }, index: number) => ({
+          id: String(imageCard.id ?? imageCard.imageUrl ?? index),
+          title: imageCard.title,
+          imageUrl: imageCard.imageUrl.trim(),
+        }));
+    }
+
+    if (Array.isArray(lesson.sourceLessonImages)) {
+      return lesson.sourceLessonImages
+        .filter((imageUrl: unknown): imageUrl is string => typeof imageUrl === 'string' && imageUrl.trim().length > 0)
+        .map((imageUrl: string, index: number) => ({
+          id: `${imageUrl}-${index}`,
+          title: undefined,
+          imageUrl: imageUrl.trim(),
+        }));
+    }
+
+    return [];
+  }, [lesson?.isVocabularyMix, lesson?.sourceLessonImageCards, lesson?.sourceLessonImages]);
+  const shouldShowMixedImageCarousel = !selectedCategoryImage && mixedLessonImageCards.length > 1;
 
   // Hero image selection
   const localImageSource = useMemo(() => getLessonThumbnailSource(lesson), [lesson]);
@@ -678,8 +472,8 @@ const categories = useMemo<string[]>(() => {
     [filteredWords, learnedFlashcardKeys]
   );
   const flashcardsComplete = filteredWords.length > 0 && knownFlashcardKeys.size >= filteredWords.length;
-  const matchingUnlocked = !lessonModeEnabled || flashcardsComplete;
-  const typingUnlocked = !lessonModeEnabled || (flashcardsComplete && allSetsCompleted);
+  const matchingUnlocked = true;
+  const typingUnlocked = true;
   const currentWordReadyToMarkKnown = !!currentFlashcardKey && seenBackFlashcardKeys.has(currentFlashcardKey);
   const activeCategoryLabel = useMemo(() => {
     if (!selectedCategories.length) return categoryPickerAllLabel;
@@ -705,6 +499,7 @@ const categories = useMemo<string[]>(() => {
     }
 
     setCompletionVisible(true);
+    setCompletionModalReady(true);
   }, [
     allSetsCompleted,
     completionVisible,
@@ -784,10 +579,14 @@ const categories = useMemo<string[]>(() => {
   useEffect(() => {
     let active = true;
     setLearnedFlashcardKeys(new Set());
+    setLearnedFlashcardKeysLoaded(false);
 
     getLearnedFlashcardKeys(flashcardProgressLessonKey).then((keys) => {
-      if (active) setLearnedFlashcardKeys(keys);
-    });
+      if (active) {
+        setLearnedFlashcardKeys(keys);
+        setLearnedFlashcardKeysLoaded(true);
+      }
+    }).catch(() => {});
 
     return () => {
       active = false;
@@ -808,9 +607,7 @@ const categories = useMemo<string[]>(() => {
       setKnownFlashcardKeys(new Set());
       setReviewFlashcardKeys(new Set());
       setSeenBackFlashcardKeys(new Set());
-      setFlashcardLessonPhase('initial');
       setFlashcardProgressModeEnabled(false);
-      setLessonSummaryVisible(false);
 
       forceTimerResetOnNextInitRef.current = false;
       return;
@@ -848,30 +645,6 @@ const categories = useMemo<string[]>(() => {
   const typingGame = useTypingGame(typingWords, { allowSlashAlternatives: allowTypingSlashAlternatives });
   const typingLevelLabel = getLevelDisplayLabel(typingGame.level);
   const isTypingLevelMaster = isMasterLevel(typingGame.level);
-  const lessonSteps = [
-    {
-      key: 'flashcards',
-      label: flashcardLessonPhase === 'review' ? 'Review' : 'Flashcards',
-      active: mode === 'flashcards',
-      complete: flashcardsComplete,
-      locked: false,
-    },
-    {
-      key: 'matching',
-      label: 'Matching',
-      active: mode === 'matching',
-      complete: allSetsCompleted,
-      locked: !matchingUnlocked,
-    },
-    {
-      key: 'typing',
-      label: 'Write',
-      active: mode === 'typing',
-      complete: lessonSummaryVisible || (lessonModeEnabled && mode === 'typing' && typingGame.isSessionComplete),
-      locked: !typingUnlocked,
-    },
-  ];
-
   useEffect(() => {
     if (mode === 'typing') {
       typingGame.reset?.();
@@ -937,18 +710,6 @@ const categories = useMemo<string[]>(() => {
     matchingViewSnapExtra,
     useReservedModeShell,
   ]);
-
-  useEffect(() => {
-    if (!lessonModeEnabled || !flashcardsComplete || mode !== 'flashcards') return;
-
-    setMode('matching');
-    setTimeout(() => {
-      scrollViewRef.current?.scrollTo({
-        y: getSecondViewScrollY(STICKY_TOP_SNAP_OFFSET + getModeSnapExtra('matching')),
-        animated: true,
-      });
-    }, 120);
-  }, [flashcardsComplete, getModeSnapExtra, getSecondViewScrollY, lessonModeEnabled, mode, STICKY_TOP_SNAP_OFFSET]);
 
   const scrollToGame = useCallback((targetMode: VocabularyMode = mode, animated = true) => {
     const snapExtra = getModeSnapExtra(targetMode);
@@ -1084,13 +845,12 @@ const goToPrevWord = () => {
   setIsFlipped(false);
 };
 
-  const restartFlashcardDeck = (wordsForDeck: Word[], phase: FlashcardLessonPhase) => {
+  const restartFlashcardDeck = (wordsForDeck: Word[]) => {
     setFlashcardDeckWords(wordsForDeck);
     setShuffledFlashcards(wordsForDeck);
     setCurrentWordIndex(0);
     setIsFlipped(false);
     setIsFlashcardDeckShuffled(false);
-    setFlashcardLessonPhase(phase);
   };
 
   const reviewFlashcardWords = (wordsForReview: Word[]) => {
@@ -1102,7 +862,6 @@ const goToPrevWord = () => {
     setCurrentWordIndex(0);
     setIsFlipped(false);
     setIsFlashcardDeckShuffled(false);
-    setFlashcardLessonPhase('review');
     setMode('flashcards');
     scrollToGame('flashcards');
   };
@@ -1118,13 +877,11 @@ const goToPrevWord = () => {
     scrollToGame('matching');
   };
 
-  const resetLessonModeProgress = (keepLessonMode = lessonModeEnabled) => {
+  const resetLessonModeProgress = () => {
     setKnownFlashcardKeys(new Set());
     setReviewFlashcardKeys(new Set());
     setSeenBackFlashcardKeys(new Set());
-    setFlashcardLessonPhase('initial');
     setFlashcardProgressModeEnabled(false);
-    setLessonSummaryVisible(false);
     setCompletionVisible(false);
     setFlashcardDeckWords(filteredWords);
     setShuffledFlashcards(filteredWords);
@@ -1134,26 +891,6 @@ const goToPrevWord = () => {
     resetGameState();
     initializeGameSet();
     typingGame.reset?.();
-
-    if (keepLessonMode) {
-      setMode('flashcards');
-    }
-  };
-
-  const handleToggleLessonMode = () => {
-    if (!LESSON_MODE_ENABLED) return;
-
-    setLessonModeEnabled((prev) => {
-      const next = !prev;
-
-      if (next) {
-        resetLessonModeProgress(true);
-      } else {
-        resetLessonModeProgress(false);
-      }
-
-      return next;
-    });
   };
 
   const handleToggleCurrentFlashcardLearned = () => {
@@ -1214,21 +951,6 @@ const goToPrevWord = () => {
       return;
     }
 
-    if (lessonModeEnabled) {
-      if (nextKnownCount >= filteredWords.length) {
-        setMode('matching');
-        scrollToGame('matching');
-        return;
-      }
-
-      if (flashcardLessonPhase === 'initial' && reviewFlashcardKeys.size > 0) {
-        const reviewWords = filteredWords.filter((word: Word) => reviewFlashcardKeys.has(vocabularyWordKey(word)));
-
-        if (reviewWords.length > 0) {
-          restartFlashcardDeck(reviewWords, 'review');
-        }
-      }
-    }
   };
 
   const handleMarkFlashcardForReview = () => {
@@ -1252,15 +974,8 @@ const goToPrevWord = () => {
       (word: Word) => reviewFlashcardKeys.has(vocabularyWordKey(word)) || vocabularyWordKey(word) === key
     );
 
-    if (flashcardLessonPhase === 'initial') {
-      if (reviewWords.length > 0) {
-        restartFlashcardDeck(reviewWords, 'review');
-      }
-      return;
-    }
-
-    if (flashcardLessonPhase === 'review' && reviewWords.length > 0) {
-      restartFlashcardDeck(reviewWords, 'review');
+    if (reviewWords.length > 0) {
+      restartFlashcardDeck(reviewWords);
     }
   };
 
@@ -1301,20 +1016,13 @@ const goToPrevWord = () => {
     scrollToGame('typing');
   };
 
-  const handleLessonTypingComplete = () => {
-    if (!lessonModeEnabled) return;
-    setLessonSummaryVisible(true);
-  };
+  const handleLessonTypingComplete = () => {};
 
-  const handleReplayLessonFlow = () => {
-    resetLessonModeProgress(true);
-  };
-
-  const handleExitLessonMode = () => {
-    setLessonSummaryVisible(false);
-    setLessonModeEnabled(false);
-    resetLessonModeProgress(false);
-  };
+  const handleGoToAccount = useCallback(() => {
+    setCompletionVisible(false);
+    const rootNav = navigation.getParent?.()?.getParent?.();
+    rootNav?.navigate('Account' as never);
+  }, [navigation]);
 
   const handleReplay = (activateTimerMode = false) => {
     triggerSelectionHaptic();
@@ -1360,12 +1068,6 @@ const goToPrevWord = () => {
 
   const prevIsVocabTimerModeRef = useRef(isVocabTimerMode);
 
-  useEffect(() => {
-    if (!LESSON_MODE_ENABLED && lessonModeEnabled) {
-      setLessonModeEnabled(false);
-    }
-  }, [lessonModeEnabled]);
-
   const renderCategoryPickerButton = () => {
     if (categories.length === 0) return null;
 
@@ -1384,8 +1086,8 @@ const goToPrevWord = () => {
           styles.categoryPickerButton,
           isAndroidLesson && styles.categoryPickerButtonAndroid,
           {
-            backgroundColor: colors.surface,
-            borderColor: colors.borderStrong,
+            backgroundColor: isDarkMode ? colors.surface : colors.card,
+            borderColor: colors.border,
           },
         ]}
       >
@@ -1399,8 +1101,8 @@ const goToPrevWord = () => {
         </Text>
         <MaterialIcons
           name={categoryPickerOpen ? 'expand-less' : 'expand-more'}
-          size={20}
-          color={colors.primary}
+          size={18}
+          color={colors.secondaryText}
         />
       </TouchableOpacity>
     );
@@ -1423,20 +1125,22 @@ const goToPrevWord = () => {
           styles.progressModeButton,
           isAndroidLesson && styles.progressModeButtonAndroid,
           {
-            backgroundColor: flashcardProgressModeEnabled ? (colors.primarySoft ?? colors.surfaceAlt) : colors.surface,
-            borderColor: flashcardProgressModeEnabled ? colors.primary : colors.borderStrong,
+            backgroundColor: flashcardProgressModeEnabled
+              ? (colors.successSoft ?? colors.surfaceAlt)
+              : (isDarkMode ? colors.surface : colors.card),
+            borderColor: flashcardProgressModeEnabled ? colors.success : colors.border,
           },
         ]}
       >
         <MaterialIcons
           name={flashcardProgressModeEnabled ? 'toggle-on' : 'toggle-off'}
-          size={20}
-          color={flashcardProgressModeEnabled ? colors.primary : colors.secondaryText}
+          size={18}
+          color={flashcardProgressModeEnabled ? colors.success : colors.secondaryText}
         />
         <Text
           style={[
             styles.progressModeText,
-            { color: flashcardProgressModeEnabled ? colors.primary : colors.text },
+            { color: flashcardProgressModeEnabled ? (colors.successText ?? colors.success) : colors.text },
           ]}
           numberOfLines={1}
           adjustsFontSizeToFit
@@ -1447,13 +1151,13 @@ const goToPrevWord = () => {
         <Text
           style={[
             styles.progressModeMeta,
-            { color: flashcardProgressModeEnabled ? colors.primary : colors.secondaryText },
+            { color: flashcardProgressModeEnabled ? (colors.successText ?? colors.success) : colors.secondaryText },
           ]}
           numberOfLines={1}
           adjustsFontSizeToFit
           minimumFontScale={0.86}
         >
-          {flashcardProgressModeEnabled ? `${learnedFlashcardCount}/${filteredWords.length}` : 'Off'}
+          {flashcardProgressModeEnabled ? (learnedFlashcardKeysLoaded ? `${learnedFlashcardCount}/${filteredWords.length}` : '-') : 'Off'}
         </Text>
       </TouchableOpacity>
     );
@@ -1492,28 +1196,11 @@ const goToPrevWord = () => {
           isScaledWebLesson && { paddingHorizontal: scaleValue(16, webLessonScale) },
         ]}
       >
-        <View style={[styles.modeHeaderRow, isScaledWebLesson && { maxWidth: scaleValue(showSideActions ? 560 : 520, webLessonScale), gap: scaleValue(8, webLessonScale) }]}>
-          {showSideActions && (
-            <TouchableOpacity
-              accessibilityLabel={backLabel}
-              accessibilityRole="button"
-              onPress={handleBackPress}
-              style={[
-                styles.imageShortcutButton,
-                {
-                  backgroundColor: isDarkMode ? colors.surface : colors.card,
-                  borderColor: colors.border,
-                  width: scaleValue(42, webLessonScale),
-                  height: scaleValue(42, webLessonScale),
-                },
-              ]}
-            >
-              <MaterialIcons name="arrow-back" size={scaleValue(21, webLessonScale)} color={colors.text} />
-            </TouchableOpacity>
-          )}
+        <View style={[styles.modeHeaderRow, showSideActions && styles.modeHeaderRowFloatingActions, isScaledWebLesson && { maxWidth: scaleValue(showSideActions ? 560 : 520, webLessonScale), gap: scaleValue(8, webLessonScale) }]}>
           <View
             style={[
               styles.modeButtons,
+              showSideActions && styles.modeButtonsWithFloatingActions,
               compactModeButtons && styles.modeButtonsCompact,
               isScaledWebLesson && { maxWidth: scaleValue(showSideActions ? 460 : 520, webLessonScale) },
             ]}
@@ -1551,31 +1238,16 @@ const goToPrevWord = () => {
                       shadowColor: colors.buttonBackground,
                     },
                   ],
-                  lessonModeEnabled &&
-                    ((item.key === 'matching' && !matchingUnlocked) ||
-                      (item.key === 'typing' && !typingUnlocked)) &&
-                    styles.modeButtonLocked,
                 ]}
-                disabled={
-                  lessonModeEnabled &&
-                  ((item.key === 'matching' && !matchingUnlocked) ||
-                    (item.key === 'typing' && !typingUnlocked))
-                }
                 onPress={() => handleModeChange(item.key)}
                 accessibilityRole="button"
                 accessibilityLabel={`Switch to ${item.label}`}
-                accessibilityState={{
-                  selected: active,
-                  disabled:
-                    lessonModeEnabled &&
-                    ((item.key === 'matching' && !matchingUnlocked) ||
-                      (item.key === 'typing' && !typingUnlocked)),
-                }}
+                accessibilityState={{ selected: active }}
               >
                 <MaterialIcons
                   name={item.icon}
                   size={compactModeButtons ? 15 : 18}
-                  color={active ? '#FFFFFF' : colors.primary}
+                  color={active ? colors.buttonText : colors.primary}
                 />
                 <Text
                   style={[
@@ -1583,7 +1255,7 @@ const goToPrevWord = () => {
                     compactModeButtons && styles.modeTextCompact,
                     isAndroidLesson && styles.modeTextAndroid,
                     isAndroidLesson && compactModeButtons && styles.modeTextCompactAndroid,
-                    { color: active ? '#FFFFFF' : colors.text },
+                    { color: active ? colors.buttonText : colors.text },
                     isDesktopWebLesson && styles.modeTextDesktopWeb,
                     isScaledWebLesson && { fontSize: scaleValue(16, webLessonScale) },
                     active && styles.modeTextActive,
@@ -1598,6 +1270,25 @@ const goToPrevWord = () => {
           })}
         </View>
           {showSideActions && (
+            <>
+            <TouchableOpacity
+              accessibilityLabel={backLabel}
+              accessibilityRole="button"
+              onPress={handleBackPress}
+              style={[
+                styles.imageShortcutButton,
+                styles.headerFloatingActionButton,
+                styles.headerFloatingBackButton,
+                {
+                  backgroundColor: isDarkMode ? colors.surface : colors.card,
+                  borderColor: colors.border,
+                  width: scaleValue(isAndroidLesson ? 38 : 42, webLessonScale),
+                  height: scaleValue(isAndroidLesson ? 38 : 42, webLessonScale),
+                },
+              ]}
+            >
+              <MaterialIcons name="arrow-back" size={scaleValue(21, webLessonScale)} color={colors.text} />
+            </TouchableOpacity>
             <TouchableOpacity
               accessibilityLabel="Open lesson image"
               accessibilityRole="button"
@@ -1609,16 +1300,19 @@ const goToPrevWord = () => {
               }
               style={[
                 styles.imageShortcutButton,
+                styles.headerFloatingActionButton,
+                styles.headerFloatingImageButton,
                 {
                   backgroundColor: isDarkMode ? colors.surface : colors.card,
                   borderColor: colors.border,
-                  width: scaleValue(42, webLessonScale),
-                  height: scaleValue(42, webLessonScale),
+                  width: scaleValue(isAndroidLesson ? 38 : 42, webLessonScale),
+                  height: scaleValue(isAndroidLesson ? 38 : 42, webLessonScale),
                 },
               ]}
             >
               <MaterialIcons name="image" size={scaleValue(21, webLessonScale)} color={colors.text} />
             </TouchableOpacity>
+            </>
           )}
         </View>
       </View>
@@ -1667,38 +1361,6 @@ const goToPrevWord = () => {
             : { minHeight: secondViewMinHeight, paddingTop: LESSON_BODY_TOP_BUFFER },
         ]}
       >
-        {LESSON_MODE_ENABLED && lessonModeEnabled && (
-          <View style={[styles.lessonProgressCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
-            <Text style={[styles.lessonProgressTitle, { color: colors.secondaryText }]}>Lesson Path</Text>
-            <View style={styles.lessonProgressRow}>
-              {lessonSteps.map((step, index) => (
-                <React.Fragment key={step.key}>
-                  <View style={styles.lessonStepItem}>
-                    <View
-                      style={[
-                        styles.lessonStepDot,
-                        step.complete && { backgroundColor: colors.success },
-                        step.active && { backgroundColor: colors.primary },
-                        step.locked && styles.lessonStepDotLocked,
-                      ]}
-                    />
-                    <Text
-                      style={[
-                        styles.lessonStepLabel,
-                        step.complete && { color: colors.successText },
-                        step.active && { color: colors.primary },
-                        step.locked && styles.lessonStepLabelLocked,
-                      ]}
-                    >
-                      {step.label}
-                    </Text>
-                  </View>
-                  {index < lessonSteps.length - 1 && <View style={[styles.lessonStepLine, { backgroundColor: colors.border }]} />}
-                </React.Fragment>
-              ))}
-            </View>
-          </View>
-        )}
 
         {isAndroidLesson && hasAndroidGameToolbar ? (
           <View style={[styles.gameToolbarAndroid, { height: ANDROID_GAME_TOOLBAR_HEIGHT }]}>
@@ -1762,8 +1424,6 @@ const goToPrevWord = () => {
                   setReverseDirection((p) => !p);
                   setIsFlipped(false);
                 }}
-                lessonModeEnabled={lessonModeEnabled}
-                onToggleLessonMode={LESSON_MODE_ENABLED ? handleToggleLessonMode : undefined}
                 onMarkKnown={handleMarkFlashcardKnown}
                 onMarkReview={handleMarkFlashcardForReview}
                 onToggleLearned={handleToggleCurrentFlashcardLearned}
@@ -1809,24 +1469,25 @@ const goToPrevWord = () => {
                 forceAndroidLayout={useApkPreviewLayout}
               />
 
-              <VocabularyCompletionModal
-                visible={completionVisible}
-                gameState={gameState}
-                timerMode={timerMode}
-                wordsLength={filteredWords.length}
-                isDarkMode={isDarkMode}
-                onReplay={handleReplay}
-                isFirstCompletion={isFirstCompletion}
-                isPersonalBest={isPersonalBest}
-                colors={colors}
-                startedTimerMode={startedTimerMode}
-                bestTimeForActiveCategory={bestTimeForActiveCategory}
-                matchingSessionXp={matchingSessionXp}
-                reviewWords={matchingReviewWords}
-                onReviewWords={() => reviewFlashcardWords(matchingReviewWords)}
-                primaryActionLabel={LESSON_MODE_ENABLED && lessonModeEnabled ? 'Continue to Write' : undefined}
-                onPrimaryAction={LESSON_MODE_ENABLED && lessonModeEnabled ? handleContinueToTyping : undefined}
-              />
+              {completionModalReady && (
+                <VocabularyCompletionModal
+                  visible={completionVisible}
+                  gameState={gameState}
+                  timerMode={timerMode}
+                  wordsLength={filteredWords.length}
+                  isDarkMode={isDarkMode}
+                  onReplay={handleReplay}
+                  isFirstCompletion={isFirstCompletion}
+                  isPersonalBest={isPersonalBest}
+                  colors={colors}
+                  startedTimerMode={startedTimerMode}
+                  bestTimeForActiveCategory={bestTimeForActiveCategory}
+                  matchingSessionXp={matchingSessionXp}
+                  reviewWords={matchingReviewWords}
+                  onReviewWords={() => reviewFlashcardWords(matchingReviewWords)}
+                  onGoToAccount={handleGoToAccount}
+                />
+              )}
             </View>
           )}
 
@@ -1860,7 +1521,7 @@ const goToPrevWord = () => {
                 forceAndroidLayout={useApkPreviewLayout}
                 onShuffle={handleShuffleTypingWords}
                 onSessionComplete={handleLessonTypingComplete}
-                suppressCompletionScreen={LESSON_MODE_ENABLED && lessonModeEnabled}
+                onGoToAccount={handleGoToAccount}
               />
             </View>
           )}
@@ -1872,7 +1533,7 @@ const goToPrevWord = () => {
   return (
     <KeyboardAvoidingView
       style={[styles.container, { backgroundColor: colors.background }]}
-      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+      behavior={undefined}
       onLayout={handleViewportLayout}
     >
       <ScrollView
@@ -1926,25 +1587,89 @@ const goToPrevWord = () => {
             </Text>
           </View>
 
-          <ImageWithCredit
-            source={preferredImageSource as any}
-            style={
-              isWebLessonLayout
-                ? [styles.lessonImage, styles.webLessonImage, { height: lessonImageHeight, maxWidth: webLessonMediaMaxWidth }]
-                : [styles.lessonImage, { height: lessonImageHeight }]
-            }
-            onPress={() =>
-              navigation.navigate('FullImageModal', {
-                source: preferredImageSource,
-                uri: preferredImageUri,
-              })
-            }
-          />
+          {shouldShowMixedImageCarousel ? (
+            <View
+              style={[
+                styles.mixedImageCarouselWrap,
+                {
+                  width: lessonMediaWidth,
+                  maxWidth: webLessonMediaMaxWidth,
+                },
+              ]}
+            >
+              <ScrollView
+                horizontal
+                pagingEnabled
+                showsHorizontalScrollIndicator={false}
+                snapToInterval={lessonMediaWidth}
+                decelerationRate="fast"
+                directionalLockEnabled
+                disableIntervalMomentum
+                nestedScrollEnabled
+                style={[
+                  styles.mixedImageScroll,
+                  {
+                    width: lessonMediaWidth,
+                    height: lessonImageHeight,
+                  },
+                ]}
+                contentContainerStyle={styles.mixedImageScrollContent}
+              >
+                {mixedLessonImageCards.map((imageCard: MixedVocabularyImageCard, imageIndex: number) => {
+                  const slideSource = { uri: imageCard.imageUrl };
+
+                  return (
+                    <View
+                      key={`${imageCard.id}-${imageIndex}`}
+                      style={[
+                        styles.mixedImageSlide,
+                        {
+                          width: lessonMediaWidth,
+                          height: lessonImageHeight,
+                        },
+                      ]}
+                    >
+                      <ImageWithCredit
+                        source={slideSource}
+                        imageScale={lessonImageContentScale}
+                        style={[
+                          styles.mixedCarouselImage,
+                          {
+                            width: lessonMediaWidth,
+                            height: lessonImageHeight,
+                          },
+                        ] as any}
+                        accessibilityLabel={imageCard.title ? `${imageCard.title} lesson image` : 'Lesson image'}
+                      />
+                    </View>
+                  );
+                })}
+              </ScrollView>
+
+            </View>
+          ) : (
+            <ImageWithCredit
+              source={preferredImageSource as any}
+              imageScale={lessonImageContentScale}
+              style={
+                isWebLessonLayout
+                  ? [styles.lessonImage, styles.webLessonImage, { height: lessonImageHeight, maxWidth: webLessonMediaMaxWidth }]
+                  : [styles.lessonImage, { height: lessonImageHeight }]
+              }
+              onPress={() =>
+                navigation.navigate('FullImageModal', {
+                  source: preferredImageSource,
+                  uri: preferredImageUri,
+                })
+              }
+            />
+          )}
         </View>
 
         {useReservedModeShell ? (
           <VocabularySecondViewShell
             backgroundColor={colors.background}
+            bodyTopGuard={isSecondViewActive ? 0 : FIRST_VIEW_SECOND_VIEW_GUARD}
             headerTopPadding={stickyHeaderPinnedTopPadding}
             headerBottomPadding={isWebLessonLayout ? 18 : 14}
             minHeight={secondViewShellMinHeight}
@@ -1976,6 +1701,19 @@ const goToPrevWord = () => {
           </View>
         )}
 
+        {!useReservedModeShell && (
+          <View
+            pointerEvents="none"
+            style={[
+              styles.firstViewSecondViewGuard,
+              {
+                backgroundColor: colors.background,
+                height: isSecondViewActive ? 0 : FIRST_VIEW_SECOND_VIEW_GUARD,
+              },
+            ]}
+          />
+        )}
+
         {useReservedModeShell ? (
           null
         ) : (
@@ -1987,38 +1725,6 @@ const goToPrevWord = () => {
           ]}
         >
 
-        {LESSON_MODE_ENABLED && lessonModeEnabled && (
-          <View style={[styles.lessonProgressCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
-            <Text style={[styles.lessonProgressTitle, { color: colors.secondaryText }]}>Lesson Path</Text>
-            <View style={styles.lessonProgressRow}>
-              {lessonSteps.map((step, index) => (
-                <React.Fragment key={step.key}>
-                  <View style={styles.lessonStepItem}>
-                    <View
-                      style={[
-                        styles.lessonStepDot,
-                        step.complete && { backgroundColor: colors.success },
-                        step.active && { backgroundColor: colors.primary },
-                        step.locked && styles.lessonStepDotLocked,
-                      ]}
-                    />
-                    <Text
-                      style={[
-                        styles.lessonStepLabel,
-                        step.complete && { color: colors.successText },
-                        step.active && { color: colors.primary },
-                        step.locked && styles.lessonStepLabelLocked,
-                      ]}
-                    >
-                      {step.label}
-                    </Text>
-                  </View>
-                  {index < lessonSteps.length - 1 && <View style={[styles.lessonStepLine, { backgroundColor: colors.border }]} />}
-                </React.Fragment>
-              ))}
-            </View>
-          </View>
-        )}
 
         {isAndroidLesson ? (
           <View style={[styles.gameToolbarAndroid, { height: ANDROID_GAME_TOOLBAR_HEIGHT }]}>
@@ -2029,6 +1735,15 @@ const goToPrevWord = () => {
         )}
 
         {/* CONTENT */}
+        {filteredWords.length === 0 && (
+          <View style={[styles.emptyLessonState, { backgroundColor: colors.card, borderColor: colors.border }]}>
+            <MaterialIcons name="book" size={32} color={colors.secondaryText} />
+            <Text style={[styles.emptyLessonStateTitle, { color: colors.text }]}>No words yet</Text>
+            <Text style={[styles.emptyLessonStateSubtitle, { color: colors.secondaryText }]}>
+              This lesson doesn't have any words in the current selection.
+            </Text>
+          </View>
+        )}
         <View
           style={[
             styles.gameViewport,
@@ -2081,8 +1796,6 @@ const goToPrevWord = () => {
                 setReverseDirection((p) => !p);
                 setIsFlipped(false);
               }}
-              lessonModeEnabled={lessonModeEnabled}
-              onToggleLessonMode={LESSON_MODE_ENABLED ? handleToggleLessonMode : undefined}
               onMarkKnown={handleMarkFlashcardKnown}
               onMarkReview={handleMarkFlashcardForReview}
               onToggleLearned={handleToggleCurrentFlashcardLearned}
@@ -2128,24 +1841,24 @@ const goToPrevWord = () => {
               forceAndroidLayout={useApkPreviewLayout}
             />
 
-            <VocabularyCompletionModal
-              visible={completionVisible}
-              gameState={gameState}
-              timerMode={timerMode}
-              wordsLength={filteredWords.length}
-              isDarkMode={isDarkMode}
-              onReplay={handleReplay}
-              isFirstCompletion={isFirstCompletion}
-              isPersonalBest={isPersonalBest}
-              colors={colors}
-              startedTimerMode={startedTimerMode}
-              bestTimeForActiveCategory={bestTimeForActiveCategory}
-              matchingSessionXp={matchingSessionXp}
-              reviewWords={matchingReviewWords}
-              onReviewWords={() => reviewFlashcardWords(matchingReviewWords)}
-              primaryActionLabel={LESSON_MODE_ENABLED && lessonModeEnabled ? 'Continue to Write' : undefined}
-              onPrimaryAction={LESSON_MODE_ENABLED && lessonModeEnabled ? handleContinueToTyping : undefined}
-            />
+            {completionModalReady && (
+              <VocabularyCompletionModal
+                visible={completionVisible}
+                gameState={gameState}
+                timerMode={timerMode}
+                wordsLength={filteredWords.length}
+                isDarkMode={isDarkMode}
+                onReplay={handleReplay}
+                isFirstCompletion={isFirstCompletion}
+                isPersonalBest={isPersonalBest}
+                colors={colors}
+                startedTimerMode={startedTimerMode}
+                bestTimeForActiveCategory={bestTimeForActiveCategory}
+                matchingSessionXp={matchingSessionXp}
+                reviewWords={matchingReviewWords}
+                onReviewWords={() => reviewFlashcardWords(matchingReviewWords)}
+              />
+            )}
             </View>
           )}
 
@@ -2179,7 +1892,7 @@ const goToPrevWord = () => {
               forceAndroidLayout={useApkPreviewLayout}
               onShuffle={handleShuffleTypingWords}
               onSessionComplete={handleLessonTypingComplete}
-              suppressCompletionScreen={LESSON_MODE_ENABLED && lessonModeEnabled}
+              onGoToAccount={handleGoToAccount}
             />
             </View>
           )}
@@ -2260,56 +1973,6 @@ const goToPrevWord = () => {
           </TouchableOpacity>
         </TouchableOpacity>
       </Modal>
-      <Modal visible={LESSON_MODE_ENABLED && lessonSummaryVisible} transparent animationType="fade">
-        <View style={styles.lessonSummaryBackdrop}>
-          <View style={[styles.lessonSummaryCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
-            <Text style={[styles.lessonSummaryTitle, { color: colors.text }]}>Lesson Complete</Text>
-            <Text style={[styles.lessonSummarySubtitle, { color: colors.secondaryText }]}>
-              Flashcards, matching, and writing done.
-            </Text>
-
-            <View style={styles.lessonSummaryMetrics}>
-              <View style={[styles.lessonSummaryMetricBox, { borderColor: colors.border, backgroundColor: colors.surface }]}>
-                <Text style={[styles.lessonSummaryMetricLabel, { color: colors.secondaryText }]}>Known</Text>
-                <Text style={[styles.lessonSummaryMetricValue, { color: colors.text }]}>
-                  {knownFlashcardKeys.size}/{filteredWords.length}
-                </Text>
-              </View>
-              <View style={[styles.lessonSummaryMetricBox, { borderColor: colors.border, backgroundColor: colors.surface }]}>
-                <Text style={[styles.lessonSummaryMetricLabel, { color: colors.secondaryText }]}>Matching</Text>
-                <Text style={[styles.lessonSummaryMetricValue, { color: colors.text }]}>
-                  {gameState.totalScore}/{filteredWords.length}
-                </Text>
-              </View>
-              <View style={[styles.lessonSummaryMetricBox, { borderColor: colors.border, backgroundColor: colors.surface }]}>
-                <Text style={[styles.lessonSummaryMetricLabel, { color: colors.secondaryText }]}>Writing points</Text>
-                <Text style={[styles.lessonSummaryMetricValue, { color: colors.text }]}>
-                  +{typingGame.sessionXp}
-                </Text>
-              </View>
-            </View>
-
-            <Text style={[styles.lessonSummaryLevelText, { color: isTypingLevelMaster ? '#8A5A00' : colors.text }]}>
-              {typingLevelLabel}
-            </Text>
-
-            <View style={styles.lessonSummaryActions}>
-              <TouchableOpacity
-                style={[styles.lessonSummarySecondaryButton, { backgroundColor: colors.surface, borderColor: colors.border }]}
-                onPress={handleExitLessonMode}
-              >
-                <Text style={[styles.lessonSummarySecondaryButtonText, { color: colors.text }]}>Free Practice</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[styles.lessonSummaryPrimaryButton, { backgroundColor: colors.primary }]}
-                onPress={handleReplayLessonFlow}
-              >
-                <Text style={styles.lessonSummaryPrimaryButtonText}>Replay Lesson</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-        </View>
-      </Modal>
     </KeyboardAvoidingView>
   );
 }
@@ -2353,6 +2016,9 @@ const styles = StyleSheet.create({
   webStickyHeaderFirstView: {
     paddingBottom: 18,
   },
+  firstViewSecondViewGuard: {
+    height: 44,
+  },
   title: {
     fontSize: 24,
     fontWeight: 'bold',
@@ -2375,6 +2041,71 @@ const styles = StyleSheet.create({
   webLessonImage: {
     marginTop: 6,
     marginBottom: 4,
+  },
+  mixedImageCarouselWrap: {
+    alignSelf: 'center',
+    marginTop: 10,
+    marginBottom: 8,
+    position: 'relative',
+  },
+  mixedImageScroll: {
+    borderRadius: 18,
+    overflow: 'hidden',
+  },
+  mixedImageScrollContent: {
+    alignItems: 'center',
+  },
+  mixedImageSlide: {
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  mixedCarouselImage: {
+    alignSelf: 'center',
+    borderRadius: 18,
+  },
+  mixedImageCarouselOverlay: {
+    alignItems: 'center',
+    bottom: 12,
+    flexDirection: 'row',
+    gap: 8,
+    left: 12,
+    pointerEvents: 'box-none',
+    position: 'absolute',
+    right: 12,
+  },
+  mixedImageNavButton: {
+    alignItems: 'center',
+    borderRadius: 18,
+    borderWidth: 1,
+    height: 36,
+    justifyContent: 'center',
+    width: 36,
+  },
+  mixedImageNavButtonDisabled: {
+    opacity: 0.42,
+  },
+  mixedImageStatusPill: {
+    alignItems: 'center',
+    borderRadius: 18,
+    borderWidth: 1,
+    flex: 1,
+    flexDirection: 'row',
+    gap: 8,
+    justifyContent: 'center',
+    minHeight: 36,
+    minWidth: 0,
+    paddingHorizontal: 12,
+  },
+  mixedImageStatusTitle: {
+    flexShrink: 1,
+    fontSize: 12,
+    fontWeight: '800',
+    lineHeight: 15,
+  },
+  mixedImageStatusCount: {
+    fontSize: 11,
+    fontWeight: '900',
+    lineHeight: 14,
   },
   lessonBody: {
     justifyContent: 'flex-start',
@@ -2407,6 +2138,10 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     gap: 8,
+    position: 'relative',
+  },
+  modeHeaderRowFloatingActions: {
+    minHeight: 44,
   },
   modeButtons: {
     flex: 1,
@@ -2417,6 +2152,9 @@ const styles = StyleSheet.create({
     maxWidth: 460,
     alignSelf: 'center',
     marginBottom: 0,
+  },
+  modeButtonsWithFloatingActions: {
+    paddingHorizontal: 44,
   },
   modeButtonsCompact: {
     maxWidth: '100%',
@@ -2429,6 +2167,18 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: 0,
+  },
+  headerFloatingActionButton: {
+    elevation: 4,
+    position: 'absolute',
+    top: 2,
+    zIndex: 5,
+  },
+  headerFloatingBackButton: {
+    left: 0,
+  },
+  headerFloatingImageButton: {
+    right: 0,
   },
   stickyActionButtonHidden: {
     opacity: 0,
@@ -2458,15 +2208,15 @@ const styles = StyleSheet.create({
     gap: 3,
   },
   activeMode: {
-    backgroundColor: '#1982d2ff',
-    borderColor: '#105b94ff',
+    backgroundColor: '#1F7AD1',
+    borderColor: '#155B9F',
   },
   modeButtonLocked: {
     opacity: 0.45,
   },
   modeText: {
     flexShrink: 1,
-    fontWeight: '500',
+    fontWeight: '400',
     fontSize: 16,
     lineHeight: 19,
   },
@@ -2477,80 +2227,17 @@ const styles = StyleSheet.create({
   modeTextAndroid: {
     fontSize: 16,
     lineHeight: 19,
-    fontWeight: '500',
+    fontWeight: '400',
   },
   modeTextCompactAndroid: {
     fontSize: 14,
     lineHeight: 17,
   },
   modeTextDesktopWeb: {
-    fontWeight: '800',
+    fontWeight: '600',
   },
   modeTextActive: {
     color: '#ffffffff',
-  },
-  lessonProgressCard: {
-    marginHorizontal: 16,
-    marginBottom: 16,
-    paddingVertical: 14,
-    paddingHorizontal: 16,
-    borderRadius: 14,
-    backgroundColor: '#fff',
-    borderWidth: 1.5,
-    borderColor: '#d8e2ec',
-  },
-  lessonProgressTitle: {
-    fontSize: 14,
-    fontWeight: '800',
-    color: '#4B5B6A',
-    marginBottom: 12,
-    textAlign: 'center',
-  },
-  lessonProgressRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-  },
-  lessonStepItem: {
-    alignItems: 'center',
-    minWidth: 78,
-  },
-  lessonStepDot: {
-    width: 12,
-    height: 12,
-    borderRadius: 999,
-    backgroundColor: '#D0D7DE',
-    marginBottom: 6,
-  },
-  lessonStepDotActive: {
-    backgroundColor: '#1671B6',
-  },
-  lessonStepDotComplete: {
-    backgroundColor: '#58CC02',
-  },
-  lessonStepDotLocked: {
-    backgroundColor: '#BCC6D0',
-  },
-  lessonStepLabel: {
-    fontSize: 13,
-    fontWeight: '700',
-    color: '#6B7A89',
-  },
-  lessonStepLabelActive: {
-    color: '#1671B6',
-  },
-  lessonStepLabelComplete: {
-    color: '#2F8F2F',
-  },
-  lessonStepLabelLocked: {
-    color: '#9AA5B1',
-  },
-  lessonStepLine: {
-    flex: 1,
-    height: 2,
-    backgroundColor: '#D8E2EC',
-    marginHorizontal: 6,
-    marginBottom: 18,
   },
   categoryRow: {
     marginTop: 8,
@@ -2606,11 +2293,12 @@ const styles = StyleSheet.create({
     position: 'relative',
     zIndex: 6,
     elevation: 6,
-    minHeight: 34,
-    borderRadius: 999,
+    height: 32,
+    minHeight: 32,
+    borderRadius: 10,
     borderWidth: 1,
     paddingHorizontal: 12,
-    paddingVertical: 6,
+    paddingVertical: 3,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
@@ -2627,11 +2315,12 @@ const styles = StyleSheet.create({
     flexShrink: 1,
   },
   progressModeButton: {
-    minHeight: 34,
-    borderRadius: 999,
+    height: 32,
+    minHeight: 32,
+    borderRadius: 10,
     borderWidth: 1,
     paddingHorizontal: 10,
-    paddingVertical: 6,
+    paddingVertical: 3,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
@@ -2673,6 +2362,26 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingBottom: 0,
     justifyContent: 'flex-start',
+  },
+  emptyLessonState: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    marginHorizontal: 16,
+    marginTop: 32,
+    paddingVertical: 36,
+    paddingHorizontal: 24,
+    borderRadius: 16,
+    borderWidth: 1.5,
+  },
+  emptyLessonStateTitle: {
+    fontSize: 17,
+    fontWeight: '600',
+    textAlign: 'center',
+  },
+  emptyLessonStateSubtitle: {
+    fontSize: 14,
+    textAlign: 'center',
   },
   gameViewportAndroid: {
     paddingTop: 6,
@@ -2731,8 +2440,8 @@ const styles = StyleSheet.create({
     marginRight: 10,
   },
   categoryChipActive: {
- backgroundColor: '#1da5c4ff',
-    borderColor: '#1881cdff',
+    backgroundColor: '#1F7AD1',
+    borderColor: '#155B9F',
   },
   categoryText: {
     fontSize: 16,
@@ -2799,90 +2508,5 @@ const styles = StyleSheet.create({
   categorySheetOptionText: {
     fontSize: 16,
     fontWeight: '600',
-  },
-  lessonSummaryBackdrop: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.45)',
-    alignItems: 'center',
-    justifyContent: 'center',
-    padding: 20,
-  },
-  lessonSummaryCard: {
-    width: '100%',
-    maxWidth: 460,
-    borderRadius: 18,
-    padding: 22,
-    borderWidth: 1.5,
-    borderColor: '#DDE5EE',
-  },
-  lessonSummaryTitle: {
-    fontSize: 28,
-    fontWeight: '800',
-    textAlign: 'center',
-    marginBottom: 6,
-  },
-  lessonSummarySubtitle: {
-    fontSize: 15,
-    fontWeight: '600',
-    textAlign: 'center',
-    marginBottom: 18,
-  },
-  lessonSummaryMetrics: {
-    flexDirection: 'row',
-    gap: 10,
-    marginBottom: 18,
-  },
-  lessonSummaryMetricBox: {
-    flex: 1,
-    borderWidth: 1.5,
-    borderRadius: 12,
-    borderColor: '#DDE5EE',
-    paddingVertical: 14,
-    paddingHorizontal: 10,
-    alignItems: 'center',
-  },
-  lessonSummaryMetricLabel: {
-    fontSize: 13,
-    fontWeight: '700',
-    marginBottom: 6,
-  },
-  lessonSummaryMetricValue: {
-    fontSize: 19,
-    fontWeight: '800',
-  },
-  lessonSummaryLevelText: {
-    fontSize: 22,
-    fontWeight: '800',
-    textAlign: 'center',
-    marginBottom: 18,
-  },
-  lessonSummaryActions: {
-    flexDirection: 'row',
-    gap: 10,
-  },
-  lessonSummaryPrimaryButton: {
-    flex: 1,
-    backgroundColor: '#1671B6',
-    paddingVertical: 12,
-    borderRadius: 12,
-    alignItems: 'center',
-  },
-  lessonSummaryPrimaryButtonText: {
-    color: '#fff',
-    fontSize: 15,
-    fontWeight: '800',
-  },
-  lessonSummarySecondaryButton: {
-    flex: 1,
-    backgroundColor: '#EEF3F8',
-    paddingVertical: 12,
-    borderRadius: 12,
-    borderWidth: 1.5,
-    alignItems: 'center',
-  },
-  lessonSummarySecondaryButtonText: {
-    color: '#44505C',
-    fontSize: 15,
-    fontWeight: '800',
   },
 });

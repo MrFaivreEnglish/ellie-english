@@ -1,5 +1,5 @@
-import React, { useEffect, useMemo, useRef } from 'react';
-import { Animated, Image, StyleProp, StyleSheet, Text, View, ViewStyle } from 'react-native';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { Animated, Image, Pressable, StyleProp, StyleSheet, Text, View, ViewStyle } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { getAccountAvatarUnlocksBetweenLevels, type AccountAvatarPreset } from '../account/accountAvatarStorage';
 import type { ThemeColors } from '../settings/ThemeContext';
@@ -21,7 +21,20 @@ type LevelProgressSummaryProps = {
   colors?: Partial<ThemeColors>;
   isDarkMode?: boolean;
   style?: StyleProp<ViewStyle>;
+  onGoToAccount?: () => void;
 };
+
+const CONFETTI_COLORS = ['#FF6B6B', '#4ECDC4', '#FFD93D', '#6BCB77', '#4D96FF', '#FF922B', '#CC5DE8', '#F7B731'];
+const CONFETTI_N = 26;
+const CONFETTI_PARTICLES = Array.from({ length: CONFETTI_N }, (_, i) => ({
+  color: CONFETTI_COLORS[i % CONFETTI_COLORS.length],
+  width: i % 3 === 0 ? 7 : i % 3 === 1 ? 12 : 9,
+  height: i % 3 === 0 ? 14 : i % 3 === 1 ? 7 : 9,
+  isCircle: i % 5 === 0,
+  angle: (i / CONFETTI_N) * Math.PI * 2,
+  distance: 120 + (i % 6) * 28,
+  spinDeg: (i % 2 === 0 ? 1 : -1) * (120 + (i % 4) * 45),
+}));
 
 const normalizeXP = (value: number) => {
   if (!Number.isFinite(value)) return 0;
@@ -50,21 +63,34 @@ export default function LevelProgressSummary({
   colors,
   isDarkMode = false,
   style,
+  onGoToAccount,
 }: LevelProgressSummaryProps) {
   const earnedXP = normalizeXP(sessionXP);
   const safeTotalXP = normalizeXP(totalXP);
   const previousXP = Math.max(0, safeTotalXP - earnedXP);
   const progressAnim = useRef(new Animated.Value(0)).current;
+  const levelBumpScale = useRef(new Animated.Value(1)).current;
+  const confettiXArr = useRef(CONFETTI_PARTICLES.map(() => new Animated.Value(0))).current;
+  const confettiYArr = useRef(CONFETTI_PARTICLES.map(() => new Animated.Value(0))).current;
+  const confettiOpacityArr = useRef(CONFETTI_PARTICLES.map(() => new Animated.Value(0))).current;
+  const confettiScaleArr = useRef(CONFETTI_PARTICLES.map(() => new Animated.Value(0))).current;
+  const confettiRotArr = useRef(CONFETTI_PARTICLES.map(() => new Animated.Value(0))).current;
+  const levelUpBannerScale = useRef(new Animated.Value(0.7)).current;
+  const levelUpBannerOpacity = useRef(new Animated.Value(0)).current;
+  const [showLevelUpBanner, setShowLevelUpBanner] = useState(false);
 
   const stats = useMemo(() => getXPLevelStats(safeTotalXP), [safeTotalXP]);
   const previousStats = useMemo(() => getXPLevelStats(previousXP), [previousXP]);
   const previousLevel = useMemo(() => getXPLevel(previousXP), [previousXP]);
   const didLevelUp = stats.level > previousLevel;
   const startProgress = didLevelUp ? 0 : previousStats.progressPercent;
+  const [displayedLevel, setDisplayedLevel] = useState(() => didLevelUp ? previousLevel : stats.level);
   const isMaster = isMasterLevel(stats.level);
   const levelDisplayLabel = getLevelDisplayLabel(stats.level);
   const levelBadgeLabel = getLevelBadgeLabel(stats.level);
   const nextLevelDisplayLabel = getLevelDisplayLabel(stats.level + 1);
+  const displayedLevelLabel = getLevelDisplayLabel(displayedLevel);
+  const displayedNextLevelLabel = getLevelDisplayLabel(displayedLevel + 1);
   const masterTierLabel = getMasterTierLabel(stats.level);
   const masterStarCount = getMasterStarCount(stats.level);
   const didReachMaster = stats.level >= MASTER_LEVEL_START && previousLevel < MASTER_LEVEL_START;
@@ -78,20 +104,84 @@ export default function LevelProgressSummary({
     [newAvatarUnlocks]
   );
   const extraAvatarUnlockCount = Math.max(0, newAvatarUnlocks.length - 1);
+  const levelsGained = stats.level - previousLevel;
   const levelUpTitle = didReachMaster
     ? 'Ellie Master!'
     : didMasterTierUp
       ? 'Master Tier Up!'
-      : 'Level Up!';
+      : levelsGained > 1
+        ? `+${levelsGained} Levels!`
+        : 'Level Up!';
+  const levelUpSubtext = levelsGained > 1
+    ? `Level ${previousLevel} → ${stats.level}`
+    : `You reached ${levelDisplayLabel}`;
 
   useEffect(() => {
-    progressAnim.setValue(startProgress);
-    Animated.timing(progressAnim, {
-      toValue: stats.progressPercent,
-      duration: 760,
-      useNativeDriver: false,
-    }).start();
-  }, [progressAnim, startProgress, stats.progressPercent]);
+    if (!didLevelUp) {
+      progressAnim.setValue(startProgress);
+      Animated.timing(progressAnim, { toValue: stats.progressPercent, duration: 760, useNativeDriver: false }).start();
+      return;
+    }
+
+    setDisplayedLevel(previousLevel);
+    progressAnim.setValue(previousStats.progressPercent);
+
+    const fireConfetti = () => {
+      CONFETTI_PARTICLES.forEach((p, i) => {
+        confettiXArr[i].setValue(0);
+        confettiYArr[i].setValue(0);
+        confettiOpacityArr[i].setValue(1);
+        confettiScaleArr[i].setValue(0);
+        confettiRotArr[i].setValue(0);
+        Animated.parallel([
+          Animated.spring(confettiScaleArr[i], { toValue: 1, friction: 3.5, tension: 400, useNativeDriver: true }),
+          Animated.timing(confettiXArr[i], { toValue: Math.cos(p.angle) * p.distance, duration: 600, useNativeDriver: true }),
+          Animated.timing(confettiYArr[i], { toValue: Math.sin(p.angle) * p.distance, duration: 600, useNativeDriver: true }),
+          Animated.timing(confettiRotArr[i], { toValue: p.spinDeg, duration: 600, useNativeDriver: true }),
+          Animated.sequence([
+            Animated.delay(200),
+            Animated.timing(confettiOpacityArr[i], { toValue: 0, duration: 400, useNativeDriver: true }),
+          ]),
+        ]).start();
+      });
+    };
+
+    const animateStep = (currentLevel: number) => {
+      const isLast = currentLevel === stats.level - 1;
+      Animated.sequence([
+        Animated.timing(progressAnim, { toValue: 100, duration: isLast ? 680 : 320, useNativeDriver: false }),
+        Animated.delay(isLast ? 380 : 80),
+      ]).start(() => {
+        setDisplayedLevel(currentLevel + 1);
+        progressAnim.setValue(0);
+        if (!isLast) {
+          Animated.sequence([
+            Animated.spring(levelBumpScale, { toValue: 1.25, friction: 4, tension: 350, useNativeDriver: true }),
+            Animated.spring(levelBumpScale, { toValue: 1, friction: 5, tension: 200, useNativeDriver: true }),
+          ]).start();
+          animateStep(currentLevel + 1);
+        } else {
+          setShowLevelUpBanner(true);
+          levelUpBannerScale.setValue(0.72);
+          levelUpBannerOpacity.setValue(0);
+          Animated.parallel([
+            Animated.spring(levelUpBannerScale, { toValue: 1, friction: 4, tension: 320, useNativeDriver: true }),
+            Animated.timing(levelUpBannerOpacity, { toValue: 1, duration: 120, useNativeDriver: true }),
+          ]).start();
+          fireConfetti();
+          Animated.parallel([
+            Animated.sequence([
+              Animated.spring(levelBumpScale, { toValue: 1.55, friction: 3, tension: 300, useNativeDriver: true }),
+              Animated.spring(levelBumpScale, { toValue: 1, friction: 4, tension: 180, useNativeDriver: true }),
+            ]),
+            Animated.timing(progressAnim, { toValue: stats.progressPercent, duration: 520, useNativeDriver: false }),
+          ]).start();
+        }
+      });
+    };
+
+    animateStep(previousLevel);
+  }, [didLevelUp, levelBumpScale, previousLevel, previousStats.progressPercent, progressAnim, startProgress, stats.level, stats.progressPercent]);
 
   if (earnedXP <= 0) return null;
 
@@ -101,22 +191,57 @@ export default function LevelProgressSummary({
   const subTextColor = colors?.secondaryText ?? (isDarkMode ? '#C9DDF0' : '#64748B');
   const primaryColor = colors?.primary ?? colors?.buttonBackground ?? '#3B82F6';
   const successColor = colors?.success ?? '#24B75A';
-  const surfaceColor = colors?.surface ?? (isDarkMode ? '#123B61' : '#F4F8FC');
-  const surfaceAltColor = colors?.surfaceAlt ?? (isDarkMode ? '#1B527F' : '#ECF6FF');
-  const trackColor = colors?.border ?? (isDarkMode ? '#1B527F' : '#D6E2EE');
-  const progressColor = isMaster ? '#D79A00' : primaryColor;
+  const warningColor = colors?.warning ?? (isDarkMode ? '#FFD166' : '#F4B740');
+  const warningSoftColor = colors?.warningSoft ?? (isDarkMode ? '#6B4D00' : '#FFF6DE');
+  const warningTextColor = isDarkMode ? '#FFF7D6' : '#7A4B00';
+  const surfaceColor = colors?.surface ?? (isDarkMode ? '#123B61' : '#F6FBFF');
+  const surfaceAltColor = colors?.surfaceAlt ?? (isDarkMode ? '#1B527F' : '#EAF7FF');
+  const trackColor = colors?.border ?? (isDarkMode ? '#1B527F' : '#CFE8F8');
+  const progressColor = isMaster ? warningColor : primaryColor;
   const progressPercentLabel = `${stats.progressXP}/${stats.neededXP} XP`;
 
   return (
     <View style={[styles.card, { backgroundColor, borderColor }, style]}>
-      {didLevelUp && (
-        <View style={[styles.levelUpBanner, isMaster && styles.masterLevelUpBanner]}>
-          <MaterialIcons name="workspace-premium" size={22} color="#7A4B00" />
+      {didLevelUp && CONFETTI_PARTICLES.map((p, i) => (
+        <Animated.View
+          key={i}
+          pointerEvents="none"
+          style={{
+            position: 'absolute',
+            top: '50%',
+            left: '50%',
+            marginTop: -(p.height / 2),
+            marginLeft: -(p.width / 2),
+            width: p.width,
+            height: p.height,
+            borderRadius: p.isCircle ? p.width / 2 : 2,
+            backgroundColor: p.color,
+            zIndex: 10,
+            opacity: confettiOpacityArr[i],
+            transform: [
+              { translateX: confettiXArr[i] },
+              { translateY: confettiYArr[i] },
+              { scale: confettiScaleArr[i] },
+              { rotate: confettiRotArr[i].interpolate({ inputRange: [-360, 360], outputRange: ['-360deg', '360deg'] }) },
+            ],
+          }}
+        />
+      ))}
+
+      {showLevelUpBanner && (
+        <Animated.View
+          style={[
+            styles.levelUpBanner,
+            { backgroundColor: warningSoftColor, borderColor: warningColor },
+            { opacity: levelUpBannerOpacity, transform: [{ scale: levelUpBannerScale }] },
+          ]}
+        >
+          <Text style={styles.levelUpEmoji}>🏆</Text>
           <View style={styles.levelUpTextBlock}>
-            <Text style={styles.levelUpTitle}>{levelUpTitle}</Text>
-            <Text style={styles.levelUpText}>You reached {levelDisplayLabel}</Text>
+            <Text style={[styles.levelUpTitle, { color: warningTextColor }]}>{levelUpTitle}</Text>
+            <Text style={[styles.levelUpText, { color: warningTextColor }]}>{levelUpSubtext}</Text>
           </View>
-        </View>
+        </Animated.View>
       )}
 
       <View style={styles.heroRow}>
@@ -129,31 +254,38 @@ export default function LevelProgressSummary({
           <Text style={[styles.xpValue, { color: successColor }]}>+{earnedXP}</Text>
         </View>
 
-        <View style={[styles.levelPill, { backgroundColor: surfaceColor, borderColor }]}>
+        <Animated.View style={[styles.levelPill, { backgroundColor: surfaceColor, borderColor, transform: [{ scale: levelBumpScale }] }]}>
           <Text style={[styles.levelPillLabel, { color: subTextColor }]}>Level</Text>
-          <Text style={[styles.levelPillValue, { color: textColor }]}>{stats.level}</Text>
-        </View>
+          <Text style={[styles.levelPillValue, { color: textColor }]}>{displayedLevel}</Text>
+        </Animated.View>
       </View>
 
       {isMaster && (
-        <View style={styles.masterBadge}>
-          <MaterialIcons name="workspace-premium" size={17} color="#8A5A00" />
+        <View style={[styles.masterBadge, { backgroundColor: warningSoftColor, borderColor: warningColor }]}>
+          <MaterialIcons name="workspace-premium" size={17} color={warningTextColor} />
           <View style={styles.masterBadgeCopy}>
-            <Text style={styles.masterBadgeTitle}>{levelBadgeLabel}</Text>
-            <Text style={styles.masterBadgeSubtitle}>
+            <Text style={[styles.masterBadgeTitle, { color: warningTextColor }]}>{levelBadgeLabel}</Text>
+            <Text style={[styles.masterBadgeSubtitle, { color: warningTextColor }]}>
               {stats.level === MASTER_LEVEL_START ? 'Ellie Master' : masterTierLabel}
             </Text>
           </View>
           <View style={styles.masterStars}>
             {Array.from({ length: masterStarCount }).map((_, index) => (
-              <MaterialIcons key={`master-star-${index}`} name="star" size={12} color="#B87500" />
+              <MaterialIcons key={`master-star-${index}`} name="star" size={12} color={warningColor} />
             ))}
           </View>
         </View>
       )}
 
       {primaryAvatarUnlock && (
-        <View style={[styles.avatarUnlockCard, { backgroundColor: surfaceColor, borderColor }]}>
+        <Pressable
+          style={({ pressed }) => [
+            styles.avatarUnlockCard,
+            { backgroundColor: surfaceColor, borderColor, opacity: pressed && onGoToAccount ? 0.8 : 1 },
+          ]}
+          onPress={onGoToAccount ?? undefined}
+          disabled={!onGoToAccount}
+        >
           <View
             style={[
               styles.avatarUnlockPreview,
@@ -179,16 +311,19 @@ export default function LevelProgressSummary({
             )}
           </View>
           <View style={styles.avatarUnlockCopy}>
-            <Text style={[styles.avatarUnlockTitle, { color: textColor }]}>New profile icon unlocked</Text>
+            <Text style={[styles.avatarUnlockTitle, { color: textColor }]}>New profile picture unlocked</Text>
             <Text style={[styles.avatarUnlockText, { color: subTextColor }]}>
               {primaryAvatarUnlock.label}{extraAvatarUnlockCount > 0 ? ` and ${extraAvatarUnlockCount} more` : ''}
             </Text>
+            {onGoToAccount && (
+              <Text style={[styles.avatarUnlockCta, { color: primaryColor }]}>Set as picture →</Text>
+            )}
           </View>
-        </View>
+        </Pressable>
       )}
 
       <View style={styles.progressHeader}>
-        <Text style={[styles.progressLabel, { color: textColor }]}>{levelDisplayLabel}</Text>
+        <Text style={[styles.progressLabel, { color: textColor }]}>{displayedLevelLabel}</Text>
         <Text style={[styles.progressAmount, { color: subTextColor }]}>{progressPercentLabel}</Text>
       </View>
 
@@ -208,7 +343,7 @@ export default function LevelProgressSummary({
       </View>
 
       <Text style={[styles.progressText, { color: subTextColor }]}>
-        {stats.remainingXP} XP to {nextLevelDisplayLabel}
+        {stats.remainingXP} XP to {displayedNextLevelLabel}
       </Text>
     </View>
   );
@@ -231,38 +366,40 @@ const styles = StyleSheet.create({
     elevation: 3,
   },
   levelUpBanner: {
-    minHeight: 54,
-    marginBottom: 11,
-    paddingHorizontal: 14,
-    paddingVertical: 9,
-    borderRadius: 16,
+    minHeight: 64,
+    marginBottom: 13,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderRadius: 18,
     backgroundColor: '#FFE8A3',
-    borderWidth: 1.5,
+    borderWidth: 2,
     borderColor: '#F4B942',
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 9,
+    gap: 12,
   },
-  masterLevelUpBanner: {
-    backgroundColor: '#FFF2B8',
-    borderColor: '#D79A00',
+  levelUpEmoji: {
+    fontSize: 32,
+    lineHeight: 36,
   },
   levelUpTextBlock: {
     flexShrink: 1,
+    alignItems: 'center',
   },
   levelUpTitle: {
     color: '#7A4B00',
-    fontSize: 19,
-    lineHeight: 22,
+    fontSize: 24,
+    lineHeight: 28,
     fontWeight: '900',
     textAlign: 'center',
+    letterSpacing: 0.3,
   },
   levelUpText: {
     color: '#7A4B00',
     fontSize: 13,
-    lineHeight: 16,
-    fontWeight: '800',
+    lineHeight: 17,
+    fontWeight: '700',
     textAlign: 'center',
   },
   heroRow: {
@@ -387,6 +524,12 @@ const styles = StyleSheet.create({
     fontSize: 12,
     lineHeight: 15,
     fontWeight: '800',
+  },
+  avatarUnlockCta: {
+    marginTop: 4,
+    fontSize: 12,
+    lineHeight: 15,
+    fontWeight: '900',
   },
   progressHeader: {
     marginTop: 13,

@@ -4,6 +4,7 @@ import {
   syncProgressItemToCloudIfSignedIn,
   type CloudProgressItem,
 } from '../account/accountStorage';
+import { recordPracticeToday } from '../progress/streakStorage';
 
 const LEARNED_FLASHCARDS_PREFIX = '@learned_flashcards';
 const LEARNED_FLASHCARDS_TODAY_PREFIX = '@learned_flashcards_today';
@@ -12,6 +13,20 @@ export type LearnedFlashcardSummary = {
   totalLearned: number;
   lessonCount: number;
   learnedToday: number;
+};
+
+let learnedByLessonCache: Promise<Map<string, Set<string>>> | null = null;
+
+const cloneLearnedByLesson = (source: Map<string, Set<string>>) => {
+  const clone = new Map<string, Set<string>>();
+  source.forEach((keys, lessonKey) => {
+    clone.set(lessonKey, new Set(keys));
+  });
+  return clone;
+};
+
+const invalidateLearnedProgressCache = () => {
+  learnedByLessonCache = null;
 };
 
 const normalizeLessonKey = (lessonKey: string) =>
@@ -75,7 +90,7 @@ export const getLearnedFlashcardKeys = async (lessonKey: string): Promise<Set<st
   }
 };
 
-export const getLearnedFlashcardKeysByLesson = async (): Promise<Map<string, Set<string>>> => {
+const readLearnedFlashcardKeysByLesson = async (): Promise<Map<string, Set<string>>> => {
   try {
     const allKeys = await AsyncStorage.getAllKeys();
     const learnedStorageKeys = allKeys.filter((key) => key.startsWith(`${LEARNED_FLASHCARDS_PREFIX}:`));
@@ -97,9 +112,18 @@ export const getLearnedFlashcardKeysByLesson = async (): Promise<Map<string, Set
   }
 };
 
+export const getLearnedFlashcardKeysByLesson = async (): Promise<Map<string, Set<string>>> => {
+  if (!learnedByLessonCache) {
+    learnedByLessonCache = readLearnedFlashcardKeysByLesson();
+  }
+
+  return cloneLearnedByLesson(await learnedByLessonCache);
+};
+
 export const saveLearnedFlashcardKeys = async (lessonKey: string, keys: Set<string>) => {
   try {
     await AsyncStorage.setItem(getStorageKey(lessonKey), JSON.stringify([...keys]));
+    invalidateLearnedProgressCache();
   } catch {}
 };
 
@@ -118,6 +142,7 @@ export const recordLearnedFlashcardToday = async (
 
     if (isLearned) {
       current.add(activityKey);
+      void recordPracticeToday();
       void syncProgressItemToCloudIfSignedIn(
         buildCloudItem(lessonKey, normalizedWordKey, { learnedOn: getLocalDateKey() })
       );
@@ -127,6 +152,7 @@ export const recordLearnedFlashcardToday = async (
     }
 
     await AsyncStorage.setItem(storageKey, JSON.stringify([...current]));
+    invalidateLearnedProgressCache();
   } catch {}
 };
 
@@ -193,26 +219,20 @@ export const mergeLearnedFlashcardCloudItems = async (items: CloudProgressItem[]
     }),
     AsyncStorage.setItem(todayKey(LEARNED_FLASHCARDS_TODAY_PREFIX), JSON.stringify([...todayLearned])),
   ]);
+  invalidateLearnedProgressCache();
 };
 
 export const getLearnedFlashcardSummary = async (): Promise<LearnedFlashcardSummary> => {
   try {
-    const allKeys = await AsyncStorage.getAllKeys();
-    const learnedStorageKeys = allKeys.filter((key) => key.startsWith(`${LEARNED_FLASHCARDS_PREFIX}:`));
-    const learnedEntries = await AsyncStorage.multiGet(learnedStorageKeys);
+    const learnedByLesson = await getLearnedFlashcardKeysByLesson();
     const todayLearned = parseStringSet(await AsyncStorage.getItem(todayKey(LEARNED_FLASHCARDS_TODAY_PREFIX)));
 
     let totalLearned = 0;
     let lessonCount = 0;
 
-    learnedEntries.forEach(([, raw]) => {
-      const keys = parseStringSet(raw);
-      const learnedCount = keys.size;
-
-      if (learnedCount > 0) {
-        lessonCount += 1;
-        totalLearned += learnedCount;
-      }
+    learnedByLesson.forEach((keys) => {
+      lessonCount += 1;
+      totalLearned += keys.size;
     });
 
     return {
@@ -241,5 +261,6 @@ export const clearLearnedFlashcardProgress = async () => {
     if (progressKeys.length > 0) {
       await AsyncStorage.multiRemove(progressKeys);
     }
+    invalidateLearnedProgressCache();
   } catch {}
 };

@@ -1,6 +1,11 @@
 export type Word = {
   english: string;
   french: string;
+  alternatives?: string[];
+  sourceLesson?: {
+    id?: string | number;
+    title?: string;
+  };
 };
 
 export type GameCard = {

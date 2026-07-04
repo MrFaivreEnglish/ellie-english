@@ -4,18 +4,22 @@ import {
   Text,
   StyleSheet,
   TouchableOpacity,
+  Pressable,
   ScrollView,
   useWindowDimensions,
   Platform,
+  InteractionManager,
 } from 'react-native';
+import { Svg, Circle } from 'react-native-svg';
 
-import { useNavigation } from '@react-navigation/native';
-import { useFocusEffect } from '@react-navigation/native';
+import { useNavigation, useFocusEffect } from '@react-navigation/native';
+import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import type { RootStackParamList, TabParamList } from '../../types/navigationTypes';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useTheme } from '../settings/ThemeContext';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { exitImmersiveOpaque } from '../../lib/immersive';
-import { useFonts } from 'expo-font';
+import { getStreak, type StreakData } from '../progress/streakStorage';
 import { getLearnedFlashcardSummary } from '../vocabulary/flashcardProgressStorage';
 import { getGrammarProgressSummary } from '../grammar/grammarProgressStorage';
 import { getMenuCopy } from '../shared/menuCopy';
@@ -29,13 +33,17 @@ import {
 import { getXP } from '../progress/xpStorage';
 import { getLevelBadgeLabel, getXPLevel, isMasterLevel } from '../progress/xpLevels';
 import { getLastLesson, type LastLessonEntry } from '../progress/lastLessonStorage';
+import { checkAndMarkFirstVisit } from './firstVisitStorage';
+import FirstVisitModal from './FirstVisitModal';
 import { grammarLessons } from '../../content/lessons/grammarRegistry';
 import { vocabularyLessons } from '../../content/lessons/vocabularyRegistry';
-import { getPanelStyle, getSoftShadow, uiRadii } from '../shared/uiPrimitives';
+import { getPanelStyle, getSoftShadow, getStudySurfaceColors, uiRadii } from '../shared/uiPrimitives';
 import {
   HOME_MENU_CARD_COLORS,
+  HOME_MENU_CARD_GRADIENT_ENDS,
   HOME_MENU_TEXT_COLOR,
   SHINY_HOME_MENU_CARD_COLORS,
+  SHINY_HOME_MENU_CARD_GRADIENT_ENDS,
   SHINY_HOME_MENU_TEXT_COLOR,
 } from '../shared/homeMenuColors';
 import { getAndroidBottomBarButtonStyle, getAndroidBottomBarColor } from '../shared/appChromeColors';
@@ -88,8 +96,8 @@ const findLastLessonTarget = (entry: LastLessonEntry | null) => {
 };
 
 export default function HomeScreen() {
-  const navigation = useNavigation();
-  const { colors, isDarkMode, isTodayCardEnabled, isAndroidStatusBarEnabled, menuLanguage, isShinyEllieMode } = useTheme();
+  const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
+  const { colors, isDarkMode, isTodayCardEnabled, isAndroidStatusBarEnabled, isShinyEllieMode } = useTheme();
   const {
     isLoading: isAccountLoading,
     lastSyncAt,
@@ -97,9 +105,10 @@ export default function HomeScreen() {
     accountAvatarColorId,
     accountAvatarId,
   } = useAccount();
-  const copy = getMenuCopy(menuLanguage).home;
+  const copy = getMenuCopy().home;
   const insets = useSafeAreaInsets();
   const { width } = useWindowDimensions();
+  const studySurface = React.useMemo(() => getStudySurfaceColors(colors, isDarkMode), [colors, isDarkMode]);
   const homeHeaderTopPadding = Platform.OS === 'ios'
     ? (insets.top > 0 ? insets.top : 24)
     : Platform.OS === 'android' && isAndroidStatusBarEnabled
@@ -109,11 +118,15 @@ export default function HomeScreen() {
   const [todayLearntCount, setTodayLearntCount] = React.useState(0);
   const [localXP, setLocalXP] = React.useState(0);
   const [lastLesson, setLastLesson] = React.useState<LastLessonEntry | null>(null);
+  const [streak, setStreak] = React.useState<StreakData>({ currentStreak: 0, longestStreak: 0, lastPracticeDate: '' });
+  const [showTutorial, setShowTutorial] = React.useState(false);
+  const isNavigatingFromMenuRef = React.useRef(false);
   const dailyPracticeGoal = 15;
   const todaySavedProgressCount = todayGrammarAnswerCount + todayLearntCount;
   const savedItemsRemaining = Math.max(0, dailyPracticeGoal - todaySavedProgressCount);
   const todayProgress = Math.min(100, Math.round((todaySavedProgressCount / dailyPracticeGoal) * 100));
   const homeMenuCardColors = isShinyEllieMode ? SHINY_HOME_MENU_CARD_COLORS : HOME_MENU_CARD_COLORS;
+  const homeMenuCardGradientEnds = isShinyEllieMode ? SHINY_HOME_MENU_CARD_GRADIENT_ENDS : HOME_MENU_CARD_GRADIENT_ENDS;
   const homeMenuTextColor = isShinyEllieMode ? SHINY_HOME_MENU_TEXT_COLOR : HOME_MENU_TEXT_COLOR;
   const localizedCategories = React.useMemo(() => [
     {
@@ -121,6 +134,7 @@ export default function HomeScreen() {
       icon: 'edit' as MaterialIconName,
       description: copy.grammarDescription,
       color: homeMenuCardColors.grammar,
+      gradientEnd: homeMenuCardGradientEnds.grammar,
       route: 'Grammar'
     },
     {
@@ -128,6 +142,7 @@ export default function HomeScreen() {
       icon: 'style' as MaterialIconName,
       description: copy.vocabularyDescription,
       color: homeMenuCardColors.vocabulary,
+      gradientEnd: homeMenuCardGradientEnds.vocabulary,
       route: 'Vocabulary'
     },
     {
@@ -135,6 +150,7 @@ export default function HomeScreen() {
       icon: 'menu-book' as MaterialIconName,
       description: copy.lessonsDescription,
       color: homeMenuCardColors.lessons,
+      gradientEnd: homeMenuCardGradientEnds.lessons,
       route: 'Lessons'
     },
     {
@@ -142,9 +158,10 @@ export default function HomeScreen() {
       icon: 'settings' as MaterialIconName,
       description: copy.settingsDescription,
       color: homeMenuCardColors.settings,
+      gradientEnd: homeMenuCardGradientEnds.settings,
       route: 'Settings'
     }
-  ], [copy, homeMenuCardColors]);
+  ], [copy, homeMenuCardColors, homeMenuCardGradientEnds]);
   const todayStatus =
     todaySavedProgressCount >= dailyPracticeGoal
       ? copy.dailyTargetReached
@@ -156,7 +173,6 @@ export default function HomeScreen() {
   const todayAccentColor = todaySavedProgressCount >= dailyPracticeGoal
     ? (isDarkMode ? colors.success : DAILY_GREEN)
     : (isDarkMode ? colors.primary : DAILY_BLUE);
-  const todayAccentSoft = todaySavedProgressCount >= dailyPracticeGoal ? dailyGreenSoft : dailyBlueSoft;
   const todayCardBorderColor = isDarkMode ? colors.borderStrong : todayAccentColor;
   const androidNavigationBarColor = getAndroidBottomBarColor(isDarkMode, colors);
   const androidNavigationBarButtonStyle = getAndroidBottomBarButtonStyle(isDarkMode);
@@ -183,14 +199,15 @@ export default function HomeScreen() {
   const accountPillAccent = accountAvatarColorPreset.accentColor;
   const continueLessonTarget = React.useMemo(() => findLastLessonTarget(lastLesson), [lastLesson]);
 
-  // Preload icon font to prevent delayed icons and layout shift.
-  const [fontsLoaded] = useFonts({
-    ...MaterialIcons.font,
-  });
-
   useFocusEffect(
     React.useCallback(() => {
       let active = true;
+      let summaryTask: { cancel?: () => void } | null = null;
+
+      isNavigatingFromMenuRef.current = false;
+      checkAndMarkFirstVisit().then((isFirst) => {
+        if (active && isFirst) setShowTutorial(true);
+      }).catch(() => {});
       exitImmersiveOpaque(
         androidNavigationBarColor,
         androidNavigationBarButtonStyle,
@@ -199,11 +216,15 @@ export default function HomeScreen() {
       getXP().then((xp) => {
         if (!active) return;
         setLocalXP(xp);
-      });
+      }).catch(() => {});
       getLastLesson().then((entry) => {
         if (!active) return;
         setLastLesson(entry);
-      });
+      }).catch(() => {});
+      getStreak().then((s) => {
+        if (!active) return;
+        setStreak(s);
+      }).catch(() => {});
 
       if (!isTodayCardEnabled) {
         return () => {
@@ -211,14 +232,17 @@ export default function HomeScreen() {
         };
       }
 
-      Promise.all([getGrammarProgressSummary(), getLearnedFlashcardSummary()]).then(([grammarSummary, learnedSummary]) => {
-        if (!active) return;
-        setTodayGrammarAnswerCount(grammarSummary.correctToday);
-        setTodayLearntCount(learnedSummary.learnedToday);
+      summaryTask = InteractionManager.runAfterInteractions(() => {
+        Promise.all([getGrammarProgressSummary(), getLearnedFlashcardSummary()]).then(([grammarSummary, learnedSummary]) => {
+          if (!active) return;
+          setTodayGrammarAnswerCount(grammarSummary.correctToday);
+          setTodayLearntCount(learnedSummary.learnedToday);
+        }).catch(() => {});
       });
 
       return () => {
         active = false;
+        summaryTask?.cancel?.();
       };
     }, [
       androidNavigationBarButtonStyle,
@@ -229,14 +253,18 @@ export default function HomeScreen() {
     ])
   );
 
-  // Do not render until icons are ready.
-  if (!fontsLoaded) return null;
+  const openHomeMenuRoute = React.useCallback((route: string) => {
+    if (isNavigatingFromMenuRef.current) return;
 
-  const openContinueLesson = () => {
+    isNavigatingFromMenuRef.current = true;
+    navigation.navigate('MainTabs', { screen: route as keyof TabParamList });
+  }, [navigation]);
+
+  const openContinueLesson = React.useCallback(() => {
     if (!continueLessonTarget) return;
 
     if (continueLessonTarget.type === 'grammar') {
-      (navigation as any).navigate('MainTabs', {
+      navigation.navigate('MainTabs', {
         screen: 'Grammar',
         params: {
           lesson: continueLessonTarget.lesson,
@@ -246,7 +274,7 @@ export default function HomeScreen() {
       return;
     }
 
-    (navigation as any).navigate('MainTabs', {
+    navigation.navigate('MainTabs', {
       screen: 'Vocabulary',
       params: {
         screen: 'VocabularyLesson',
@@ -255,7 +283,7 @@ export default function HomeScreen() {
         },
       },
     });
-  };
+  }, [continueLessonTarget, navigation]);
 
   return (
     <ScrollView
@@ -267,6 +295,8 @@ export default function HomeScreen() {
           styles.header, 
           { 
             backgroundColor: colors.card,
+            borderBottomColor: isDarkMode ? colors.border : '#E1EAF3',
+            borderBottomWidth: 1,
             paddingTop: homeHeaderTopPadding
           }
         ]}
@@ -276,15 +306,10 @@ export default function HomeScreen() {
             <Text style={[styles.headerTitle, { color: colors.text }]} numberOfLines={1}>{welcomeText}</Text>
             <Text style={[styles.subtitle, { color: colors.secondaryText }]}>{copy.subtitle}</Text>
           </View>
+          <View style={styles.headerRightGroup}>
           <TouchableOpacity
-            onPress={() => (navigation as any).navigate('Account')}
-            style={[
-              styles.accountPill,
-              {
-                backgroundColor: 'transparent',
-                borderColor: 'transparent',
-              },
-            ]}
+            onPress={() => navigation.navigate('Account')}
+            style={styles.accountPillWrap}
             accessibilityRole="button"
             accessibilityLabel="Open account"
           >
@@ -293,19 +318,29 @@ export default function HomeScreen() {
             ) : (
               <MaterialIcons
                 name="account-circle"
-                size={34}
+                size={58}
                 color={accountPillAccent}
               />
             )}
-            {isAccountMaster && (
-              <View style={styles.accountPillMasterBadge}>
-                <Text style={styles.accountPillMasterText}>{accountLevelBadgeLabel.replace('Level ', '')}</Text>
-              </View>
-            )}
+            <View
+              style={[
+                styles.levelBadge,
+                {
+                  backgroundColor: isAccountMaster ? (isDarkMode ? colors.warningSoft : '#FFF7D7') : (isDarkMode ? colors.primarySoft : '#E8F4FF'),
+                  borderColor: isAccountMaster ? colors.warning : colors.borderStrong,
+                },
+              ]}
+            >
+              {isAccountMaster && <Text style={styles.levelBadgeIcon}>★</Text>}
+              <Text style={[styles.levelBadgeText, { color: isAccountMaster ? (isDarkMode ? '#FFD166' : '#7A4B00') : colors.primary }]}>
+                {accountLevelBadgeLabel.replace('Level ', 'Lv.')}
+              </Text>
+            </View>
           </TouchableOpacity>
         </View>
+        </View>
       </View>
-      
+
       {isTodayCardEnabled && (
         <View
           style={[
@@ -319,54 +354,58 @@ export default function HomeScreen() {
         >
           <View style={[styles.todayTopStripe, { backgroundColor: todayAccentColor }]} />
           <View style={styles.todayHeaderRow}>
-            <View style={[styles.todayIcon, { backgroundColor: todayAccentSoft, borderColor: todayAccentColor }]}>
-              <MaterialIcons
-                name={todaySavedProgressCount >= dailyPracticeGoal ? 'emoji-events' : 'flag'}
-                size={24}
-                color={todayAccentColor}
-              />
-            </View>
-            <View style={styles.todayTitleBlock}>
-              <Text style={[styles.todayTitle, { color: colors.text }]}>{copy.today}</Text>
+            <View style={styles.todayLeftBlock}>
+              <View style={styles.todayTitleRow}>
+                <Text style={[styles.todayTitle, { color: colors.text }]}>{copy.today}</Text>
+                {streak.currentStreak >= 2 && (
+                  <View style={[styles.streakChip, { backgroundColor: isDarkMode ? '#3D2800' : '#FFF3DC', borderColor: isDarkMode ? '#7A5200' : '#F4B740' }]}>
+                    <Text style={styles.streakFlame}>🔥</Text>
+                    <Text style={[styles.streakCount, { color: isDarkMode ? '#FFD166' : '#B36B00' }]}>{streak.currentStreak}</Text>
+                  </View>
+                )}
+              </View>
               <Text style={[styles.todaySubtitle, { color: colors.secondaryText }]}>
                 {todaySavedProgressCount > 0 ? copy.todayLogged : copy.todayStart}
               </Text>
+              <Text style={[styles.todayStatusInline, { color: colors.secondaryText }]} numberOfLines={2}>{todayStatus}</Text>
             </View>
-            <View style={[
-              styles.todayScoreBadge,
-              {
-                backgroundColor: todayAccentSoft,
-                borderColor: todayAccentColor,
-              },
-            ]}>
-              <Text style={[styles.todayScoreValue, { color: todayAccentColor }]}>{todaySavedProgressCount}</Text>
-              <Text style={[styles.todayScoreLabel, { color: todayAccentColor }]}>/{dailyPracticeGoal}</Text>
-            </View>
-          </View>
-
-          <View style={styles.todayProgressBlock}>
-            <View style={[
-              styles.todayProgressTrack,
-              {
-                backgroundColor: colors.surfaceAlt,
-                borderColor: colors.border,
-              },
-            ]}>
-              <View
-                style={[
-                  styles.todayProgressFill,
-                  {
-                    width: `${todayProgress}%`,
-                    backgroundColor: todayAccentColor,
-                  },
-                ]}
-              />
-            </View>
-            <View style={styles.todayProgressHeader}>
-              <Text style={[styles.todayProgressText, { color: colors.text }]}>{todayStatus}</Text>
-              <Text style={[styles.todayGoalText, { color: todayAccentColor }]}>
-                {todayProgress}%
-              </Text>
+            <View style={styles.todayRingWrap}>
+              {(() => {
+                const size = 80;
+                const strokeWidth = 7;
+                const radius = (size - strokeWidth) / 2;
+                const circumference = 2 * Math.PI * radius;
+                const offset = circumference * (1 - Math.min(todayProgress / 100, 1));
+                return (
+                  <Svg width={size} height={size}>
+                    <Circle
+                      cx={size / 2}
+                      cy={size / 2}
+                      r={radius}
+                      stroke={isDarkMode ? colors.surfaceAlt : '#E8F0F8'}
+                      strokeWidth={strokeWidth}
+                      fill="none"
+                    />
+                    <Circle
+                      cx={size / 2}
+                      cy={size / 2}
+                      r={radius}
+                      stroke={todayAccentColor}
+                      strokeWidth={strokeWidth}
+                      fill="none"
+                      strokeDasharray={circumference}
+                      strokeDashoffset={offset}
+                      strokeLinecap="round"
+                      rotation="-90"
+                      origin={`${size / 2}, ${size / 2}`}
+                    />
+                  </Svg>
+                );
+              })()}
+              <View style={styles.todayRingCenter} pointerEvents="none">
+                <Text style={[styles.todayRingValue, { color: todayAccentColor }]}>{todaySavedProgressCount}</Text>
+                <Text style={[styles.todayRingGoal, { color: colors.secondaryText }]}>/{dailyPracticeGoal}</Text>
+              </View>
             </View>
           </View>
 
@@ -420,14 +459,14 @@ export default function HomeScreen() {
             getPanelStyle(colors, isDarkMode),
             {
               backgroundColor: colors.card,
-              borderColor: isDarkMode ? colors.borderStrong : '#1CB0F6',
+              borderColor: isDarkMode ? colors.border : colors.borderStrong,
             },
           ]}
           onPress={openContinueLesson}
           accessibilityRole="button"
           accessibilityLabel={`Continue ${continueLessonTarget.title}`}
         >
-          <View style={[styles.continueIcon, { backgroundColor: isDarkMode ? colors.primarySoft : '#DDF4FF' }]}>
+          <View style={[styles.continueIcon, { backgroundColor: isDarkMode ? studySurface.control : '#DDF4FF', borderColor: isDarkMode ? colors.border : 'transparent' }]}>
             <MaterialIcons
               name={continueLessonTarget.type === 'grammar' ? 'edit' : 'style'}
               size={24}
@@ -448,25 +487,41 @@ export default function HomeScreen() {
       )}
 
       <View style={[styles.categoriesContainer, isDesktop && styles.categoriesContainerDesktop]}>
-        {localizedCategories.map((category, index) => (
-          <TouchableOpacity
-            key={index}
-            style={[
+        {localizedCategories.map((category) => (
+          <Pressable
+            key={category.route}
+            style={({ pressed }) => [
               styles.categoryCard,
               getSoftShadow(isDarkMode, 'raised'),
               isDesktop && styles.categoryCardDesktop,
+              pressed && styles.categoryCardPressed,
               {
                 backgroundColor: category.color,
+                borderColor: 'rgba(255,255,255,0.62)',
+                borderBottomColor: 'rgba(0,0,0,0.12)',
               }
             ]}
-            onPress={() => (navigation as any).navigate('MainTabs', { screen: category.route })}
+            android_ripple={{ color: 'rgba(255,255,255,0.26)' }}
+            unstable_pressDelay={0}
+            onPress={() => openHomeMenuRoute(category.route)}
+            accessibilityRole="button"
+            accessibilityLabel={category.title}
           >
             <MaterialIcons name={category.icon} size={32} color={homeMenuTextColor} />
             <Text style={[styles.categoryTitle, { color: homeMenuTextColor }]}>{category.title}</Text>
             <Text style={[styles.categoryDescription, { color: homeMenuTextColor }]}>{category.description}</Text>
-          </TouchableOpacity>
+          </Pressable>
         ))}
       </View>
+
+      <FirstVisitModal
+        visible={showTutorial}
+        onDismiss={() => setShowTutorial(false)}
+        onSetupAccount={() => {
+          setShowTutorial(false);
+          navigation.navigate('Account');
+        }}
+      />
     </ScrollView>
   );
 }
@@ -499,33 +554,34 @@ const styles = StyleSheet.create({
     fontSize: 16,
     marginTop: 8,
   },
-  accountPill: {
-    width: 64,
-    height: 64,
-    borderRadius: 999,
-    borderWidth: 2,
+  headerRightGroup: {
+    flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
+    gap: 8,
   },
-  accountPillMasterBadge: {
-    position: 'absolute',
-    right: -4,
-    bottom: -5,
-    minWidth: 34,
-    height: 18,
+  accountPillWrap: {
+    alignItems: 'center',
+    gap: 5,
+  },
+  levelBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 3,
     borderRadius: 999,
     borderWidth: 1.5,
-    borderColor: '#D79A00',
-    backgroundColor: '#FFF7D7',
-    alignItems: 'center',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    minWidth: 48,
     justifyContent: 'center',
-    paddingHorizontal: 5,
   },
-  accountPillMasterText: {
-    color: '#7A4B00',
+  levelBadgeIcon: {
     fontSize: 9,
     lineHeight: 11,
+  },
+  levelBadgeText: {
+    fontSize: 11,
     fontWeight: '900',
+    lineHeight: 13,
   },
   todayCard: {
     marginHorizontal: 16,
@@ -553,49 +609,75 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 12,
+    justifyContent: 'space-between',
   },
-  todayIcon: {
-    width: 48,
-    height: 48,
-    borderRadius: 16,
-    borderWidth: 2,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  todayTitleBlock: {
+  todayLeftBlock: {
     flex: 1,
     minWidth: 0,
+    gap: 3,
+  },
+  todayTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
   },
   todayTitle: {
     fontSize: 21,
     lineHeight: 25,
     fontWeight: '900',
   },
+  streakChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 3,
+    borderRadius: 999,
+    borderWidth: 1.5,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+  },
+  streakFlame: {
+    fontSize: 13,
+    lineHeight: 16,
+  },
+  streakCount: {
+    fontSize: 13,
+    fontWeight: '900',
+    lineHeight: 16,
+  },
   todaySubtitle: {
     fontSize: 13,
     fontWeight: '800',
     lineHeight: 18,
+  },
+  todayStatusInline: {
+    fontSize: 12,
+    fontWeight: '700',
+    lineHeight: 16,
     marginTop: 2,
   },
-  todayScoreBadge: {
-    minWidth: 72,
-    minHeight: 54,
-    borderRadius: 18,
-    borderWidth: 2,
+  todayRingWrap: {
+    width: 80,
+    height: 80,
+    alignItems: 'center',
+    justifyContent: 'center',
+    flexShrink: 0,
+  },
+  todayRingCenter: {
+    position: 'absolute',
     alignItems: 'center',
     justifyContent: 'center',
     flexDirection: 'row',
-    paddingHorizontal: 10,
+    gap: 0,
   },
-  todayScoreValue: {
-    fontSize: 28,
-    lineHeight: 32,
+  todayRingValue: {
+    fontSize: 22,
     fontWeight: '900',
+    lineHeight: 26,
   },
-  todayScoreLabel: {
-    fontSize: 13,
-    lineHeight: 17,
-    fontWeight: '900',
+  todayRingGoal: {
+    fontSize: 12,
+    fontWeight: '800',
+    lineHeight: 14,
     marginTop: 6,
   },
   todayRows: {
@@ -642,38 +724,6 @@ const styles = StyleSheet.create({
     fontWeight: '900',
     textAlign: 'center',
   },
-  todayProgressBlock: {
-    marginTop: 14,
-  },
-  todayProgressHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    gap: 12,
-    marginTop: 8,
-  },
-  todayProgressText: {
-    fontSize: 13,
-    fontWeight: '900',
-    flex: 1,
-    minWidth: 0,
-  },
-  todayGoalText: {
-    fontSize: 12,
-    fontWeight: '900',
-    textTransform: 'uppercase',
-  },
-  todayProgressTrack: {
-    height: 16,
-    borderRadius: 999,
-    overflow: 'hidden',
-    borderWidth: 2,
-    borderColor: 'rgba(0,0,0,0.04)',
-  },
-  todayProgressFill: {
-    height: '100%',
-    borderRadius: 999,
-  },
   continueCard: {
     minHeight: 84,
     marginHorizontal: 16,
@@ -696,6 +746,7 @@ const styles = StyleSheet.create({
     width: 48,
     height: 48,
     borderRadius: 12,
+    borderWidth: 1,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -734,19 +785,25 @@ const styles = StyleSheet.create({
     padding: 24,
     paddingBottom: 32,
     borderRadius: uiRadii.card,
+    borderWidth: 2,
+    borderBottomWidth: 4,
     marginBottom: 16,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
+    shadowOffset: { width: 0, height: 5 },
+    shadowOpacity: 0.14,
+    shadowRadius: 9,
+    elevation: 5,
+  },
+  categoryCardPressed: {
+    opacity: 0.9,
+    transform: [{ scale: 0.985 }],
   },
   categoryCardDesktop: {
     width: '48%',
   },
   categoryTitle: {
     fontSize: 27,
-    fontWeight: 'bold',
+    fontWeight: '800',
     color: 'white',
     marginTop: 4,
     textAlign: 'center',

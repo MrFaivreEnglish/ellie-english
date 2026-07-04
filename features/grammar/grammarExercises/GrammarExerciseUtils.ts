@@ -10,6 +10,10 @@ export interface Exercise {
   prompt?: string;
   distractors?: string[];
   wordBank?: string[];
+  sourceLesson?: {
+    id?: string | number;
+    title?: string;
+  };
 }
 
 export type ExerciseMode = 'quiz' | 'fill' | 'reorder' | 'translate';
@@ -116,6 +120,21 @@ export const getQuestionsForMode = (exs: Exercise[], mode: ExerciseMode, count =
       : exs.filter(ex => ex.type !== 'fill' && ex.type !== 'reorder' && ex.type !== 'translate');
 
   return getRandomizedQuestions(filtered, count);
+};
+
+export const computeWordDensity = (
+  wordCount: number,
+  wordCharacterCount: number,
+  isDesktopWeb: boolean,
+  isNarrowWordLayout: boolean,
+): 0 | 1 | 2 => {
+  const denseWordCountLimit = isDesktopWeb ? 12 : isNarrowWordLayout ? 7 : 9;
+  const veryDenseWordCountLimit = isDesktopWeb ? 16 : isNarrowWordLayout ? 10 : 12;
+  const denseCharacterLimit = isDesktopWeb ? 78 : isNarrowWordLayout ? 44 : 58;
+  const veryDenseCharacterLimit = isDesktopWeb ? 110 : isNarrowWordLayout ? 64 : 82;
+  if (wordCount >= veryDenseWordCountLimit || wordCharacterCount >= veryDenseCharacterLimit) return 2;
+  if (wordCount >= denseWordCountLimit || wordCharacterCount >= denseCharacterLimit) return 1;
+  return 0;
 };
 
 export const normalizeAnswer = (value: string) =>

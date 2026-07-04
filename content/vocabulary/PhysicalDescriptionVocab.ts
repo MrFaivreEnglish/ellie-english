@@ -48,7 +48,7 @@ const PhysicalDescriptionVocab = {
         { english: 'Beautiful', french: 'Beau / belle' },
         { english: 'Pretty', french: 'Joli' },
         { english: 'Handsome', french: 'Beau' },
-        { english: 'Elegant', french: 'Elégant' },
+        { english: 'Elegant', french: 'Élégant' },
         { english: 'Classy', french: 'Chic' },
         { english: 'Cute', french: 'Mignon' },
         { english: 'Ugly', french: 'Laid' }

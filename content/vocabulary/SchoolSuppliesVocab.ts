@@ -1,0 +1,33 @@
+const SchoolSuppliesVocab = {
+  id: '404',
+  title: 'School Supplies',
+  description: 'Name the things you need for school',
+  imageUrl: 'https://i.ibb.co/SD91yxwQ/School-supplies.webp',
+  flashcards: [
+    { english: 'A school bag', french: 'Un cartable' },
+    { english: 'A textbook', french: 'Un manuel scolaire' },
+    { english: 'A copybook', french: 'Un cahier' },
+    { english: 'A notebook', french: 'Un carnet / Un cahier' },
+    { english: 'Some paper', french: 'Du papier' },
+    { english: 'A pencil case', french: 'Une trousse' },
+    { english: 'A pen', french: 'Un stylo' },
+    { english: 'A pencil', french: 'Un crayon de papier' },
+    { english: 'A highlighter', french: 'Un surligneur' },
+    { english: 'Coloured pencils', french: 'Des crayons de couleur' },
+    { english: 'Felt pens', french: 'Des feutres' },
+    { english: 'Markers', french: 'Des marqueurs' },
+    { english: 'An eraser', french: 'Une gomme' },
+    { english: 'A pencil sharpener', french: 'Un taille-crayon' },
+    { english: 'Scissors', french: 'Des ciseaux' },
+    { english: 'A glue stick', french: 'Un bâton de colle' },
+    { english: 'A ruler', french: 'Une règle' },
+    { english: 'A calculator', french: 'Une calculatrice' },
+    { english: 'A computer', french: 'Un ordinateur' },
+    { english: 'A tablet', french: 'Une tablette' },
+    { english: 'Headphones', french: 'Un casque' },
+    { english: 'A desk', french: 'Un bureau' },
+    { english: 'A chair', french: 'Une chaise' },
+  ],
+};
+
+export default SchoolSuppliesVocab;

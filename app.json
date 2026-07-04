@@ -12,8 +12,8 @@
       "themeColor": "#1671B6",
       "backgroundColor": "#ffffff",
       "display": "standalone",
-      "scope": "/",
-      "startUrl": "/",
+      "scope": "./",
+      "startUrl": "./",
       "favicon": "./assets/icony.png"
     },
     "assetBundlePatterns": [

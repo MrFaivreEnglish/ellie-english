@@ -47,6 +47,7 @@ export const lessonThumbnails: Record<string, AssetValue> = (() => {
     'More Emotions': require('./thumbnails/emotions-level-2-thumbnail.png'),
     Family: require('./thumbnails/family-thumbnail.png'),
     'Food Basics': require('./thumbnails/food-basics-thumbnail.png'),
+    'Food +': require('./thumbnails/food-basics-thumbnail.png'),
     Tastes: require('./thumbnails/likes-thumbnail.png'),
     'Frequency Adverbs': require('./thumbnails/frequency-thumbnail.png'),
     Furniture: require('./thumbnails/furniture-thumbnail.png'),
@@ -94,6 +95,10 @@ export const lessonThumbnails: Record<string, AssetValue> = (() => {
     'Extreme-Sports': require('./thumbnails/extreme-sports-thumbnail.png'),
 
     'The Blitz': require('./thumbnails/blitzthumbnail.png'),
+    Christmas: require('./thumbnails/christmas-thumbnail.png'),
+    Halloween: require('./thumbnails/halloween-thumbnail.png'),
+    'School Subjects': require('./thumbnails/subjects-thumbnail.png'),
+    'School Supplies': require('./thumbnails/supplies-thumbnail.png'),
   };
 
   const mapped: Record<string, AssetValue> = {};

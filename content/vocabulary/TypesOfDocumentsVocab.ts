@@ -10,7 +10,7 @@ const TypesOfDocumentsVocab = {
   { "english": "a poem", "french": "un poème" },
   { "english": "a text message", "french": "un texto" },
   { "english": "a book cover", "french": "une couverture de livre" },
-  { "english": "a cartoon", "french": "un dessin animé" },
+  { "english": "a cartoon", "french": "un dessin humoristique / une caricature" },
   { "english": "a painting", "french": "une peinture" },
   { "english": "a poster", "french": "une affiche" },
   { "english": "a map", "french": "une carte" },

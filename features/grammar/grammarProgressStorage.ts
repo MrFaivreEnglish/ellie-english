@@ -3,6 +3,7 @@ import {
   syncProgressItemToCloudIfSignedIn,
   type CloudProgressItem,
 } from '../account/accountStorage';
+import { recordPracticeToday } from '../progress/streakStorage';
 
 const GRAMMAR_PROGRESS_PREFIX = '@grammar_progress';
 const GRAMMAR_PROGRESS_TODAY_PREFIX = '@grammar_progress_today';
@@ -11,6 +12,14 @@ export type GrammarProgressSummary = {
   totalCorrectAnswers: number;
   lessonCount: number;
   correctToday: number;
+};
+
+let grammarSummaryCache: Promise<GrammarProgressSummary> | null = null;
+let grammarSummaryCacheDate = '';
+
+const invalidateGrammarProgressCache = () => {
+  grammarSummaryCache = null;
+  grammarSummaryCacheDate = '';
 };
 
 const normalizeLessonKey = (lessonKey: string) =>
@@ -116,7 +125,9 @@ export const recordGrammarCorrectAnswer = async (lessonKey: string, answerKey: s
       saveStringSet(storageKey, allCorrectAnswers),
       saveStringSet(todayStorageKey, todayCorrectAnswers),
     ]);
+    invalidateGrammarProgressCache();
 
+    void recordPracticeToday();
     void syncProgressItemToCloudIfSignedIn(
       buildCloudItem(normalizedLessonKey, normalizedAnswerKey, { savedOn: getLocalDateKey() })
     );
@@ -189,9 +200,10 @@ export const mergeGrammarProgressCloudItems = async (items: CloudProgressItem[])
     }),
     saveStringSet(todayKey(GRAMMAR_PROGRESS_TODAY_PREFIX), todayCorrectAnswers),
   ]);
+  invalidateGrammarProgressCache();
 };
 
-export const getGrammarProgressSummary = async (): Promise<GrammarProgressSummary> => {
+const readGrammarProgressSummary = async (): Promise<GrammarProgressSummary> => {
   try {
     const allKeys = await AsyncStorage.getAllKeys();
     const progressStorageKeys = allKeys.filter((key) => key.startsWith(`${GRAMMAR_PROGRESS_PREFIX}:`));
@@ -225,6 +237,31 @@ export const getGrammarProgressSummary = async (): Promise<GrammarProgressSummar
   }
 };
 
+export const getGrammarProgressSummary = async (): Promise<GrammarProgressSummary> => {
+  const localDateKey = getLocalDateKey();
+
+  if (!grammarSummaryCache || grammarSummaryCacheDate !== localDateKey) {
+    grammarSummaryCacheDate = localDateKey;
+    grammarSummaryCache = readGrammarProgressSummary();
+  }
+
+  return grammarSummaryCache;
+};
+
+export const getGrammarLessonKeysPracticedToday = async (): Promise<Set<string>> => {
+  try {
+    const todayAnswers = parseStringSet(await AsyncStorage.getItem(todayKey(GRAMMAR_PROGRESS_TODAY_PREFIX)));
+    const lessonKeys = new Set<string>();
+    todayAnswers.forEach((itemKey) => {
+      const sep = itemKey.indexOf(':');
+      if (sep > 0) lessonKeys.add(itemKey.slice(0, sep));
+    });
+    return lessonKeys;
+  } catch {
+    return new Set<string>();
+  }
+};
+
 export const clearGrammarProgress = async () => {
   try {
     const allKeys = await AsyncStorage.getAllKeys();
@@ -237,5 +274,6 @@ export const clearGrammarProgress = async () => {
     if (progressKeys.length > 0) {
       await AsyncStorage.multiRemove(progressKeys);
     }
+    invalidateGrammarProgressCache();
   } catch {}
 };

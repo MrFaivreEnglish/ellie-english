@@ -1,24 +1,32 @@
-const NourritureVocab = {  id: '45',  title: 'Food Basics',
-  description: 'Learn vocabulary related to food, meals, and cooking',  imageUrl: 'https://i.ibb.co/0LR1yGM/vocab-food.webp',
+const NourritureVocab = {
+  id: '45',
+  title: 'Food Basics',
+  description: 'Learn basic food vocabulary: vegetables, fruits, desserts, drinks, meat, and other food',
+  imageUrl: 'https://i.ibb.co/997QBBww/food-1.webp',
   thumbnail: require('../../assets/thumbnails/food-basics-thumbnail.png'),
+  categoryPickerTitle: 'Choose a food basics category',
+  categoryPickerLabel: 'Food category',
+  categoryPickerAllLabel: 'All food basics',
   flashcards: [
     {
-      category: 'Vegetables 🥦',
+      category: 'Vegetables',
+      imageUrl: 'https://i.ibb.co/997QBBww/food-1.webp',
       words: [
         { english: 'Cucumber', french: 'Concombre' },
-        { english: 'Broccoli', french: 'Brocoli' },
-        { english: 'Salad', french: 'Salade' },
-        { english: 'Cauliflower', french: 'Chou-fleur' },
-        { english: 'Spinach', french: 'Épinards' },
-        { english: 'Pickles', french: 'Cornichons' },
-        { english: 'Potato', french: 'Pomme de terre' },
+        { english: 'Corn', french: 'Maïs' },
+        { english: 'Lettuce', french: 'Laitue' },
+        { english: 'Pumpkin', french: 'Citrouille' },
         { english: 'Carrot', french: 'Carotte' },
+        { english: 'Tomato', french: 'Tomate' },
+        { english: 'Potato', french: 'Pomme de terre' },
+        { english: 'Onion', french: 'Oignon' },
         { english: 'Beans', french: 'Haricots' },
-        { english: 'Tomato', french: 'Tomate' }
-      ]
+        { english: 'Mushroom', french: 'Champignon' },
+      ],
     },
     {
-      category: 'Fruits 🍓',
+      category: 'Fruits',
+      imageUrl: 'https://i.ibb.co/997QBBww/food-1.webp',
       words: [
         { english: 'Apple', french: 'Pomme' },
         { english: 'Pear', french: 'Poire' },
@@ -26,48 +34,51 @@ const NourritureVocab = {  id: '45',  title: 'Food Basics',
         { english: 'Peach', french: 'Pêche' },
         { english: 'Orange', french: 'Orange' },
         { english: 'Lemon', french: 'Citron' },
-        { english: 'Pineapple', french: 'Ananas' },
+        { english: 'Grapes', french: 'Raisin' },
         { english: 'Banana', french: 'Banane' },
         { english: 'Cherry', french: 'Cerise' },
         { english: 'Strawberry', french: 'Fraise' },
         { english: 'Blueberry', french: 'Myrtille' },
-        { english: 'Raspberry', french: 'Framboise' }
-      ]
+        { english: 'Raspberry', french: 'Framboise' },
+      ],
     },
     {
-      category: 'Dairy & Desserts 🍰',
+      category: 'Desserts',
+      imageUrl: 'https://i.ibb.co/997QBBww/food-1.webp',
       words: [
         { english: 'Yogurt', french: 'Yaourt' },
+        { english: 'Cake', french: 'Gâteau' },
+        { english: 'Pie', french: 'Tarte' },
+        { english: 'Ice cream', french: 'Glace' },
         { english: 'Jelly', french: 'Gelée' },
-        { english: 'Cheesecake', french: 'Gâteau au fromage' },
-        { english: 'Muffin', french: 'Muffin' },
         { english: 'Pudding', french: 'Pudding' },
-        { english: 'Trifle', french: 'Trifle' }
-      ]
+      ],
     },
     {
-      category: 'Drinks 🥤',
+      category: 'Drinks',
+      imageUrl: 'https://i.ibb.co/997QBBww/food-1.webp',
       words: [
         { english: 'Water', french: 'Eau' },
         { english: 'Fruit juice', french: 'Jus de fruit' },
         { english: 'Soda', french: 'Soda' },
         { english: 'Milk', french: 'Lait' },
         { english: 'Tea', french: 'Thé' },
-        { english: 'Coffee', french: 'Café' }
-      ]
+        { english: 'Coffee', french: 'Café' },
+      ],
     },
     {
-      category: 'Staples & Snacks 🍞',
+      category: 'Other',
+      imageUrl: 'https://i.ibb.co/997QBBww/food-1.webp',
       words: [
         { english: 'Bread', french: 'Pain' },
         { english: 'Cheese', french: 'Fromage' },
         { english: 'Jam', french: 'Confiture' },
         { english: 'Crisps', french: 'Chips' },
-        { english: 'Fish and chips', french: 'Poisson et frites' },
-        { english: 'Cereal', french: 'Céréales' }
-      ]
-    }
-  ]
+        { english: 'Fish and chips', french: 'Poisson-frites' },
+        { english: 'Egg', french: 'Œuf' },
+      ],
+    },
+  ],
 };
 
 export default NourritureVocab;

@@ -39,8 +39,8 @@ const BackButton: React.FC<BackButtonProps> = ({
   textStyle,
 }) => {
   const navigation = useNavigation<any>();
-  const { colors, menuLanguage } = useTheme();
-  const copy = getMenuCopy(menuLanguage).common;
+  const { colors } = useTheme();
+  const copy = getMenuCopy().common;
   const resolvedLabel = label ?? copy.back;
 
   const handlePress = React.useCallback(() => {

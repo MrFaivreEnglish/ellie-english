@@ -52,6 +52,19 @@ import {
 
 const GUEST_PROGRESS_SNAPSHOT_KEY = '@ellie_guest_progress_snapshot';
 
+const friendlyErrorMessage = (error: unknown): string => {
+  const raw = error instanceof Error ? error.message : '';
+  const lower = raw.toLowerCase();
+  if (lower.includes('invalid login credentials') || lower.includes('invalid credentials')) return 'Incorrect username or password.';
+  if (lower.includes('email not confirmed')) return 'Please confirm your email address before logging in.';
+  if (lower.includes('duplicate key') || lower.includes('already registered') || lower.includes('already exists')) return 'That username is already taken.';
+  if (lower.includes('user not found') || lower.includes('no user found')) return 'No account found with that username.';
+  if (lower.includes('failed to fetch') || lower.includes('network request failed') || lower.includes('networkerror')) return 'Connection failed. Check your internet and try again.';
+  if (lower.includes('jwt expired') || lower.includes('session expired')) return 'Your session has expired. Please log in again.';
+  if (lower.includes('password') && lower.includes('weak')) return 'Password is too weak. Use at least 6 characters.';
+  return raw || 'Something went wrong. Please try again.';
+};
+
 type AccountSyncStatus = 'local' | 'waiting' | 'syncing' | 'synced' | 'failed';
 
 type AccountContextValue = {
@@ -233,8 +246,7 @@ const AccountProviderInner = ({ children }: { children: React.ReactNode }) => {
     try {
       await task();
     } catch (nextError) {
-      const message = nextError instanceof Error ? nextError.message : 'Account action failed.';
-      setError(message);
+      setError(friendlyErrorMessage(nextError));
       setSyncStatus('failed');
       throw nextError;
     } finally {
@@ -262,11 +274,22 @@ const AccountProviderInner = ({ children }: { children: React.ReactNode }) => {
           return;
         }
 
-        const refreshedSession = await refreshSupabaseUser();
+        // Show the locally cached account immediately so the app is usable offline.
+        // The network refresh below updates it in the background.
+        setSession(savedSession);
+        setSyncStatus('waiting');
+        setIsLoading(false);
 
-        if (!active) return;
+        try {
+          const refreshedSession = await refreshSupabaseUser();
 
-        await mergeSessionWithLocalXP(refreshedSession);
+          if (!active) return;
+
+          await mergeSessionWithLocalXP(refreshedSession);
+        } catch {
+          if (!active) return;
+          setSyncStatus('failed');
+        }
       } catch {
         if (!active) return;
         await clearAccountSession();
@@ -375,8 +398,7 @@ const AccountProviderInner = ({ children }: { children: React.ReactNode }) => {
       setLastSyncAt(null);
       setSyncStatus('local');
     } catch (nextError) {
-      const message = nextError instanceof Error ? nextError.message : 'Sign out failed.';
-      setError(message);
+      setError(friendlyErrorMessage(nextError));
       setSyncStatus('failed');
       throw nextError;
     } finally {

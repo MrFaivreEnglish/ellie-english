@@ -16,23 +16,14 @@ import AccountAvatar from './AccountAvatar';
 import { useAccount } from './AccountContext';
 import {
   ACCOUNT_AVATAR_COLOR_PRESETS,
-  IMAGE_ACCOUNT_AVATAR_PRESETS,
   ICON_ACCOUNT_AVATAR_PRESETS,
+  IMAGE_ACCOUNT_AVATAR_PRESETS,
   getUnlockedAccountAvatarColorId,
   getUnlockedAccountAvatarId,
   type AccountAvatarColorId,
   type AccountAvatarId,
 } from './accountAvatarStorage';
-import { getXP } from '../progress/xpStorage';
-import {
-  getLearnedFlashcardSummary,
-  type LearnedFlashcardSummary,
-} from '../vocabulary/flashcardProgressStorage';
-import {
-  getGrammarProgressSummary,
-  type GrammarProgressSummary,
-} from '../grammar/grammarProgressStorage';
-import { getVocabularyTimerBests } from '../vocabulary/vocabularyTimerStorage';
+import { useAccountStats } from './useAccountStats';
 import {
   getLevelBadgeLabel,
   getMasterStarCount,
@@ -58,26 +49,21 @@ type AccountPanelProps = {
     dangerSoft: string;
     warning: string;
     warningSoft: string;
+    buttonBackground?: string;
+    buttonText?: string;
   };
   isDarkMode: boolean;
 };
 
 type AccountMode = 'signIn' | 'create';
 type FocusedField = 'username' | 'password' | null;
+type MaterialIconName = React.ComponentProps<typeof MaterialIcons>['name'];
 
 const ACCOUNT_TOUR_SEEN_KEY = '@ellie_account_signed_in_tour_seen';
 
-const emptyLearnedSummary: LearnedFlashcardSummary = {
-  totalLearned: 0,
-  lessonCount: 0,
-  learnedToday: 0,
-};
+const ALL_AVATAR_PRESETS = [...IMAGE_ACCOUNT_AVATAR_PRESETS, ...ICON_ACCOUNT_AVATAR_PRESETS]
+  .sort((a, b) => (a.unlockLevel ?? 0) - (b.unlockLevel ?? 0));
 
-const emptyGrammarSummary: GrammarProgressSummary = {
-  totalCorrectAnswers: 0,
-  lessonCount: 0,
-  correctToday: 0,
-};
 
 export default function AccountPanel({ colors, isDarkMode }: AccountPanelProps) {
   const {
@@ -104,10 +90,7 @@ export default function AccountPanel({ colors, isDarkMode }: AccountPanelProps) 
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [focusedField, setFocusedField] = useState<FocusedField>(null);
-  const [localXP, setLocalXP] = useState(0);
-  const [learnedSummary, setLearnedSummary] = useState<LearnedFlashcardSummary>(emptyLearnedSummary);
-  const [grammarSummary, setGrammarSummary] = useState<GrammarProgressSummary>(emptyGrammarSummary);
-  const [timerBestCount, setTimerBestCount] = useState(0);
+  const { localXP, learnedSummary, grammarSummary, streak, timerBestCount } = useAccountStats(session?.user?.id, isSyncing);
   const [localMessage, setLocalMessage] = useState('');
   const [showConnectionTour, setShowConnectionTour] = useState(false);
   const [isProfileEditorOpen, setIsProfileEditorOpen] = useState(false);
@@ -124,7 +107,8 @@ export default function AccountPanel({ colors, isDarkMode }: AccountPanelProps) 
     isSyncing ||
     !trimmedUsername ||
     !password ||
-    (isCreateMode && (trimmedUsername.length < 3 || password.length < 6));
+    trimmedUsername.length < 3 ||
+    password.length < 6;
   const compact = width < 390;
   const levelStats = useMemo(() => getXPLevelStats(localXP), [localXP]);
   const unlockedAccountAvatarId = useMemo(
@@ -147,6 +131,57 @@ export default function AccountPanel({ colors, isDarkMode }: AccountPanelProps) 
   const levelBadgeLabel = useMemo(() => getLevelBadgeLabel(levelStats.level), [levelStats.level]);
   const masterTierLabel = useMemo(() => getMasterTierLabel(levelStats.level), [levelStats.level]);
   const masterStarCount = useMemo(() => getMasterStarCount(levelStats.level), [levelStats.level]);
+  const actionButtonColor = colors.buttonBackground ?? colors.primary;
+  const actionButtonTextColor = colors.buttonText ?? '#fff';
+  const masterSurfaceColor = isDarkMode ? colors.warningSoft : '#FFF7D7';
+  const masterTextColor = isDarkMode ? '#FFF7D6' : '#7A4B00';
+  const profileProgressPercent = isMaster ? 100 : levelStats.progressPercent;
+  const profileProgressHint = totalSavedItems > 0
+    ? 'Keep going - your work is saved here.'
+    : 'Start a lesson to build your level.';
+  const profileProgressNextLabel = isMaster
+    ? (masterTierLabel || 'Master level')
+    : `${levelStats.remainingXP} XP to next level`;
+  const streakDayLabel = streak.currentStreak === 1 ? 'day' : 'days';
+  const profileProgressStats = useMemo(() => [
+    {
+      key: 'xp',
+      icon: 'local-fire-department' as MaterialIconName,
+      value: `${localXP}`,
+      label: 'Total XP',
+      accent: colors.warning,
+    },
+    {
+      key: 'streak',
+      icon: 'whatshot' as MaterialIconName,
+      value: `${streak.currentStreak}`,
+      label: `Streak (${streakDayLabel})`,
+      accent: colors.warning,
+    },
+    {
+      key: 'learnt',
+      icon: 'style' as MaterialIconName,
+      value: `${learnedSummary.totalLearned}`,
+      label: 'Words learnt',
+      accent: colors.success,
+    },
+    {
+      key: 'answers',
+      icon: 'edit' as MaterialIconName,
+      value: `${grammarSummary.totalCorrectAnswers}`,
+      label: 'Saved answers',
+      accent: colors.primary,
+    },
+  ], [
+    colors.primary,
+    colors.success,
+    colors.warning,
+    grammarSummary.totalCorrectAnswers,
+    learnedSummary.totalLearned,
+    localXP,
+    streak.currentStreak,
+    streakDayLabel,
+  ]);
   const backupSummary = useMemo(
     () =>
       `${grammarSummary.totalCorrectAnswers} grammar answers, ${learnedSummary.totalLearned} learnt words, ${timerBestCount} best times, and ${localXP} revision points.`,
@@ -161,15 +196,15 @@ export default function AccountPanel({ colors, isDarkMode }: AccountPanelProps) 
     submitLabel: isCreateMode ? 'Create account' : 'Log in',
     submitIcon: isCreateMode ? 'cloud-upload' as const : 'login' as const,
   }), [isCreateMode]);
-  const authSupportText = isCreateMode
-    ? isUsernameTooShort
-      ? 'Username needs at least 3 characters.'
-      : isPasswordTooShort
-        ? 'Password needs at least 6 characters.'
-        : 'New accounts start with their own progress.'
-    : "This account's progress replaces shared device progress while logged in.";
+  const authSupportText = isUsernameTooShort
+    ? 'Username needs at least 3 characters.'
+    : isPasswordTooShort
+      ? 'Password needs at least 6 characters.'
+      : isCreateMode
+        ? 'New accounts start with their own progress.'
+        : "This account's progress replaces shared device progress while logged in.";
   const authSupportIcon: React.ComponentProps<typeof MaterialIcons>['name'] =
-    isCreateMode && (isUsernameTooShort || isPasswordTooShort)
+    isUsernameTooShort || isPasswordTooShort
       ? 'error-outline'
       : isCreateMode
         ? 'cloud-upload'
@@ -213,28 +248,6 @@ export default function AccountPanel({ colors, isDarkMode }: AccountPanelProps) 
       text: 'Online copy not saved yet.',
     };
   }, [colors.danger, colors.primary, colors.success, error, isSyncing, lastSyncAt, session, syncStatus]);
-
-  useEffect(() => {
-    let active = true;
-
-    Promise.all([
-      getXP(),
-      getLearnedFlashcardSummary(),
-      getGrammarProgressSummary(),
-      getVocabularyTimerBests(),
-    ]).then(([xp, nextLearnedSummary, nextGrammarSummary, timerBests]) => {
-      if (!active) return;
-
-      setLocalXP(xp);
-      setLearnedSummary(nextLearnedSummary);
-      setGrammarSummary(nextGrammarSummary);
-      setTimerBestCount(Object.keys(timerBests).length);
-    });
-
-    return () => {
-      active = false;
-    };
-  }, [session, isSyncing]);
 
   useEffect(() => {
     setDraftAccountName(accountName);
@@ -378,7 +391,7 @@ export default function AccountPanel({ colors, isDarkMode }: AccountPanelProps) 
     return (
       <View style={styles.masterStars}>
         {Array.from({ length: masterStarCount }).map((_, index) => (
-          <MaterialIcons key={`account-master-star-${index}`} name="star" size={size} color="#B87500" />
+          <MaterialIcons key={`account-master-star-${index}`} name="star" size={size} color={colors.warning} />
         ))}
       </View>
     );
@@ -388,12 +401,12 @@ export default function AccountPanel({ colors, isDarkMode }: AccountPanelProps) 
     if (!isMaster) return null;
 
     return (
-      <View style={styles.masterProfileBadge}>
-        <MaterialIcons name="workspace-premium" size={16} color="#8A5A00" />
-        <Text style={styles.masterProfileBadgeText} numberOfLines={1}>
+      <View style={[styles.masterProfileBadge, { backgroundColor: masterSurfaceColor, borderColor: colors.warning }]}>
+        <MaterialIcons name="workspace-premium" size={16} color={masterTextColor} />
+        <Text style={[styles.masterProfileBadgeText, { color: masterTextColor }]} numberOfLines={1}>
           {levelBadgeLabel}
         </Text>
-        <Text style={styles.masterProfileBadgeSubtext} numberOfLines={1}>
+        <Text style={[styles.masterProfileBadgeSubtext, { color: masterTextColor }]} numberOfLines={1}>
           {levelStats.level === 100 ? 'Ellie Master' : masterTierLabel}
         </Text>
         {renderMasterStars()}
@@ -413,6 +426,80 @@ export default function AccountPanel({ colors, isDarkMode }: AccountPanelProps) 
       </View>
       <Text style={[styles.dashboardStatValue, { color: colors.text }]} numberOfLines={1}>{value}</Text>
       <Text style={[styles.dashboardStatLabel, { color: colors.secondaryText }]} numberOfLines={1}>{label}</Text>
+    </View>
+  );
+
+  const renderProfileProgress = () => (
+    <View
+      style={[
+        styles.profileProgressCard,
+        {
+          backgroundColor: colors.card,
+          borderColor: isMaster ? colors.warning : colors.border,
+        },
+      ]}
+    >
+      <View style={styles.profileProgressHeader}>
+        <View style={styles.profileProgressTitleBlock}>
+          <Text style={[styles.profileProgressTitle, { color: colors.text }]}>Profile progress</Text>
+          <Text style={[styles.profileProgressHint, { color: colors.secondaryText }]} numberOfLines={1}>
+            {profileProgressHint}
+          </Text>
+        </View>
+        <View
+          style={[
+            styles.profileProgressXpPill,
+            {
+              backgroundColor: isMaster ? masterSurfaceColor : colors.primarySoft,
+              borderColor: isMaster ? colors.warning : colors.borderStrong,
+            },
+          ]}
+        >
+          <Text style={[styles.profileProgressXpText, { color: isMaster ? masterTextColor : colors.primary }]}>
+            {levelBadgeLabel.replace('Level ', 'Lv.')}
+          </Text>
+        </View>
+      </View>
+
+      {renderMasterProfileBadge()}
+
+      <View style={[styles.progressTrackLarge, { backgroundColor: isDarkMode ? colors.surfaceAlt : '#D8E9F7' }]}>
+        <View
+          style={[
+            styles.progressFill,
+            {
+              width: `${profileProgressPercent}%`,
+              backgroundColor: isMaster ? colors.warning : colors.primary,
+            },
+          ]}
+        />
+      </View>
+      <Text style={[styles.profileProgressNextText, { color: colors.secondaryText }]} numberOfLines={1}>
+        {profileProgressNextLabel}
+      </Text>
+
+      <View style={[styles.profileProgressStatsRow, { borderTopColor: colors.border }]}>
+        {profileProgressStats.map((stat, index) => (
+          <View
+            key={stat.key}
+            style={[
+              styles.profileProgressStatItem,
+              index > 0 && {
+                borderLeftColor: colors.border,
+                borderLeftWidth: StyleSheet.hairlineWidth,
+              },
+            ]}
+          >
+            <MaterialIcons name={stat.icon} size={18} color={stat.accent} />
+            <Text style={[styles.profileProgressStatValue, { color: colors.text }]} numberOfLines={1}>
+              {stat.value}
+            </Text>
+            <Text style={[styles.profileProgressStatLabel, { color: colors.secondaryText }]} numberOfLines={2}>
+              {stat.label}
+            </Text>
+          </View>
+        ))}
+      </View>
     </View>
   );
 
@@ -445,8 +532,8 @@ export default function AccountPanel({ colors, isDarkMode }: AccountPanelProps) 
       >
         <AccountAvatar avatarId={avatarId} colorId={unlockedAccountAvatarColorId} size={36} />
         {selected && (
-          <View style={[styles.avatarChoiceCheck, { backgroundColor: colors.primary }]}>
-            <MaterialIcons name="check" size={13} color="#fff" />
+          <View style={[styles.avatarChoiceCheck, { backgroundColor: actionButtonColor }]}>
+            <MaterialIcons name="check" size={13} color={actionButtonTextColor} />
           </View>
         )}
         {!selected && !unlocked && (
@@ -493,8 +580,8 @@ export default function AccountPanel({ colors, isDarkMode }: AccountPanelProps) 
       >
         <View style={[styles.colorSwatch, { backgroundColor, borderColor: accentColor, borderWidth: borderWidth ?? 2 }]} />
         {selected && (
-          <View style={[styles.colorChoiceCheck, { backgroundColor: colors.primary }]}>
-            <MaterialIcons name="check" size={12} color="#fff" />
+          <View style={[styles.colorChoiceCheck, { backgroundColor: actionButtonColor }]}>
+            <MaterialIcons name="check" size={12} color={actionButtonTextColor} />
           </View>
         )}
         {!selected && !unlocked && (
@@ -512,7 +599,7 @@ export default function AccountPanel({ colors, isDarkMode }: AccountPanelProps) 
       <View style={styles.profileEditor}>
         <View style={styles.profileEditorHeader}>
           <Text style={[styles.profileEditorTitle, { color: colors.text }]}>Profile styles</Text>
-          <Text style={[styles.profileEditorMeta, { color: isMaster ? '#8A5A00' : colors.secondaryText }]}>
+          <Text style={[styles.profileEditorMeta, { color: isMaster ? masterTextColor : colors.secondaryText }]}>
             {levelBadgeLabel}
           </Text>
         </View>
@@ -529,17 +616,9 @@ export default function AccountPanel({ colors, isDarkMode }: AccountPanelProps) 
             )
           )}
         </View>
-        <Text style={[styles.avatarGroupLabel, { color: colors.secondaryText }]}>Icons</Text>
+        <Text style={[styles.avatarGroupLabel, { color: colors.secondaryText }]}>Avatars</Text>
         <View style={styles.avatarGrid}>
-          {ICON_ACCOUNT_AVATAR_PRESETS.map((preset) =>
-            renderAvatarChoice(preset.id, preset.label, preset.unlockLevel)
-          )}
-        </View>
-        <Text style={[styles.avatarGroupLabel, styles.avatarGroupLabelSpaced, { color: colors.secondaryText }]}>
-          Images
-        </Text>
-        <View style={styles.avatarGrid}>
-          {IMAGE_ACCOUNT_AVATAR_PRESETS.map((preset) =>
+          {ALL_AVATAR_PRESETS.map((preset) =>
             renderAvatarChoice(preset.id, preset.label, preset.unlockLevel)
           )}
         </View>
@@ -590,24 +669,7 @@ export default function AccountPanel({ colors, isDarkMode }: AccountPanelProps) 
         </View>
       </View>
 
-      <View style={styles.levelSummaryRow}>
-        <Text style={[styles.levelSummaryTitle, { color: colors.text }]}>Profile progress</Text>
-        <Text style={[styles.levelSummaryMeta, { color: isMaster ? '#8A5A00' : colors.secondaryText }]}>
-          {levelBadgeLabel}
-        </Text>
-      </View>
-      {renderMasterProfileBadge()}
-      <View style={[styles.progressTrackLarge, { backgroundColor: isDarkMode ? colors.surfaceAlt : '#D8E9F7' }]}>
-        <View
-          style={[
-            styles.progressFill,
-            {
-              width: `${levelStats.progressPercent}%`,
-              backgroundColor: isMaster ? '#D79A00' : colors.warning,
-            },
-          ]}
-        />
-      </View>
+      {renderProfileProgress()}
     </View>
   );
 
@@ -786,16 +848,16 @@ export default function AccountPanel({ colors, isDarkMode }: AccountPanelProps) 
                       disabled={isNameSaveDisabled}
                       style={[
                         styles.identityPillAction,
-                        { backgroundColor: colors.primary, borderColor: colors.primary },
+                        { backgroundColor: actionButtonColor, borderColor: actionButtonColor },
                         isNameSaveDisabled && styles.disabledButton,
                       ]}
                       accessibilityRole="button"
                       accessibilityLabel="Save account name"
                     >
                       {isSyncing ? (
-                        <ActivityIndicator color="#fff" size="small" />
+                        <ActivityIndicator color={actionButtonTextColor} size="small" />
                       ) : (
-                        <MaterialIcons name="check" size={16} color="#fff" />
+                        <MaterialIcons name="check" size={16} color={actionButtonTextColor} />
                       )}
                     </TouchableOpacity>
                   </View>
@@ -843,24 +905,7 @@ export default function AccountPanel({ colors, isDarkMode }: AccountPanelProps) 
             </View>
           </View>
 
-          <View style={styles.levelSummaryRow}>
-            <Text style={[styles.levelSummaryTitle, { color: colors.text }]}>Profile progress</Text>
-            <Text style={[styles.levelSummaryMeta, { color: isMaster ? '#8A5A00' : colors.secondaryText }]}>
-              {levelBadgeLabel}
-            </Text>
-          </View>
-          {renderMasterProfileBadge()}
-          <View style={[styles.progressTrackLarge, { backgroundColor: isDarkMode ? colors.surfaceAlt : '#D8E9F7' }]}>
-            <View
-              style={[
-                styles.progressFill,
-                {
-                  width: `${levelStats.progressPercent}%`,
-                  backgroundColor: isMaster ? '#D79A00' : colors.warning,
-                },
-              ]}
-            />
-          </View>
+          {renderProfileProgress()}
         </View>
 
         <View style={styles.dashboardBody}>
@@ -899,16 +944,16 @@ export default function AccountPanel({ colors, isDarkMode }: AccountPanelProps) 
             <TouchableOpacity
               onPress={confirmSync}
               disabled={isSyncing}
-              style={[styles.backupActionButton, { backgroundColor: colors.primary }]}
+              style={[styles.backupActionButton, { backgroundColor: actionButtonColor }]}
               accessibilityRole="button"
               accessibilityLabel="Sync account progress now"
             >
               {isSyncing ? (
-                <ActivityIndicator color="#fff" />
+                <ActivityIndicator color={actionButtonTextColor} />
               ) : (
                 <>
-                  <MaterialIcons name="sync" size={17} color="#fff" />
-                  <Text style={styles.backupActionText}>
+                  <MaterialIcons name="sync" size={17} color={actionButtonTextColor} />
+                  <Text style={[styles.backupActionText, { color: actionButtonTextColor }]}>
                     {syncStatus === 'failed' || error ? 'Retry' : 'Sync'}
                   </Text>
                 </>
@@ -970,7 +1015,7 @@ export default function AccountPanel({ colors, isDarkMode }: AccountPanelProps) 
         <View style={[styles.modeRow, { backgroundColor: colors.surface, borderColor: colors.border }]}>
           <TouchableOpacity
             onPress={() => setModeAndClearFeedback('signIn')}
-            style={[styles.modeButton, mode === 'signIn' && { backgroundColor: colors.primary }]}
+            style={[styles.modeButton, mode === 'signIn' && { backgroundColor: actionButtonColor }]}
             accessibilityRole="button"
             accessibilityState={{ selected: mode === 'signIn' }}
             accessibilityLabel="Log in to a personal account"
@@ -978,15 +1023,15 @@ export default function AccountPanel({ colors, isDarkMode }: AccountPanelProps) 
             <MaterialIcons
               name="login"
               size={16}
-              color={mode === 'signIn' ? '#fff' : colors.primary}
+              color={mode === 'signIn' ? actionButtonTextColor : colors.primary}
             />
-            <Text style={[styles.modeText, { color: colors.primary }, mode === 'signIn' && styles.activeModeText]}>
+            <Text style={[styles.modeText, { color: mode === 'signIn' ? actionButtonTextColor : colors.primary }]}>
               Log in
             </Text>
           </TouchableOpacity>
           <TouchableOpacity
             onPress={() => setModeAndClearFeedback('create')}
-            style={[styles.modeButton, mode === 'create' && { backgroundColor: colors.primary }]}
+            style={[styles.modeButton, mode === 'create' && { backgroundColor: actionButtonColor }]}
             accessibilityRole="button"
             accessibilityState={{ selected: mode === 'create' }}
             accessibilityLabel="Create a personal account"
@@ -994,9 +1039,9 @@ export default function AccountPanel({ colors, isDarkMode }: AccountPanelProps) 
             <MaterialIcons
               name="person-add"
               size={16}
-              color={mode === 'create' ? '#fff' : colors.primary}
+              color={mode === 'create' ? actionButtonTextColor : colors.primary}
             />
-            <Text style={[styles.modeText, { color: colors.primary }, mode === 'create' && styles.activeModeText]}>
+            <Text style={[styles.modeText, { color: mode === 'create' ? actionButtonTextColor : colors.primary }]}>
               Create
             </Text>
           </TouchableOpacity>
@@ -1066,18 +1111,18 @@ export default function AccountPanel({ colors, isDarkMode }: AccountPanelProps) 
           disabled={isSubmitDisabled}
           style={[
             styles.primaryButton,
-            { backgroundColor: colors.primary },
+            { backgroundColor: actionButtonColor },
             isSubmitDisabled && styles.disabledButton,
           ]}
           accessibilityRole="button"
           accessibilityLabel={isCreateMode ? 'Create account' : 'Log in'}
         >
           {isSyncing ? (
-            <ActivityIndicator color="#fff" />
+            <ActivityIndicator color={actionButtonTextColor} />
           ) : (
             <>
-              <MaterialIcons name={formCopy.submitIcon} size={19} color="#fff" />
-              <Text style={styles.primaryButtonText}>{formCopy.submitLabel}</Text>
+              <MaterialIcons name={formCopy.submitIcon} size={19} color={actionButtonTextColor} />
+              <Text style={[styles.primaryButtonText, { color: actionButtonTextColor }]}>{formCopy.submitLabel}</Text>
             </>
           )}
         </TouchableOpacity>
@@ -1322,29 +1367,84 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '800',
   },
-  progressTrackLarge: {
-    height: 10,
-    borderRadius: 999,
-    overflow: 'hidden',
+  profileProgressCard: {
+    borderRadius: 14,
+    borderWidth: 1.5,
+    padding: 12,
+    gap: 9,
   },
-  levelSummaryRow: {
-    minHeight: 20,
+  profileProgressHeader: {
+    minHeight: 36,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     gap: 12,
   },
-  levelSummaryTitle: {
-    fontSize: 14,
-    lineHeight: 18,
+  profileProgressTitleBlock: {
+    flex: 1,
+    minWidth: 0,
+  },
+  profileProgressTitle: {
+    fontSize: 16,
+    lineHeight: 20,
     fontWeight: '900',
   },
-  levelSummaryMeta: {
-    flexShrink: 1,
+  profileProgressHint: {
+    fontSize: 11,
+    lineHeight: 15,
+    fontWeight: '800',
+    marginTop: 2,
+  },
+  profileProgressXpPill: {
+    minHeight: 32,
+    minWidth: 76,
+    borderRadius: 999,
+    borderWidth: 1.5,
+    paddingHorizontal: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  profileProgressXpText: {
     fontSize: 12,
-    lineHeight: 16,
-    fontWeight: '700',
-    textAlign: 'right',
+    lineHeight: 15,
+    fontWeight: '900',
+  },
+  progressTrackLarge: {
+    height: 10,
+    borderRadius: 999,
+    overflow: 'hidden',
+  },
+  profileProgressNextText: {
+    fontSize: 11,
+    lineHeight: 15,
+    fontWeight: '800',
+  },
+  profileProgressStatsRow: {
+    flexDirection: 'row',
+    borderTopWidth: StyleSheet.hairlineWidth,
+    paddingTop: 9,
+    marginTop: 2,
+  },
+  profileProgressStatItem: {
+    flex: 1,
+    minHeight: 66,
+    minWidth: 0,
+    alignItems: 'center',
+    justifyContent: 'flex-start',
+    gap: 3,
+    paddingHorizontal: 5,
+  },
+  profileProgressStatValue: {
+    fontSize: 14,
+    lineHeight: 17,
+    fontWeight: '900',
+    textAlign: 'center',
+  },
+  profileProgressStatLabel: {
+    fontSize: 9,
+    lineHeight: 12,
+    fontWeight: '800',
+    textAlign: 'center',
   },
   levelShowcaseSubtext: {
     fontSize: 11,

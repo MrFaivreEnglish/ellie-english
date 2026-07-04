@@ -15,11 +15,17 @@
     "validate:content": "node scripts/validate-content.js",
     "validate:logic": "node scripts/validate-logic.js",
     "validate:build-config": "node scripts/validate-build-config.js",
-    "check": "npm run typecheck && npm run validate:content && npm run validate:logic && npm run validate:build-config",
-    "predeploy": "npx expo export --platform web",
+    "check": "npm run typecheck && npm run validate:content && npm run validate:logic && npm run validate:build-config && npm test -- --ci",
+    "test": "jest",
+    "predeploy": "npx expo export --platform web && node scripts/fix-web-base-path.js",
     "deploy": "gh-pages -d dist"
   },
+  "overrides": {
+    "shell-quote": "^1.8.4",
+    "uuid": "^11.1.1"
+  },
   "dependencies": {
+    "@expo-google-fonts/nunito": "^0.4.2",
     "@expo/metro-runtime": "~55.0.11",
     "@expo/vector-icons": "^15.0.0",
     "@react-native-async-storage/async-storage": "^2.2.0",
@@ -35,6 +41,7 @@
     "expo-font": "~55.0.8",
     "expo-haptics": "^55.0.0",
     "expo-linear-gradient": "~55.0.14",
+    "expo-speech": "~55.0.14",
     "expo-status-bar": "~55.0.6",
     "lucide-react-native": "0.542.0",
     "react": "19.2.0",
@@ -52,9 +59,12 @@
   },
   "devDependencies": {
     "@babel/core": "^7.20.0",
+    "@testing-library/react-native": "^14.0.0",
+    "@types/jest": "^30.0.0",
     "@types/react": "^19.2.14",
     "babel-preset-expo": "^55.0.22",
     "gh-pages": "^6.3.0",
+    "jest-expo": "~55.0.0",
     "supabase": "^2.39.2",
     "typescript": "^5.1.3"
   }

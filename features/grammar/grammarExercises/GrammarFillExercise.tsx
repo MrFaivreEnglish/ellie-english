@@ -3,8 +3,9 @@ import { Platform, Pressable, StyleSheet, Text, TextInput, TouchableOpacity, Vie
 import { MaterialIcons } from '@expo/vector-icons';
 import { CARD_HEIGHT, Exercise, normalizeAnswer } from './GrammarExerciseUtils';
 import { clampNumber, getWebLessonScale, scaleValue } from '../../shared/responsiveLayout';
-import { getPrimaryButtonStyle } from '../../shared/uiPrimitives';
+import { getGrammarGameColors, getPrimaryButtonStyle } from '../../shared/uiPrimitives';
 import { triggerSelectionHaptic } from '../../shared/haptics';
+import { usePersistentExerciseKeyboard } from '../../shared/usePersistentExerciseKeyboard';
 import type { ThemeColors } from '../../settings/ThemeContext';
 
 interface GrammarFillExerciseProps {
@@ -64,12 +65,17 @@ const GrammarFillExercise: React.FC<GrammarFillExerciseProps> = ({
   const inputShellMarginBottom = isDesktopWeb ? scaleValue(14, webScale) : isAndroid ? (keyboardMode ? 11 : 15) : keyboardMode ? 7 : isCompact ? 9 : 13;
   const fillInputMinHeight = isDesktopWeb ? scaleValue(64, webScale) : isAndroid ? (keyboardMode ? 46 : isCompact ? 52 : 60) : keyboardMode ? 36 : isCompact ? 40 : 48;
   const fillInputFontSize = isDesktopWeb ? scaleValue(24, webScale) : isAndroid ? (keyboardMode ? 19 : isCompact ? 20 : 22) : keyboardMode ? 16 : isCompact ? 17 : 19;
-
-  const focusInput = useCallback(() => {
-    requestAnimationFrame(() => {
-      inputRef.current?.focus();
-    });
-  }, []);
+  const grammarGame = getGrammarGameColors(colors, isDarkMode);
+  const {
+    shouldKeepKeyboardOpen: shouldAllowKeyboardFocus,
+    focusInput,
+    focusInputSequence,
+    focusOnExerciseChange,
+  } = usePersistentExerciseKeyboard({
+    inputRef,
+    enabled: !isDesktopWeb,
+    androidFocusRetries: Platform.OS === 'android',
+  });
 
   const handleFillAnswerChange = useCallback((value: string) => {
     if (userAnswer !== '') return;
@@ -81,33 +87,35 @@ const GrammarFillExercise: React.FC<GrammarFillExerciseProps> = ({
   }, [exercise?.question, exercise?.answer]);
 
   useEffect(() => {
-    if (userAnswer !== '') return;
+    if (!shouldAllowKeyboardFocus) return;
 
-    const timeoutId = setTimeout(() => {
-      inputRef.current?.focus();
-    }, 60);
+    focusOnExerciseChange();
+  }, [exercise?.question, focusOnExerciseChange, shouldAllowKeyboardFocus]);
 
-    return () => clearTimeout(timeoutId);
-  }, [exercise?.question, focusInput, userAnswer]);
-
-  const handleSubmit = async () => {
+  const handleSubmit = useCallback(async () => {
     if (!exercise || userAnswer !== '' || typeof exercise.answer !== 'string') return;
 
     const isCorrect = normalizeAnswer(fillAnswer) === normalizeAnswer(exercise.answer);
 
     if (isCorrect) {
       await onCorrect(exercise.answer);
+      focusInputSequence([0, 180, 1900]);
     } else {
       onIncorrect('fill');
       focusInput();
     }
-  };
+  }, [exercise, userAnswer, fillAnswer, onCorrect, onIncorrect, focusInput]);
 
-  const handleClear = () => {
+  const handleClear = useCallback(() => {
     triggerSelectionHaptic();
     setFillAnswer('');
     focusInput();
-  };
+  }, [focusInput]);
+
+  const handleInputBlur = useCallback(() => {
+    setIsInputFocused(false);
+    focusInput(120);
+  }, [focusInput]);
 
   const disabled = fillAnswer.trim() === '' || userAnswer !== '';
   const canClear = fillAnswer.length > 0 && userAnswer === '';
@@ -128,15 +136,18 @@ const GrammarFillExercise: React.FC<GrammarFillExerciseProps> = ({
           styles.fillCard,
           { height: fillCardHeight, padding: fillCardPadding },
           {
-            backgroundColor: colors.card,
-            borderColor: isDarkMode ? colors.borderStrong : colors.border,
-            borderBottomColor: isDarkMode ? colors.buttonBackground : colors.borderStrong,
-            shadowColor: isDarkMode ? colors.buttonBackground : '#000',
+            backgroundColor: grammarGame.panelSurface,
+            borderColor: grammarGame.panelBorder,
+            borderBottomColor: grammarGame.panelBottom,
+            shadowColor: grammarGame.panelShadow,
+            shadowOpacity: isDarkMode ? 0.22 : 0.08,
+            shadowRadius: isDarkMode ? 9 : 6,
+            elevation: isDarkMode ? 4 : 2,
           },
         ]}
       >
         <Pressable
-          onPress={focusInput}
+          onPress={() => focusInput()}
           style={[
             styles.inputShell,
             useTightKeyboardStyles && styles.inputShellTight,
@@ -145,21 +156,21 @@ const GrammarFillExercise: React.FC<GrammarFillExerciseProps> = ({
               minHeight: inputShellMinHeight,
               paddingVertical: inputShellVerticalPadding,
               marginBottom: inputShellMarginBottom,
-              backgroundColor: isDarkMode ? colors.surface : colors.surfaceAlt,
-              borderColor: isDarkMode ? colors.borderStrong : colors.border,
-              borderBottomColor: isDarkMode ? colors.buttonBackground : colors.borderStrong,
+              backgroundColor: grammarGame.inputSurface,
+              borderColor: grammarGame.answerBorder,
+              borderBottomColor: grammarGame.answerBottom,
             },
             isInputFocused && styles.inputShellFocused,
             isInputFocused && {
-              backgroundColor: isDarkMode ? colors.surfaceAlt : colors.primarySoft,
-              borderColor: colors.primary,
-              borderBottomColor: colors.primary,
+              backgroundColor: grammarGame.inputFocusedSurface,
+              borderColor: grammarGame.answerSelectedBorder,
+              borderBottomColor: grammarGame.answerSelectedBottom,
             },
             incorrectAnswer === 'fill' && styles.inputShellIncorrect,
             incorrectAnswer === 'fill' && {
-              backgroundColor: colors.dangerSoft,
-              borderColor: colors.danger,
-              borderBottomColor: colors.danger,
+              backgroundColor: grammarGame.incorrectSurface,
+              borderColor: grammarGame.incorrectBorder,
+              borderBottomColor: grammarGame.incorrectBottom,
             },
           ]}
         >
@@ -168,23 +179,23 @@ const GrammarFillExercise: React.FC<GrammarFillExerciseProps> = ({
             value={fillAnswer}
             onChangeText={handleFillAnswerChange}
             placeholder="Type your answer..."
-            placeholderTextColor={colors.secondaryText}
+            placeholderTextColor={grammarGame.metaText}
             autoCapitalize="none"
             autoCorrect={false}
             blurOnSubmit={false}
             submitBehavior="submit"
             editable={!!exercise}
             showSoftInputOnFocus
-            returnKeyType="done"
+            returnKeyType="send"
             onFocus={() => setIsInputFocused(true)}
-            onBlur={() => setIsInputFocused(false)}
+            onBlur={handleInputBlur}
             onSubmitEditing={handleSubmit}
             style={[
               styles.fillInput,
               useTightKeyboardStyles && styles.fillInputTight,
               isDesktopWeb && styles.fillInputDesktopWeb,
               { minHeight: fillInputMinHeight, fontSize: fillInputFontSize },
-              { color: colors.text },
+              { color: grammarGame.answerText },
               { outlineStyle: 'none' } as any,
             ]}
           />
@@ -194,7 +205,7 @@ const GrammarFillExercise: React.FC<GrammarFillExerciseProps> = ({
               style={styles.clearInputButton}
               hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
             >
-              <MaterialIcons name="close" size={22} color={colors.secondaryText} />
+              <MaterialIcons name="close" size={22} color={grammarGame.metaText} />
             </TouchableOpacity>
           )}
         </Pressable>
@@ -212,14 +223,14 @@ const GrammarFillExercise: React.FC<GrammarFillExerciseProps> = ({
           <Text style={[styles.checkAnswerButtonText, { color: colors.buttonText }, isDesktopWeb && { fontSize: scaleValue(16, webScale) }]}>Check</Text>
         </TouchableOpacity>
         {incorrectAnswer === 'fill' && (
-          <Text style={[styles.fillErrorText, { color: colors.dangerText }]}>Try again.</Text>
+          <Text style={[styles.fillErrorText, { color: grammarGame.incorrectText }]}>Try again.</Text>
         )}
       </View>
     </View>
   );
 };
 
-export default GrammarFillExercise;
+export default React.memo(GrammarFillExercise);
 
 const styles = StyleSheet.create({
   fillContainer: {
@@ -230,8 +241,8 @@ const styles = StyleSheet.create({
     padding: 20,
     borderRadius: 8,
     backgroundColor: '#fff',
-    borderWidth: 2,
-    borderBottomWidth: 4,
+    borderWidth: 1.5,
+    borderBottomWidth: 3,
     borderColor: '#E5E5E5',
     borderBottomColor: '#D1D5DB',
     justifyContent: 'center',
@@ -244,8 +255,8 @@ const styles = StyleSheet.create({
   inputShell: {
     minHeight: 104,
     borderRadius: 8,
-    borderWidth: 2,
-    borderBottomWidth: 4,
+    borderWidth: 1.5,
+    borderBottomWidth: 3,
     borderColor: '#D6E2EE',
     borderBottomColor: '#B9C8D6',
     backgroundColor: '#F8FBFF',
@@ -268,9 +279,9 @@ const styles = StyleSheet.create({
     borderBottomColor: '#D94E64',
   },
   inputShellFocused: {
-    backgroundColor: '#ECF6FF',
-    borderColor: '#1671B6',
-    borderBottomColor: '#0F5E98',
+    backgroundColor: '#EEF3FF',
+    borderColor: '#1F7AD1',
+    borderBottomColor: '#155B9F',
   },
   fillInput: {
     minHeight: 56,
@@ -302,11 +313,11 @@ const styles = StyleSheet.create({
   checkAnswerButton: {
     minHeight: 48,
     borderRadius: 8,
-    backgroundColor: '#1671B6',
-    borderWidth: 2,
-    borderBottomWidth: 4,
-    borderColor: '#1671B6',
-    borderBottomColor: '#0F5E98',
+    backgroundColor: '#1F7AD1',
+    borderWidth: 1.5,
+    borderBottomWidth: 3,
+    borderColor: '#1F7AD1',
+    borderBottomColor: '#155B9F',
     alignItems: 'center',
     justifyContent: 'center',
   },

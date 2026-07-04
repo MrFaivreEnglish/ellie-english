@@ -3,6 +3,7 @@ import { LayoutChangeEvent, StyleSheet, View } from 'react-native';
 
 type VocabularySecondViewShellProps = {
   backgroundColor: string;
+  bodyTopGuard?: number;
   headerTopPadding: number;
   headerBottomPadding?: number;
   minHeight: number;
@@ -14,6 +15,7 @@ type VocabularySecondViewShellProps = {
 
 export function VocabularySecondViewShell({
   backgroundColor,
+  bodyTopGuard = 0,
   headerTopPadding,
   headerBottomPadding = 14,
   minHeight,
@@ -36,6 +38,9 @@ export function VocabularySecondViewShell({
       >
         {modeBar}
       </View>
+      {bodyTopGuard > 0 && (
+        <View pointerEvents="none" style={{ height: bodyTopGuard, backgroundColor }} />
+      )}
       <View style={styles.body}>{children}</View>
     </View>
   );

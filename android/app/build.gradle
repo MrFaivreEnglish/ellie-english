@@ -68,6 +68,38 @@ react {
  */
 def enableMinifyInReleaseBuilds = (findProperty('android.enableMinifyInReleaseBuilds') ?: false).toBoolean()
 
+def getReleaseValue = { propertyName, environmentName ->
+    def propertyValue = findProperty(propertyName)
+    if (propertyValue != null && propertyValue.toString().trim()) {
+        return propertyValue.toString().trim()
+    }
+
+    def environmentValue = System.getenv(environmentName)
+    return environmentValue != null && environmentValue.trim() ? environmentValue.trim() : null
+}
+
+def androidVersionCode = (
+    findProperty('android.versionCode') ?:
+    System.getenv('ANDROID_VERSION_CODE') ?:
+    '2'
+).toString().toInteger()
+
+def androidVersionName = (
+    findProperty('android.versionName') ?:
+    System.getenv('ANDROID_VERSION_NAME') ?:
+    '2.2.0'
+).toString()
+
+def releaseStoreFilePath = getReleaseValue('ELLIE_UPLOAD_STORE_FILE', 'ANDROID_KEYSTORE_PATH') ?:
+    findProperty('android.injected.signing.store.file')
+def releaseStorePassword = getReleaseValue('ELLIE_UPLOAD_STORE_PASSWORD', 'ANDROID_KEYSTORE_PASSWORD') ?:
+    findProperty('android.injected.signing.store.password')
+def releaseKeyAlias = getReleaseValue('ELLIE_UPLOAD_KEY_ALIAS', 'ANDROID_KEY_ALIAS') ?:
+    findProperty('android.injected.signing.key.alias')
+def releaseKeyPassword = getReleaseValue('ELLIE_UPLOAD_KEY_PASSWORD', 'ANDROID_KEY_PASSWORD') ?:
+    findProperty('android.injected.signing.key.password')
+def releaseSigningConfigured = releaseStoreFilePath && releaseStorePassword && releaseKeyAlias && releaseKeyPassword
+
 /**
  * The preferred build flavor of JavaScriptCore (JSC)
  *
@@ -92,8 +124,8 @@ android {
         applicationId 'com.ellie.app'
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode 1
-        versionName "2.2.0"
+        versionCode androidVersionCode
+        versionName androidVersionName
 
         buildConfigField "String", "REACT_NATIVE_RELEASE_LEVEL", "\"${findProperty('reactNativeReleaseLevel') ?: 'stable'}\""
     }
@@ -104,15 +136,23 @@ android {
             keyAlias 'androiddebugkey'
             keyPassword 'android'
         }
+        release {
+            if (releaseSigningConfigured) {
+                storeFile file(releaseStoreFilePath)
+                storePassword releaseStorePassword
+                keyAlias releaseKeyAlias
+                keyPassword releaseKeyPassword
+            }
+        }
     }
     buildTypes {
         debug {
             signingConfig signingConfigs.debug
         }
         release {
-            // Caution! In production, you need to generate your own keystore file.
-            // see https://reactnative.dev/docs/signed-apk-android.
-            signingConfig signingConfigs.debug
+            if (releaseSigningConfigured) {
+                signingConfig signingConfigs.release
+            }
             def enableShrinkResources = findProperty('android.enableShrinkResourcesInReleaseBuilds') ?: 'false'
             shrinkResources enableShrinkResources.toBoolean()
             minifyEnabled enableMinifyInReleaseBuilds

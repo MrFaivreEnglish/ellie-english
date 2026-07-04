@@ -1,9 +1,8 @@
 import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Image, Dimensions, Animated, Platform, useWindowDimensions, Easing, KeyboardAvoidingView, ScrollView, Keyboard } from 'react-native';
-import { useTheme } from '../settings/ThemeContext';
+import { View, Text, StyleSheet, TouchableOpacity, Image, Dimensions, Animated, Platform, Easing, KeyboardAvoidingView, ScrollView, Keyboard } from 'react-native';
+import { useGrammarQuizLayout } from './useGrammarQuizLayout';
 import { useAudioPlayer } from 'expo-audio';
 import { MaterialIcons } from '@expo/vector-icons';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import assets from '../../assets/index';
 import BackButton from '../shared/BackButton';
@@ -12,7 +11,7 @@ import GrammarFillExercise from './grammarExercises/GrammarFillExercise';
 import GrammarModeTabs from './grammarExercises/GrammarModeTabs';
 import GrammarReorderExercise from './grammarExercises/GrammarReorderExercise';
 import GrammarTranslateExercise from './grammarExercises/GrammarTranslateExercise';
-import { clampNumber, getWebLessonImageScale, getWebLessonScale, scaleValue } from '../shared/responsiveLayout';
+import { clampNumber, scaleValue } from '../shared/responsiveLayout';
 import {
   CARD_HEIGHT,
   Exercise,
@@ -35,24 +34,26 @@ import { XP_REWARDS } from '../progress/xpRewards';
 import { saveLastLesson } from '../progress/lastLessonStorage';
 import LevelProgressSummary from '../progress/LevelProgressSummary';
 import { triggerSelectionHaptic, triggerSuccessHaptic, triggerWarningHaptic } from '../shared/haptics';
+import { getButtonStyle, getButtonTextColor, getGrammarGameColors } from '../shared/uiPrimitives';
+import type { GrammarLesson } from '../../types/lessonTypes';
+
+const Speech = (() => {
+  try { return require('expo-speech') as typeof import('expo-speech'); } catch { return null; }
+})();
 
 interface GrammarQuizProps {
-  lesson: {
-    title: string;
-    id?: string | number;
-    imageUrl: string;
-    exercises: Exercise[];
-    availableModes?: Partial<Record<ExerciseMode, boolean>>;
-  };
+  lesson: GrammarLesson;
   onBack: () => void;
   backLabel?: string;
 }
 
-const { width: screenWidth } = Dimensions.get('window');
-const ANDROID_SECOND_VIEW_LAYOUT = {
-  modeRowTopGap: 18,
-  modeRowTopGapWithStatusBar: 4,
+type MixedLessonImageCard = {
+  id: string;
+  title?: string;
+  imageUrl: string;
 };
+
+const { width: screenWidth } = Dimensions.get('window');
 
 const renderPromptText = (prompt?: string) => {
   if (!prompt) return null;
@@ -68,61 +69,36 @@ const renderPromptText = (prompt?: string) => {
   });
 };
 
+const withColorAlpha = (color: string, alpha: number): string => {
+  const match = /^#([0-9a-f]{6})$/i.exec(color.trim());
+  if (!match) return color;
+
+  const value = parseInt(match[1], 16);
+  const clampedAlpha = Math.max(0, Math.min(1, alpha));
+
+  return `rgba(${(value >> 16) & 255}, ${(value >> 8) & 255}, ${value & 255}, ${clampedAlpha})`;
+};
+
 const GrammarQuiz: React.FC<GrammarQuizProps> = ({ lesson, onBack, backLabel = 'Back to Grammar', navigation }: any) => {
-  const { colors, isDarkMode, isGrammarGameMode, isAndroidStatusBarEnabled } = useTheme();
-  const STICKY_TOP_SNAP_OFFSET = 0;
-  const insets = useSafeAreaInsets();
-  const { width: windowWidth, height: rawWindowHeight } = useWindowDimensions();
-  const [exerciseMode, setExerciseMode] = useState<ExerciseMode>('quiz');
-  const [viewportHeight, setViewportHeight] = useState(rawWindowHeight);
-  const [isSecondViewActive, setIsSecondViewActive] = useState(false);
-  const [stableWindowHeight, setStableWindowHeight] = useState(rawWindowHeight);
-  const [keyboardHeight, setKeyboardHeight] = useState(0);
-  const keyboardHeightDrop = stableWindowHeight - rawWindowHeight;
-  const isKeyboardOpen = keyboardHeight > 0 || keyboardHeightDrop > 120;
-  const isFillKeyboardOpen = exerciseMode === 'fill' && isKeyboardOpen;
-  const windowHeight = isKeyboardOpen ? stableWindowHeight : rawWindowHeight;
-  const lessonViewportHeight = viewportHeight > 0 ? viewportHeight : windowHeight;
-  const isDesktopWebLayout = Platform.OS === 'web' && windowWidth >= 768;
-  const isCompactScreen = lessonViewportHeight < 760 || windowWidth < 390;
-  const isKeyboardTightScreen = !isDesktopWebLayout && (lessonViewportHeight < 700 || windowWidth < 380);
-  const isLargeScreen = lessonViewportHeight > 900 && windowWidth >= 400;
-  const webLessonScale = getWebLessonScale(windowWidth, lessonViewportHeight);
-  const webLessonImageScale = getWebLessonImageScale(windowWidth, lessonViewportHeight);
-  const isScaledWebLesson = isDesktopWebLayout && webLessonScale > 1;
-  const webLessonMediaMaxWidth = Platform.OS === 'web'
-    ? Math.round(clampNumber(windowWidth * 0.78, 860, 1320))
-    : undefined;
-  const webExerciseMaxWidth = Platform.OS === 'web'
-    ? isDesktopWebLayout
-      ? Math.round(clampNumber(windowWidth * 0.66, 860, 1040))
-      : scaleValue(760, webLessonScale)
-    : undefined;
-  const quizCardHeight = Platform.OS === 'web'
-    ? scaleValue(isDesktopWebLayout ? 320 : CARD_HEIGHT, webLessonScale)
-    : CARD_HEIGHT;
-  const quizOptionGap = Platform.OS === 'web' ? scaleValue(6, webLessonScale) : 6;
-  const quizOptionHeight = (quizCardHeight - quizOptionGap * 3) / 4;
-  const layoutTopInset = Platform.OS === 'ios'
-    ? (insets.top > 0 ? insets.top : 0)
-    : Platform.OS === 'android' && isAndroidStatusBarEnabled
-      ? insets.top
-      : 0;
-  const layoutBottomInset = Platform.OS === 'android' ? 0 : insets.bottom;
-  const stickyHeaderTopPadding = Platform.OS === 'web' ? 4 : 6;
-  const androidSecondViewTopInset = Platform.OS === 'android' && isAndroidStatusBarEnabled ? layoutTopInset : 0;
-  const androidModeRowTopGap = Platform.OS === 'android' && isAndroidStatusBarEnabled
-    ? ANDROID_SECOND_VIEW_LAYOUT.modeRowTopGapWithStatusBar
-    : ANDROID_SECOND_VIEW_LAYOUT.modeRowTopGap;
-  const stickyHeaderPinnedTopPadding = Platform.OS === 'android'
-    ? androidSecondViewTopInset + androidModeRowTopGap
-    : stickyHeaderTopPadding;
-  const QUIZ_VIEW_SNAP_EXTRA = 0;
-  const FILL_VIEW_SNAP_EXTRA = 0;
-  const REORDER_VIEW_SNAP_EXTRA = 0;
-  const TRANSLATE_VIEW_SNAP_EXTRA = 0;
-  const FIRST_VIEW_BOTTOM_SPACE = isCompactScreen ? 20 : 28;
-  const FIRST_VIEW_PEEK = 0;
+  const {
+    colors, isDarkMode, isGrammarGameMode, isGrammarSpeechEnabled,
+    insets, windowWidth, rawWindowHeight,
+    exerciseMode, setExerciseMode,
+    setViewportHeight,
+    isSecondViewActive, setIsSecondViewActive,
+    stableWindowHeight, setStableWindowHeight,
+    keyboardHeight, setKeyboardHeight,
+    keyboardHeightDrop, isKeyboardOpen, isFillKeyboardOpen, lessonViewportHeight,
+    isDesktopWebLayout, isCompactScreen, isKeyboardTightScreen, isLargeScreen,
+    webLessonScale, webLessonImageScale, isScaledWebLesson, webLessonMediaMaxWidth,
+    lessonMediaWidth, lessonImageContentScale, webExerciseMaxWidth,
+    quizCardHeight, quizOptionGap, quizOptionHeight,
+    layoutTopInset, layoutBottomInset,
+    stickyHeaderPinnedTopPadding,
+    STICKY_TOP_SNAP_OFFSET,
+    QUIZ_VIEW_SNAP_EXTRA, FILL_VIEW_SNAP_EXTRA, REORDER_VIEW_SNAP_EXTRA, TRANSLATE_VIEW_SNAP_EXTRA,
+    FIRST_VIEW_BOTTOM_SPACE, FIRST_VIEW_PEEK, FIRST_VIEW_MODE_RAISE, FIRST_VIEW_SECOND_VIEW_GUARD,
+  } = useGrammarQuizLayout();
   const scrollViewRef = useRef<ScrollView>(null);
   const overviewHeightRef = useRef(0);
   const secondViewYRef = useRef(0);
@@ -131,18 +107,47 @@ const GrammarQuiz: React.FC<GrammarQuizProps> = ({ lesson, onBack, backLabel = '
   const [stickyHeaderHeight, setStickyHeaderHeight] = useState(112);
   const overviewMinHeight = Math.max(
     isCompactScreen ? 420 : 500,
-    lessonViewportHeight - layoutTopInset - layoutBottomInset - stickyHeaderHeight - FIRST_VIEW_PEEK
+    lessonViewportHeight - layoutTopInset - layoutBottomInset - stickyHeaderHeight - FIRST_VIEW_PEEK - FIRST_VIEW_MODE_RAISE
   );
   // Ensure we always have a navigation object (works when component is rendered without prop)
   const navHook = useNavigation<any>();
   const nav = navigation ?? navHook;
+  const mixedLessonImageCards = useMemo<MixedLessonImageCard[]>(() => {
+    if (!lesson.isMixedGrammarLesson) return [];
+
+    if (Array.isArray(lesson.sourceLessonImageCards)) {
+      return lesson.sourceLessonImageCards
+        .filter((imageCard: { id?: string | number; title?: string; imageUrl?: string } | null | undefined): imageCard is { id?: string | number; title?: string; imageUrl: string } =>
+          typeof imageCard?.imageUrl === 'string' && imageCard.imageUrl.trim().length > 0
+        )
+        .map((imageCard: { id?: string | number; title?: string; imageUrl: string }, index: number) => ({
+          id: String(imageCard.id ?? imageCard.imageUrl ?? index),
+          title: imageCard.title,
+          imageUrl: imageCard.imageUrl,
+        }));
+    }
+
+    if (Array.isArray(lesson.sourceLessonImages)) {
+      return lesson.sourceLessonImages
+        .filter((imageUrl: unknown): imageUrl is string => typeof imageUrl === 'string' && imageUrl.trim().length > 0)
+        .map((imageUrl: string, index: number) => ({
+          id: `${imageUrl}-${index}`,
+          title: undefined,
+          imageUrl,
+        }));
+    }
+
+    return [];
+  }, [lesson.isMixedGrammarLesson, lesson.sourceLessonImageCards, lesson.sourceLessonImages]);
+  const shouldShowMixedImageCarousel = mixedLessonImageCards.length > 1;
+  const activeLessonImage = lesson.imageUrl;
   // Normalize image source and uri so we pass the same payload to the root FullImageModal
   const imageSource = useMemo(() => {
-  return typeof lesson.imageUrl === 'string'
-    ? { uri: lesson.imageUrl }
-    : lesson.imageUrl;
-}, [lesson.imageUrl]);
-  const imageUri = typeof lesson.imageUrl === 'string' ? lesson.imageUrl : (lesson.imageUrl as any)?.uri;
+  return typeof activeLessonImage === 'string'
+    ? { uri: activeLessonImage }
+    : activeLessonImage;
+}, [activeLessonImage]);
+  const imageUri = typeof activeLessonImage === 'string' ? activeLessonImage : (activeLessonImage as any)?.uri;
   const handleImagePress = useCallback(() => {
   nav.navigate('FullImageModal', { source: imageSource, uri: imageUri });
 }, [nav, imageSource, imageUri]);
@@ -150,7 +155,7 @@ const GrammarQuiz: React.FC<GrammarQuizProps> = ({ lesson, onBack, backLabel = '
   const lessonImageHeight = useMemo(() => {
     const imageReservedGap = Platform.OS === 'web'
       ? (isCompactScreen ? 62 : 70)
-      : (isCompactScreen ? 64 : 72);
+      : (isCompactScreen ? 44 : 52);
     const availableHeight =
       overviewMinHeight - titleBlockHeight - FIRST_VIEW_BOTTOM_SPACE - imageReservedGap;
 
@@ -197,6 +202,7 @@ const GrammarQuiz: React.FC<GrammarQuizProps> = ({ lesson, onBack, backLabel = '
   const [lives, setLives] = useState(3);
   const [isGameOver, setIsGameOver] = useState(false);
   const [perfectRun, setPerfectRun] = useState(false);
+  const [sessionMistakeCount, setSessionMistakeCount] = useState(0);
   const previousLivesRef = useRef(3);
   const [lostLifeIndex, setLostLifeIndex] = useState<number | null>(null);
   const lostLifeAnim = useRef(new Animated.Value(0)).current;
@@ -213,6 +219,10 @@ const GrammarQuiz: React.FC<GrammarQuizProps> = ({ lesson, onBack, backLabel = '
   const questionRef = useRef<View>(null);
   const pendingKeyboardHideScrollModeRef = useRef<ExerciseMode | null>(null);
   const lastModeSwitchAtRef = useRef(0);
+  const feedbackTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const incorrectTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const gameOverTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const speechTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   // Fallback layout tracking to ensure exact alignment even if measure APIs fail (esp. on web)
   const optionsContainerRef = useRef<View>(null);
   const [optionsContainerY, setOptionsContainerY] = useState(0); // Y of options container within exercise container
@@ -258,7 +268,7 @@ const GrammarQuiz: React.FC<GrammarQuizProps> = ({ lesson, onBack, backLabel = '
 
     getXP().then((xp) => {
       if (active) setGrammarTotalXP(xp);
-    });
+    }).catch(() => {});
 
     return () => {
       active = false;
@@ -322,6 +332,7 @@ const GrammarQuiz: React.FC<GrammarQuizProps> = ({ lesson, onBack, backLabel = '
       setAnswerSaveMessage('');
       setGrammarSessionXp(0);
       setLastGrammarXpGain(0);
+      setSessionMistakeCount(0);
       setSelectedQuestions(getQuestionsForMode(lesson.exercises, nextMode));
       setCurrentQuestionIndex(0);
     }
@@ -335,28 +346,20 @@ const GrammarQuiz: React.FC<GrammarQuizProps> = ({ lesson, onBack, backLabel = '
     });
   }, [lesson?.id, lesson.title]);
 
-  // Reset when Grammar Game Mode toggles
-  useEffect(() => {
-    const safeMode = resolveSafeMode(exerciseMode);
-    setIsGameMode(isGrammarGameMode);
-    setStartedGameMode(isGrammarGameMode);
-    setLives(3);
-    setIsGameOver(false);
-    setIsComplete(false);
-    setPerfectRun(false);
-    setUserAnswer('');
-    setIncorrectAnswer('');
-    setFeedback('');
-    setAnswerSaveMessage('');
-    setGrammarSessionXp(0);
-    setLastGrammarXpGain(0);
-    setSelectedQuestions(getQuestionsForMode(lesson.exercises, safeMode));
-    setCurrentQuestionIndex(0);
-  }, [isGrammarGameMode]);
 
   useEffect(() => {
     setActiveCardHeight(quizCardHeight);
   }, [exerciseMode, currentQuestionIndex, quizCardHeight]);
+
+  useEffect(() => {
+    return () => {
+      if (feedbackTimeoutRef.current) clearTimeout(feedbackTimeoutRef.current);
+      if (incorrectTimeoutRef.current) clearTimeout(incorrectTimeoutRef.current);
+      if (gameOverTimeoutRef.current) clearTimeout(gameOverTimeoutRef.current);
+      if (speechTimeoutRef.current) clearTimeout(speechTimeoutRef.current);
+      Speech?.stop();
+    };
+  }, []);
 
   useEffect(() => {
     const lessonKey = String(lesson?.title || 'grammar-lesson');
@@ -466,6 +469,13 @@ const GrammarQuiz: React.FC<GrammarQuizProps> = ({ lesson, onBack, backLabel = '
       triggerSelectionHaptic();
     }
 
+    if (feedbackTimeoutRef.current) { clearTimeout(feedbackTimeoutRef.current); feedbackTimeoutRef.current = null; }
+    if (incorrectTimeoutRef.current) { clearTimeout(incorrectTimeoutRef.current); incorrectTimeoutRef.current = null; }
+    if (gameOverTimeoutRef.current) { clearTimeout(gameOverTimeoutRef.current); gameOverTimeoutRef.current = null; }
+    if (speechTimeoutRef.current) { clearTimeout(speechTimeoutRef.current); speechTimeoutRef.current = null; Speech?.stop(); }
+    feedbackAnim.stopAnimation();
+    feedbackAnim.setValue(CARD_HEIGHT);
+
     const shouldScrollAfterKeyboardHides = exerciseMode === 'fill' && safeMode !== 'fill' && isKeyboardOpen;
     pendingKeyboardHideScrollModeRef.current = shouldScrollAfterKeyboardHides ? safeMode : null;
 
@@ -484,6 +494,7 @@ const GrammarQuiz: React.FC<GrammarQuizProps> = ({ lesson, onBack, backLabel = '
     setAnswerSaveMessage('');
     setGrammarSessionXp(0);
     setLastGrammarXpGain(0);
+    setSessionMistakeCount(0);
     setSelectedQuestions(getQuestionsForMode(lesson.exercises, safeMode));
     setCurrentQuestionIndex(0);
     scrollToExercise(safeMode);
@@ -509,7 +520,7 @@ const GrammarQuiz: React.FC<GrammarQuizProps> = ({ lesson, onBack, backLabel = '
     if (correct) {
       triggerSuccessHaptic();
 
-      const lessonProgressKey = getGrammarLessonProgressKey(lesson);
+      const lessonProgressKey = getGrammarLessonProgressKey(current.sourceLesson ?? lesson);
       const answerProgressKey = `${exerciseMode}:${current.question}:${String(current.answer)}`;
 
       void markPracticeActivityToday(`grammar:${lessonProgressKey}:${answerProgressKey}`);
@@ -530,6 +541,16 @@ const GrammarQuiz: React.FC<GrammarQuizProps> = ({ lesson, onBack, backLabel = '
       // only play short success for non-final questions
       if (currentQuestionIndex < selectedQuestions.length - 1) {
         playSuccess();
+      }
+
+      if (isGrammarSpeechEnabled && typeof current.answer === 'string' && current.answer.trim()) {
+        const answerText = current.answer.trim();
+        if (speechTimeoutRef.current) clearTimeout(speechTimeoutRef.current);
+        speechTimeoutRef.current = setTimeout(() => {
+          speechTimeoutRef.current = null;
+          Speech?.stop();
+          Speech?.speak(answerText, { language: 'en-US', rate: 0.88, pitch: 1.0 });
+        }, 700);
       }
       setFeedback('Well done! 🎉');
 
@@ -580,7 +601,9 @@ const GrammarQuiz: React.FC<GrammarQuizProps> = ({ lesson, onBack, backLabel = '
         }),
       ]).start();
       // keep feedback visible a bit before hiding; exit animation slides back down
-      setTimeout(() => {
+      if (feedbackTimeoutRef.current) clearTimeout(feedbackTimeoutRef.current);
+      feedbackTimeoutRef.current = setTimeout(() => {
+        feedbackTimeoutRef.current = null;
         Animated.timing(feedbackAnim, { toValue: activeCardHeight, duration: 420, easing: Easing.in(Easing.cubic), useNativeDriver: canUseNativeDriver }).start(() => {
           setFeedback('');
           setAnswerSaveMessage('');
@@ -602,12 +625,15 @@ const GrammarQuiz: React.FC<GrammarQuizProps> = ({ lesson, onBack, backLabel = '
       setAnswerSaveMessage('');
       setLastGrammarXpGain(0);
       setIncorrectAnswer(option);
+      setSessionMistakeCount(c => c + 1);
       if (isGameMode) {
         const nl = lives - 1;
         setLives(nl);
         if (nl <= 0) {
           setIsGameOver(true);
-          setTimeout(() => {
+          if (gameOverTimeoutRef.current) clearTimeout(gameOverTimeoutRef.current);
+          gameOverTimeoutRef.current = setTimeout(() => {
+            gameOverTimeoutRef.current = null;
             setCurrentQuestionIndex(0);
             setLives(3);
             setUserAnswer('');
@@ -616,7 +642,9 @@ const GrammarQuiz: React.FC<GrammarQuizProps> = ({ lesson, onBack, backLabel = '
           }, 10000);
         }
       }
-      setTimeout(() => {
+      if (incorrectTimeoutRef.current) clearTimeout(incorrectTimeoutRef.current);
+      incorrectTimeoutRef.current = setTimeout(() => {
+        incorrectTimeoutRef.current = null;
         setIncorrectAnswer('');
         setUserAnswer('');
       }, 1100);
@@ -627,12 +655,15 @@ const GrammarQuiz: React.FC<GrammarQuizProps> = ({ lesson, onBack, backLabel = '
     triggerWarningHaptic();
     setIncorrectAnswer(marker);
     setLastGrammarXpGain(0);
+    setSessionMistakeCount(c => c + 1);
     if (isGameMode) {
       const nextLives = lives - 1;
       setLives(nextLives);
       if (nextLives <= 0) {
         setIsGameOver(true);
-        setTimeout(() => {
+        if (gameOverTimeoutRef.current) clearTimeout(gameOverTimeoutRef.current);
+        gameOverTimeoutRef.current = setTimeout(() => {
+          gameOverTimeoutRef.current = null;
           setCurrentQuestionIndex(0);
           setLives(3);
           setUserAnswer('');
@@ -641,7 +672,9 @@ const GrammarQuiz: React.FC<GrammarQuizProps> = ({ lesson, onBack, backLabel = '
         }, 10000);
       }
     }
-    setTimeout(() => {
+    if (incorrectTimeoutRef.current) clearTimeout(incorrectTimeoutRef.current);
+    incorrectTimeoutRef.current = setTimeout(() => {
+      incorrectTimeoutRef.current = null;
       setIncorrectAnswer('');
     }, 1100);
   };
@@ -659,6 +692,7 @@ const GrammarQuiz: React.FC<GrammarQuizProps> = ({ lesson, onBack, backLabel = '
     setAnswerSaveMessage('');
     setGrammarSessionXp(0);
     setLastGrammarXpGain(0);
+    setSessionMistakeCount(0);
     setSelectedQuestions(getQuestionsForMode(lesson.exercises, exerciseMode, 10));
     setCurrentQuestionIndex(0);
   }, [exerciseMode, lesson.exercises]);
@@ -668,12 +702,17 @@ const GrammarQuiz: React.FC<GrammarQuizProps> = ({ lesson, onBack, backLabel = '
     exerciseMode === 'translate'
       ? currentExercise?.prompt ?? currentExercise?.question
       : currentExercise?.question;
+  const currentSourceLessonTitle =
+    typeof currentExercise?.sourceLesson?.title === 'string'
+      ? currentExercise.sourceLesson.title
+      : '';
   const hasCurrentExercise = !!currentExercise;
   const exerciseContainerTopOffset = (isCompactScreen ? 16 : 22)
     + (Platform.OS !== 'web' && isGameMode ? (isCompactScreen ? 18 : 22) : 0);
 
   const modeLabel = exerciseModeOptions.find(option => option.key === exerciseMode)?.label ?? 'Quiz';
-  const isBuildExerciseMode = exerciseMode === 'fill' || exerciseMode === 'reorder' || exerciseMode === 'translate';
+  const grammarGame = getGrammarGameColors(colors, isDarkMode);
+  const feedbackCardBackground = withColorAlpha(grammarGame.feedbackSurface, isDarkMode ? 0.9 : 0.92);
   const hasFreshCorrectAnswer = !!answerSaveMessage;
   const correctSavedCount = Math.min(
     selectedQuestions.length,
@@ -687,14 +726,33 @@ const GrammarQuiz: React.FC<GrammarQuizProps> = ({ lesson, onBack, backLabel = '
     isCompactScreen ? 410 : 470,
     isCompactScreen ? 540 : 620
   ));
+  const handleGoToAccount = useCallback(() => {
+    nav.getParent?.()?.navigate('Account' as never);
+  }, [nav]);
+
   const renderGrammarCompletionSummary = () => (
-    <LevelProgressSummary
-      totalXP={grammarTotalXP}
-      sessionXP={grammarSessionXp}
-      colors={colors}
-      isDarkMode={isDarkMode}
-    />
+    <>
+      <LevelProgressSummary
+        totalXP={grammarTotalXP}
+        sessionXP={grammarSessionXp}
+        colors={colors}
+        isDarkMode={isDarkMode}
+        onGoToAccount={handleGoToAccount}
+      />
+      {sessionMistakeCount > 0 && (
+        <Text style={[styles.sessionMistakeStat, { color: colors.secondaryText }]}>
+          {sessionMistakeCount} {sessionMistakeCount === 1 ? 'mistake' : 'mistakes'} this session
+        </Text>
+      )}
+    </>
   );
+  const warningTextColor = isDarkMode ? '#FFF7D6' : '#5F4A13';
+  const warningSurfaceColor = isDarkMode ? colors.warningSoft : '#FFF8D6';
+  const warningShadowColor = isDarkMode ? '#000000' : colors.warning;
+  const gameModeButtonStyle = getButtonStyle(colors, isDarkMode, 'primary');
+  const gameModeButtonTextColor = getButtonTextColor(colors, isDarkMode, 'primary');
+  const backButtonStyle = getButtonStyle(colors, isDarkMode, 'secondary');
+  const backButtonTextColor = getButtonTextColor(colors, isDarkMode, 'secondary');
 
 
   const renderModeTabs = (placement: 'overview' | 'sticky' = 'sticky') => {
@@ -709,26 +767,8 @@ const GrammarQuiz: React.FC<GrammarQuizProps> = ({ lesson, onBack, backLabel = '
           isScaledWebLesson && { paddingHorizontal: scaleValue(16, webLessonScale) },
         ]}
       >
-        <View style={[styles.modeTabsRow, isScaledWebLesson && { maxWidth: scaleValue(showSideActions ? 560 : 520, webLessonScale), gap: scaleValue(8, webLessonScale) }]}>
-          {showSideActions && (
-            <TouchableOpacity
-              accessibilityLabel={backLabel}
-              accessibilityRole="button"
-              onPress={onBack}
-              style={[
-                styles.imageShortcutButton,
-                {
-                  backgroundColor: colors.card,
-                  borderColor: colors.border,
-                  width: scaleValue(42, webLessonScale),
-                  height: scaleValue(42, webLessonScale),
-                },
-              ]}
-            >
-              <MaterialIcons name="arrow-back" size={scaleValue(21, webLessonScale)} color={colors.text} />
-            </TouchableOpacity>
-          )}
-          <View style={[styles.modeTabsContainer, isScaledWebLesson && { maxWidth: scaleValue(showSideActions ? 460 : 520, webLessonScale) }]}>
+        <View style={[styles.modeTabsRow, showSideActions && styles.modeTabsRowFloatingActions, isScaledWebLesson && { maxWidth: scaleValue(showSideActions ? 560 : 520, webLessonScale), gap: scaleValue(8, webLessonScale) }]}>
+          <View style={[styles.modeTabsContainer, showSideActions && styles.modeTabsContainerWithFloatingActions, isScaledWebLesson && { maxWidth: scaleValue(showSideActions ? 460 : 520, webLessonScale) }]}>
           <GrammarModeTabs
             modes={exerciseModeOptions}
             activeMode={exerciseMode}
@@ -737,22 +777,44 @@ const GrammarQuiz: React.FC<GrammarQuizProps> = ({ lesson, onBack, backLabel = '
           />
         </View>
           {showSideActions && (
+            <>
+            <TouchableOpacity
+              accessibilityLabel={backLabel}
+              accessibilityRole="button"
+              onPress={onBack}
+              style={[
+                styles.imageShortcutButton,
+                styles.headerFloatingActionButton,
+                styles.headerFloatingBackButton,
+                {
+                  backgroundColor: colors.card,
+                  borderColor: colors.border,
+                  width: scaleValue(Platform.OS === 'android' ? 38 : 42, webLessonScale),
+                  height: scaleValue(Platform.OS === 'android' ? 38 : 42, webLessonScale),
+                },
+              ]}
+            >
+              <MaterialIcons name="arrow-back" size={scaleValue(21, webLessonScale)} color={colors.text} />
+            </TouchableOpacity>
             <TouchableOpacity
               accessibilityLabel="Open lesson image"
               accessibilityRole="button"
               onPress={handleImagePress}
               style={[
                 styles.imageShortcutButton,
+                styles.headerFloatingActionButton,
+                styles.headerFloatingImageButton,
                 {
                   backgroundColor: colors.card,
                   borderColor: colors.border,
-                  width: scaleValue(42, webLessonScale),
-                  height: scaleValue(42, webLessonScale),
+                  width: scaleValue(Platform.OS === 'android' ? 38 : 42, webLessonScale),
+                  height: scaleValue(Platform.OS === 'android' ? 38 : 42, webLessonScale),
                 },
               ]}
             >
               <MaterialIcons name="image" size={scaleValue(21, webLessonScale)} color={colors.text} />
             </TouchableOpacity>
+            </>
           )}
         </View>
       </View>
@@ -838,21 +900,83 @@ const GrammarQuiz: React.FC<GrammarQuizProps> = ({ lesson, onBack, backLabel = '
                 isScaledWebLesson && { fontSize: scaleValue(22, webLessonScale), marginLeft: scaleValue(8, webLessonScale) },
                 { color: colors.text },
               ]}
+              numberOfLines={2}
             >
               {lesson.title}
             </Text>
           </View>
-          <ImageWithCredit
-            onPress={() => {
-              nav.navigate('FullImageModal', { source: imageSource, uri: imageUri });
-            }}
-            source={imageSource}
-            style={
-              Platform.OS === 'web'
-                ? [styles.lessonImage, styles.webLessonImage, { height: lessonImageHeight, maxWidth: webLessonMediaMaxWidth }] as any
-                : [styles.lessonImage, { height: lessonImageHeight }] as any
-            }
-          />
+          {shouldShowMixedImageCarousel ? (
+            <View
+              style={[
+                styles.mixedImageCarouselWrap,
+                {
+                  width: lessonMediaWidth,
+                  maxWidth: webLessonMediaMaxWidth,
+                },
+              ]}
+            >
+              <ScrollView
+                horizontal
+                pagingEnabled
+                showsHorizontalScrollIndicator={false}
+                snapToInterval={lessonMediaWidth}
+                decelerationRate="fast"
+                directionalLockEnabled
+                disableIntervalMomentum
+                nestedScrollEnabled
+                style={[
+                  styles.mixedImageScroll,
+                  {
+                    width: lessonMediaWidth,
+                    height: lessonImageHeight,
+                  },
+                ]}
+                contentContainerStyle={styles.mixedImageScrollContent}
+              >
+                {mixedLessonImageCards.map((imageCard: MixedLessonImageCard, imageIndex: number) => {
+                  const slideSource = { uri: imageCard.imageUrl };
+
+                  return (
+                    <View
+                      key={`${imageCard.id}-${imageIndex}`}
+                      style={[
+                        styles.mixedImageSlide,
+                        {
+                          width: lessonMediaWidth,
+                          height: lessonImageHeight,
+                        },
+                      ]}
+                    >
+                      <ImageWithCredit
+                        source={slideSource}
+                        imageScale={lessonImageContentScale}
+                        style={[
+                          styles.mixedCarouselImage,
+                          {
+                            width: lessonMediaWidth,
+                            height: lessonImageHeight,
+                          },
+                        ] as any}
+                        accessibilityLabel={imageCard.title ? `${imageCard.title} lesson image` : 'Lesson image'}
+                      />
+                    </View>
+                  );
+                })}
+              </ScrollView>
+          
+            </View>
+          ) : (
+            <ImageWithCredit
+              onPress={handleImagePress}
+              source={imageSource}
+              imageScale={lessonImageContentScale}
+              style={
+                Platform.OS === 'web'
+                  ? [styles.lessonImage, styles.webLessonImage, { height: lessonImageHeight, maxWidth: webLessonMediaMaxWidth }] as any
+                  : [styles.lessonImage, { height: lessonImageHeight }] as any
+              }
+            />
+          )}
         </View>
         <View
           style={[
@@ -870,6 +994,16 @@ const GrammarQuiz: React.FC<GrammarQuizProps> = ({ lesson, onBack, backLabel = '
         >
           {renderModeTabs()}
         </View>
+        <View
+          pointerEvents="none"
+          style={[
+            styles.firstViewSecondViewGuard,
+            {
+              backgroundColor: colors.background,
+              height: isSecondViewActive ? 0 : FIRST_VIEW_SECOND_VIEW_GUARD,
+            },
+          ]}
+        />
         <View
           ref={exerciseContainerRef}
           style={[
@@ -899,7 +1033,16 @@ const GrammarQuiz: React.FC<GrammarQuizProps> = ({ lesson, onBack, backLabel = '
             {hasCurrentExercise && (
             <>
             {isGameOver ? (
-              <View style={[styles.gameOverContainer, isDarkMode && { backgroundColor: colors.card }]}>  
+              <View
+                style={[
+                  styles.gameOverContainer,
+                  {
+                    backgroundColor: grammarGame.panelSurface,
+                    borderColor: grammarGame.panelBorder,
+                    shadowColor: grammarGame.panelShadow,
+                  },
+                ]}
+              >
                 <Image
                   source={require('../../assets/embarrassed.png')}
                   style={[
@@ -910,8 +1053,8 @@ const GrammarQuiz: React.FC<GrammarQuizProps> = ({ lesson, onBack, backLabel = '
                 />
                 <Text style={[styles.gameOverText, { color: colors.text }]}>Oops! Too bad!</Text>
                 <Text style={[styles.gameOverSubText, { color: colors.text }]}>It's ok, you can do it!</Text>
-                <TouchableOpacity style={[styles.gameModeButton, { backgroundColor: colors.primary }]} onPress={startChallenge}>
-                  <Text style={styles.gameModeButtonText}>Retry Game Mode</Text>
+                <TouchableOpacity style={[styles.gameModeButton, gameModeButtonStyle]} onPress={startChallenge} accessibilityRole="button" accessibilityLabel="Retry Game Mode">
+                  <Text style={[styles.gameModeButtonText, { color: gameModeButtonTextColor }]}>Retry Game Mode</Text>
                 </TouchableOpacity>
               </View>
             ) : (
@@ -920,7 +1063,7 @@ const GrammarQuiz: React.FC<GrammarQuizProps> = ({ lesson, onBack, backLabel = '
                   <View style={styles.livesSlot}>
                     {isGameMode && !isComplete && (
                       <View style={styles.livesContainer}>
-                        <Text style={[styles.livesLabel, { color: colors.text }]}>Lives</Text>
+                        <Text style={[styles.livesLabel, { color: isDarkMode ? grammarGame.metaStrong : colors.text }]}>Lives</Text>
                         <View style={styles.livesPill}>
                           {Array.from({ length: 3 }).map((_, i) => {
                             const isFilled = i < lives;
@@ -931,7 +1074,7 @@ const GrammarQuiz: React.FC<GrammarQuizProps> = ({ lesson, onBack, backLabel = '
                                 <MaterialIcons
                                   name={isFilled ? 'favorite' : 'favorite-border'}
                                   size={28}
-                                  color={isFilled ? colors.danger : (isDarkMode ? colors.borderStrong : '#B7C1CC')}
+                                  color={isFilled ? grammarGame.heartFilled : grammarGame.heartEmpty}
                                   style={styles.lifeIcon}
                                 />
                                 {isLost && (
@@ -967,7 +1110,7 @@ const GrammarQuiz: React.FC<GrammarQuizProps> = ({ lesson, onBack, backLabel = '
                                       },
                                     ]}
                                   >
-                                    <MaterialIcons name="favorite" size={28} color="#D63B55" />
+                                    <MaterialIcons name="favorite" size={28} color={grammarGame.heartLost} />
                                   </Animated.View>
                                 )}
                               </View>
@@ -978,10 +1121,10 @@ const GrammarQuiz: React.FC<GrammarQuizProps> = ({ lesson, onBack, backLabel = '
                     )}
                   </View>
                   <View style={styles.progressContainer}>
-                  <View style={[styles.progressBar, isDarkMode && { backgroundColor: colors.border }]}>
-                    <View style={[styles.progressFill, { width: `${(currentQuestionIndex / selectedQuestions.length) * 100}%`, backgroundColor: colors.primary }]} />
+                  <View style={[styles.progressBar, { backgroundColor: grammarGame.progressTrack }]}>
+                    <View style={[styles.progressFill, { width: `${(currentQuestionIndex / selectedQuestions.length) * 100}%`, backgroundColor: grammarGame.progressFill }]} />
                   </View>
-                  <Text style={[styles.progressText, { color: colors.text }]}>
+                  <Text style={[styles.progressText, { color: isDarkMode ? grammarGame.metaStrong : colors.text }]}>
                     Question {currentQuestionIndex + 1} of {selectedQuestions.length}
                   </Text>
                 </View>
@@ -1002,10 +1145,13 @@ const GrammarQuiz: React.FC<GrammarQuizProps> = ({ lesson, onBack, backLabel = '
                         Platform.OS === 'android' ? styles.questionCardFillAndroidRoomy : styles.questionCardFillTight
                       ),
                       {
-                        backgroundColor: colors.surface,
-                        borderColor: isDarkMode && isBuildExerciseMode ? colors.borderStrong : colors.border,
-                        borderBottomColor: isDarkMode && isBuildExerciseMode ? colors.buttonBackground : colors.borderStrong,
-                        shadowColor: isDarkMode && isBuildExerciseMode ? colors.buttonBackground : '#000',
+                        backgroundColor: grammarGame.promptSurface,
+                        borderColor: grammarGame.promptBorder,
+                        borderBottomColor: grammarGame.promptBottom,
+                        shadowColor: grammarGame.panelShadow,
+                        shadowOpacity: isDarkMode ? 0.22 : 0.08,
+                        shadowRadius: isDarkMode ? 9 : 6,
+                        elevation: isDarkMode ? 4 : 2,
                       },
                       isScaledWebLesson && {
                         paddingVertical: scaleValue(16, webLessonScale),
@@ -1016,26 +1162,47 @@ const GrammarQuiz: React.FC<GrammarQuizProps> = ({ lesson, onBack, backLabel = '
                     ]}
                   >
                     <View style={styles.questionHeaderRow}>
-                      <Text style={[styles.questionModeText, { color: colors.secondaryText }, isScaledWebLesson && { fontSize: scaleValue(12, webLessonScale) }]}>{modeLabel}</Text>
+                      <View style={styles.questionLabelRow}>
+                        <Text style={[styles.questionModeText, { color: grammarGame.metaStrong }, isScaledWebLesson && { fontSize: scaleValue(12, webLessonScale) }]}>{modeLabel}</Text>
+                        {currentSourceLessonTitle ? (
+                          <View
+                            style={[
+                              styles.sourceLessonBadge,
+                              {
+                                backgroundColor: grammarGame.badgeSurface,
+                                borderColor: grammarGame.badgeBorder,
+                              },
+                            ]}
+                          >
+                            <MaterialIcons name="school" size={13} color={grammarGame.badgeText} />
+                            <Text
+                              style={[styles.sourceLessonBadgeText, { color: grammarGame.badgeText }]}
+                              numberOfLines={1}
+                            >
+                              {currentSourceLessonTitle}
+                            </Text>
+                          </View>
+                        ) : null}
+                      </View>
                       {selectedQuestions.length > 0 && (
                         <View
                           style={[
                             styles.answerSavedBadge,
                             {
-                              backgroundColor: hasFreshCorrectAnswer ? colors.successSoft : colors.surfaceAlt,
-                              borderColor: hasFreshCorrectAnswer ? colors.success : colors.border,
+                              backgroundColor: hasFreshCorrectAnswer ? grammarGame.correctSurface : grammarGame.statusSurface,
+                              borderColor: hasFreshCorrectAnswer ? grammarGame.correctBorder : grammarGame.statusBorder,
                             },
                           ]}
                         >
                           <MaterialIcons
                             name={hasFreshCorrectAnswer ? 'check-circle' : 'check-circle-outline'}
                             size={14}
-                            color={hasFreshCorrectAnswer ? colors.success : colors.secondaryText}
+                            color={hasFreshCorrectAnswer ? grammarGame.correctBorder : grammarGame.metaText}
                           />
                           <Text
                             style={[
                               styles.answerSavedText,
-                              { color: hasFreshCorrectAnswer ? colors.successText : colors.secondaryText },
+                              { color: hasFreshCorrectAnswer ? grammarGame.correctText : grammarGame.metaText },
                             ]}
                             numberOfLines={1}
                           >
@@ -1054,7 +1221,7 @@ const GrammarQuiz: React.FC<GrammarQuizProps> = ({ lesson, onBack, backLabel = '
                           fontSize: scaleValue(21, webLessonScale),
                           lineHeight: scaleValue(29, webLessonScale),
                         },
-                        { color: colors.text },
+                        { color: grammarGame.promptText },
                       ]}
                     >
                       {renderPromptText(currentPrompt)}
@@ -1134,6 +1301,9 @@ const GrammarQuiz: React.FC<GrammarQuizProps> = ({ lesson, onBack, backLabel = '
                             onPress={() => handleAnswer(option)}
                             ref={isFirst ? firstOptionRef : undefined}
                             onLayout={isFirst ? (e) => setFirstOptionLocalY(e.nativeEvent.layout.y) : undefined}
+                            accessibilityRole="button"
+                            accessibilityLabel={option}
+                            accessibilityState={{ selected: isSelected, disabled: !!userAnswer && !isSelected }}
                             style={[
                               styles.optionButton,
                               Platform.OS === 'web' && {
@@ -1141,18 +1311,38 @@ const GrammarQuiz: React.FC<GrammarQuizProps> = ({ lesson, onBack, backLabel = '
                                 paddingVertical: scaleValue(12, webLessonScale),
                                 paddingHorizontal: scaleValue(16, webLessonScale),
                               },
-                              isDarkMode && { backgroundColor: colors.surface, borderColor: colors.border, borderBottomColor: colors.borderStrong },
+                              {
+                                backgroundColor: grammarGame.answerSurface,
+                                borderColor: grammarGame.answerBorder,
+                                borderBottomColor: grammarGame.answerBottom,
+                                shadowColor: grammarGame.panelShadow,
+                                shadowOpacity: isDarkMode ? 0.22 : 0.08,
+                                shadowRadius: isDarkMode ? 7 : 5,
+                                elevation: 3,
+                              },
                               isSelected && [
                                 styles.selectedOption,
-                                { backgroundColor: colors.primarySoft, borderColor: colors.primary, borderBottomColor: colors.buttonBackground },
+                                {
+                                  backgroundColor: grammarGame.answerSelectedSurface,
+                                  borderColor: grammarGame.answerSelectedBorder,
+                                  borderBottomColor: grammarGame.answerSelectedBottom,
+                                },
                               ],
                               isIncorrect && [
                                 styles.incorrectOption,
-                                { backgroundColor: colors.dangerSoft, borderColor: colors.danger, borderBottomColor: colors.danger },
+                                {
+                                  backgroundColor: grammarGame.incorrectSurface,
+                                  borderColor: grammarGame.incorrectBorder,
+                                  borderBottomColor: grammarGame.incorrectBottom,
+                                },
                               ],
                               isCorrect && [
                                 styles.correctAnswer,
-                                { backgroundColor: colors.successSoft, borderColor: colors.success, borderBottomColor: colors.success },
+                                {
+                                  backgroundColor: grammarGame.correctSurface,
+                                  borderColor: grammarGame.correctBorder,
+                                  borderBottomColor: grammarGame.correctBottom,
+                                },
                               ]
                             ]}>
                             <Text style={[
@@ -1162,9 +1352,9 @@ const GrammarQuiz: React.FC<GrammarQuizProps> = ({ lesson, onBack, backLabel = '
                                 lineHeight: scaleValue(25, webLessonScale),
                                 fontWeight: '700',
                               },
-                              isDarkMode && { color: colors.text },
-                              isIncorrect && [styles.incorrectOptionText, { color: colors.dangerText }],
-                              isCorrect && [styles.correctAnswerText, { color: colors.successText }]
+                              { color: grammarGame.answerText },
+                              isIncorrect && [styles.incorrectOptionText, { color: grammarGame.incorrectText }],
+                              isCorrect && [styles.correctAnswerText, { color: grammarGame.correctText }]
                             ]}>{option}</Text>
                           </TouchableOpacity>
                         );
@@ -1182,14 +1372,14 @@ const GrammarQuiz: React.FC<GrammarQuizProps> = ({ lesson, onBack, backLabel = '
                   // Position the card using the computed feedbackTop on all platforms (align with first option top)
                   top: feedbackTop,
                   height: activeCardHeight,
-                  backgroundColor: colors.success,
-                  borderColor: colors.successText,
-                  shadowColor: colors.success,
+                  backgroundColor: feedbackCardBackground,
+                  borderColor: grammarGame.feedbackBorder,
+                  shadowColor: grammarGame.feedbackSurface,
                   // Use translateY for smooth, hardware-accelerated animations where supported
                   transform: [{ translateY: feedbackAnim }]
                 }
               ]}>
-                <Text style={[styles.feedbackText, { color: colors.buttonText }, isScaledWebLesson && { fontSize: scaleValue(32, webLessonScale) }]}>{feedback}</Text>
+                <Text style={[styles.feedbackText, { color: grammarGame.feedbackText }, isScaledWebLesson && { fontSize: scaleValue(32, webLessonScale) }]}>{feedback}</Text>
               </Animated.View>
             )}
             </>
@@ -1197,7 +1387,18 @@ const GrammarQuiz: React.FC<GrammarQuizProps> = ({ lesson, onBack, backLabel = '
           </>
         ) : (
           perfectRun ? (
-            <View style={[styles.congratsBox, styles.perfectCongratsBox, { minHeight: completionCardMinHeight }]}>
+            <View
+              style={[
+                styles.congratsBox,
+                styles.perfectCongratsBox,
+                {
+                  minHeight: completionCardMinHeight,
+                  backgroundColor: warningSurfaceColor,
+                  borderColor: colors.warning,
+                  shadowColor: warningShadowColor,
+                },
+              ]}
+            >
               <Image
                 source={assets.comic}
                 style={[
@@ -1206,15 +1407,30 @@ const GrammarQuiz: React.FC<GrammarQuizProps> = ({ lesson, onBack, backLabel = '
                 ]}
                 resizeMode="contain"
               />
-              <Text style={styles.perfectCompletionText}>Amazing! Perfect Game!</Text>
+              <Text style={[styles.perfectCompletionText, { color: warningTextColor }]}>Amazing! Perfect Game!</Text>
               {renderGrammarCompletionSummary()}
-               <TouchableOpacity style={[styles.gameModeButton, { backgroundColor: colors.primary }]} onPress={startChallenge}>
-                 <Text style={styles.gameModeButtonText}>Play Again</Text>
-               </TouchableOpacity>
+               <View style={styles.completionButtonRow}>
+                 <TouchableOpacity style={[styles.gameModeButton, styles.completionButtonFlex, gameModeButtonStyle]} onPress={startChallenge} accessibilityRole="button" accessibilityLabel="Play Again">
+                   <Text style={[styles.gameModeButtonText, { color: gameModeButtonTextColor }]}>Play Again</Text>
+                 </TouchableOpacity>
+                 <TouchableOpacity style={[styles.gameModeButton, styles.completionButtonFlex, backButtonStyle]} onPress={onBack} accessibilityRole="button" accessibilityLabel={backLabel}>
+                   <Text style={[styles.gameModeButtonText, { color: backButtonTextColor }]}>{backLabel}</Text>
+                 </TouchableOpacity>
+               </View>
             </View>
           ) : (
             startedGameMode ? (
-              <View style={[styles.congratsBox, { backgroundColor: colors.card, minHeight: completionCardMinHeight }]}>
+              <View
+                style={[
+                  styles.congratsBox,
+                  {
+                    backgroundColor: grammarGame.panelSurface,
+                    borderColor: grammarGame.panelBorder,
+                    shadowColor: grammarGame.panelShadow,
+                    minHeight: completionCardMinHeight,
+                  },
+                ]}
+              >
                 <Image
                   source={assets.good}
                   style={[
@@ -1223,28 +1439,56 @@ const GrammarQuiz: React.FC<GrammarQuizProps> = ({ lesson, onBack, backLabel = '
                   ]}
                   resizeMode="contain"
                 />
-                <Text style={[styles.completionText, { color: colors.text }]}>
+                <Text style={[styles.completionText, { color: grammarGame.promptText }]}>
                   {'\uD83C\uDF89 Congratulations! You\'ve completed Game Mode! \uD83C\uDF89'}
                 </Text>
                 {renderGrammarCompletionSummary()}
-                <TouchableOpacity style={[styles.gameModeButton, { backgroundColor: colors.primary }]} onPress={startChallenge}>
-                  <Text style={styles.gameModeButtonText}>Play Again</Text>
-                </TouchableOpacity>
+                <View style={styles.completionButtonRow}>
+                  <TouchableOpacity style={[styles.gameModeButton, styles.completionButtonFlex, gameModeButtonStyle]} onPress={startChallenge} accessibilityRole="button" accessibilityLabel="Play Again">
+                    <Text style={[styles.gameModeButtonText, { color: gameModeButtonTextColor }]}>Play Again</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity style={[styles.gameModeButton, styles.completionButtonFlex, backButtonStyle]} onPress={onBack} accessibilityRole="button" accessibilityLabel={backLabel}>
+                    <Text style={[styles.gameModeButtonText, { color: backButtonTextColor }]}>{backLabel}</Text>
+                  </TouchableOpacity>
+                </View>
               </View>
             ) : (
-              <View style={[styles.congratsBox, { backgroundColor: colors.card, minHeight: completionCardMinHeight }]}>
-                <Text style={[styles.completionText, { color: colors.text }]}>
+              <View
+                style={[
+                  styles.congratsBox,
+                  {
+                    backgroundColor: grammarGame.panelSurface,
+                    borderColor: grammarGame.panelBorder,
+                    shadowColor: grammarGame.panelShadow,
+                    minHeight: completionCardMinHeight,
+                  },
+                ]}
+              >
+                <Text style={[styles.completionText, { color: grammarGame.promptText }]}>
                   {'\uD83C\uDF89 Congratulations! You\'ve completed the quiz! \uD83C\uDF89'}
                 </Text>
                 {renderGrammarCompletionSummary()}
-                <View style={styles.unlockBox}>
-                  <Text style={styles.unlockText}>
+                <View
+                  style={[
+                    styles.unlockBox,
+                    {
+                      backgroundColor: isDarkMode ? colors.warningSoft : colors.warning,
+                      borderColor: colors.warning,
+                    },
+                  ]}
+                >
+                  <Text style={[styles.unlockText, { color: isDarkMode ? '#FFF7D6' : '#333333' }]}>
                     {'\uD83C\uDFAE You\'ve unlocked game mode! Answer 10 more questions with only 3 lives \uD83C\uDFAE'}
                   </Text>
                 </View>
-                <TouchableOpacity style={[styles.gameModeButton, { backgroundColor: colors.primary }]} onPress={startChallenge}>
-                  <Text style={styles.gameModeButtonText}>{'\uD83C\uDFAE Try Game Mode \uD83C\uDFAE'}</Text>
-                </TouchableOpacity>
+                <View style={styles.completionButtonRow}>
+                  <TouchableOpacity style={[styles.gameModeButton, styles.completionButtonFlex, gameModeButtonStyle]} onPress={startChallenge} accessibilityRole="button" accessibilityLabel="Try Game Mode">
+                    <Text style={[styles.gameModeButtonText, { color: gameModeButtonTextColor }]}>{'\uD83C\uDFAE Try Game Mode \uD83C\uDFAE'}</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity style={[styles.gameModeButton, styles.completionButtonFlex, backButtonStyle]} onPress={onBack} accessibilityRole="button" accessibilityLabel={backLabel}>
+                    <Text style={[styles.gameModeButtonText, { color: backButtonTextColor }]}>{backLabel}</Text>
+                  </TouchableOpacity>
+                </View>
               </View>
             )
           )
@@ -1296,6 +1540,9 @@ const styles = StyleSheet.create({
   webStickyHeaderFirstView: {
     paddingBottom: 18,
   },
+  firstViewSecondViewGuard: {
+    height: 44,
+  },
   modeTabsWrap: {
     paddingHorizontal: 16,
   },
@@ -1314,6 +1561,10 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     gap: 8,
+    position: 'relative',
+  },
+  modeTabsRowFloatingActions: {
+    minHeight: 44,
   },
   modeTabsContainer: {
     flex: 1,
@@ -1323,6 +1574,9 @@ const styles = StyleSheet.create({
     alignSelf: 'center',
     marginBottom: 0,
   },
+  modeTabsContainerWithFloatingActions: {
+    paddingHorizontal: 44,
+  },
   imageShortcutButton: {
     width: 42,
     height: 42,
@@ -1331,6 +1585,18 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: 0,
+  },
+  headerFloatingActionButton: {
+    elevation: 4,
+    position: 'absolute',
+    top: 2,
+    zIndex: 5,
+  },
+  headerFloatingBackButton: {
+    left: 0,
+  },
+  headerFloatingImageButton: {
+    right: 0,
   },
   stickyActionButtonHidden: {
     opacity: 0,
@@ -1357,6 +1623,71 @@ const styles = StyleSheet.create({
   webLessonImage: {
     marginTop: 6,
     marginBottom: 4,
+  },
+  mixedImageCarouselWrap: {
+    alignSelf: 'center',
+    marginTop: 10,
+    marginBottom: 8,
+    position: 'relative',
+  },
+  mixedImageScroll: {
+    borderRadius: 18,
+    overflow: 'hidden',
+  },
+  mixedImageScrollContent: {
+    alignItems: 'center',
+  },
+  mixedImageSlide: {
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  mixedCarouselImage: {
+    alignSelf: 'center',
+    borderRadius: 18,
+  },
+  mixedImageCarouselOverlay: {
+    alignItems: 'center',
+    bottom: 12,
+    flexDirection: 'row',
+    gap: 8,
+    left: 12,
+    pointerEvents: 'box-none',
+    position: 'absolute',
+    right: 12,
+  },
+  mixedImageNavButton: {
+    alignItems: 'center',
+    borderRadius: 18,
+    borderWidth: 1,
+    height: 36,
+    justifyContent: 'center',
+    width: 36,
+  },
+  mixedImageNavButtonDisabled: {
+    opacity: 0.42,
+  },
+  mixedImageStatusPill: {
+    alignItems: 'center',
+    borderRadius: 18,
+    borderWidth: 1,
+    flex: 1,
+    flexDirection: 'row',
+    gap: 8,
+    justifyContent: 'center',
+    minHeight: 36,
+    minWidth: 0,
+    paddingHorizontal: 12,
+  },
+  mixedImageStatusTitle: {
+    flexShrink: 1,
+    fontSize: 12,
+    fontWeight: '800',
+    lineHeight: 15,
+  },
+  mixedImageStatusCount: {
+    fontSize: 11,
+    fontWeight: '900',
+    lineHeight: 14,
   },
   exerciseContainer: {
     paddingHorizontal: 16,
@@ -1419,7 +1750,7 @@ const styles = StyleSheet.create({
   },
   progressBar: {
     flex: 1,
-    height: 6,
+    height: 8,
     backgroundColor: '#d5dde6',
     borderRadius: 4,
     overflow: 'hidden',
@@ -1441,8 +1772,8 @@ const styles = StyleSheet.create({
     marginTop: 4,
   },
   questionCard: {
-    borderWidth: 2,
-    borderBottomWidth: 4,
+    borderWidth: 1.5,
+    borderBottomWidth: 3,
     borderRadius: 8,
     paddingVertical: 16,
     paddingHorizontal: 18,
@@ -1475,12 +1806,36 @@ const styles = StyleSheet.create({
     gap: 8,
     marginBottom: 6,
   },
+  questionLabelRow: {
+    flex: 1,
+    minWidth: 0,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 7,
+  },
   questionModeText: {
     color: '#777',
     fontSize: 12,
     fontWeight: '800',
     textTransform: 'uppercase',
     letterSpacing: 0,
+  },
+  sourceLessonBadge: {
+    minHeight: 25,
+    maxWidth: 190,
+    flexShrink: 1,
+    borderRadius: 999,
+    borderWidth: 1,
+    paddingHorizontal: 8,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  sourceLessonBadgeText: {
+    flexShrink: 1,
+    minWidth: 0,
+    fontSize: 12,
+    fontWeight: '900',
   },
   answerSavedBadge: {
     minHeight: 25,
@@ -1522,8 +1877,8 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     borderRadius: 8,
     backgroundColor: '#fff',
-    borderWidth: 2,
-    borderBottomWidth: 4,
+    borderWidth: 1.5,
+    borderBottomWidth: 3,
     borderColor: '#E5E5E5',
     borderBottomColor: '#D1D5DB',
     justifyContent: 'center',
@@ -1542,7 +1897,17 @@ const styles = StyleSheet.create({
   gameOverText: { fontSize: 24, fontWeight: 'bold', marginBottom: 8 },
   gameOverSubText: { fontSize: 16 },
   completionText: { fontSize: 22, lineHeight: 27, fontWeight: 'bold', marginBottom: 8, textAlign: 'center' },
-  gameOverContainer: { alignItems: 'center', padding: 24, borderRadius: 16, marginVertical: 16 },
+  gameOverContainer: {
+    alignItems: 'center',
+    padding: 24,
+    borderRadius: 16,
+    marginVertical: 16,
+    borderWidth: 1.5,
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.16,
+    shadowRadius: 12,
+    elevation: 5,
+  },
   completionContainer: { alignItems: 'center', padding: 24, borderRadius: 16, marginVertical: 16 },
   emptyStateCard: {
     alignItems: 'center',
@@ -1561,7 +1926,7 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     textAlign: 'center',
   },
-  feedbackCard: { position: 'absolute', left: 16, right: 16, height: CARD_HEIGHT, padding: 16, borderRadius: 8, alignItems: 'center', justifyContent: 'center', zIndex: 10, borderWidth: 2, borderColor: 'rgba(223,255,238,0.5)', shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.18, shadowRadius: 14, elevation: 7 },
+  feedbackCard: { position: 'absolute', left: 16, right: 16, height: CARD_HEIGHT, padding: 16, borderRadius: 8, alignItems: 'center', justifyContent: 'center', zIndex: 10, borderWidth: 1.5, borderColor: 'rgba(223,255,238,0.5)', shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.18, shadowRadius: 14, elevation: 7 },
   feedbackText: { color: '#fff', fontSize: 32, fontWeight: 'bold', textAlign: 'center' },
   congratsBox: {
     width: '100%',
@@ -1572,6 +1937,18 @@ const styles = StyleSheet.create({
     padding: 24,
     borderRadius: 18,
     marginVertical: 16,
+    borderWidth: 1.5,
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.14,
+    shadowRadius: 12,
+    elevation: 4,
+  },
+  sessionMistakeStat: {
+    fontSize: 13,
+    fontWeight: '600',
+    textAlign: 'center',
+    marginTop: 6,
+    marginBottom: 2,
   },
   levelUpBanner: {
     minHeight: 40,
@@ -1594,13 +1971,15 @@ const styles = StyleSheet.create({
     fontWeight: '900',
     textAlign: 'center',
   },
-  unlockBox: { backgroundColor: '#FFD700', padding: 14, borderRadius: 12, marginTop: 12 },
+  unlockBox: { backgroundColor: '#FFD700', borderWidth: 1.5, padding: 14, borderRadius: 12, marginTop: 12 },
   unlockText: { color: '#333', fontSize: 16, fontWeight: '600', textAlign: 'center' },
   gameModeButton: { minWidth: 220, paddingVertical: 13, paddingHorizontal: 24, borderRadius: 999, marginTop: 12, alignItems: 'center', justifyContent: 'center' },
   gameModeButtonText: { color: '#fff', fontSize: 16, fontWeight: 'bold', textAlign: 'center' },
+  completionButtonRow: { flexDirection: 'row', gap: 10, marginTop: 12, width: '100%' },
+  completionButtonFlex: { flex: 1, minWidth: 0 },
   perfectCongratsBox: {
     backgroundColor: '#FFF8D6',
-    borderWidth: 2,
+    borderWidth: 1.5,
     borderColor: '#E7C566',
     shadowColor: '#D4A72C',
     shadowOffset: { width: 0, height: 4 },

@@ -12,6 +12,7 @@ import Assets from '../../assets/index';
 import { SOUND_EFFECT_OPTIONS, replaySoundEffect } from '../shared/soundEffects';
 import { getXP } from '../progress/xpStorage';
 import LevelProgressSummary from '../progress/LevelProgressSummary';
+import { getButtonStyle, getButtonTextColor } from '../shared/uiPrimitives';
 import type { ThemeColors } from '../settings/ThemeContext';
 
 interface CompletionModalProps {
@@ -31,6 +32,7 @@ interface CompletionModalProps {
   onPrimaryAction?: () => void;
   reviewWords?: Word[];
   onReviewWords?: () => void;
+  onGoToAccount?: () => void;
 }
 
 export default function VocabularyCompletionModal({
@@ -49,6 +51,7 @@ export default function VocabularyCompletionModal({
   onPrimaryAction,
   reviewWords = [],
   onReviewWords,
+  onGoToAccount,
 }: CompletionModalProps) {
   const bigSuccessPlayer = useAudioPlayer(Assets.bigsuccess, SOUND_EFFECT_OPTIONS);
   const bestSuccessPlayer = useAudioPlayer(Assets.bestsuccess, SOUND_EFFECT_OPTIONS);
@@ -74,7 +77,7 @@ export default function VocabularyCompletionModal({
 
     getXP().then((xp) => {
       if (active) setCurrentXP(xp);
-    });
+    }).catch(() => {});
 
     return () => {
       active = false;
@@ -124,6 +127,10 @@ export default function VocabularyCompletionModal({
     'rgba(0,0,0,0.60)',
     'rgba(0,0,0,0.95)',
   ];
+  const primaryButtonStyle = getButtonStyle(colors, isDarkMode, 'primary');
+  const primaryButtonTextColor = getButtonTextColor(colors, isDarkMode, 'primary');
+  const secondaryButtonStyle = getButtonStyle(colors, isDarkMode, 'secondary');
+  const secondaryButtonTextColor = getButtonTextColor(colors, isDarkMode, 'secondary');
 
   return (
     <Modal
@@ -192,11 +199,12 @@ export default function VocabularyCompletionModal({
               sessionXP={matchingSessionXp}
               colors={colors}
               isDarkMode={isDarkMode}
+              onGoToAccount={onGoToAccount}
             />
 
             {/* Unlock card (first completion) */}
             {timerModeUnlocked && (
-              <View style={[styles.unlockCard, styles.goldenCard]}> 
+              <View style={[styles.unlockCard, styles.goldenCard]}>
                 <Text style={styles.unlockEmoji}>{'\uD83C\uDFC5'}</Text>
                 <Text style={[styles.unlockTitle, styles.goldenTitle]}>Timer Mode Unlocked!</Text>
                 <Text style={styles.unlockDescription}>Try timer mode for an extra challenge.</Text>
@@ -235,7 +243,7 @@ export default function VocabularyCompletionModal({
             <Pressable
               style={({ pressed }) => [
                 styles.replayButton,
-                { backgroundColor: colors?.primary ?? '#1671B6' },
+                primaryButtonStyle,
                 pressed && { opacity: 0.8 }
               ]}
               onPress={() => {
@@ -248,7 +256,7 @@ export default function VocabularyCompletionModal({
                 onReplay(activateTimer);
               }}
             >
-              <Text style={styles.replayButtonText}>
+              <Text style={[styles.replayButtonText, { color: primaryButtonTextColor }]}>
                 {primaryActionLabel ?? (
                   timerModeUnlocked
                     ? 'Try Timer Mode!'
@@ -298,11 +306,11 @@ export default function VocabularyCompletionModal({
                   onPress={onReviewWords}
                   style={({ pressed }) => [
                     styles.reviewActionButton,
-                    { borderColor: colors?.primary ?? '#1671B6' },
+                    secondaryButtonStyle,
                     pressed && { opacity: 0.76 },
                   ]}
                 >
-                  <Text style={[styles.reviewActionText, { color: colors?.primary ?? '#1671B6' }]}>
+                  <Text style={[styles.reviewActionText, { color: secondaryButtonTextColor }]}>
                     Review These Words
                   </Text>
                 </Pressable>
