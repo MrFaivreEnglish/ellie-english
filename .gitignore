@@ -43,3 +43,7 @@ yarn-error.*
 *.tsbuildinfo
 
 .vercel
+
+# Browser profiles (accidentally created in project dir)
+.edge-rating-profile/
+.chrome-profile/
