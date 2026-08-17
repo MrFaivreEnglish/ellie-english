@@ -3,6 +3,44 @@ const PastPerfectGrammar = {
   title: 'Past Perfect',
   description: 'Learn how to use the past perfect tense',
   imageUrl: 'https://i.ibb.co/3yQ0FHPW/Past-Perfect.png',
+  textContent: {
+    cards: [
+      {
+        eyebrow: 'À quoi ça sert',
+        paragraph: 'Pour parler de ce qui était déjà arrivé avant une action passée.',
+        tip: 'Formule : sujet + have au prétérit + participe passé.',
+        columns: [
+          {
+            label: '1/ Je repère le sujet et / ou le pronom',
+            accent: 'blue',
+            rows: ['I', 'You', 'He / She / It', 'We', 'They'],
+          },
+          {
+            label: '2/ Je conjugue HAVE au prétérit',
+            accent: 'coral',
+            rows: ['had', "hadn't (négatif)"],
+          },
+          {
+            label: '3/ Je trouve le participe passé du verbe',
+            accent: 'teal',
+            rows: ['Verbe régulier : **+ED**', 'Verbe irrégulier : **par cœur**'],
+          },
+        ],
+        examples: [
+          { en: 'I **had talked** with the King.', fr: "J'avais parlé au roi." },
+          { en: 'Emma **had seen** dolphins.', fr: 'Emma avait vu des dauphins.' },
+        ],
+      },
+      {
+        eyebrow: 'La forme négative',
+        paragraph: "On utilise **had not** (hadn't) + participe passé.",
+        examples: [
+          { en: 'You **had not spoken** to him.', fr: "Tu ne lui avais pas parlé." },
+          { en: 'They **had not watched** bears.', fr: "Ils n'avaient pas regardé d'ours." },
+        ],
+      },
+    ],
+  },
 translateExercises: [
   {
     type: 'translate',

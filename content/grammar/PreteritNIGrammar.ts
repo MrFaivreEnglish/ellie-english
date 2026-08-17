@@ -3,6 +3,48 @@ const PreteritNIGrammar = {
   title: 'Prétérit Négatif et Interrogatif',
   description: 'Learn negative and interrogative forms in past simple',
   imageUrl: 'https://i.ibb.co/Dg7h1Bx5/Pr-t-rit-N-gatif-et-interrogatif.png',
+  textContent: {
+    cards: [
+      {
+        eyebrow: 'Le négatif',
+        paragraph: 'Ici, pas de verbes réguliers ou irréguliers.',
+        tip: "Formule : sujet + didn't + base verbale, à toutes les personnes, sauf avec be.",
+        columns: [
+          {
+            label: "Sujet + DIDN'T + base verbale",
+            accent: 'coral',
+            rows: ["I **didn't** go", "You **didn't** go", "He / She / It **didn't** go", "We **didn't** go", "They **didn't** go"],
+          },
+        ],
+        subsections: [
+          {
+            text: 'Avec **be** :',
+            accent: 'amber',
+            rows: ["I **wasn't**", "You **weren't**", "He / She / It **wasn't**", "We **weren't**", "They **weren't**"],
+          },
+        ],
+      },
+      {
+        eyebrow: "L'interrogatif",
+        paragraph: 'À toutes les personnes, sauf avec be.',
+        tip: 'Formule : did + sujet + base verbale ?',
+        columns: [
+          {
+            label: 'DID + sujet + base verbale ?',
+            accent: 'blue',
+            rows: ['**Did** I go?', '**Did** you go?', '**Did** he / she / it go?', '**Did** we go?', '**Did** they go?'],
+          },
+        ],
+        subsections: [
+          {
+            text: 'Avec **be** :',
+            accent: 'teal',
+            rows: ['**Was** I', '**Were** you', '**Was** he / she / it', '**Were** we', '**Were** they'],
+          },
+        ],
+      },
+    ],
+  },
 translateExercises: [
   {
     type: 'translate',

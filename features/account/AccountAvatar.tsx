@@ -27,15 +27,10 @@ export default function AccountAvatar({ avatarId, colorId, size = 48, style }: A
   const colorPreset = getAccountAvatarColorPreset(colorId);
   const iconSize = Math.max(18, Math.round(size * 0.48));
   const avatarRadius = Math.round(size * 0.36);
-  const thumbnailInset = preset.type === 'thumbnail'
-    ? Math.round(size * (preset.imageInsetRatio ?? 0))
-    : 0;
+  const thumbnailInset = Math.round(size * (preset.imageInsetRatio ?? 0));
   const thumbnailSize = Math.max(1, size - thumbnailInset * 2);
   const [thumbnailFailed, setThumbnailFailed] = React.useState(false);
-  const thumbnailSource = React.useMemo(() => {
-    if (preset.type !== 'thumbnail') return null;
-    return resolveThumbnailSource(preset.image);
-  }, [preset]);
+  const thumbnailSource = React.useMemo(() => resolveThumbnailSource(preset.image), [preset]);
 
   React.useEffect(() => {
     setThumbnailFailed(false);
@@ -57,7 +52,7 @@ export default function AccountAvatar({ avatarId, colorId, size = 48, style }: A
         style,
       ]}
     >
-      {preset.type === 'thumbnail' && thumbnailSource && !thumbnailFailed ? (
+      {thumbnailSource && !thumbnailFailed ? (
         <Image
           source={thumbnailSource as any}
           style={[
@@ -72,7 +67,7 @@ export default function AccountAvatar({ avatarId, colorId, size = 48, style }: A
         />
       ) : (
         <MaterialIcons
-          name={(preset.type === 'icon' ? preset.icon : 'image') as React.ComponentProps<typeof MaterialIcons>['name']}
+          name="image"
           size={iconSize}
           color={colorPreset.accentColor}
         />

@@ -4,6 +4,44 @@ const PassivePastGrammar = {
   description: 'Learn how to use the passive voice in past tense',
   category: 'Voix passive',
   imageUrl: 'https://i.ibb.co/zHt9fbBY/Voix-passive-pass-e.png',
+  textContent: {
+    cards: [
+      {
+        eyebrow: 'À quoi ça sert',
+        paragraph: 'Je parle de ce qui était subi (être disputé, être construit...).',
+        tip: 'Formule : sujet + be au prétérit + participe passé.',
+        columns: [
+          {
+            label: '1/ Je repère le sujet et / ou le pronom',
+            accent: 'blue',
+            rows: ['I', 'You', 'He / She / It', 'We', 'They'],
+          },
+          {
+            label: '2/ Je conjugue BE au prétérit',
+            accent: 'coral',
+            rows: ['**was** (not)', '**were** (not)', '**was** (not)', '**were** (not)', '**were** (not)'],
+          },
+          {
+            label: '3/ Je trouve le participe passé du verbe',
+            accent: 'teal',
+            rows: ['Verbe régulier : **+ED**', 'Verbe irrégulier : **par cœur**'],
+          },
+        ],
+        examples: [
+          { en: 'The dog **was taken** to the zoo.', fr: 'Le chien a été emmené au zoo.' },
+          { en: 'Sharks **were fished**.', fr: 'Les requins étaient pêchés.' },
+        ],
+      },
+      {
+        eyebrow: 'La forme négative',
+        paragraph: "On utilise **wasn't** ou **weren't** + participe passé.",
+        examples: [
+          { en: "We **weren't informed** of it.", fr: "Nous n'avons pas été informés de ça." },
+          { en: "The text **wasn't written** by AI.", fr: "Le texte n'a pas été écrit par IA." },
+        ],
+      },
+    ],
+  },
 translateExercises: [
   {
     type: 'translate',

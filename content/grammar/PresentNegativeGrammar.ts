@@ -3,6 +3,48 @@ const PresentNegativeGrammar = {
   title: 'Present Simple Négatif',
   description: 'Learn how to make negative sentences in present simple',
   imageUrl: 'https://i.ibb.co/69pyGYT/Present-n-gtaif-et-interrogatif.png',
+  textContent: {
+    cards: [
+      {
+        eyebrow: 'Le négatif',
+        paragraph: 'Ici, pas de verbes réguliers ou irréguliers.',
+        tip: "Formule : sujet + don't / doesn't + base verbale, à toutes les personnes, sauf avec be.",
+        columns: [
+          {
+            label: "Sujet + DON'T / DOESN'T + base verbale",
+            accent: 'coral',
+            rows: ["I **don't** go", "You **don't** go", "He / She / It **doesn't** go", "We **don't** go", "They **don't** go"],
+          },
+        ],
+        subsections: [
+          {
+            text: 'Avec **be**, pas de don\'t / doesn\'t :',
+            accent: 'amber',
+            rows: ['I **am not**', 'You **are not**', 'He / She / It **is not**', 'We **are not**', 'They **are not**'],
+          },
+        ],
+      },
+      {
+        eyebrow: "L'interrogatif",
+        paragraph: 'À toutes les personnes, sauf avec be.',
+        tip: 'Formule : do / does + sujet + base verbale ?',
+        columns: [
+          {
+            label: 'DO / DOES + sujet + base verbale ?',
+            accent: 'blue',
+            rows: ['**Do** I go?', '**Do** you go?', '**Does** he / she / it go?', '**Do** we go?', '**Do** they go?'],
+          },
+        ],
+        subsections: [
+          {
+            text: 'Avec **be** :',
+            accent: 'teal',
+            rows: ['**Am** I', '**Are** you', '**Is** he / she / it', '**Are** we', '**Are** they'],
+          },
+        ],
+      },
+    ],
+  },
 translateExercises: [
   {
     type: 'translate',

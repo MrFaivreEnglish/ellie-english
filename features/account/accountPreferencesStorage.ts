@@ -24,6 +24,7 @@ export const GRAMMAR_GAME_MODE_KEY = '@grammar_game_mode';
 export const GRAMMAR_SPEECH_ENABLED_KEY = '@grammar_speech_enabled';
 export const VOCAB_TIMER_MODE_KEY = '@vocab_timer_mode';
 export const VOCAB_TIMER_RECORD_SAVING_KEY = '@vocab_timer_record_saving';
+export const VOCAB_AUDIO_MATCH_MODE_KEY = '@vocab_audio_match_mode';
 export const VOCAB_LESSON_CARD_VIEW_KEY = '@vocab_lesson_card_view';
 export const TYPING_STRICT_MODE_KEY = '@typing_strict_mode';
 export const HAPTICS_ENABLED_KEY = '@haptics_enabled';
@@ -41,6 +42,7 @@ export type AccountPreferenceSnapshot = {
   grammarGameMode: boolean;
   vocabTimerMode: boolean;
   vocabTimerRecordSaving: boolean;
+  vocabAudioMatchMode: boolean;
   vocabLessonCardView: 'list' | 'tile';
   typingStrictMode: boolean;
   hapticsEnabled: boolean;
@@ -75,6 +77,7 @@ const normalizeSnapshot = (value: unknown): AccountPreferenceSnapshot => {
     grammarGameMode: asBoolean(record.grammarGameMode),
     vocabTimerMode: asBoolean(record.vocabTimerMode),
     vocabTimerRecordSaving: asBoolean(record.vocabTimerRecordSaving),
+    vocabAudioMatchMode: asBoolean(record.vocabAudioMatchMode),
     vocabLessonCardView: asVocabLessonCardView(record.vocabLessonCardView),
     typingStrictMode: asBoolean(record.typingStrictMode),
     hapticsEnabled: hapticsAreSupported && asBoolean(record.hapticsEnabled, hapticsAreSupported),
@@ -99,6 +102,7 @@ export const getLocalAccountPreferenceSnapshot = async (
     savedGrammarMode,
     savedVocabMode,
     savedVocabTimerRecordSaving,
+    savedVocabAudioMatchMode,
     savedVocabLessonCardView,
     savedTypingStrictMode,
     savedHapticsEnabled,
@@ -114,6 +118,7 @@ export const getLocalAccountPreferenceSnapshot = async (
     AsyncStorage.getItem(GRAMMAR_GAME_MODE_KEY),
     AsyncStorage.getItem(VOCAB_TIMER_MODE_KEY),
     AsyncStorage.getItem(VOCAB_TIMER_RECORD_SAVING_KEY),
+    AsyncStorage.getItem(VOCAB_AUDIO_MATCH_MODE_KEY),
     AsyncStorage.getItem(VOCAB_LESSON_CARD_VIEW_KEY),
     AsyncStorage.getItem(TYPING_STRICT_MODE_KEY),
     AsyncStorage.getItem(HAPTICS_ENABLED_KEY),
@@ -132,6 +137,7 @@ export const getLocalAccountPreferenceSnapshot = async (
     grammarGameMode: savedGrammarMode === 'true',
     vocabTimerMode: savedVocabMode === 'true',
     vocabTimerRecordSaving: savedVocabTimerRecordSaving === 'true',
+    vocabAudioMatchMode: savedVocabAudioMatchMode === 'true',
     vocabLessonCardView: savedVocabLessonCardView === 'tile' ? 'tile' : 'list',
     typingStrictMode: savedTypingStrictMode === 'true',
     hapticsEnabled: hapticsAreSupported && savedHapticsEnabled !== 'false',
@@ -156,6 +162,7 @@ export const saveLocalAccountPreferenceSnapshot = async (
       [GRAMMAR_GAME_MODE_KEY, snapshot.grammarGameMode ? 'true' : 'false'],
       [VOCAB_TIMER_MODE_KEY, snapshot.vocabTimerMode ? 'true' : 'false'],
       [VOCAB_TIMER_RECORD_SAVING_KEY, snapshot.vocabTimerRecordSaving ? 'true' : 'false'],
+      [VOCAB_AUDIO_MATCH_MODE_KEY, snapshot.vocabAudioMatchMode ? 'true' : 'false'],
       [VOCAB_LESSON_CARD_VIEW_KEY, snapshot.vocabLessonCardView],
       [TYPING_STRICT_MODE_KEY, snapshot.typingStrictMode ? 'true' : 'false'],
       [HAPTICS_ENABLED_KEY, snapshot.hapticsEnabled ? 'true' : 'false'],

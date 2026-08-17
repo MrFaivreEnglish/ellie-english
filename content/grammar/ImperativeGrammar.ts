@@ -3,6 +3,43 @@ const ImperativeGrammar = {
   title: 'Impératif',
   description: 'Learn how to use the imperative mood',
   imageUrl: 'https://i.ibb.co/7tY3p7dm/Imp-ratif.png',
+  textContent: {
+    cards: [
+      {
+        eyebrow: 'Donner des ordres, des conseils',
+        paragraph: "Pour donner un ordre ou un conseil, j'utilise la base verbale seule, sans sujet.",
+        tip: 'Formule : base verbale + ... (et c’est tout !)',
+        examples: [
+          { en: '**Be** quiet!', fr: 'Taisez-vous !' },
+          { en: '**Eat** your veggies!', fr: 'Mange tes légumes !' },
+        ],
+      },
+      {
+        eyebrow: "L'impératif négatif",
+        paragraph: "Pour dire de ne pas faire quelque chose : don't + base verbale, sans sujet.",
+        tip: "Formule : don't + base verbale.",
+        examples: [
+          { en: "**Don't go**!", fr: 'Ne pars pas !' },
+          { en: "**Don't listen** to him!", fr: 'Ne l’écoutez pas !' },
+        ],
+      },
+      {
+        eyebrow: 'Impératif ou should ?',
+        columns: [
+          {
+            label: 'Impératif',
+            accent: 'blue',
+            rows: ['Tell her.', "Don't tell her."],
+          },
+          {
+            label: 'Should',
+            accent: 'teal',
+            rows: ['You should tell her.', "You shouldn't tell her."],
+          },
+        ],
+      },
+    ],
+  },
 translateExercises: [
   {
     type: 'translate',

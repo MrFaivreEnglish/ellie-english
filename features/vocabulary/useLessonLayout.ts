@@ -7,7 +7,7 @@ import { getApkPreviewStatusBarInset, isApkLayoutPreviewEnabled } from '../share
 export type VocabularyMode = 'flashcards' | 'matching' | 'typing';
 
 const ANDROID_SECOND_VIEW = {
-  modeRowTopGap: 18,
+  modeRowTopGap: 8,
   modeRowTopGapWithStatusBar: 4,
   bodyTopGapCompact: 10,
   bodyTopGapRegular: 14,
@@ -41,6 +41,7 @@ export function useLessonLayout({
   const isAndroidLesson = Platform.OS === 'android' || useApkPreviewLayout;
   const isWebLessonLayout = Platform.OS === 'web' && !useApkPreviewLayout;
   const useReservedModeShell = isAndroidLesson || isWebLessonLayout;
+  const isCompactPracticeMode = mode === 'matching' || mode === 'typing';
   const lessonLayoutWidth = useApkPreviewLayout ? Math.min(screenWidth, 430) : screenWidth;
 
   const keyboardHeightDrop = stableScreenHeight - rawScreenHeight;
@@ -84,12 +85,17 @@ export function useLessonLayout({
       : 0;
   const layoutBottomInset = isAndroidLesson ? 0 : insets.bottom;
   const stickyHeaderTopPadding = isWebLessonLayout ? 4 : 6;
-  const androidSecondViewTopInset = isAndroidLesson && isAndroidStatusBarEnabled ? layoutTopInset : 0;
   const androidModeRowTopGap = isAndroidLesson && isAndroidStatusBarEnabled
     ? ANDROID_SECOND_VIEW.modeRowTopGapWithStatusBar
     : ANDROID_SECOND_VIEW.modeRowTopGap;
+  // Note: androidSecondViewTopInset (status bar height) is deliberately NOT
+  // added here — it's already reserved once via layoutTopInset on the
+  // ScrollView's own contentContainerStyle. Adding it again on top of the
+  // mode-bar shell double-counted the status bar and left a large gap above
+  // the mode row on the very first view that web (which has no status bar
+  // inset here) never showed.
   const stickyHeaderPinnedTopPadding = isAndroidLesson
-    ? androidSecondViewTopInset + androidModeRowTopGap
+    ? androidModeRowTopGap
     : stickyHeaderTopPadding;
 
   const STICKY_TOP_SNAP_OFFSET = 0;
@@ -98,19 +104,20 @@ export function useLessonLayout({
   const FLASHCARDS_VIEWPORT_TRIM = isAndroidLesson
     ? isCompactScreen ? 12 : 18
     : isCompactScreen ? 44 : 68;
-  const TYPING_VIEWPORT_TRIM = isWebLessonLayout && lessonLayoutWidth >= 768
-    ? (isCompactScreen ? 8 : 14)
-    : isAndroidLesson
-      ? (isCompactScreen ? 4 : 8)
-      : FLASHCARDS_VIEWPORT_TRIM;
   const BOTTOM_NAVIGATION_RESERVE = isWebLessonLayout
     ? (lessonLayoutWidth >= 768 ? 58 : 58)
     : isAndroidLesson
       ? Math.max(insets.bottom, 12)
       : 50 + Math.max(insets.bottom, 0);
 
-  const hasAndroidGameToolbar = isAndroidLesson && (hasMatchingCategoryControls || mode === 'flashcards');
-  const MATCHING_CATEGORY_CONTROLS_HEIGHT = hasMatchingCategoryControls
+  // The category-controls row also always shows the audio-match toggle while
+  // in Match mode (even for lessons with no categories), so its height must
+  // be reserved whenever mode === 'matching' too — not just when a category
+  // picker is present — or the board budget undercounts the row and the
+  // match tiles end up sized differently depending on whether a category
+  // happens to be selectable.
+  const hasAndroidGameToolbar = isAndroidLesson && (hasMatchingCategoryControls || mode === 'flashcards' || mode === 'matching');
+  const MATCHING_CATEGORY_CONTROLS_HEIGHT = (hasMatchingCategoryControls || mode === 'matching')
     ? isWebLessonLayout && lessonLayoutWidth >= 768 ? 38 : 46
     : 0;
   const MATCHING_GAME_TOP_SPACE = isAndroidLesson
@@ -132,10 +139,10 @@ export function useLessonLayout({
       : ANDROID_SECOND_VIEW.toolbarHeightRegular
     : 0;
   const ANDROID_GAME_CONTENT_TOP_PADDING = isAndroidLesson ? ANDROID_SECOND_VIEW.gameTopGap : 0;
-  const LESSON_BODY_TOP_BUFFER = isAndroidLesson
-    ? isCompactScreen ? ANDROID_SECOND_VIEW.bodyTopGapCompact : ANDROID_SECOND_VIEW.bodyTopGapRegular
-    : mode === 'matching'
-      ? isCompactScreen ? 3 : 5
+  const LESSON_BODY_TOP_BUFFER = isCompactPracticeMode
+    ? 0
+    : isAndroidLesson
+      ? isCompactScreen ? ANDROID_SECOND_VIEW.bodyTopGapCompact : ANDROID_SECOND_VIEW.bodyTopGapRegular
       : isCompactScreen ? 6 : 8;
   const flashcardModuleTopDrop = mode === 'flashcards' && !isDesktopWebLesson
     ? isAndroidLesson
@@ -160,13 +167,13 @@ export function useLessonLayout({
 
   const lessonImageHeight = useMemo(() => {
     const imageReservedGap = isWebLessonLayout
-      ? (isCompactScreen ? 62 : 70)
-      : (isCompactScreen ? 44 : 52);
+      ? (isCompactScreen ? 54 : 60)
+      : (isCompactScreen ? 10 : 14);
     const availableHeight = overviewMinHeight - titleBlockHeight - FIRST_VIEW_BOTTOM_SPACE - imageReservedGap;
     const minHeight = Math.round(clampNumber(
-      lessonViewportHeight * (isCompactScreen ? 0.42 : 0.5),
-      isCompactScreen ? 280 : 380,
-      isCompactScreen ? 380 : 520
+      lessonViewportHeight * (isCompactScreen ? 0.45 : 0.53),
+      isCompactScreen ? 300 : 405,
+      isCompactScreen ? 400 : 545
     ));
     const maxByViewport = Math.round(clampNumber(
       lessonViewportHeight * (isCompactScreen ? 0.72 : isLargeScreen ? 0.82 : 0.78),
@@ -175,7 +182,7 @@ export function useLessonLayout({
     ));
     const maxByWidth = isWebLessonLayout
       ? Math.round(clampNumber(lessonLayoutWidth * 0.95, 680, 1260) * webLessonImageScale)
-      : Math.round(clampNumber(lessonLayoutWidth * 1.8, 500, isLargeScreen ? 940 : 820));
+      : Math.round(clampNumber(lessonLayoutWidth * 2.05, 560, isLargeScreen ? 1040 : 910));
     const maxHeight = Math.max(minHeight, Math.min(maxByViewport, maxByWidth));
     return Math.round(clampNumber(availableHeight, minHeight, maxHeight));
   }, [FIRST_VIEW_BOTTOM_SPACE, isCompactScreen, isLargeScreen, isWebLessonLayout, lessonLayoutWidth, lessonViewportHeight, overviewMinHeight, titleBlockHeight, webLessonImageScale]);
@@ -215,9 +222,9 @@ export function useLessonLayout({
 
   const typingViewportMinHeight = useMemo(() => {
     if (isAndroidLesson) return androidPracticeViewportHeight ?? (isCompactScreen ? 220 : 260);
-    const availableHeight = secondViewMinHeight - SECOND_VIEW_CONTROLS_HEIGHT - TYPING_VIEWPORT_TRIM - (isCompactScreen ? 2 : 8);
-    return Math.max(isCompactScreen ? 320 : 420, availableHeight);
-  }, [androidPracticeViewportHeight, TYPING_VIEWPORT_TRIM, SECOND_VIEW_CONTROLS_HEIGHT, isCompactScreen, isAndroidLesson, secondViewMinHeight]);
+    const availableHeight = secondViewMinHeight - SECOND_VIEW_CONTROLS_HEIGHT - FLASHCARDS_VIEWPORT_TRIM - (isCompactScreen ? 6 : 10);
+    return Math.max(isCompactScreen ? 170 : 190, availableHeight);
+  }, [androidPracticeViewportHeight, FLASHCARDS_VIEWPORT_TRIM, SECOND_VIEW_CONTROLS_HEIGHT, isCompactScreen, isAndroidLesson, secondViewMinHeight]);
 
   const matchingViewSnapExtra = useMemo(() => {
     if (isAndroidLesson) return 0;

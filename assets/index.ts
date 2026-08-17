@@ -47,7 +47,7 @@ export const lessonThumbnails: Record<string, AssetValue> = (() => {
     'More Emotions': require('./thumbnails/emotions-level-2-thumbnail.png'),
     Family: require('./thumbnails/family-thumbnail.png'),
     'Food Basics': require('./thumbnails/food-basics-thumbnail.png'),
-    'Food +': require('./thumbnails/food-basics-thumbnail.png'),
+    'Food +': require('./thumbnails/foodplus-thumbnail.png'),
     Tastes: require('./thumbnails/likes-thumbnail.png'),
     'Frequency Adverbs': require('./thumbnails/frequency-thumbnail.png'),
     Furniture: require('./thumbnails/furniture-thumbnail.png'),

@@ -3,6 +3,46 @@ const PresentPerfectNIGrammar = {
   title: 'Present Perfect Interrogatif',
   description: 'Learn interrogative forms in present perfect',
   imageUrl: 'https://i.ibb.co/Z647SNz7/Present-perfect-Interrogatif.png',
+  textContent: {
+    cards: [
+      {
+        eyebrow: 'Poser une question',
+        paragraph: 'Je demande ce qui a déjà été fait.',
+        tip: 'Formule : have au présent + sujet + participe passé ?',
+        columns: [
+          {
+            label: '1/ Je conjugue HAVE au présent',
+            accent: 'coral',
+            rows: ['Have', 'Have', '**Has**', 'Have', 'Have'],
+          },
+          {
+            label: '2/ Avec le sujet',
+            accent: 'blue',
+            rows: ['I', 'You', 'He / She / It', 'We', 'They'],
+          },
+          {
+            label: '3/ + participe passé',
+            accent: 'teal',
+            rows: ['Verbe régulier → **+ED**', 'Verbe irrégulier → **par cœur**'],
+          },
+        ],
+        examples: [
+          { en: '**Have you seen** this film?', fr: 'As-tu vu ce film ?' },
+          { en: 'Where **has he gone**?', fr: 'Où est-il parti ?' },
+        ],
+      },
+      {
+        eyebrow: 'Adverbes au present perfect',
+        paragraph: '**Already** (déjà), **never** (jamais), **ever** (déjà ?), **yet** (pas encore).',
+        examples: [
+          { en: 'You **have already met** her.', fr: "Tu l'as déjà rencontrée." },
+          { en: 'He **has never met** her.', fr: "Il ne l'a jamais rencontrée." },
+          { en: '**Have you ever met** her?', fr: "L'as-tu déjà rencontrée ?" },
+          { en: "I **haven't met** her yet.", fr: "Je ne l'ai pas encore rencontrée." },
+        ],
+      },
+    ],
+  },
 translateExercises: [
   {
     type: 'translate',

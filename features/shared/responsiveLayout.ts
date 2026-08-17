@@ -6,7 +6,7 @@ export const clampNumber = (value: number, min: number, max: number) =>
 export const getWebAppContentMaxWidth = (windowWidth: number) => {
   if (Platform.OS !== 'web') return 800;
 
-  return Math.round(clampNumber(windowWidth * 0.78, 800, 1440));
+  return windowWidth;
 };
 
 export const getWebLessonScale = (windowWidth: number, windowHeight: number) => {

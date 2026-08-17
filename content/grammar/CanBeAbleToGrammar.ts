@@ -3,6 +3,52 @@ const CanBeAbleToGrammar = {
   title: 'Can & Be Able To',
   description: 'Express ability in present and past using can, be able to, could, and was able to',
   imageUrl: 'https://i.ibb.co/twmDg3pV/Can-Be-able-to.png',
+  textContent: {
+    cards: [
+      {
+        eyebrow: 'Can + base verbale',
+        paragraph: 'Je parle de ce que je peux faire.',
+        tip: 'Formule : sujet + can (ou can’t) + base verbale. Can ne change jamais.',
+        columns: [
+          {
+            label: 'Sujet',
+            accent: 'blue',
+            rows: ['I', 'You', 'He / She / It', 'We', 'They'],
+          },
+          {
+            label: 'Can (affirmatif) / Can’t (négatif)',
+            accent: 'coral',
+            rows: ['**Can**', '**Can’t**'],
+          },
+        ],
+        examples: [
+          { en: '**She can sleep** anywhere.', fr: 'Elle peut dormir n’importe où.' },
+          { en: '**You can’t speak** Korean.', fr: 'Tu ne peux pas parler coréen.' },
+        ],
+      },
+      {
+        eyebrow: 'Be able to + base verbale',
+        paragraph: 'On peut également utiliser be able to + base verbale.',
+        columns: [
+          {
+            label: 'Be able to (selon le sujet)',
+            accent: 'amber',
+            rows: [
+              'I **am** (not) able to',
+              'You **are** (not) able to',
+              'He / She / It **is** (not) able to',
+              'We **are** (not) able to',
+              'They **are** (not) able to',
+            ],
+          },
+        ],
+        examples: [
+          { en: '**She is able to see** ghosts.', fr: 'Elle est capable de voir des fantômes.' },
+          { en: '**You aren’t able to go** there.', fr: 'Tu n’es pas capable d’y aller.' },
+        ],
+      },
+    ],
+  },
 translateExercises: [
   {
     type: 'translate',

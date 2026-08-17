@@ -2,35 +2,6 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import type { ImageSourcePropType } from 'react-native';
 
 export type AccountAvatarId =
-  | 'spark'
-  | 'check'
-  | 'tips'
-  | 'retry'
-  | 'target'
-  | 'timer'
-  | 'keyboard'
-  | 'rocket'
-  | 'book'
-  | 'star'
-  | 'bolt'
-  | 'game'
-  | 'globe'
-  | 'flame'
-  | 'science'
-  | 'puzzle'
-  | 'leaf'
-  | 'medal'
-  | 'mind'
-  | 'gem'
-  | 'artist'
-  | 'explorer'
-  | 'shield'
-  | 'magic'
-  | 'night'
-  | 'premium'
-  | 'crown'
-  | 'guardian'
-  | 'legend'
   | 'avatar-student'
   | 'avatar-teacher'
   | 'avatar-thumbsup'
@@ -152,11 +123,6 @@ type BaseAccountAvatarPreset = {
   borderWidth?: number;
 };
 
-export type IconAccountAvatarPreset = BaseAccountAvatarPreset & {
-  type: 'icon';
-  icon: string;
-};
-
 export type ThumbnailAccountAvatarPreset = BaseAccountAvatarPreset & {
   type: 'thumbnail';
   image: ImageSourcePropType;
@@ -164,7 +130,7 @@ export type ThumbnailAccountAvatarPreset = BaseAccountAvatarPreset & {
   imageInsetRatio?: number;
 };
 
-export type AccountAvatarPreset = IconAccountAvatarPreset | ThumbnailAccountAvatarPreset;
+export type AccountAvatarPreset = ThumbnailAccountAvatarPreset;
 
 const ACCOUNT_AVATAR_KEY_PREFIX = '@ellie_account_avatar';
 const ACCOUNT_AVATAR_COLOR_KEY_PREFIX = '@ellie_account_avatar_color';
@@ -195,47 +161,6 @@ export const ACCOUNT_AVATAR_COLOR_PRESETS: AccountAvatarColorPreset[] = [
   { id: 'platinum', label: 'Platinum', backgroundColor: '#F4F8FA', accentColor: '#6D7D87', unlockLevel: 80 },
   { id: 'cosmic', label: 'Cosmic', backgroundColor: '#E9EDFF', accentColor: '#3349C9', unlockLevel: 92, borderWidth: 3 },
   { id: 'legend-gold', label: 'Legend gold', backgroundColor: '#FFF4BC', accentColor: '#C48B00', unlockLevel: 100, borderWidth: 3 },
-];
-
-export const ICON_ACCOUNT_AVATAR_PRESETS: IconAccountAvatarPreset[] = [
-  { type: 'icon', id: 'spark', label: 'Spark', icon: 'auto-awesome', backgroundColor: '#EAF5FF', accentColor: '#1671B6' },
-  { type: 'icon', id: 'check', label: 'Great job', icon: 'check-circle', backgroundColor: '#E9F8EF', accentColor: '#2C8F54' },
-  { type: 'icon', id: 'tips', label: 'Bright idea', icon: 'tips-and-updates', backgroundColor: '#FFF6DE', accentColor: '#B87500', unlockLevel: 3 },
-  { type: 'icon', id: 'retry', label: 'Retry', icon: 'refresh', backgroundColor: '#EEF3F8', accentColor: '#44505C', unlockLevel: 5 },
-  { type: 'icon', id: 'rocket', label: 'Rocket', icon: 'rocket-launch', backgroundColor: '#F1EDFF', accentColor: '#7654D4', unlockLevel: 9 },
-  { type: 'icon', id: 'target', label: 'Target', icon: 'track-changes', backgroundColor: '#EAF5FF', accentColor: '#1671B6', unlockLevel: 11 },
-  { type: 'icon', id: 'book', label: 'Book', icon: 'menu-book', backgroundColor: '#ECF8F3', accentColor: '#258B62', unlockLevel: 13 },
-  { type: 'icon', id: 'timer', label: 'Timer', icon: 'timer', backgroundColor: '#FFF0E2', accentColor: '#D4681D', unlockLevel: 15 },
-  { type: 'icon', id: 'star', label: 'Star', icon: 'stars', backgroundColor: '#FFF6DE', accentColor: '#B87500', unlockLevel: 19 },
-  { type: 'icon', id: 'bolt', label: 'Bolt', icon: 'bolt', backgroundColor: '#FFECEF', accentColor: '#D63B55', unlockLevel: 25 },
-  { type: 'icon', id: 'keyboard', label: 'Writer', icon: 'keyboard', backgroundColor: '#EAF7FF', accentColor: '#1687A7', unlockLevel: 28 },
-  { type: 'icon', id: 'game', label: 'Game', icon: 'sports-esports', backgroundColor: '#EAF7FF', accentColor: '#1687A7', unlockLevel: 32 },
-  { type: 'icon', id: 'globe', label: 'Globe', icon: 'public', backgroundColor: '#EEF7E7', accentColor: '#4B8F2F', unlockLevel: 36 },
-  { type: 'icon', id: 'leaf', label: 'Leaf', icon: 'eco', backgroundColor: '#E9F8EF', accentColor: '#2C8F54', unlockLevel: 39 },
-  { type: 'icon', id: 'flame', label: 'Flame', icon: 'local-fire-department', backgroundColor: '#FFF0E2', accentColor: '#D4681D', unlockLevel: 44 },
-  { type: 'icon', id: 'science', label: 'Science', icon: 'science', backgroundColor: '#EAF4F2', accentColor: '#327E76', unlockLevel: 47 },
-  { type: 'icon', id: 'puzzle', label: 'Puzzle', icon: 'extension', backgroundColor: '#F5EEFF', accentColor: '#8B4DD6', unlockLevel: 51 },
-  { type: 'icon', id: 'medal', label: 'Medal', icon: 'military-tech', backgroundColor: '#FFF6DE', accentColor: '#B87500', unlockLevel: 54 },
-  { type: 'icon', id: 'artist', label: 'Artist', icon: 'palette', backgroundColor: '#FFECEF', accentColor: '#D63B55', unlockLevel: 58 },
-  { type: 'icon', id: 'mind', label: 'Mind', icon: 'psychology', backgroundColor: '#EAF5FF', accentColor: '#1671B6', unlockLevel: 61 },
-  { type: 'icon', id: 'gem', label: 'Gem', icon: 'diamond', backgroundColor: '#EAF5FF', accentColor: '#1671B6', unlockLevel: 66 },
-  { type: 'icon', id: 'explorer', label: 'Explorer', icon: 'explore', backgroundColor: '#EEF7E7', accentColor: '#4B8F2F', unlockLevel: 69 },
-  { type: 'icon', id: 'shield', label: 'Shield', icon: 'shield', backgroundColor: '#ECF8F3', accentColor: '#258B62', unlockLevel: 72 },
-  { type: 'icon', id: 'magic', label: 'Magic', icon: 'auto-fix-high', backgroundColor: '#F1EDFF', accentColor: '#7654D4', unlockLevel: 75 },
-  { type: 'icon', id: 'night', label: 'Night', icon: 'dark-mode', backgroundColor: '#E9EDFF', accentColor: '#3349C9', unlockLevel: 78 },
-  { type: 'icon', id: 'premium', label: 'Premium', icon: 'workspace-premium', backgroundColor: '#F4F8FA', accentColor: '#6D7D87', unlockLevel: 81 },
-  { type: 'icon', id: 'crown', label: 'Champion', icon: 'emoji-events', backgroundColor: '#FFF4C7', accentColor: '#987000', unlockLevel: 84 },
-  { type: 'icon', id: 'guardian', label: 'Guardian', icon: 'local-police', backgroundColor: '#EAF4F2', accentColor: '#327E76', unlockLevel: 90 },
-  { type: 'icon', id: 'legend', label: 'Legend', icon: 'verified', backgroundColor: '#FFF4BC', accentColor: '#C48B00', unlockLevel: 100, borderWidth: 3 },
-];
-
-export const FEATURED_ICON_ACCOUNT_AVATAR_PRESETS: IconAccountAvatarPreset[] = [
-  ICON_ACCOUNT_AVATAR_PRESETS.find((preset) => preset.id === 'spark')!,
-  ICON_ACCOUNT_AVATAR_PRESETS.find((preset) => preset.id === 'check')!,
-  ICON_ACCOUNT_AVATAR_PRESETS.find((preset) => preset.id === 'tips')!,
-  ICON_ACCOUNT_AVATAR_PRESETS.find((preset) => preset.id === 'star')!,
-  ICON_ACCOUNT_AVATAR_PRESETS.find((preset) => preset.id === 'crown')!,
-  ICON_ACCOUNT_AVATAR_PRESETS.find((preset) => preset.id === 'legend')!,
 ];
 
 export const ASSET_ACCOUNT_AVATAR_PRESETS: ThumbnailAccountAvatarPreset[] = [
@@ -394,15 +319,9 @@ export const IMAGE_ACCOUNT_AVATAR_PRESETS: ThumbnailAccountAvatarPreset[] = with
   ...END_CARD_ACCOUNT_AVATAR_PRESETS.filter((preset) => preset.id === 'asset-ellie'),
 ]);
 
-export const PICKER_ACCOUNT_AVATAR_PRESETS: AccountAvatarPreset[] = [
-  ...IMAGE_ACCOUNT_AVATAR_PRESETS,
-  ...FEATURED_ICON_ACCOUNT_AVATAR_PRESETS,
-];
+export const PICKER_ACCOUNT_AVATAR_PRESETS: AccountAvatarPreset[] = IMAGE_ACCOUNT_AVATAR_PRESETS;
 
-export const ACCOUNT_AVATAR_PRESETS: AccountAvatarPreset[] = [
-  ...ICON_ACCOUNT_AVATAR_PRESETS,
-  ...IMAGE_ACCOUNT_AVATAR_PRESETS,
-];
+export const ACCOUNT_AVATAR_PRESETS: AccountAvatarPreset[] = IMAGE_ACCOUNT_AVATAR_PRESETS;
 
 const isUnlockedForLevel = (unlockLevel: number | undefined, currentLevel: number) =>
   !unlockLevel || currentLevel >= unlockLevel;

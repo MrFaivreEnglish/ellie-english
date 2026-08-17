@@ -2,21 +2,22 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   ActivityIndicator,
   Alert,
+  LayoutAnimation,
   Platform,
   StyleSheet,
   Text,
   TextInput,
   TouchableOpacity,
+  UIManager,
   View,
-  useWindowDimensions,
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import Animated, { ZoomIn } from 'react-native-reanimated';
 import { MaterialIcons } from '@expo/vector-icons';
 import AccountAvatar from './AccountAvatar';
 import { useAccount } from './AccountContext';
 import {
   ACCOUNT_AVATAR_COLOR_PRESETS,
-  ICON_ACCOUNT_AVATAR_PRESETS,
   IMAGE_ACCOUNT_AVATAR_PRESETS,
   getUnlockedAccountAvatarColorId,
   getUnlockedAccountAvatarId,
@@ -31,6 +32,7 @@ import {
   getXPLevelStats,
   isMasterLevel,
 } from '../progress/xpLevels';
+import { getSoftShadow } from '../shared/uiPrimitives';
 
 type AccountPanelProps = {
   colors: {
@@ -61,7 +63,7 @@ type MaterialIconName = React.ComponentProps<typeof MaterialIcons>['name'];
 
 const ACCOUNT_TOUR_SEEN_KEY = '@ellie_account_signed_in_tour_seen';
 
-const ALL_AVATAR_PRESETS = [...IMAGE_ACCOUNT_AVATAR_PRESETS, ...ICON_ACCOUNT_AVATAR_PRESETS]
+const ALL_AVATAR_PRESETS = [...IMAGE_ACCOUNT_AVATAR_PRESETS]
   .sort((a, b) => (a.unlockLevel ?? 0) - (b.unlockLevel ?? 0));
 
 
@@ -84,7 +86,6 @@ export default function AccountPanel({ colors, isDarkMode }: AccountPanelProps) 
     updateAccountAvatar,
     clearError,
   } = useAccount();
-  const { width } = useWindowDimensions();
   const [mode, setMode] = useState<AccountMode>('signIn');
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
@@ -95,9 +96,20 @@ export default function AccountPanel({ colors, isDarkMode }: AccountPanelProps) 
   const [showConnectionTour, setShowConnectionTour] = useState(false);
   const [isProfileEditorOpen, setIsProfileEditorOpen] = useState(false);
   const [isNameEditorOpen, setIsNameEditorOpen] = useState(false);
+  const toggleProfileEditor = useCallback(() => {
+    if (Platform.OS === 'android') {
+      UIManager.setLayoutAnimationEnabledExperimental?.(true);
+    }
+    LayoutAnimation.configureNext(
+      LayoutAnimation.create(220, LayoutAnimation.Types.easeInEaseOut, LayoutAnimation.Properties.opacity)
+    );
+    setIsProfileEditorOpen((current) => !current);
+    setIsNameEditorOpen(false);
+  }, []);
   const [draftAccountName, setDraftAccountName] = useState('');
   const usernameInputRef = useRef<TextInput>(null);
   const passwordInputRef = useRef<TextInput>(null);
+  const hasSyncedThisSessionRef = useRef(false);
 
   const isCreateMode = mode === 'create';
   const trimmedUsername = username.trim();
@@ -109,7 +121,6 @@ export default function AccountPanel({ colors, isDarkMode }: AccountPanelProps) 
     !password ||
     trimmedUsername.length < 3 ||
     password.length < 6;
-  const compact = width < 390;
   const levelStats = useMemo(() => getXPLevelStats(localXP), [localXP]);
   const unlockedAccountAvatarId = useMemo(
     () => getUnlockedAccountAvatarId(accountAvatarId, levelStats.level),
@@ -126,7 +137,6 @@ export default function AccountPanel({ colors, isDarkMode }: AccountPanelProps) 
     !cleanedDraftAccountName ||
     cleanedDraftAccountName.length > 40 ||
     cleanedDraftAccountName === accountName;
-  const totalSavedItems = grammarSummary.totalCorrectAnswers + learnedSummary.totalLearned + timerBestCount;
   const isMaster = isMasterLevel(levelStats.level);
   const levelBadgeLabel = useMemo(() => getLevelBadgeLabel(levelStats.level), [levelStats.level]);
   const masterTierLabel = useMemo(() => getMasterTierLabel(levelStats.level), [levelStats.level]);
@@ -136,9 +146,6 @@ export default function AccountPanel({ colors, isDarkMode }: AccountPanelProps) 
   const masterSurfaceColor = isDarkMode ? colors.warningSoft : '#FFF7D7';
   const masterTextColor = isDarkMode ? '#FFF7D6' : '#7A4B00';
   const profileProgressPercent = isMaster ? 100 : levelStats.progressPercent;
-  const profileProgressHint = totalSavedItems > 0
-    ? 'Keep going - your work is saved here.'
-    : 'Start a lesson to build your level.';
   const profileProgressNextLabel = isMaster
     ? (masterTierLabel || 'Master level')
     : `${levelStats.remainingXP} XP to next level`;
@@ -196,19 +203,11 @@ export default function AccountPanel({ colors, isDarkMode }: AccountPanelProps) 
     submitLabel: isCreateMode ? 'Create account' : 'Log in',
     submitIcon: isCreateMode ? 'cloud-upload' as const : 'login' as const,
   }), [isCreateMode]);
+  const hasAuthValidationWarning = isUsernameTooShort || isPasswordTooShort;
   const authSupportText = isUsernameTooShort
     ? 'Username needs at least 3 characters.'
-    : isPasswordTooShort
-      ? 'Password needs at least 6 characters.'
-      : isCreateMode
-        ? 'New accounts start with their own progress.'
-        : "This account's progress replaces shared device progress while logged in.";
-  const authSupportIcon: React.ComponentProps<typeof MaterialIcons>['name'] =
-    isUsernameTooShort || isPasswordTooShort
-      ? 'error-outline'
-      : isCreateMode
-        ? 'cloud-upload'
-        : 'cloud-download';
+    : 'Password needs at least 6 characters.';
+  const authSupportIcon: React.ComponentProps<typeof MaterialIcons>['name'] = 'error-outline';
   const syncCopy = useMemo(() => {
     if (!session) {
       return {
@@ -252,6 +251,7 @@ export default function AccountPanel({ colors, isDarkMode }: AccountPanelProps) 
   useEffect(() => {
     setDraftAccountName(accountName);
     setIsNameEditorOpen(false);
+    hasSyncedThisSessionRef.current = false;
   }, [accountName, session?.user.id]);
 
   useEffect(() => {
@@ -300,7 +300,6 @@ export default function AccountPanel({ colors, isDarkMode }: AccountPanelProps) 
         setLocalMessage('Account made. Fresh online progress loaded.');
       } else {
         await signIn(trimmedUsername, password);
-        setLocalMessage("Logged in. This account's progress is loaded.");
       }
 
       resetForm();
@@ -318,6 +317,7 @@ export default function AccountPanel({ colors, isDarkMode }: AccountPanelProps) 
   ]);
 
   const runSync = useCallback(async () => {
+    hasSyncedThisSessionRef.current = true;
     setLocalMessage('');
     clearError();
 
@@ -385,6 +385,15 @@ export default function AccountPanel({ colors, isDarkMode }: AccountPanelProps) 
     ]);
   }, [backupSummary, error, runSync, syncStatus]);
 
+  const handleSyncPress = useCallback(() => {
+    const needsConfirmation = !hasSyncedThisSessionRef.current || syncStatus === 'failed' || !!error;
+    if (needsConfirmation) {
+      confirmSync();
+    } else {
+      void runSync();
+    }
+  }, [confirmSync, error, runSync, syncStatus]);
+
   const renderMasterStars = (size = 11) => {
     if (!isMaster) return null;
 
@@ -414,25 +423,11 @@ export default function AccountPanel({ colors, isDarkMode }: AccountPanelProps) 
     );
   };
 
-  const renderDashboardStat = (
-    icon: React.ComponentProps<typeof MaterialIcons>['name'],
-    value: string,
-    label: string,
-    accentColor: string
-  ) => (
-    <View style={[styles.dashboardStat, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-      <View style={[styles.dashboardStatIcon, { backgroundColor: colors.primarySoft }]}>
-        <MaterialIcons name={icon} size={16} color={accentColor} />
-      </View>
-      <Text style={[styles.dashboardStatValue, { color: colors.text }]} numberOfLines={1}>{value}</Text>
-      <Text style={[styles.dashboardStatLabel, { color: colors.secondaryText }]} numberOfLines={1}>{label}</Text>
-    </View>
-  );
-
   const renderProfileProgress = () => (
     <View
       style={[
         styles.profileProgressCard,
+        getSoftShadow(isDarkMode, 'soft'),
         {
           backgroundColor: colors.card,
           borderColor: isMaster ? colors.warning : colors.border,
@@ -442,9 +437,6 @@ export default function AccountPanel({ colors, isDarkMode }: AccountPanelProps) 
       <View style={styles.profileProgressHeader}>
         <View style={styles.profileProgressTitleBlock}>
           <Text style={[styles.profileProgressTitle, { color: colors.text }]}>Profile progress</Text>
-          <Text style={[styles.profileProgressHint, { color: colors.secondaryText }]} numberOfLines={1}>
-            {profileProgressHint}
-          </Text>
         </View>
         <View
           style={[
@@ -463,7 +455,7 @@ export default function AccountPanel({ colors, isDarkMode }: AccountPanelProps) 
 
       {renderMasterProfileBadge()}
 
-      <View style={[styles.progressTrackLarge, { backgroundColor: isDarkMode ? colors.surfaceAlt : '#D8E9F7' }]}>
+      <View style={[styles.progressTrackLarge, { backgroundColor: isDarkMode ? colors.surfaceAlt : '#E2E8F0' }]}>
         <View
           style={[
             styles.progressFill,
@@ -532,9 +524,9 @@ export default function AccountPanel({ colors, isDarkMode }: AccountPanelProps) 
       >
         <AccountAvatar avatarId={avatarId} colorId={unlockedAccountAvatarColorId} size={36} />
         {selected && (
-          <View style={[styles.avatarChoiceCheck, { backgroundColor: actionButtonColor }]}>
+          <Animated.View entering={ZoomIn.springify().damping(12)} style={[styles.avatarChoiceCheck, { backgroundColor: actionButtonColor }]}>
             <MaterialIcons name="check" size={13} color={actionButtonTextColor} />
-          </View>
+          </Animated.View>
         )}
         {!selected && !unlocked && (
           <View style={[styles.lockBadge, { backgroundColor: colors.secondaryText }]}>
@@ -580,9 +572,9 @@ export default function AccountPanel({ colors, isDarkMode }: AccountPanelProps) 
       >
         <View style={[styles.colorSwatch, { backgroundColor, borderColor: accentColor, borderWidth: borderWidth ?? 2 }]} />
         {selected && (
-          <View style={[styles.colorChoiceCheck, { backgroundColor: actionButtonColor }]}>
+          <Animated.View entering={ZoomIn.springify().damping(12)} style={[styles.colorChoiceCheck, { backgroundColor: actionButtonColor }]}>
             <MaterialIcons name="check" size={12} color={actionButtonTextColor} />
-          </View>
+          </Animated.View>
         )}
         {!selected && !unlocked && (
           <View style={[styles.lockBadge, { backgroundColor: colors.secondaryText }]}>
@@ -626,15 +618,12 @@ export default function AccountPanel({ colors, isDarkMode }: AccountPanelProps) 
     </View>
   );
 
-  const renderLocalProfileOverview = (subtitle: string) => (
-    <View style={[styles.accountOverview, { backgroundColor: colors.surface, borderBottomColor: colors.border }]}>
+  const renderLocalProfileOverview = () => (
+    <View style={[styles.accountOverview, { backgroundColor: colors.surface }]}>
       <View style={styles.dashboardHeroTop}>
         <View style={styles.identityCluster}>
           <TouchableOpacity
-            onPress={() => {
-              setIsProfileEditorOpen((current) => !current);
-              setIsNameEditorOpen(false);
-            }}
+            onPress={toggleProfileEditor}
             activeOpacity={0.82}
             style={styles.avatarEditButton}
             accessibilityRole="button"
@@ -657,9 +646,6 @@ export default function AccountPanel({ colors, isDarkMode }: AccountPanelProps) 
           <View style={styles.identityCopy}>
             <Text style={[styles.dashboardGreeting, { color: colors.text }]} numberOfLines={1}>
               Local profile
-            </Text>
-            <Text style={[styles.localProfileText, { color: colors.secondaryText }]} numberOfLines={2}>
-              {subtitle}
             </Text>
           </View>
         </View>
@@ -704,7 +690,7 @@ export default function AccountPanel({ colors, isDarkMode }: AccountPanelProps) 
             backgroundColor: isDarkMode ? colors.surface : '#fff',
             borderColor: focused ? colors.primary : colors.border,
           },
-          focused && styles.inputShellFocused,
+          focused && getSoftShadow(isDarkMode, 'soft'),
         ]}
       >
         <View style={[styles.inputIconBox, { backgroundColor: focused ? colors.primarySoft : colors.surface }]}>
@@ -720,7 +706,7 @@ export default function AccountPanel({ colors, isDarkMode }: AccountPanelProps) 
           autoCorrect={false}
           secureTextEntry={secureTextEntry && !showPassword}
           placeholder={placeholder}
-          placeholderTextColor={colors.secondaryText}
+          placeholderTextColor={isDarkMode ? '#FFFFFF' : colors.secondaryText}
           returnKeyType={returnKeyType}
           showSoftInputOnFocus
           textContentType={isPasswordField ? 'password' : 'username'}
@@ -731,7 +717,7 @@ export default function AccountPanel({ colors, isDarkMode }: AccountPanelProps) 
               ? !isSubmitDisabled ? submit : undefined
               : () => passwordInputRef.current?.focus()
           }
-          style={[styles.input, { color: colors.text }]}
+          style={[styles.input, { color: isDarkMode ? '#FFFFFF' : colors.text }, { outlineStyle: 'none' } as any]}
         />
         {isPasswordField && (
           <TouchableOpacity
@@ -753,8 +739,8 @@ export default function AccountPanel({ colors, isDarkMode }: AccountPanelProps) 
 
   if (!isConfigured) {
     return (
-      <View style={[styles.dashboardCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
-        {renderLocalProfileOverview('Change your avatar here. Progress stays on this device.')}
+      <View style={styles.dashboardCard}>
+        {renderLocalProfileOverview()}
         <View style={styles.dashboardBody}>
           {renderProfileCustomizer()}
           <View style={[styles.mergePanel, { backgroundColor: colors.surfaceAlt, borderColor: colors.border }]}>
@@ -779,15 +765,12 @@ export default function AccountPanel({ colors, isDarkMode }: AccountPanelProps) 
 
   if (session) {
     return (
-      <View style={[styles.dashboardCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
-        <View style={[styles.accountOverview, { backgroundColor: colors.surface, borderBottomColor: colors.border }]}>
+      <View style={styles.dashboardCard}>
+        <View style={[styles.accountOverview, { backgroundColor: colors.surface }]}>
           <View style={styles.dashboardHeroTop}>
             <View style={styles.identityCluster}>
               <TouchableOpacity
-                onPress={() => {
-                  setIsProfileEditorOpen((current) => !current);
-                  setIsNameEditorOpen(false);
-                }}
+                onPress={toggleProfileEditor}
                 activeOpacity={0.82}
                 style={styles.avatarEditButton}
                 accessibilityRole="button"
@@ -813,6 +796,7 @@ export default function AccountPanel({ colors, isDarkMode }: AccountPanelProps) 
                     style={[
                       styles.identityNameButton,
                       styles.identityNameEditorPill,
+                      getSoftShadow(isDarkMode, 'soft'),
                       {
                         backgroundColor: colors.primarySoft,
                         borderColor: colors.primary,
@@ -832,7 +816,7 @@ export default function AccountPanel({ colors, isDarkMode }: AccountPanelProps) 
                       returnKeyType="done"
                       onSubmitEditing={submitAccountName}
                       maxLength={40}
-                      style={[styles.inlineNameInput, { color: colors.text }]}
+                      style={[styles.inlineNameInput, { color: colors.text }, { outlineStyle: 'none' } as any]}
                     />
                     <TouchableOpacity
                       onPress={closeNameEditor}
@@ -933,7 +917,7 @@ export default function AccountPanel({ colors, isDarkMode }: AccountPanelProps) 
 
           {renderProfileCustomizer()}
 
-          <View style={[styles.backupPanel, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+          <View style={[styles.backupPanel, getSoftShadow(isDarkMode, 'soft'), { backgroundColor: colors.card, borderColor: colors.border }]}>
             <View style={[styles.backupIconDisc, { backgroundColor: colors.primarySoft }]}>
               <MaterialIcons name={syncCopy.icon} size={24} color={syncCopy.color} />
             </View>
@@ -942,7 +926,7 @@ export default function AccountPanel({ colors, isDarkMode }: AccountPanelProps) 
               <Text style={[styles.backupText, { color: colors.secondaryText }]}>{syncCopy.text}</Text>
             </View>
             <TouchableOpacity
-              onPress={confirmSync}
+              onPress={handleSyncPress}
               disabled={isSyncing}
               style={[styles.backupActionButton, { backgroundColor: actionButtonColor }]}
               accessibilityRole="button"
@@ -959,22 +943,6 @@ export default function AccountPanel({ colors, isDarkMode }: AccountPanelProps) 
                 </>
               )}
             </TouchableOpacity>
-          </View>
-
-          <View style={styles.sectionHeaderRow}>
-            <View>
-              <Text style={[styles.dashboardSectionTitle, { color: colors.text }]}>Saved work</Text>
-              <Text style={[styles.dashboardSectionSubtitle, { color: colors.secondaryText }]}>
-                {totalSavedItems} saved items on this device
-              </Text>
-            </View>
-          </View>
-
-          <View style={[styles.dashboardStatsGrid, compact && styles.dashboardStatsGridCompact]}>
-            {renderDashboardStat('local-fire-department', `${localXP}`, 'Points', colors.warning)}
-            {renderDashboardStat('edit', `${grammarSummary.totalCorrectAnswers}`, 'Grammar', colors.primary)}
-            {renderDashboardStat('style', `${learnedSummary.totalLearned}`, 'Words', colors.success)}
-            {renderDashboardStat('timer', `${timerBestCount}`, 'Best times', colors.primary)}
           </View>
 
           <View style={[styles.mergePanel, { backgroundColor: colors.surfaceAlt, borderColor: colors.border }]}>
@@ -996,11 +964,18 @@ export default function AccountPanel({ colors, isDarkMode }: AccountPanelProps) 
   }
 
   return (
-    <View style={[styles.authShell, { backgroundColor: colors.card, borderColor: colors.border }]}>
-      {renderLocalProfileOverview('Tap the avatar to change this device profile.')}
+    <View style={styles.authShell}>
+      {renderLocalProfileOverview()}
       <View style={styles.authBody}>
         {renderProfileCustomizer()}
-        <View style={styles.authCard}>
+        <View
+          style={[
+            styles.authCard,
+            styles.authCardSurface,
+            getSoftShadow(isDarkMode, 'soft'),
+            { backgroundColor: colors.card, borderColor: colors.border },
+          ]}
+        >
         <View style={styles.authCardHeader}>
           <View style={styles.authTitleBlock}>
             <Text style={[styles.authEyebrow, { color: colors.primary }]}>{formCopy.status}</Text>
@@ -1067,37 +1042,19 @@ export default function AccountPanel({ colors, isDarkMode }: AccountPanelProps) 
           })}
         </View>
 
-        <View
-          style={[
-            styles.authSupportLine,
-            {
-              backgroundColor: isCreateMode && (isUsernameTooShort || isPasswordTooShort)
-                ? colors.warningSoft
-                : colors.surface,
-              borderColor: isCreateMode && (isUsernameTooShort || isPasswordTooShort)
-                ? colors.warning
-                : colors.border,
-            },
-          ]}
-        >
-          <MaterialIcons
-            name={authSupportIcon}
-            size={17}
-            color={isCreateMode && (isUsernameTooShort || isPasswordTooShort) ? colors.warning : colors.primary}
-          />
-          <Text
+        {hasAuthValidationWarning && (
+          <View
             style={[
-              styles.authSupportText,
-              {
-                color: isCreateMode && (isUsernameTooShort || isPasswordTooShort)
-                  ? colors.warning
-                  : colors.secondaryText,
-              },
+              styles.authSupportLine,
+              { backgroundColor: colors.dangerSoft, borderColor: colors.danger },
             ]}
           >
-            {authSupportText}
-          </Text>
-        </View>
+            <MaterialIcons name={authSupportIcon} size={17} color={colors.danger} />
+            <Text style={[styles.authSupportText, { color: colors.danger }]}>
+              {authSupportText}
+            </Text>
+          </View>
+        )}
 
         {!!localMessage && <Text style={[styles.successText, { color: colors.primary }]}>{localMessage}</Text>}
         {!!error && (
@@ -1148,26 +1105,14 @@ const styles = StyleSheet.create({
   dashboardCard: {
     marginHorizontal: 16,
     marginVertical: 5,
-    borderRadius: 12,
-    borderWidth: 1.5,
+    borderRadius: 16,
     overflow: 'hidden',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.07,
-    shadowRadius: 7,
-    elevation: 2,
   },
   authShell: {
     marginHorizontal: 16,
     marginVertical: 5,
-    borderRadius: 12,
-    borderWidth: 1.5,
+    borderRadius: 16,
     overflow: 'hidden',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.06,
-    shadowRadius: 7,
-    elevation: 2,
   },
   authBody: {
     padding: 10,
@@ -1176,7 +1121,7 @@ const styles = StyleSheet.create({
   accountOverview: {
     padding: 12,
     gap: 9,
-    borderBottomWidth: 1,
+    borderRadius: 16,
   },
   dashboardHero: {
     padding: 14,
@@ -1908,6 +1853,10 @@ const styles = StyleSheet.create({
   authCard: {
     padding: 14,
   },
+  authCardSurface: {
+    borderRadius: 14,
+    borderWidth: 1.5,
+  },
   authCardHeader: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -2193,13 +2142,6 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 9,
-  },
-  inputShellFocused: {
-    shadowColor: '#1671B6',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.12,
-    shadowRadius: 6,
-    elevation: 2,
   },
   inputIconBox: {
     width: 32,

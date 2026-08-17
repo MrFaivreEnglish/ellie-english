@@ -3,6 +3,29 @@ const GenitiveGrammar = {
   title: 'Le génitif',
   description: 'Use of the genitive (possessive) in English: "\'s" and "of" constructions',
   imageUrl: 'https://i.ibb.co/VWt6yvhs/G-nitif.png',
+  textContent: {
+    cards: [
+      {
+        eyebrow: 'Ce que je montre',
+        paragraph: 'Je montre à qui appartient quelque chose.',
+        tip: "Formule : nom (possesseur) + 's + nom (possédé).",
+        examples: [
+          { en: '**John’s car** is electric.', fr: 'La voiture de John est électrique.' },
+          { en: '**The teacher’s voice** is funny.', fr: 'La voix du professeur est drôle.' },
+        ],
+      },
+      {
+        eyebrow: 'Les liens de parenté',
+        paragraph: "Le génitif montre aussi les liens de parenté : nom + 's + nom (lien de parenté).",
+        tip: "Remarque : si le possesseur est au pluriel, on ajoute seulement une apostrophe, pas 's.",
+        examples: [
+          { en: 'Tom is **Tabitha’s brother**.', fr: 'Tom est le frère de Tabitha.' },
+          { en: '**Ellie’s parents** are cool.', fr: 'Les parents d’Ellie sont cools.' },
+          { en: 'I like **the neighbours’ house**.', fr: 'J’aime la maison des voisins.' },
+        ],
+      },
+    ],
+  },
 translateExercises: [
   {
     type: 'translate',

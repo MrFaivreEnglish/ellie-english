@@ -3,6 +3,49 @@ const BePreteritGrammar = {
   title: 'Be au prétérit',
   description: 'Questions au prétérit avec le verbe "to be" — complétez avec was / were.',
   imageUrl: 'https://i.ibb.co/dyGHTby/Pr-t-rit-BE.png',
+  textContent: {
+    cards: [
+      {
+        eyebrow: 'Formes du prétérit',
+        paragraph: 'Be est le seul verbe à avoir deux formes au prétérit. Elles dépendent du pronom utilisé.',
+        columns: [
+          {
+            label: '1/ Je repère le sujet',
+            accent: 'blue',
+            rows: ['I', 'You', 'He / She / It', 'We', 'They'],
+          },
+          {
+            label: '2/ Je conjugue le verbe',
+            accent: 'amber',
+            rows: ['I **was**', 'You **were**', 'He / She / It **was**', 'We **were**', 'They **were**'],
+          },
+        ],
+        examples: [
+          { en: '**Molly was** a good singer.', fr: 'Molly était une bonne chanteuse.' },
+          { en: '**They were** out yesterday.', fr: 'Ils étaient dehors hier.' },
+        ],
+      },
+      {
+        eyebrow: 'C’est vrai aussi pour le négatif et les questions',
+        columns: [
+          {
+            label: 'Négatif',
+            accent: 'coral',
+            rows: ['I **wasn’t**', 'You **weren’t**', 'He / She / It **wasn’t**', 'We **weren’t**', 'They **weren’t**'],
+          },
+          {
+            label: 'Questions',
+            accent: 'teal',
+            rows: ['**Was** I', '**Were** you', '**Was** he / she / it', '**Were** we', '**Were** they'],
+          },
+        ],
+        examples: [
+          { en: '**Harry wasn’t** happy.', fr: "Harry n'était pas heureux." },
+          { en: '**Were** the Dursleys nice?', fr: 'Les Dursleys étaient-ils gentils ?' },
+        ],
+      },
+    ],
+  },
 translateExercises: [
   {
     type: 'translate',

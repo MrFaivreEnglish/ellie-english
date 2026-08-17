@@ -3,6 +3,31 @@ const Conditional2Grammar = {
   title: 'Conditionnel 2',
   description: 'Learn how to use the second conditional',
   imageUrl: 'https://i.ibb.co/NdJ7KZyS/Conditionnel-2.png',
+  textContent: {
+    cards: [
+      {
+        eyebrow: 'La formule',
+        paragraph: 'Pour parler de ce qui pourrait arriver si une condition était remplie.',
+        tip: 'Formule : IF + prétérit, sujet + would + base verbale. La phrase est construite en deux temps.',
+        columns: [
+          {
+            label: '1/ La subordonnée : si une condition était remplie...',
+            accent: 'blue',
+            rows: ['If **you went** with me,', 'If **Juliet’s family saw** Romeo,'],
+          },
+          {
+            label: '2/ La principale : ... il y aurait telle conséquence',
+            accent: 'coral',
+            rows: ['I **would be** very happy.', 'They **would kill** him.'],
+          },
+        ],
+        examples: [
+          { en: '**If you went** with me, **I would be** very happy.', fr: 'Si tu venais avec moi, je serais très heureux.' },
+          { en: '**If Juliet’s family saw** Romeo, **they would kill** him.', fr: 'Si la famille de Juliette voyait Roméo, ils le tueraient.' },
+        ],
+      },
+    ],
+  },
 translateExercises: [
   {
     type: 'translate',

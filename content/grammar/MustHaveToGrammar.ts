@@ -3,6 +3,50 @@ const MustHaveToGrammar = {
   title: 'Must et Have to',
   description: 'Comprendre la différence entre must et have to',
   imageUrl: 'https://i.ibb.co/FbpBmQ8H/Must-Have-to.png',
+  textContent: {
+    cards: [
+      {
+        eyebrow: 'Je parle de ce que je dois faire (MUST)',
+        tip: "Formule : sujet + must + base verbale. Négatif : sujet + mustn't + base verbale.",
+        columns: [
+          {
+            label: 'Sujet',
+            accent: 'blue',
+            rows: ['I', 'You', 'He / She / It', 'We', 'They'],
+          },
+          {
+            label: 'MUST (invariable)',
+            accent: 'coral',
+            rows: ['Must', "Mustn't (négatif)"],
+          },
+        ],
+        examples: [
+          { en: 'She **must sleep** early.', fr: 'Elle doit dormir tôt.' },
+          { en: "You **mustn't go**.", fr: "Tu ne dois pas y aller." },
+        ],
+      },
+      {
+        eyebrow: "Parler de ce qui est imposé par quelqu'un (HAVE TO)",
+        paragraph: "Have to se conjugue selon le sujet : has to à la 3e personne du singulier.",
+        columns: [
+          {
+            label: 'Sujet',
+            accent: 'blue',
+            rows: ['I', 'You', 'He / She / It', 'We', 'They'],
+          },
+          {
+            label: 'HAVE TO',
+            accent: 'teal',
+            rows: ['Have to', 'Have to', '**Has to**', 'Have to', 'Have to'],
+          },
+        ],
+        examples: [
+          { en: 'She **has to sleep** early.', fr: 'Elle doit dormir tôt.' },
+          { en: "You **don't have to go**.", fr: "Tu n'es pas obligée d'y aller." },
+        ],
+      },
+    ],
+  },
   translateExercises: [
   {
     type: 'translate',

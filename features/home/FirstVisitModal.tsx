@@ -19,32 +19,32 @@ const SLIDES = [
     color: '#4EA7F5',
     bg: '#EBF5FF',
     bgDark: '#0D2742',
-    title: 'Welcome to Ellie!',
-    body: "Your English class companion. Use Ellie alongside your lessons to practise what you’ve learnt.",
+    title: 'Bienvenue sur Ellie !',
+    body: "Ton assistant pour les cours d’anglais. Utilise Ellie en complément de tes leçons pour t’entraîner sur ce que tu as appris.",
   },
   {
     icon: 'edit' as MaterialIconName,
     color: '#4EA7F5',
     bg: '#EBF5FF',
     bgDark: '#0D2742',
-    title: 'Grammar',
-    body: 'Fill in blanks, reorder sentences, choose the right answer, and translate — your answers are saved automatically.',
+    title: 'Grammaire',
+    body: 'Complète les blancs, remets les phrases dans l’ordre, choisis la bonne réponse, ou traduis — tes réponses sont enregistrées automatiquement.',
   },
   {
     icon: 'style' as MaterialIconName,
     color: '#35C8B5',
     bg: '#E6FAF8',
     bgDark: '#092B28',
-    title: 'Vocabulary',
-    body: 'Study words with flashcards, pair them in the matching game, or type the translation to challenge yourself.',
+    title: 'Vocabulaire',
+    body: 'Révise les mots avec des flashcards, associe-les dans le jeu de memory, ou tape la traduction pour te mettre au défi.',
   },
   {
     icon: 'workspace-premium' as MaterialIconName,
     color: '#F4B942',
     bg: '#FFF8E6',
     bgDark: '#2C2000',
-    title: 'Track your progress',
-    body: 'Earn XP and keep your daily streak going. Set up a free account to unlock profile pictures and save progress.',
+    title: 'Suis ta progression',
+    body: 'Gagne des XP et garde ta série de jours actifs. Crée un compte gratuit pour débloquer des photos de profil et sauvegarder ta progression.',
   },
 ];
 
@@ -106,7 +106,7 @@ export default function FirstVisitModal({ visible, onDismiss, onSetupAccount }: 
           </Animated.View>
 
           <View style={styles.dots}>
-            {SLIDES.map((s, i) => (
+            {SLIDES.map((_s, i) => (
               <Pressable key={i} onPress={() => goToSlide(i)} hitSlop={10}>
                 <View
                   style={[
@@ -128,17 +128,17 @@ export default function FirstVisitModal({ visible, onDismiss, onSetupAccount }: 
             ]}
             onPress={handleNext}
           >
-            <Text style={styles.buttonText}>{isLast ? "Let's go!" : 'Next'}</Text>
+            <Text style={styles.buttonText}>{isLast ? "C'est parti !" : 'Suivant'}</Text>
             {!isLast && <MaterialIcons name="arrow-forward" size={18} color="#fff" />}
           </Pressable>
 
           {isLast ? (
             <Pressable onPress={handleSetupAccount} hitSlop={12} style={styles.secondaryWrap}>
-              <Text style={[styles.secondaryText, { color: colors.primary }]}>Set up an account →</Text>
+              <Text style={[styles.secondaryText, { color: colors.primary }]}>Créer un compte →</Text>
             </Pressable>
           ) : (
             <Pressable onPress={onDismiss} hitSlop={12} style={styles.secondaryWrap}>
-              <Text style={[styles.secondaryText, { color: colors.secondaryText }]}>Skip</Text>
+              <Text style={[styles.secondaryText, { color: colors.secondaryText }]}>Passer</Text>
             </Pressable>
           )}
         </Pressable>

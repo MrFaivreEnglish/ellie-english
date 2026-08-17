@@ -3,6 +3,29 @@ const ArticlesGrammar = {
   title: 'Les articles',
   description: 'Definite and indefinite articles: a, an, the and when to omit them',
   imageUrl: 'https://i.ibb.co/6RKTZVzq/Articles.png',
+  textContent: {
+    cards: [
+      {
+        eyebrow: 'The, a, an',
+        paragraph: "J'utilise un article devant un nom. Je montre si je parle de quelque chose de précis ou de général.",
+        tip: '**The** (article défini) = un nom précis ou connu. **A / an** (article indéfini) = un nom parmi d’autres. On utilise **an** devant un son voyelle.',
+        examples: [
+          { en: '**The** book on the table is mine.', fr: 'Le livre sur la table est à moi.' },
+          { en: 'I like **the** cake you made.', fr: 'J’aime le gâteau que tu as fait.' },
+          { en: 'I saw **a** dog.', fr: 'J’ai vu un chien.' },
+          { en: 'She eats **an** orange.', fr: 'Elle mange une orange.' },
+        ],
+      },
+      {
+        eyebrow: 'Pas d’article',
+        paragraph: 'Pas d’article devant un nom en général ou au pluriel.',
+        examples: [
+          { en: '**Dogs** are friendly.', fr: 'Les chiens sont gentils.' },
+          { en: 'I like **music**.', fr: 'J’aime la musique (en général).' },
+        ],
+      },
+    ],
+  },
 
   translateExercises: [
     {

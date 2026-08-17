@@ -3,6 +3,44 @@ const PresentIngGrammar = {
   title: 'Present ING',
   description: 'Learn how to use the present continuous tense',
   imageUrl: 'https://i.ibb.co/hxp1J2W9/Pr-sent-ING.png',
+  textContent: {
+    cards: [
+      {
+        eyebrow: 'À quoi ça sert',
+        paragraph: "Je parle de ce qui est en train de se passer (ou non).",
+        tip: 'Formule : sujet + be au présent + verbe-ing.',
+        columns: [
+          {
+            label: '1/ Je repère le sujet et le pronom correspondant',
+            accent: 'blue',
+            rows: ['I', 'You', 'He / She / It', 'We', 'They'],
+          },
+          {
+            label: '2/ Je conjugue BE au présent',
+            accent: 'coral',
+            rows: ['**am**', 'are', '**is**', 'are', 'are'],
+          },
+          {
+            label: "3/ J'ajoute la terminaison -ING au verbe",
+            accent: 'teal',
+            rows: ['visiting', 'speaking', 'being', 'dancing', 'Etc.'],
+          },
+        ],
+        examples: [
+          { en: '**I am dancing** with her.', fr: 'Je suis en train de danser avec elle.' },
+          { en: '**Anna is visiting** London.', fr: 'Anna est en train de visiter Londres.' },
+        ],
+      },
+      {
+        eyebrow: 'Le négatif',
+        paragraph: "Pour la forme négative, j'ajoute « not » après be.",
+        examples: [
+          { en: "**We aren't talking**.", fr: 'Nous ne sommes pas en train de parler.' },
+          { en: "**Owen is not eating** a bagel.", fr: "Owen n'est pas en train de manger..." },
+        ],
+      },
+    ],
+  },
 translateExercises: [
   {
     type: 'translate',

@@ -18,7 +18,6 @@ import { scaleValue } from '../shared/responsiveLayout';
 import { useLessonLayout, VocabularyMode } from './useLessonLayout';
 import { markPracticeActivityToday } from '../progress/xpStorage';
 import { saveLastLesson } from '../progress/lastLessonStorage';
-import { getLevelDisplayLabel, isMasterLevel } from '../progress/xpLevels';
 import { triggerSelectionHaptic, triggerSuccessHaptic } from '../shared/haptics';
 import {
   getLearnedFlashcardKeys,
@@ -26,6 +25,8 @@ import {
   saveLearnedFlashcardKeys,
 } from './flashcardProgressStorage';
 import { getSoftShadow, uiRadii } from '../shared/uiPrimitives';
+import { FRESH_COLORS } from '../shared/freshDirection';
+import SoundWaveIcon from '../shared/SoundWaveIcon';
 import type { CompositeScreenProps } from '@react-navigation/native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import type { VocabularyStackParamList, RootStackParamList } from '../../types/navigationTypes';
@@ -48,8 +49,14 @@ type Props = CompositeScreenProps<
   NativeStackScreenProps<RootStackParamList>
 >;
 
+const fmtMs = (ms: number) => {
+  const m = Math.floor(ms / 60000);
+  const s = Math.floor((ms % 60000) / 1000);
+  return `${m}:${s < 10 ? '0' : ''}${s}`;
+};
+
 export default function VocabularyLessonScreen({ route, navigation }: Props) {
-  const { isDarkMode, colors, isVocabTimerMode, isVocabTimerRecordSavingEnabled, isAndroidStatusBarEnabled } = useTheme();
+  const { isDarkMode, colors, isVocabTimerMode, isVocabTimerRecordSavingEnabled, isAndroidStatusBarEnabled, isVocabAudioMatchMode, toggleVocabAudioMatchMode } = useTheme();
   const initialRouteMode = resolveVocabularyMode(route?.params?.initialMode);
   const { width: screenWidth, height: rawScreenHeight } = useWindowDimensions();
   const [mode, setMode] = useState<VocabularyMode>(initialRouteMode);
@@ -60,9 +67,9 @@ export default function VocabularyLessonScreen({ route, navigation }: Props) {
 
   const { lesson, backLabel = 'Back to Vocabulary', backTarget } = route.params;
   const hasMatchingCategoryControls = Array.isArray((lesson?.flashcards?.[0] as any)?.words);
+  const useRefillMatching = !!lesson?.useRefillMatching;
 
   const {
-    insets,
     useApkPreviewLayout,
     isAndroidLesson,
     isWebLessonLayout,
@@ -201,6 +208,10 @@ export default function VocabularyLessonScreen({ route, navigation }: Props) {
   const scrollViewRef = useRef<ScrollView>(null);
   const overviewHeightRef = useRef(0);
   const secondViewYRef = useRef(0);
+  const lastLessonScrollYRef = useRef(0);
+  const lastLessonScrollDirectionRef = useRef<'up' | 'down'>('down');
+  const secondViewThresholdRef = useRef(0);
+  const isManualLessonScrollRef = useRef(false);
   const matchingViewportLockRef = useRef({ width: screenWidth, height: lessonViewportHeight });
   const initializedLessonKeyRef = useRef<string | null>(null);
   const pendingKeyboardHideScrollModeRef = useRef<VocabularyMode | null>(null);
@@ -260,6 +271,8 @@ export default function VocabularyLessonScreen({ route, navigation }: Props) {
   const [seenBackFlashcardKeys, setSeenBackFlashcardKeys] = useState<Set<string>>(new Set());
   const [flashcardProgressModeEnabled, setFlashcardProgressModeEnabled] = useState(false);
   const [categoryPickerOpen, setCategoryPickerOpen] = useState(false);
+  const [categoryPickerAnchor, setCategoryPickerAnchor] = useState({ x: 16, y: 0, width: 200, height: 40 });
+  const categoryPickerButtonRef = useRef<View>(null);
 
   // Words
   const allWords = useMemo(() => {
@@ -286,8 +299,6 @@ const categories = useMemo<string[]>(() => {
   const [selectedCategories, setSelectedCategories] = useState<string[]>([]);
   const previousLessonIdentityRef = useRef(lessonIdentity);
   const allowMultiCategorySelection = !!lesson?.allowMultiCategorySelection;
-  const categoryPickerTitle =
-    typeof lesson?.categoryPickerTitle === 'string' ? lesson.categoryPickerTitle : 'Select category';
   const categoryPickerLabel =
     typeof lesson?.categoryPickerLabel === 'string' ? lesson.categoryPickerLabel : 'Category';
   const categoryPickerAllLabel =
@@ -337,6 +348,22 @@ const categories = useMemo<string[]>(() => {
     return [];
   }, [lesson?.isVocabularyMix, lesson?.sourceLessonImageCards, lesson?.sourceLessonImages]);
   const shouldShowMixedImageCarousel = !selectedCategoryImage && mixedLessonImageCards.length > 1;
+
+  // Prefetch every slide up front so swiping the carousel doesn't re-trigger
+  // the "Loading picture…" placeholder for images that are about to be seen.
+  useEffect(() => {
+    if (!shouldShowMixedImageCarousel) return;
+
+    let cancelled = false;
+    mixedLessonImageCards.forEach((imageCard) => {
+      if (cancelled) return;
+      Image.prefetch(imageCard.imageUrl).catch(() => {});
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [mixedLessonImageCards, shouldShowMixedImageCarousel]);
 
   // Hero image selection
   const localImageSource = useMemo(() => getLessonThumbnailSource(lesson), [lesson]);
@@ -435,7 +462,8 @@ const categories = useMemo<string[]>(() => {
     timerMode,
     mode === 'matching',
     activeCategoryKey,
-    isVocabTimerRecordSavingEnabled
+    isVocabTimerRecordSavingEnabled,
+    useRefillMatching
   );
 
   const focusCleanupRef = useRef({ stopTimer, resetGameState, setGameState });
@@ -450,6 +478,10 @@ const categories = useMemo<string[]>(() => {
   }, [gameState.bestTimeByCategory, activeCategoryKey]);
 
   const allSetsCompleted = useMemo(() => {
+    if (useRefillMatching) {
+      return filteredWords.length > 0 && gameState.totalScore >= filteredWords.length;
+    }
+
     return (
       gameState.currentSet >= getMatchingSetCount(filteredWords.length) - 1 &&
       gameState.matchedPairs.length === (matchingGamePairs?.english?.length || 0) * 2 &&
@@ -458,8 +490,10 @@ const categories = useMemo<string[]>(() => {
   }, [
     gameState.currentSet,
     gameState.matchedPairs.length,
+    gameState.totalScore,
     matchingGamePairs?.english?.length,
     filteredWords.length,
+    useRefillMatching,
   ]);
   const currentFlashcardWord = shuffledFlashcards[currentWordIndex] ?? null;
   const currentFlashcardKey = currentFlashcardWord ? vocabularyWordKey(currentFlashcardWord) : null;
@@ -471,7 +505,6 @@ const categories = useMemo<string[]>(() => {
     ),
     [filteredWords, learnedFlashcardKeys]
   );
-  const flashcardsComplete = filteredWords.length > 0 && knownFlashcardKeys.size >= filteredWords.length;
   const matchingUnlocked = true;
   const typingUnlocked = true;
   const currentWordReadyToMarkKnown = !!currentFlashcardKey && seenBackFlashcardKeys.has(currentFlashcardKey);
@@ -643,8 +676,6 @@ const categories = useMemo<string[]>(() => {
     .toLowerCase()
     .includes('irregular verbs');
   const typingGame = useTypingGame(typingWords, { allowSlashAlternatives: allowTypingSlashAlternatives });
-  const typingLevelLabel = getLevelDisplayLabel(typingGame.level);
-  const isTypingLevelMaster = isMasterLevel(typingGame.level);
   useEffect(() => {
     if (mode === 'typing') {
       typingGame.reset?.();
@@ -670,6 +701,7 @@ const categories = useMemo<string[]>(() => {
     initializedLessonKeyRef.current = lessonKey;
 
     const scrollToInitialMode = (animated: boolean) => {
+      isManualLessonScrollRef.current = false;
       if (initialRouteMode === 'flashcards') {
         scrollViewRef.current?.scrollTo({ y: 0, animated });
         return;
@@ -712,6 +744,7 @@ const categories = useMemo<string[]>(() => {
   ]);
 
   const scrollToGame = useCallback((targetMode: VocabularyMode = mode, animated = true) => {
+    isManualLessonScrollRef.current = false;
     const snapExtra = getModeSnapExtra(targetMode);
     const targetY = getSecondViewScrollY(STICKY_TOP_SNAP_OFFSET + snapExtra);
 
@@ -720,17 +753,11 @@ const categories = useMemo<string[]>(() => {
     }
 
     requestAnimationFrame(() => {
-      scrollViewRef.current?.scrollTo({
-        y: targetY,
-        animated,
-      });
+      scrollViewRef.current?.scrollTo({ y: targetY, animated });
     });
 
     setTimeout(() => {
-      scrollViewRef.current?.scrollTo({
-        y: targetY,
-        animated,
-      });
+      scrollViewRef.current?.scrollTo({ y: targetY, animated });
     }, 180);
   }, [getModeSnapExtra, getSecondViewScrollY, useReservedModeShell, STICKY_TOP_SNAP_OFFSET, mode]);
 
@@ -877,22 +904,6 @@ const goToPrevWord = () => {
     scrollToGame('matching');
   };
 
-  const resetLessonModeProgress = () => {
-    setKnownFlashcardKeys(new Set());
-    setReviewFlashcardKeys(new Set());
-    setSeenBackFlashcardKeys(new Set());
-    setFlashcardProgressModeEnabled(false);
-    setCompletionVisible(false);
-    setFlashcardDeckWords(filteredWords);
-    setShuffledFlashcards(filteredWords);
-    setCurrentWordIndex(0);
-    setIsFlipped(false);
-    setIsFlashcardDeckShuffled(false);
-    resetGameState();
-    initializeGameSet();
-    typingGame.reset?.();
-  };
-
   const handleToggleCurrentFlashcardLearned = () => {
     const currentWord = shuffledFlashcards[currentWordIndex];
     if (!currentWord) return;
@@ -934,7 +945,6 @@ const goToPrevWord = () => {
 
     const key = vocabularyWordKey(currentWord);
     const alreadyKnown = knownFlashcardKeys.has(key);
-    const nextKnownCount = alreadyKnown ? knownFlashcardKeys.size : knownFlashcardKeys.size + 1;
 
     if (!alreadyKnown) {
       void markPracticeActivityToday(`vocabulary:flashcard:${lesson.title}:${key}`);
@@ -1008,14 +1018,6 @@ const goToPrevWord = () => {
     }
   };
 
-  const handleContinueToTyping = () => {
-    triggerSelectionHaptic();
-    setCompletionVisible(false);
-    Keyboard.dismiss();
-    setMode('typing');
-    scrollToGame('typing');
-  };
-
   const handleLessonTypingComplete = () => {};
 
   const handleGoToAccount = useCallback(() => {
@@ -1073,11 +1075,16 @@ const goToPrevWord = () => {
 
     return (
       <TouchableOpacity
+        ref={categoryPickerButtonRef}
         activeOpacity={0.82}
         onPress={() => {
           triggerSelectionHaptic();
           Keyboard.dismiss();
-          setCategoryPickerOpen((current) => !current);
+          if (categoryPickerOpen) { setCategoryPickerOpen(false); return; }
+          categoryPickerButtonRef.current?.measureInWindow((x, y, width, height) => {
+            setCategoryPickerAnchor({ x, y, width, height });
+            setCategoryPickerOpen(true);
+          });
         }}
         accessibilityRole="button"
         accessibilityLabel={`Choose ${categoryPickerLabel.toLowerCase()}`}
@@ -1097,7 +1104,7 @@ const goToPrevWord = () => {
           adjustsFontSizeToFit
           minimumFontScale={0.82}
         >
-          {categoryPickerLabel}: {activeCategoryLabel}
+          {selectedCategories.length ? activeCategoryLabel : `${categoryPickerLabel}: ${activeCategoryLabel}`}
         </Text>
         <MaterialIcons
           name={categoryPickerOpen ? 'expand-less' : 'expand-more'}
@@ -1126,39 +1133,94 @@ const goToPrevWord = () => {
           isAndroidLesson && styles.progressModeButtonAndroid,
           {
             backgroundColor: flashcardProgressModeEnabled
-              ? (colors.successSoft ?? colors.surfaceAlt)
+              ? (isDarkMode ? '#0E2E1E' : '#dbfce0')
               : (isDarkMode ? colors.surface : colors.card),
-            borderColor: flashcardProgressModeEnabled ? colors.success : colors.border,
+            borderColor: flashcardProgressModeEnabled ? '#5cb572' : colors.border,
           },
         ]}
       >
-        <MaterialIcons
-          name={flashcardProgressModeEnabled ? 'toggle-on' : 'toggle-off'}
-          size={18}
-          color={flashcardProgressModeEnabled ? colors.success : colors.secondaryText}
-        />
+        <View
+          style={[
+            styles.progressModeCheckbox,
+            {
+              backgroundColor: flashcardProgressModeEnabled ? '#1c8742' : 'transparent',
+              borderColor: flashcardProgressModeEnabled ? '#1c8742' : (isDarkMode ? colors.border : '#CCC5B5'),
+            },
+          ]}
+        >
+          {flashcardProgressModeEnabled && (
+            <MaterialIcons name="check" size={10} color="#FFFFFF" />
+          )}
+        </View>
         <Text
           style={[
             styles.progressModeText,
-            { color: flashcardProgressModeEnabled ? (colors.successText ?? colors.success) : colors.text },
+            { color: flashcardProgressModeEnabled ? (isDarkMode ? '#8FE3A3' : '#005f21') : colors.text },
           ]}
           numberOfLines={1}
           adjustsFontSizeToFit
           minimumFontScale={0.82}
         >
-          Save words
+          {flashcardProgressModeEnabled
+            ? `Saving · ${learnedFlashcardKeysLoaded ? learnedFlashcardCount : 0}/${filteredWords.length}`
+            : 'Save words'}
         </Text>
-        <Text
+      </TouchableOpacity>
+    );
+  };
+
+  const renderAudioMatchToggle = () => {
+    if (mode !== 'matching') return null;
+
+    const audioAccent = isDarkMode ? '#4BBAF4' : FRESH_COLORS.exerciseBlue;
+
+    return (
+      <TouchableOpacity
+        activeOpacity={0.82}
+        onPress={() => {
+          triggerSelectionHaptic();
+          toggleVocabAudioMatchMode();
+          // Audio and text match are treated as separate, standalone rounds —
+          // switching mid-round would let a player who's already seen the
+          // text carry that knowledge into audio mode (or vice versa), so
+          // force a fresh shuffle every time the toggle changes.
+          Keyboard.dismiss();
+          stopTimer();
+          resetGameState();
+          initializeGameSet();
+        }}
+        accessibilityRole="switch"
+        accessibilityLabel={isVocabAudioMatchMode ? 'Turn off audio match mode' : 'Turn on audio match mode'}
+        accessibilityState={{ checked: isVocabAudioMatchMode }}
+        style={[
+          styles.audioMatchToggle,
+          {
+            backgroundColor: isDarkMode ? '#1D252E' : colors.card,
+            borderColor: isDarkMode ? 'transparent' : colors.border,
+            borderWidth: isDarkMode ? 0 : 1,
+          },
+        ]}
+      >
+        {compactModeButtons ? (
+          <SoundWaveIcon size={15} color={audioAccent} />
+        ) : (
+          <Text style={[styles.audioMatchToggleText, { color: colors.text }]} numberOfLines={1}>
+            Audio Mode
+          </Text>
+        )}
+        <View
           style={[
-            styles.progressModeMeta,
-            { color: flashcardProgressModeEnabled ? (colors.successText ?? colors.success) : colors.secondaryText },
+            styles.audioMatchSwitchTrack,
+            { backgroundColor: isVocabAudioMatchMode ? audioAccent : (isDarkMode ? '#262F38' : colors.border) },
           ]}
-          numberOfLines={1}
-          adjustsFontSizeToFit
-          minimumFontScale={0.86}
         >
-          {flashcardProgressModeEnabled ? (learnedFlashcardKeysLoaded ? `${learnedFlashcardCount}/${filteredWords.length}` : '-') : 'Off'}
-        </Text>
+          <View
+            style={[
+              styles.audioMatchSwitchKnob,
+              { left: isVocabAudioMatchMode ? 15 : 2.5 },
+            ]}
+          />
+        </View>
       </TouchableOpacity>
     );
   };
@@ -1166,8 +1228,9 @@ const goToPrevWord = () => {
   const renderCategoryControls = () => {
     const categoryButton = renderCategoryPickerButton();
     const progressButton = renderFlashcardProgressButton();
+    const audioToggle = renderAudioMatchToggle();
 
-    if (!categoryButton && !progressButton) return null;
+    if (!categoryButton && !progressButton && !audioToggle) return null;
 
     return (
       <View
@@ -1180,6 +1243,7 @@ const goToPrevWord = () => {
       >
         {categoryButton}
         {progressButton}
+        {audioToggle}
       </View>
     );
   };
@@ -1200,9 +1264,9 @@ const goToPrevWord = () => {
           <View
             style={[
               styles.modeButtons,
-              showSideActions && styles.modeButtonsWithFloatingActions,
               compactModeButtons && styles.modeButtonsCompact,
-              isScaledWebLesson && { maxWidth: scaleValue(showSideActions ? 460 : 520, webLessonScale) },
+              isScaledWebLesson && { maxWidth: scaleValue(380, webLessonScale) },
+              { backgroundColor: isDarkMode ? colors.surface : '#ECE8DD' },
             ]}
           >
           {[
@@ -1221,11 +1285,10 @@ const goToPrevWord = () => {
                   isAndroidLesson && styles.modeButtonAndroid,
                   compactModeButtons && styles.modeButtonCompact,
                   {
-                    backgroundColor: isDarkMode ? colors.surface : colors.card,
-                    borderColor: colors.borderStrong,
-                    shadowColor: active ? colors.primary : '#000',
+                    backgroundColor: 'transparent',
+                    borderColor: 'transparent',
+                    borderWidth: 0,
                   },
-                  getSoftShadow(isDarkMode, active ? 'raised' : 'soft'),
                   isScaledWebLesson && {
                     marginHorizontal: scaleValue(8, webLessonScale),
                     paddingVertical: scaleValue(10, webLessonScale),
@@ -1233,9 +1296,8 @@ const goToPrevWord = () => {
                   active && [
                     styles.activeMode,
                     {
-                      backgroundColor: colors.buttonBackground,
-                      borderColor: colors.primary,
-                      shadowColor: colors.buttonBackground,
+                      backgroundColor: isDarkMode ? colors.card : '#FFFFFF',
+                      borderColor: 'transparent',
                     },
                   ],
                 ]}
@@ -1244,21 +1306,15 @@ const goToPrevWord = () => {
                 accessibilityLabel={`Switch to ${item.label}`}
                 accessibilityState={{ selected: active }}
               >
-                <MaterialIcons
-                  name={item.icon}
-                  size={compactModeButtons ? 15 : 18}
-                  color={active ? colors.buttonText : colors.primary}
-                />
                 <Text
                   style={[
                     styles.modeText,
                     compactModeButtons && styles.modeTextCompact,
                     isAndroidLesson && styles.modeTextAndroid,
                     isAndroidLesson && compactModeButtons && styles.modeTextCompactAndroid,
-                    { color: active ? colors.buttonText : colors.text },
+                    { color: active ? (isDarkMode ? '#3FA0DB' : FRESH_COLORS.exerciseBlue) : colors.secondaryText, fontWeight: active ? '800' : '600' },
                     isDesktopWebLesson && styles.modeTextDesktopWeb,
                     isScaledWebLesson && { fontSize: scaleValue(16, webLessonScale) },
-                    active && styles.modeTextActive,
                   ]}
                   numberOfLines={1}
                   allowFontScaling={false}
@@ -1334,17 +1390,38 @@ const goToPrevWord = () => {
 
   const handleLessonScroll = useCallback((event: any) => {
     const y = event.nativeEvent.contentOffset?.y ?? 0;
+    const previousY = lastLessonScrollYRef.current;
+    lastLessonScrollYRef.current = y;
+    if (y > previousY + 0.5) lastLessonScrollDirectionRef.current = 'down';
+    if (y < previousY - 0.5) lastLessonScrollDirectionRef.current = 'up';
     if (overviewHeightRef.current <= 0) return;
 
     const secondViewThreshold = isAndroidLesson
       ? Math.max(0, (secondViewYRef.current || overviewHeightRef.current + layoutTopInset) - 2)
       : Math.max(0, overviewHeightRef.current - stickyHeaderHeight - 2);
+    secondViewThresholdRef.current = secondViewThreshold;
     const nextIsSecondViewActive = y >= secondViewThreshold;
 
     setIsSecondViewActive((current) => (
       current === nextIsSecondViewActive ? current : nextIsSecondViewActive
     ));
+
   }, [isAndroidLesson, layoutTopInset, stickyHeaderHeight]);
+
+  const handleManualLessonScrollStart = useCallback(() => {
+    isManualLessonScrollRef.current = true;
+  }, []);
+
+  const handleManualLessonScrollEnd = useCallback(() => {
+    if (!isManualLessonScrollRef.current) return;
+    isManualLessonScrollRef.current = false;
+
+    const secondViewThreshold = secondViewThresholdRef.current;
+    if (!isTypingKeyboardOpen && lastLessonScrollDirectionRef.current === 'down' && lastLessonScrollYRef.current > secondViewThreshold + 1) {
+      lastLessonScrollYRef.current = secondViewThreshold;
+      scrollViewRef.current?.scrollTo({ y: secondViewThreshold, animated: false });
+    }
+  }, [isTypingKeyboardOpen]);
 
   const renderSecondViewContent = (placement: 'flow' | 'stage' = 'flow') => {
     const isStage = placement === 'stage';
@@ -1465,8 +1542,10 @@ const goToPrevWord = () => {
                 bestTimeForActiveCategory={bestTimeForActiveCategory}
                 matchingSessionXp={matchingSessionXp}
                 lastMatchingXpGain={lastMatchingXpGain}
+                refillOnMatch={useRefillMatching}
                 availableHeight={matchingViewportMinHeight}
                 forceAndroidLayout={useApkPreviewLayout}
+                audioMode={isVocabAudioMatchMode}
               />
 
               {completionModalReady && (
@@ -1483,9 +1562,18 @@ const goToPrevWord = () => {
                   startedTimerMode={startedTimerMode}
                   bestTimeForActiveCategory={bestTimeForActiveCategory}
                   matchingSessionXp={matchingSessionXp}
+                  statsItems={timerMode ? [
+                    { emoji: '✨', value: matchingSessionXp, label: 'XP' },
+                    { emoji: '⏱', value: fmtMs(gameState.timer), label: 'Time' },
+                    { emoji: '🏆', value: bestTimeForActiveCategory != null ? fmtMs(bestTimeForActiveCategory) : '--:--', label: 'Best' },
+                  ] : [
+                    { emoji: '✨', value: matchingSessionXp, label: 'XP Earned' },
+                  ]}
                   reviewWords={matchingReviewWords}
                   onReviewWords={() => reviewFlashcardWords(matchingReviewWords)}
                   onGoToAccount={handleGoToAccount}
+                  secondaryActionLabel="Back to Vocabulary"
+                  onSecondaryAction={handleBackPress}
                 />
               )}
             </View>
@@ -1522,6 +1610,7 @@ const goToPrevWord = () => {
                 onShuffle={handleShuffleTypingWords}
                 onSessionComplete={handleLessonTypingComplete}
                 onGoToAccount={handleGoToAccount}
+                onBack={handleBackPress}
               />
             </View>
           )}
@@ -1545,6 +1634,12 @@ const goToPrevWord = () => {
           paddingBottom: scrollBottomPadding + typingKeyboardInset,
         }}
         onScroll={handleLessonScroll}
+        onScrollBeginDrag={handleManualLessonScrollStart}
+        onScrollEndDrag={handleManualLessonScrollEnd}
+        {...(Platform.OS === 'web' ? ({
+          onWheel: handleManualLessonScrollStart,
+          onScrollEnd: handleManualLessonScrollEnd,
+        } as any) : {})}
         scrollEventThrottle={16}
         keyboardShouldPersistTaps="always"
         bounces={false}
@@ -1690,7 +1785,10 @@ const goToPrevWord = () => {
               isWebLessonLayout ? styles.webStickyHeader : undefined,
               !isSecondViewActive && styles.stickyHeaderFirstView,
               isWebLessonLayout && !isSecondViewActive ? styles.webStickyHeaderFirstView : undefined,
-              { backgroundColor: colors.background, paddingTop: stickyHeaderPinnedTopPadding },
+              {
+                backgroundColor: colors.background,
+                paddingTop: stickyHeaderPinnedTopPadding,
+              },
             ]}
             onLayout={(event) => {
               secondViewYRef.current = event.nativeEvent.layout.y;
@@ -1837,8 +1935,10 @@ const goToPrevWord = () => {
               bestTimeForActiveCategory={bestTimeForActiveCategory}
               matchingSessionXp={matchingSessionXp}
               lastMatchingXpGain={lastMatchingXpGain}
+              refillOnMatch={useRefillMatching}
               availableHeight={matchingViewportMinHeight}
               forceAndroidLayout={useApkPreviewLayout}
+              audioMode={isVocabAudioMatchMode}
             />
 
             {completionModalReady && (
@@ -1855,8 +1955,17 @@ const goToPrevWord = () => {
                 startedTimerMode={startedTimerMode}
                 bestTimeForActiveCategory={bestTimeForActiveCategory}
                 matchingSessionXp={matchingSessionXp}
+                statsItems={timerMode ? [
+                  { emoji: '✨', value: matchingSessionXp, label: 'XP' },
+                  { emoji: '⏱', value: fmtMs(gameState.timer), label: 'Time' },
+                  { emoji: '🏆', value: bestTimeForActiveCategory != null ? fmtMs(bestTimeForActiveCategory) : '--:--', label: 'Best' },
+                ] : [
+                  { emoji: '✨', value: matchingSessionXp, label: 'XP Earned' },
+                ]}
                 reviewWords={matchingReviewWords}
                 onReviewWords={() => reviewFlashcardWords(matchingReviewWords)}
+                secondaryActionLabel="Back to Vocabulary"
+                onSecondaryAction={handleBackPress}
               />
             )}
             </View>
@@ -1893,6 +2002,7 @@ const goToPrevWord = () => {
               onShuffle={handleShuffleTypingWords}
               onSessionComplete={handleLessonTypingComplete}
               onGoToAccount={handleGoToAccount}
+              onBack={handleBackPress}
             />
             </View>
           )}
@@ -1900,76 +2010,74 @@ const goToPrevWord = () => {
         </View>
         )}
       </ScrollView>
-      <Modal visible={categoryPickerOpen} transparent animationType="slide">
+      <Modal visible={categoryPickerOpen} transparent animationType="fade">
         <TouchableOpacity
           activeOpacity={1}
-          style={styles.categorySheetBackdrop}
+          style={styles.categoryPopoverBackdrop}
           onPress={() => setCategoryPickerOpen(false)}
         >
           <TouchableOpacity
             activeOpacity={1}
             style={[
-              styles.categorySheet,
+              styles.categoryPopover,
+              getSoftShadow(isDarkMode, 'strong'),
               {
                 backgroundColor: colors.card,
                 borderColor: colors.border,
-                paddingBottom: Math.max(insets.bottom, 16),
+                shadowColor: '#000',
+                top: categoryPickerAnchor.y + categoryPickerAnchor.height + 8,
+                left: Math.max(16, categoryPickerAnchor.x),
               },
             ]}
             onPress={() => {}}
           >
-            <View style={styles.categorySheetHeader}>
-              <Text style={[styles.categorySheetTitle, { color: colors.text }]}>{categoryPickerTitle}</Text>
-              <TouchableOpacity
-                onPress={() => setCategoryPickerOpen(false)}
-                style={styles.categorySheetDoneButton}
-                accessibilityRole="button"
-                accessibilityLabel="Close category picker"
-              >
-                <Text style={[styles.categorySheetDoneText, { color: colors.primary }]}>Done</Text>
-              </TouchableOpacity>
-            </View>
+            <ScrollView style={styles.categoryPopoverScroll} bounces={false}>
+              {[categoryPickerAllLabel, ...categories].map((cat) => {
+                const active =
+                  (cat === categoryPickerAllLabel && selectedCategories.length === 0) ||
+                  selectedCategories.includes(cat);
+                const isAllOption = cat === categoryPickerAllLabel;
 
-            {[categoryPickerAllLabel, ...categories].map((cat) => {
-              const active =
-                (cat === categoryPickerAllLabel && selectedCategories.length === 0) ||
-                selectedCategories.includes(cat);
-              const isAllOption = cat === categoryPickerAllLabel;
-
-              return (
-                <TouchableOpacity
-                  key={cat}
-                  onPress={() => toggleCategory(cat)}
-                  accessibilityRole="button"
-                  accessibilityLabel={`Select ${cat}`}
-                  accessibilityState={{ selected: active }}
-                  style={[
-                    styles.categorySheetOption,
-                    {
-                      backgroundColor: active ? colors.primarySoft : 'transparent',
-                      borderColor: colors.border,
-                    },
-                  ]}
-                >
-                  <MaterialIcons
-                    name={
-                      active
-                        ? allowMultiCategorySelection && !isAllOption
-                          ? 'check-box'
-                          : 'check-circle'
-                        : allowMultiCategorySelection && !isAllOption
-                          ? 'check-box-outline-blank'
-                          : 'radio-button-unchecked'
-                    }
-                    size={20}
-                    color={active ? colors.primary : colors.secondaryText}
-                  />
-                  <Text style={[styles.categorySheetOptionText, { color: colors.text }]}>
-                    {cat}
-                  </Text>
-                </TouchableOpacity>
-              );
-            })}
+                return (
+                  <TouchableOpacity
+                    key={cat}
+                    onPress={() => toggleCategory(cat)}
+                    accessibilityRole="button"
+                    accessibilityLabel={`Select ${cat}`}
+                    accessibilityState={{ selected: active }}
+                    style={[
+                      styles.categorySheetOption,
+                      {
+                        backgroundColor: active ? (isDarkMode ? colors.primarySoft : '#d2f0ff') : 'transparent',
+                        borderColor: colors.border,
+                      },
+                    ]}
+                  >
+                    <MaterialIcons
+                      name={
+                        active
+                          ? allowMultiCategorySelection && !isAllOption
+                            ? 'check-box'
+                            : 'check-circle'
+                          : allowMultiCategorySelection && !isAllOption
+                            ? 'check-box-outline-blank'
+                            : 'radio-button-unchecked'
+                      }
+                      size={20}
+                      color={active ? colors.primary : colors.secondaryText}
+                    />
+                    <Text
+                      style={[
+                        styles.categorySheetOptionText,
+                        { color: colors.text, fontWeight: active ? '700' : '600' },
+                      ]}
+                    >
+                      {cat}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </ScrollView>
           </TouchableOpacity>
         </TouchableOpacity>
       </Modal>
@@ -2149,12 +2257,12 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     width: '100%',
-    maxWidth: 460,
+    maxWidth: 380,
     alignSelf: 'center',
     marginBottom: 0,
-  },
-  modeButtonsWithFloatingActions: {
-    paddingHorizontal: 44,
+    borderRadius: 999,
+    padding: 3,
+    gap: 2,
   },
   modeButtonsCompact: {
     maxWidth: '100%',
@@ -2162,8 +2270,8 @@ const styles = StyleSheet.create({
   imageShortcutButton: {
     width: 42,
     height: 42,
-    borderRadius: 8,
-    borderWidth: 2,
+    borderRadius: 12,
+    borderWidth: 1.5,
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: 0,
@@ -2208,8 +2316,8 @@ const styles = StyleSheet.create({
     gap: 3,
   },
   activeMode: {
-    backgroundColor: '#1F7AD1',
-    borderColor: '#155B9F',
+    backgroundColor: '#0D7DD4',
+    borderColor: '#005EB3',
   },
   modeButtonLocked: {
     opacity: 0.45,
@@ -2295,8 +2403,8 @@ const styles = StyleSheet.create({
     elevation: 6,
     height: 32,
     minHeight: 32,
-    borderRadius: 10,
-    borderWidth: 1,
+    borderRadius: 999,
+    borderWidth: 1.5,
     paddingHorizontal: 12,
     paddingVertical: 3,
     flexDirection: 'row',
@@ -2305,20 +2413,49 @@ const styles = StyleSheet.create({
     gap: 4,
     maxWidth: '100%',
   },
+  audioMatchToggle: {
+    flexShrink: 0,
+    height: 32,
+    minHeight: 32,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 7,
+    borderRadius: 999,
+    paddingHorizontal: 12,
+  },
+  audioMatchToggleText: {
+    fontSize: 13,
+    fontWeight: '700',
+  },
+  audioMatchSwitchTrack: {
+    width: 30,
+    height: 17,
+    borderRadius: 999,
+    position: 'relative',
+  },
+  audioMatchSwitchKnob: {
+    position: 'absolute',
+    top: 2.5,
+    width: 12,
+    height: 12,
+    borderRadius: 6,
+    backgroundColor: '#FFFFFF',
+  },
   categoryPickerButtonAndroid: {
     flexShrink: 1,
     minWidth: 0,
   },
   categoryPickerText: {
     fontSize: 13,
-    fontWeight: '600',
+    fontWeight: '700',
     flexShrink: 1,
   },
   progressModeButton: {
     height: 32,
     minHeight: 32,
-    borderRadius: 10,
-    borderWidth: 1,
+    borderRadius: 999,
+    borderWidth: 1.5,
     paddingHorizontal: 10,
     paddingVertical: 3,
     flexDirection: 'row',
@@ -2330,14 +2467,17 @@ const styles = StyleSheet.create({
     flexShrink: 0,
   },
   progressModeText: {
-    maxWidth: 118,
+    maxWidth: 140,
     fontSize: 13,
     fontWeight: '700',
   },
-  progressModeMeta: {
-    fontSize: 11,
-    fontWeight: '900',
-    textTransform: 'uppercase',
+  progressModeCheckbox: {
+    width: 16,
+    height: 16,
+    borderRadius: 5,
+    borderWidth: 1.5,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   categoryLabel: {
     fontSize: 15,
@@ -2440,8 +2580,8 @@ const styles = StyleSheet.create({
     marginRight: 10,
   },
   categoryChipActive: {
-    backgroundColor: '#1F7AD1',
-    borderColor: '#155B9F',
+    backgroundColor: '#0D7DD4',
+    borderColor: '#005EB3',
   },
   categoryText: {
     fontSize: 16,
@@ -2451,49 +2591,19 @@ const styles = StyleSheet.create({
   categoryTextActive: {
     color: '#ffffff',
   },
-  categorySheetBackdrop: {
+  categoryPopoverBackdrop: {
     flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.36)',
-    justifyContent: 'flex-end',
-    alignItems: 'center',
-    paddingHorizontal: 0,
   },
-  categorySheet: {
-    width: '100%',
-    maxWidth: 800,
-    borderTopLeftRadius: 22,
-    borderTopRightRadius: 22,
-    borderBottomLeftRadius: 0,
-    borderBottomRightRadius: 0,
+  categoryPopover: {
+    position: 'absolute',
+    width: 240,
+    maxHeight: 320,
+    borderRadius: 14,
     borderWidth: 1,
-    paddingTop: 14,
-    paddingHorizontal: 16,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: -4 },
-    shadowOpacity: 0.18,
-    shadowRadius: 12,
-    elevation: 12,
+    padding: 8,
   },
-  categorySheetHeader: {
-    minHeight: 42,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: 6,
-  },
-  categorySheetTitle: {
-    fontSize: 18,
-    fontWeight: '800',
-  },
-  categorySheetDoneButton: {
-    minHeight: 36,
-    paddingHorizontal: 10,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  categorySheetDoneText: {
-    fontSize: 15,
-    fontWeight: '700',
+  categoryPopoverScroll: {
+    maxHeight: 304,
   },
   categorySheetOption: {
     minHeight: 48,

@@ -1,13 +1,13 @@
 import React, { useMemo, useState } from 'react';
-import { Alert, View, Text, StyleSheet, Switch, Platform, ScrollView, Pressable, Modal, TextInput, TouchableOpacity, Linking, useWindowDimensions } from 'react-native';
+import { Alert, View, Text, StyleSheet, Platform, ScrollView, Pressable, Modal, TextInput, TouchableOpacity, Linking, useWindowDimensions } from 'react-native';
 import BackButton from '../shared/BackButton';
+import PillToggle from '../shared/PillToggle';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import type { RootStackParamList } from '../../types/navigationTypes';
 import { FontAwesome, MaterialIcons } from '@expo/vector-icons';
 import { useTheme } from './ThemeContext';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { clearVocabularyTimerBests } from '../vocabulary/vocabularyTimerStorage';
 import { getMenuCopy } from '../shared/menuCopy';
 import { ENABLE_SHINY_ELLIE_COLOR_MODE } from '../../lib/featureFlags';
 import { hapticsAreSupported } from '../shared/haptics';
@@ -25,8 +25,8 @@ const ANDROID_APK_DOWNLOAD_URL = 'https://github.com/MrFaivreEnglish/ellie-engli
 export default function SettingsScreen() {
   const ADMIN_PIN = '241711';
   const { 
-    isDarkMode, 
-    toggleTheme, 
+    isDarkMode,
+    toggleTheme,
     colors,
     isGrammarGameMode,
     toggleGrammarGameMode,
@@ -55,6 +55,7 @@ export default function SettingsScreen() {
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const insets = useSafeAreaInsets();
   const { width: windowWidth } = useWindowDimensions();
+  const isDesktopWeb = Platform.OS === 'web' && windowWidth >= 768;
   const topContentInset = Platform.OS === 'ios'
     ? (insets.top > 0 ? insets.top : 0)
     : Platform.OS === 'android' && isAndroidStatusBarEnabled
@@ -131,30 +132,6 @@ export default function SettingsScreen() {
     navigation.navigate('AdminLessonPreview');
   };
 
-  const resetVocabularyTimerBests = () => {
-    const runReset = async () => {
-      await clearVocabularyTimerBests();
-    };
-
-    if (Platform.OS === 'web') {
-      const confirmed = typeof window !== 'undefined'
-        ? window.confirm(copy.resetConfirmTitle)
-        : true;
-
-      if (confirmed) runReset();
-      return;
-    }
-
-    Alert.alert(
-      copy.resetConfirmTitle,
-      copy.resetConfirmMessage,
-      [
-        { text: copy.cancel, style: 'cancel' },
-        { text: copy.reset, style: 'destructive', onPress: runReset },
-      ]
-    );
-  };
-
   const renderSetting = ({
     icon,
     title,
@@ -182,14 +159,12 @@ export default function SettingsScreen() {
           </Text>
         </View>
       </View>
-      <Switch
+      <PillToggle
         value={value}
         onValueChange={onValueChange}
-        trackColor={{ false: '#767577', true: activeColor }}
-        thumbColor={value ? '#fff' : '#f4f3f4'}
-        accessibilityRole="switch"
+        activeColor={activeColor}
+        trackOffColor={colors.border}
         accessibilityLabel={title}
-        accessibilityState={{ checked: value }}
       />
     </View>
   );
@@ -202,6 +177,7 @@ export default function SettingsScreen() {
         paddingBottom: insets.bottom + 32,
       }}
     >
+      <View style={isDesktopWeb && styles.desktopContentWrap}>
       <BackButton label={commonCopy.backToHome} onPress={() => navigation.navigate('Home')} />
 
       <View style={styles.headerTitleRow}>
@@ -345,7 +321,7 @@ export default function SettingsScreen() {
             description: copy.timerModeDescription,
             value: isVocabTimerMode,
             onValueChange: toggleVocabTimerMode,
-            activeColor: '#FFB74D',
+            activeColor: colors.primary,
           })}
           {renderSetting({
             icon: 'save',
@@ -353,29 +329,8 @@ export default function SettingsScreen() {
             description: copy.saveBestTimesDescription,
             value: isVocabTimerRecordSavingEnabled,
             onValueChange: toggleVocabTimerRecordSaving,
-            activeColor: '#f4b942',
+            activeColor: colors.primary,
           })}
-          <View style={[styles.settingItem, { borderBottomColor: settingsRowBorder }]}>
-            <View style={styles.settingTextContainer}>
-              <View style={[styles.settingIconBox, { backgroundColor: settingsIconBackground }]}>
-                <MaterialIcons name="restore" size={20} color={settingsIconColor} />
-              </View>
-              <View style={styles.settingCopy}>
-                <Text style={[styles.settingText, { color: colors.text }]}>{copy.resetBestTimesTitle}</Text>
-                <Text style={[styles.settingDescription, { color: colors.secondaryText }]}>
-                  {copy.resetBestTimesDescription}
-                </Text>
-              </View>
-            </View>
-            <TouchableOpacity
-              onPress={resetVocabularyTimerBests}
-              style={[styles.actionButton, { backgroundColor: colors.primarySoft, borderColor: colors.primary }]}
-              accessibilityRole="button"
-              accessibilityLabel={copy.resetBestTimesTitle}
-            >
-              <Text style={[styles.actionButtonText, { color: colors.primary }]}>{copy.reset}</Text>
-            </TouchableOpacity>
-          </View>
           <Text
             style={[
               styles.subsectionTitle,
@@ -408,7 +363,7 @@ export default function SettingsScreen() {
             description: copy.grammarGameModeDescription,
             value: isGrammarGameMode,
             onValueChange: toggleGrammarGameMode,
-            activeColor: '#9575CD',
+            activeColor: colors.primary,
           })}
           {renderSetting({
             icon: 'record-voice-over',
@@ -416,7 +371,7 @@ export default function SettingsScreen() {
             description: copy.grammarSpeechDescription,
             value: isGrammarSpeechEnabled,
             onValueChange: toggleGrammarSpeech,
-            activeColor: '#9575CD',
+            activeColor: colors.primary,
           })}
         </View>
       </View>
@@ -431,7 +386,7 @@ export default function SettingsScreen() {
               description: copy.shinyEllieDescription,
               value: isShinyEllieMode,
               onValueChange: toggleShinyEllieMode,
-              activeColor: '#f4b942',
+              activeColor: colors.primary,
             })}
           </View>
         </View>
@@ -443,7 +398,7 @@ export default function SettingsScreen() {
         <Text style={[styles.creditsText, { color: colors.secondaryText }]}>
           - {copy.creditsConcept}{"\n"}
           - {copy.creditsImages}{"\n"}
-          - {copy.creditsBuiltWith}{"\n"}{"\n"}{"\n"}
+          - {copy.creditsBuiltWith}
         </Text>
         <Pressable
           onPress={handleAdminVersionPress}
@@ -453,6 +408,8 @@ export default function SettingsScreen() {
         >
           <Text style={[styles.versionTrigger, { color: colors.secondaryText }]}>{copy.version}</Text>
         </Pressable>
+        <Text style={[styles.creditsSchoolText, { color: colors.secondaryText }]}>{copy.creditsSchool}</Text>
+      </View>
       </View>
 
       <Modal visible={adminAccessEnabled && adminModalVisible} transparent animationType="fade" onRequestClose={closeAdminModal}>
@@ -553,6 +510,11 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
   },
+  desktopContentWrap: {
+    width: '100%',
+    maxWidth: 700,
+    alignSelf: 'center',
+  },
   headerTitle: {
     fontFamily: SETTINGS_FONT_FAMILY,
     fontSize: 30,
@@ -563,7 +525,7 @@ const styles = StyleSheet.create({
   },
   headerTitleRow: {
     paddingHorizontal: 20,
-    paddingBottom: 14,
+    paddingBottom: 24,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
@@ -617,7 +579,7 @@ const styles = StyleSheet.create({
   },
   sectionCard: {
     marginHorizontal: 16,
-    borderRadius: 14,
+    borderRadius: 18,
     borderWidth: 1,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 4 },
@@ -704,11 +666,11 @@ const styles = StyleSheet.create({
     paddingVertical: 7,
   },
   inlineChoiceButtonActive: {
-    backgroundColor: '#1F7AD1',
+    backgroundColor: '#0D7DD4',
   },
   inlineChoiceText: {
     fontFamily: SETTINGS_FONT_FAMILY,
-    color: '#1F7AD1',
+    color: '#0D7DD4',
     fontSize: 12,
     fontWeight: '700',
   },
@@ -744,13 +706,13 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     backgroundColor: '#EAF1FF',
     borderWidth: 1.5,
-    borderColor: '#1F7AD1',
+    borderColor: '#0D7DD4',
     alignItems: 'center',
     justifyContent: 'center',
   },
   actionButtonText: {
     fontFamily: SETTINGS_FONT_FAMILY,
-    color: '#1F7AD1',
+    color: '#0D7DD4',
     fontSize: 13,
     fontWeight: '700',
   },
@@ -780,6 +742,12 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '700',
     alignSelf: 'flex-start',
+  },
+  creditsSchoolText: {
+    fontFamily: SETTINGS_FONT_FAMILY,
+    marginTop: 4,
+    fontSize: 11,
+    fontWeight: '500',
   },
   adminModalBackdrop: {
     flex: 1,
@@ -902,7 +870,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 11,
     borderRadius: 12,
-    backgroundColor: '#1F7AD1',
+    backgroundColor: '#0D7DD4',
   },
   adminPrimaryButtonText: {
     fontFamily: SETTINGS_FONT_FAMILY,

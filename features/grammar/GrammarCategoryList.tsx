@@ -8,8 +8,15 @@ import {
   StyleSheet,
   Platform,
   TextInput,
+  UIManager,
+  LayoutAnimation,
   useWindowDimensions
 } from 'react-native';
+import Animated, { FadeIn, FadeInDown, FadeOut } from 'react-native-reanimated';
+import { useSpringPress } from '../shared/useSpringPress';
+import { useSelectPop } from '../shared/useSelectPop';
+import { useSearchFocusAnimation } from '../shared/useSearchFocusAnimation';
+import FloatingIcon from '../shared/FloatingIcon';
 import { useTheme, type ThemeColors } from '../settings/ThemeContext';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
@@ -86,6 +93,8 @@ const GrammarLessonRow = React.memo(({
 
     onSelectLesson(lesson);
   }, [lesson, onSelectLesson, onToggleLesson, selectable, selectionMode]);
+  const rowPress = useSpringPress();
+  const selectPopStyle = useSelectPop(selected);
   const isMixedGrammarLesson = !!lesson.isMixedGrammarLesson;
   const mixedLessonImageUrls: string[] = Array.isArray(lesson.sourceLessonImages)
     ? lesson.sourceLessonImages.filter((imageUrl: unknown): imageUrl is string => typeof imageUrl === 'string' && imageUrl.trim().length > 0)
@@ -97,7 +106,7 @@ const GrammarLessonRow = React.memo(({
   const [imageLoadFailed, setImageLoadFailed] = useState(false);
   const shouldRenderThumbnail = !isMixedGrammarLesson && imageSource && (!isRemoteImage || canLoadRemoteImage);
   const studySurface = getStudySurfaceColors(colors, isDarkMode);
-  const mixedLessonSurface = isDarkMode ? colors.surface : '#F8FAFF';
+  const mixedLessonSurface = isDarkMode ? colors.surface : '#FDFCFA';
   const mixedLessonBorder = isDarkMode ? '#FFFFFF' : colors.border;
   const mixedLessonIconSurface = studySurface.control;
   const mixedLessonMetaSurface = studySurface.control;
@@ -123,6 +132,10 @@ const GrammarLessonRow = React.memo(({
   }, [lesson.imageUrl]);
 
   return (
+    <Animated.View
+      entering={FadeInDown.delay(Math.min(rowIndex, 10) * 40).duration(300)}
+      style={[rowPress.animatedStyle, selectPopStyle]}
+    >
     <TouchableOpacity
       style={[
         styles.lessonItem,
@@ -133,7 +146,7 @@ const GrammarLessonRow = React.memo(({
           backgroundColor: isMixedGrammarLesson
             ? selected ? colors.primarySoft : mixedLessonSurface
             : selected ? colors.primarySoft
-            : isDarkMode ? colors.surface : '#F8FBFF',
+            : isDarkMode ? colors.surface : '#FDFCFA',
           borderColor: isMixedGrammarLesson
             ? selected ? colors.primary : mixedLessonBorder
             : selected ? colors.primary
@@ -144,6 +157,8 @@ const GrammarLessonRow = React.memo(({
       ]}
       activeOpacity={0.82}
       onPress={handlePress}
+      onPressIn={rowPress.onPressIn}
+      onPressOut={rowPress.onPressOut}
       accessibilityRole="button"
       accessibilityLabel={lesson.title}
       accessibilityState={{ selected }}
@@ -192,7 +207,7 @@ const GrammarLessonRow = React.memo(({
                 <View
                   style={[
                     styles.thumbnailSkeletonPanel,
-                    { backgroundColor: isDarkMode ? colors.card : '#F8FAFF' },
+                    { backgroundColor: isDarkMode ? colors.card : '#FDFCFA' },
                   ]}
                 />
                 <View
@@ -287,6 +302,7 @@ const GrammarLessonRow = React.memo(({
         />
       )}
     </TouchableOpacity>
+    </Animated.View>
   );
 });
 
@@ -323,6 +339,7 @@ const GrammarCategoryList: React.FC<{ onSelectLesson: (lesson: GrammarLesson) =>
   const insets = useSafeAreaInsets();
   const navigation = useNavigation();
   const { width: windowWidth } = useWindowDimensions();
+  const isDesktopWeb = Platform.OS === 'web' && windowWidth >= 768;
   const { colors, isDarkMode, isAndroidStatusBarEnabled } = useTheme();
   const appCopy = getMenuCopy();
   const copy = appCopy.grammar;
@@ -389,8 +406,15 @@ const GrammarCategoryList: React.FC<{ onSelectLesson: (lesson: GrammarLesson) =>
     }, [lessonProgressKeys])
   );
 
-  const toggleSub = (key: string) =>
+  const toggleSub = (key: string) => {
+    if (Platform.OS === 'android') {
+      UIManager.setLayoutAnimationEnabledExperimental?.(true);
+    }
+    LayoutAnimation.configureNext(
+      LayoutAnimation.create(220, LayoutAnimation.Types.easeInEaseOut, LayoutAnimation.Properties.opacity)
+    );
     setExpandedSub(prev => ({ ...prev, [key]: !prev[key] }));
+  };
 
   const canSelectLessonForMix = (lesson: any) =>
     lesson.practiceType !== 'vocabulary' &&
@@ -524,6 +548,7 @@ const GrammarCategoryList: React.FC<{ onSelectLesson: (lesson: GrammarLesson) =>
   const searchSurfaceColor = studySurface.search;
   const searchBorderColor = studySurface.searchBorder;
   const searchActiveColor = studySurface.searchActive;
+  const searchFocusAnim = useSearchFocusAnimation(!!search.trim(), searchBorderColor, searchActiveColor);
   const visibleGrammarSections = grammarCategories
     .map((level) => ({
       key: level.group,
@@ -555,10 +580,13 @@ const GrammarCategoryList: React.FC<{ onSelectLesson: (lesson: GrammarLesson) =>
       bounces={false}
       alwaysBounceVertical={false}
       stickySectionHeadersEnabled={false}
-      contentContainerStyle={{
-        paddingTop: topContentInset,
-        paddingBottom: selectionMode ? 142 : 18,
-      }}
+      contentContainerStyle={[
+        {
+          paddingTop: topContentInset,
+          paddingBottom: selectionMode ? 142 : 18,
+        },
+        isDesktopWeb && styles.desktopContentWrap,
+      ]}
       ListHeaderComponent={(
         <>
           <BackButton label={commonCopy.backToHome} onPress={() => navigation.goBack()} />
@@ -594,21 +622,22 @@ const GrammarCategoryList: React.FC<{ onSelectLesson: (lesson: GrammarLesson) =>
             </TouchableOpacity>
           </View>
 
-          <View
+          <Animated.View
             style={[
               styles.searchShell,
               getInsetSurfaceStyle(colors, isDarkMode),
               {
                 backgroundColor: searchSurfaceColor,
-                borderColor: search.trim() ? searchActiveColor : searchBorderColor,
-                borderWidth: search.trim() ? 2 : 1.5,
                 borderRadius: uiRadii.control,
               },
+              searchFocusAnim.animatedStyle,
             ]}
           >
             <TextInput
               value={search}
               onChangeText={setSearch}
+              onFocus={searchFocusAnim.onFocus}
+              onBlur={searchFocusAnim.onBlur}
               placeholder={copy.searchPlaceholder}
               placeholderTextColor={colors.secondaryText}
               style={[
@@ -630,19 +659,20 @@ const GrammarCategoryList: React.FC<{ onSelectLesson: (lesson: GrammarLesson) =>
             </View>
 
             {search.length > 0 && (
-              <TouchableOpacity
-                onPress={() => setSearch('')}
-                style={styles.searchClearButton}
-                hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-              >
-                <MaterialIcons name="close" size={20} color={searchActiveColor} />
-              </TouchableOpacity>
+              <Animated.View entering={FadeIn.duration(140)} exiting={FadeOut.duration(110)} style={styles.searchClearButton}>
+                <TouchableOpacity
+                  onPress={() => setSearch('')}
+                  hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                >
+                  <MaterialIcons name="close" size={20} color={searchActiveColor} />
+                </TouchableOpacity>
+              </Animated.View>
             )}
-          </View>
+          </Animated.View>
 
           {!hasGrammarLessons && (
             <View style={[styles.searchEmptyState, { backgroundColor: colors.card, borderColor: colors.border }]}>
-              <MaterialIcons name="menu-book" size={28} color={colors.secondaryText} />
+              <FloatingIcon name="menu-book" size={28} color={colors.secondaryText} />
               <Text style={[styles.searchEmptyTitle, { color: colors.text }]}>{copy.noLessonTitle}</Text>
               <Text style={[styles.searchEmptySubtitle, { color: colors.secondaryText }]}>
                 {copy.noLessonText}
@@ -652,7 +682,7 @@ const GrammarCategoryList: React.FC<{ onSelectLesson: (lesson: GrammarLesson) =>
 
           {hasGrammarLessons && !hasSearchResults && (
             <View style={[styles.searchEmptyState, { backgroundColor: colors.card, borderColor: colors.border }]}>
-              <MaterialIcons name="search-off" size={28} color={colors.secondaryText} />
+              <FloatingIcon name="search-off" size={28} color={colors.secondaryText} />
               <Text style={[styles.searchEmptyTitle, { color: colors.text }]}>{copy.noSearchTitle}</Text>
               <Text style={[styles.searchEmptySubtitle, { color: colors.secondaryText }]}>
                 {copy.noSearchText}
@@ -680,11 +710,9 @@ const GrammarCategoryList: React.FC<{ onSelectLesson: (lesson: GrammarLesson) =>
             style={[
               styles.categoryContainer,
               getPanelStyle(colors, isDarkMode, open ? 'raised' : 'soft'),
-              open && styles.categoryContainerActive,
               {
                 backgroundColor: colors.card,
-                borderColor: '#FFFFFF',
-                borderWidth: 2,
+                borderWidth: 0,
               }
             ]}
           >
@@ -923,6 +951,11 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   container: { flex: 1 },
+  desktopContentWrap: {
+    width: '100%',
+    maxWidth: 1000,
+    alignSelf: 'center',
+  },
 
   headerRow: {
     alignItems: 'center',
@@ -1187,7 +1220,9 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     padding: 16,
-    justifyContent: 'space-between'
+    justifyContent: 'space-between',
+    borderWidth: 1.5,
+    borderColor: 'rgba(255,255,255,0.55)',
   },
 
   categoryIcon: {
@@ -1303,12 +1338,12 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   lessonThumbnailSkeleton: {
-    ...StyleSheet.absoluteFillObject,
+    ...StyleSheet.absoluteFill,
     padding: 8,
     justifyContent: 'flex-end',
   },
   thumbnailSkeletonPanel: {
-    ...StyleSheet.absoluteFillObject,
+    ...StyleSheet.absoluteFill,
     opacity: 0.88,
   },
   thumbnailSkeletonLine: {

@@ -1,25 +1,26 @@
-import React, { useCallback, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Animated, Platform, StyleSheet, Text, TouchableOpacity, View, useWindowDimensions } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import {
   CARD_HEIGHT,
   Exercise,
   computeWordDensity,
+  matchAnswerChips,
   normalizeAnswer,
   tokenizeTranslateAnswer,
 } from './GrammarExerciseUtils';
-import { clampNumber, getWebLessonScale, scaleValue } from '../../shared/responsiveLayout';
+import { getWebLessonScale, scaleValue } from '../../shared/responsiveLayout';
 import { getGrammarGameColors, getPrimaryButtonStyle } from '../../shared/uiPrimitives';
 import { triggerSelectionHaptic } from '../../shared/haptics';
 import type { ThemeColors } from '../../settings/ThemeContext';
 import { useSelectedWordDrag } from './useSelectedWordDrag';
-import { wordBankStyles } from './grammarExerciseStyles';
+import DraggableWordChip from './DraggableWordChip';
+import { BLANK_SLOT_WIDTH, wordBankStyles } from './grammarExerciseStyles';
 
 interface GrammarTranslateExerciseProps {
   exercise?: Exercise;
   colors: ThemeColors;
   isDarkMode: boolean;
-  compact?: boolean;
   userAnswer: string;
   incorrectAnswer: string;
   optionsContainerRef: React.RefObject<View | null>;
@@ -31,11 +32,55 @@ interface GrammarTranslateExerciseProps {
   onIncorrect: (marker: string) => void;
 }
 
+// Chips freshly added to the answer tray mount with no transition by default;
+// this fades + scales them in so tapping a word feels like it lands, not teleports.
+const TrayChipEntrance: React.FC<{ children: React.ReactNode; style?: any }> = ({ children, style }) => {
+  const progress = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    Animated.spring(progress, {
+      toValue: 1,
+      useNativeDriver: Platform.OS !== 'web',
+      speed: 22,
+      bounciness: 6,
+    }).start();
+  }, [progress]);
+
+  return (
+    <Animated.View
+      style={[
+        style,
+        {
+          opacity: progress,
+          transform: [{ scale: progress.interpolate({ inputRange: [0, 1], outputRange: [0.7, 1] }) }],
+        },
+      ]}
+    >
+      {children}
+    </Animated.View>
+  );
+};
+
+// Fades a word-bank chip to its "used" state instead of the instant opacity/color
+// swap React Native applies to a plain style-array change.
+const WordBankChipFade: React.FC<{ used: boolean; children: React.ReactNode; style?: any }> = ({ used, children, style }) => {
+  const opacity = useRef(new Animated.Value(used ? 0.3 : 1)).current;
+
+  useEffect(() => {
+    Animated.timing(opacity, {
+      toValue: used ? 0.3 : 1,
+      duration: 180,
+      useNativeDriver: Platform.OS !== 'web',
+    }).start();
+  }, [opacity, used]);
+
+  return <Animated.View style={[style, { opacity }]}>{children}</Animated.View>;
+};
+
 const GrammarTranslateExercise: React.FC<GrammarTranslateExerciseProps> = ({
   exercise,
   colors,
   isDarkMode,
-  compact = false,
   userAnswer,
   incorrectAnswer,
   optionsContainerRef,
@@ -48,74 +93,76 @@ const GrammarTranslateExercise: React.FC<GrammarTranslateExerciseProps> = ({
 }) => {
   const { width, height } = useWindowDimensions();
   const isDesktopWeb = Platform.OS === 'web' && width >= 768;
-  const isAndroid = Platform.OS === 'android';
-  const isWeb = Platform.OS === 'web';
-  const applyCompactStyles = compact && !isAndroid;
   const webScale = getWebLessonScale(width, height);
   const [selectedWordIndexes, setSelectedWordIndexes] = useState<number[]>([]);
-  const selectedWordDrag = useSelectedWordDrag<number>(selectedWordIndexes.length, setSelectedWordIndexes, userAnswer !== '');
+  const selectedWordDrag = useSelectedWordDrag<number>(selectedWordIndexes.length, setSelectedWordIndexes);
   const { draggingPosition, dropTargetPosition } = selectedWordDrag;
   const wordBank = useMemo(() => {
     const words = exercise?.wordBank ?? (typeof exercise?.answer === 'string' ? tokenizeTranslateAnswer(exercise.answer) : []);
     return words.map((word, index) => ({ word, index }));
   }, [exercise?.answer, exercise?.wordBank]);
-  const desktopTranslateCardMinHeight = Math.min(
-    scaleValue(390, webScale),
-    Math.max(scaleValue(320, webScale), Math.round(height * 0.4))
-  );
-  const androidTranslateCardMinHeight = Math.round(clampNumber(
-    height * (compact ? 0.39 : 0.43),
-    compact ? 286 : 320,
-    compact ? 348 : 420
-  ));
-  const translateCardMinHeight = isDesktopWeb ? desktopTranslateCardMinHeight : isAndroid ? androidTranslateCardMinHeight : compact ? 236 : CARD_HEIGHT;
-  const answerTrayMinHeight = isAndroid ? (compact ? 88 : 104) : compact ? 68 : isDesktopWeb ? scaleValue(108, webScale) : 92;
-  const selectedWordsMinHeight = isAndroid ? (compact ? 70 : 82) : compact ? 56 : isDesktopWeb ? scaleValue(86, webScale) : 72;
+  // No forced percentage-of-screen floor here — the tray and word-bank card
+  // below both size themselves from their actual content, and stacking a
+  // large minHeight on top of that just padded the card with empty space.
+  const translateCardMinHeight = 0;
+  const answerTrayMinHeight = 0;
   const wordCount = wordBank.length;
   const wordCharacterCount = wordBank.reduce((total, option) => total + option.word.length, 0);
-  const isNarrowWordLayout = width < 390 || compact;
+  const isNarrowWordLayout = width < 390;
   const wordDensity = computeWordDensity(wordCount, wordCharacterCount, isDesktopWeb, isNarrowWordLayout);
-  const wordBankPanelPadding = isDesktopWeb
-    ? scaleValue(wordDensity === 0 ? 18 : wordDensity === 1 ? 16 : 14, webScale)
-    : isAndroid
-      ? compact
-        ? wordDensity === 0 ? 12 : wordDensity === 1 ? 11 : 10
-        : wordDensity === 0 ? 16 : wordDensity === 1 ? 14 : 12
-      : compact
-        ? wordDensity === 0 ? 9 : wordDensity === 1 ? 8 : 7
-        : wordDensity === 0 ? 16 : wordDensity === 1 ? 14 : 12;
+  // Mobile (native + mobile web) chips run a size tier smaller than desktop web
+  // so more of them fit per row across the full screen width.
   const chipVerticalPadding = isDesktopWeb
-    ? scaleValue(wordDensity === 0 ? 14 : wordDensity === 1 ? 13 : 11, webScale)
-    : isAndroid
-      ? compact
-        ? wordDensity === 0 ? 11 : wordDensity === 1 ? 9 : 8
-        : wordDensity === 0 ? 16 : wordDensity === 1 ? 14 : 12
-      : compact
-        ? isWeb
-          ? wordDensity === 0 ? 13 : wordDensity === 1 ? 11 : 9
-          : wordDensity === 0 ? 10 : wordDensity === 1 ? 8 : 7
-        : wordDensity === 0 ? 15 : wordDensity === 1 ? 13 : 11;
+    ? scaleValue(wordDensity === 0 ? 16 : wordDensity === 1 ? 15 : 13, webScale)
+    : wordDensity === 0 ? 11 : wordDensity === 1 ? 10 : 9;
   const chipHorizontalPadding = isDesktopWeb
-    ? scaleValue(wordDensity === 0 ? 19 : wordDensity === 1 ? 17 : 14, webScale)
-    : isAndroid
-      ? compact
-        ? wordDensity === 0 ? 15 : wordDensity === 1 ? 13 : 11
-        : wordDensity === 0 ? 21 : wordDensity === 1 ? 18 : 16
-      : compact
-        ? isWeb
-          ? wordDensity === 0 ? 17 : wordDensity === 1 ? 14 : 12
-          : wordDensity === 0 ? 13 : wordDensity === 1 ? 11 : 10
-        : wordDensity === 0 ? 20 : wordDensity === 1 ? 17 : 15;
+    ? scaleValue(wordDensity === 0 ? 22 : wordDensity === 1 ? 20 : 17, webScale)
+    : wordDensity === 0 ? 15 : wordDensity === 1 ? 13 : 12;
   const wordChipFontSize = isDesktopWeb
-    ? scaleValue(wordDensity === 0 ? 19 : wordDensity === 1 ? 17 : 16, webScale)
-    : compact
-      ? isWeb
-        ? wordDensity === 0 ? 17 : wordDensity === 1 ? 15 : 14
-        : wordDensity === 0 ? 16 : wordDensity === 1 ? 14 : 13
-      : wordDensity === 0 ? 18 : wordDensity === 1 ? 16 : 15;
-  const wordBankGap = wordDensity === 0 ? 8 : wordDensity === 1 ? 7 : 6;
-  const selectedWordsGap = wordDensity === 0 ? 7 : wordDensity === 1 ? 6 : 5;
+    ? scaleValue(wordDensity === 0 ? 21 : wordDensity === 1 ? 19 : 18, webScale)
+    : wordDensity === 0 ? 17 : wordDensity === 1 ? 15 : 14;
+  const wordBankGap = isDesktopWeb ? scaleValue(10, webScale) : wordDensity === 0 ? 8 : wordDensity === 1 ? 7 : 6;
+  const selectedWordsGap = isDesktopWeb ? scaleValue(10, webScale) : wordDensity === 0 ? 7 : wordDensity === 1 ? 6 : 5;
   const grammarGame = getGrammarGameColors(colors, isDarkMode);
+  // wordBank includes distractor chips, and some chips span multiple words
+  // (e.g. "to the left"), so the slot count can't just be the answer's raw
+  // word count — match actual bank chips against the answer to find how many
+  // taps are really needed.
+  const matchedAnswerWords = useMemo(() => {
+    if (typeof exercise?.answer !== 'string') return [];
+    return matchAnswerChips(exercise.answer, wordBank.map(option => option.word)).matchedWords;
+  }, [exercise?.answer, wordBank]);
+  const totalSlots = matchedAnswerWords.length > 0 || typeof exercise?.answer === 'string'
+    ? matchedAnswerWords.length
+    : selectedWordIndexes.length;
+  const blankSlotCount = Math.max(0, totalSlots - selectedWordIndexes.length);
+  // Both blanks and real chips must reserve the exact same row space so the
+  // tray never grows or shrinks as the user selects words — derive the
+  // reserved height only from the (fixed) answer/word bank, never from the
+  // live selection.
+  const trayHorizontalPadding = isDesktopWeb ? 26 : 16;
+  const clearButtonReserve = 44;
+  // GrammarQuiz's own exerciseContainer wraps this component with its own
+  // horizontal padding (8px/side on mobile for translate mode specifically) —
+  // that width is gone before this component ever renders, so it must be
+  // subtracted here too or the tray's own width estimate runs wider than what
+  // actually renders, letting blanks/chips overflow into an extra wrapped row.
+  const outerContainerPadding = isDesktopWeb ? 0 : 8;
+  const trayContentWidth = (isDesktopWeb ? Math.min(620, width) : width) - outerContainerPadding * 2 - trayHorizontalPadding * 2 - clearButtonReserve;
+  const selectedChipRowHeight = isDesktopWeb ? scaleValue(54, webScale) : 54;
+  // On mobile, blank/answer slots stretch to fill the tray's full width instead of
+  // sitting at a fixed 92px — a fixed width only ever fit 2-3 per row on a phone,
+  // leaving the rest of the row empty. Rows target a fixed item count instead, and
+  // each slot's width is derived from that, so a full row always reaches both edges.
+  const mobileRowTarget = isNarrowWordLayout ? 3 : 4;
+  const itemsPerRow = isDesktopWeb
+    ? Math.max(1, Math.floor((trayContentWidth + selectedWordsGap) / (BLANK_SLOT_WIDTH + selectedWordsGap)))
+    : Math.max(1, Math.min(mobileRowTarget, totalSlots || mobileRowTarget));
+  const blankSlotWidth = isDesktopWeb
+    ? BLANK_SLOT_WIDTH
+    : Math.max(48, Math.floor((trayContentWidth - (itemsPerRow - 1) * selectedWordsGap) / itemsPerRow));
+  const wrappedRows = Math.min(3, Math.max(1, Math.ceil(totalSlots / itemsPerRow)));
+  const selectedWordsMinHeight = wrappedRows * selectedChipRowHeight + (wrappedRows - 1) * selectedWordsGap;
 
   const handleWordPress = useCallback((index: number) => {
     if (userAnswer !== '' || selectedWordIndexes.includes(index)) return;
@@ -155,6 +202,19 @@ const GrammarTranslateExercise: React.FC<GrammarTranslateExerciseProps> = ({
   const hasSelectedWords = selectedWordIndexes.length > 0;
   const disabled = userAnswer !== '' || selectedWordIndexes.length === 0;
 
+  const trayShakeAnim = useRef(new Animated.Value(0)).current;
+  useEffect(() => {
+    if (incorrectAnswer !== 'translate') return;
+    trayShakeAnim.setValue(0);
+    Animated.sequence([
+      Animated.timing(trayShakeAnim, { toValue: -8, duration: 45, useNativeDriver: true }),
+      Animated.timing(trayShakeAnim, { toValue: 8, duration: 90, useNativeDriver: true }),
+      Animated.timing(trayShakeAnim, { toValue: -6, duration: 80, useNativeDriver: true }),
+      Animated.timing(trayShakeAnim, { toValue: 6, duration: 70, useNativeDriver: true }),
+      Animated.timing(trayShakeAnim, { toValue: 0, duration: 60, useNativeDriver: true }),
+    ]).start();
+  }, [incorrectAnswer, trayShakeAnim]);
+
   return (
     <View
       ref={optionsContainerRef}
@@ -167,49 +227,24 @@ const GrammarTranslateExercise: React.FC<GrammarTranslateExerciseProps> = ({
           onFirstOptionLayout(e.nativeEvent.layout.y);
           onCardHeightChange?.(e.nativeEvent.layout.height);
         }}
-        style={[
-          styles.translateCard,
-          applyCompactStyles && styles.translateCardCompact,
-          isDesktopWeb && styles.translateCardDesktopWeb,
-          {
-            minHeight: translateCardMinHeight,
-            backgroundColor: grammarGame.panelSurface,
-            borderColor: grammarGame.panelBorder,
-            borderBottomColor: grammarGame.panelBottom,
-            shadowColor: grammarGame.panelShadow,
-            shadowOpacity: isDarkMode ? 0.22 : 0.08,
-            shadowRadius: isDarkMode ? 9 : 6,
-            elevation: isDarkMode ? 4 : 2,
-          },
-          incorrectAnswer === 'translate' && [
-            wordBankStyles.incorrectOption,
-            {
-              backgroundColor: grammarGame.incorrectSurface,
-              borderColor: grammarGame.incorrectBorder,
-              borderBottomColor: grammarGame.incorrectBottom,
-            },
-          ],
-        ]}
+        style={[wordBankStyles.wordBankOuterWrap, { minHeight: translateCardMinHeight }]}
       >
-        <View
+        <Animated.View
           style={[
             wordBankStyles.answerTray,
-            applyCompactStyles && wordBankStyles.answerTrayCompact,
             isDesktopWeb && styles.answerTrayDesktopWeb,
+            !isDesktopWeb && { paddingHorizontal: trayHorizontalPadding },
             {
               minHeight: answerTrayMinHeight,
-              backgroundColor: grammarGame.answerSurface,
-              borderColor: grammarGame.answerBorder,
-              borderBottomColor: grammarGame.answerBottom,
+              backgroundColor: 'transparent',
+              borderTopWidth: 0,
+              borderRadius: 0,
             },
             incorrectAnswer === 'translate' && [
               wordBankStyles.answerTrayIncorrect,
-              {
-                backgroundColor: grammarGame.incorrectSurface,
-                borderColor: grammarGame.incorrectBorder,
-                borderBottomColor: grammarGame.incorrectBottom,
-              },
+              { backgroundColor: grammarGame.incorrectSurface },
             ],
+            { transform: [{ translateX: trayShakeAnim }] },
           ]}
         >
           {hasSelectedWords && userAnswer === '' && (
@@ -221,152 +256,158 @@ const GrammarTranslateExercise: React.FC<GrammarTranslateExerciseProps> = ({
               style={[
                 wordBankStyles.clearAnswerButton,
                 {
-                  backgroundColor: grammarGame.incorrectBorder,
-                  borderColor: grammarGame.incorrectBottom,
+                  backgroundColor: 'rgba(255,255,255,0.18)',
+                  borderColor: 'rgba(255,255,255,0.4)',
                 },
               ]}
               hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
             >
-              <MaterialIcons name="close" size={18} color="#fff" />
+              <MaterialIcons name="close" size={16} color="#fff" />
             </TouchableOpacity>
           )}
           <View
             style={[
               wordBankStyles.selectedWordsRow,
-              applyCompactStyles && wordBankStyles.selectedWordsRowCompact,
-              hasSelectedWords && userAnswer === '' && wordBankStyles.selectedWordsRowWithClear,
+              wordBankStyles.selectedWordsRowWithClear,
               { minHeight: selectedWordsMinHeight, gap: selectedWordsGap },
             ]}
           >
-            {selectedWordIndexes.length === 0 ? (
-              <Text style={[wordBankStyles.answerPlaceholderText, { color: grammarGame.metaText }]}>
-                Tap the words to build your answer
-              </Text>
-            ) : (
-              selectedWordIndexes.map((wordIndex, position) => {
-                const selectedWord = wordBank.find(option => option.index === wordIndex)?.word;
-                if (!selectedWord) return null;
+            {selectedWordIndexes.map((wordIndex, position) => {
+              const selectedWord = wordBank.find(option => option.index === wordIndex)?.word;
+              if (!selectedWord) return null;
 
-                const isBeingDragged = draggingPosition === position;
-                const isDropTarget = dropTargetPosition === position && !isBeingDragged;
-                return (
-                  <Animated.View
-                    key={`${wordIndex}-${position}`}
-                    {...selectedWordDrag.getPanHandlers(position)}
-                    onLayout={(event) => selectedWordDrag.handleChipLayout(position, event)}
-                    style={[
-                      wordBankStyles.selectedWordDragWrap,
-                      selectedWordDrag.getDragStyle(position),
-                      draggingPosition !== null && !isBeingDragged && wordBankStyles.siblingChipDuringDrag,
-                    ]}
-                  >
-                    <TouchableOpacity
-                      accessibilityRole="button"
-                      accessibilityLabel={`Move or remove word ${selectedWord}`}
-                      onPress={() => handleSelectedWordPress(position)}
-                      activeOpacity={0.84}
-                      style={[
-                        wordBankStyles.selectedWordChip,
-                        applyCompactStyles && wordBankStyles.selectedWordChipCompact,
-                        isDesktopWeb && wordBankStyles.selectedWordChipDesktopWeb,
-                        { paddingVertical: chipVerticalPadding, paddingHorizontal: chipHorizontalPadding },
-                        {
-                          backgroundColor: grammarGame.selectedWordSurface,
-                          borderColor: grammarGame.selectedWordBorder,
-                          borderBottomColor: grammarGame.selectedWordBottom,
-                        },
-                        isDropTarget && wordBankStyles.dropTargetChip,
-                      ]}
-                    >
-                      <Text style={[
-                        wordBankStyles.selectedWordChipText,
-                        applyCompactStyles && wordBankStyles.selectedWordChipTextCompact,
-                        isDesktopWeb && wordBankStyles.selectedWordChipTextDesktopWeb,
-                        { fontSize: wordChipFontSize },
-                        { color: grammarGame.selectedWordText },
-                      ]}>{selectedWord}</Text>
-                    </TouchableOpacity>
-                  </Animated.View>
-                );
-              })
-            )}
-          </View>
-        </View>
-
-        <View style={wordBankStyles.dividerRow}>
-          <View style={[wordBankStyles.dividerLine, { backgroundColor: grammarGame.wordBankBorder }]} />
-          <Text style={[wordBankStyles.dividerLabel, { color: grammarGame.metaText }]}>Word bank</Text>
-          <View style={[wordBankStyles.dividerLine, { backgroundColor: grammarGame.wordBankBorder }]} />
-        </View>
-        <View style={[wordBankStyles.wordBankPanel, applyCompactStyles && wordBankStyles.wordBankPanelCompact, {
-          padding: wordBankPanelPadding,
-          backgroundColor: grammarGame.wordBankSurface,
-          borderColor: grammarGame.wordBankBorder,
-        }]}>
-          <View style={[wordBankStyles.wordBank, { gap: wordBankGap }]}>
-            {wordBank.map(({ word, index }) => {
-              const isSelected = selectedWordIndexes.includes(index);
-
+              const isBeingDragged = draggingPosition === position;
+              const isDropTarget = dropTargetPosition === position && !isBeingDragged;
               return (
-                <TouchableOpacity
-                  key={`${word}-${index}`}
-                  accessibilityRole="button"
-                  accessibilityLabel={`${isSelected ? 'Selected word' : 'Add word'} ${word}`}
-                  accessibilityState={{ disabled: isSelected || userAnswer !== '', selected: isSelected }}
-                  onPress={() => handleWordPress(index)}
-                  activeOpacity={0.84}
-                  disabled={isSelected || userAnswer !== ''}
+                <DraggableWordChip
+                  key={wordIndex}
+                  position={position}
+                  disabled={userAnswer !== ''}
+                  onLayoutMeasured={selectedWordDrag.handleChipLayout}
+                  onDragStart={selectedWordDrag.handleDragStart}
+                  onDragMove={selectedWordDrag.handleDragMove}
+                  onDragEnd={selectedWordDrag.handleDragEnd}
                   style={[
-                    wordBankStyles.wordChip,
-                    applyCompactStyles && wordBankStyles.wordChipCompact,
-                    isDesktopWeb && wordBankStyles.wordChipDesktopWeb,
-                    { paddingVertical: chipVerticalPadding, paddingHorizontal: chipHorizontalPadding },
-                    {
-                      backgroundColor: grammarGame.wordChipSurface,
-                      borderColor: grammarGame.wordChipBorder,
-                      borderBottomColor: grammarGame.wordChipBottom,
-                      shadowColor: isDarkMode ? grammarGame.wordChipBottom : grammarGame.panelShadow,
-                      shadowOpacity: isDarkMode ? 0.1 : 0.08,
-                    },
-                    isSelected && wordBankStyles.disabledWordChip,
+                    wordBankStyles.selectedWordDragWrap,
+                    draggingPosition !== null && !isBeingDragged && wordBankStyles.siblingChipDuringDrag,
                   ]}
                 >
-                  <Text style={[
-                    wordBankStyles.wordChipText,
-                    applyCompactStyles && wordBankStyles.wordChipTextCompact,
-                    isDesktopWeb && wordBankStyles.wordChipTextDesktopWeb,
-                    { fontSize: wordChipFontSize },
-                    { color: grammarGame.wordChipText },
-                    isSelected && [wordBankStyles.disabledWordChipText, { color: grammarGame.metaText }],
-                  ]}>{word}</Text>
-                </TouchableOpacity>
+                  <TrayChipEntrance>
+                  <TouchableOpacity
+                    accessibilityRole="button"
+                    accessibilityLabel={`Move or remove word ${selectedWord}`}
+                    onPress={() => handleSelectedWordPress(position)}
+                    activeOpacity={0.84}
+                    style={[
+                      wordBankStyles.selectedWordChip,
+                      isDesktopWeb && wordBankStyles.selectedWordChipDesktopWeb,
+                      {
+                        backgroundColor: grammarGame.selectedWordSurface,
+                      },
+                      isDropTarget && wordBankStyles.dropTargetChip,
+                    ]}
+                  >
+                    <Text style={[
+                      wordBankStyles.selectedWordChipText,
+                      isDesktopWeb && wordBankStyles.selectedWordChipTextDesktopWeb,
+                      { color: grammarGame.selectedWordText },
+                    ]}>{selectedWord}</Text>
+                  </TouchableOpacity>
+                  </TrayChipEntrance>
+                </DraggableWordChip>
               );
             })}
+            {Array.from({ length: blankSlotCount }).map((_, index) => (
+              <View
+                key={`blank-${index}`}
+                style={[wordBankStyles.blankSlot, { width: blankSlotWidth, borderColor: grammarGame.blankSlotColor }]}
+              />
+            ))}
           </View>
-        </View>
-        <TouchableOpacity
-          accessibilityRole="button"
-          accessibilityLabel="Check answer"
-          accessibilityState={{ disabled }}
-          onPress={handleSubmit}
-          disabled={disabled}
+        </Animated.View>
+
+        <View
           style={[
-            wordBankStyles.checkAnswerButton,
-            applyCompactStyles && wordBankStyles.checkAnswerButtonCompact,
-            isDesktopWeb && wordBankStyles.checkAnswerButtonDesktopWeb,
-            isDesktopWeb && { minHeight: scaleValue(54, webScale) },
-            getPrimaryButtonStyle(colors, isDarkMode),
-            disabled && wordBankStyles.disabledCheckAnswerButton,
+            wordBankStyles.wordBankCard,
+            isDesktopWeb && styles.translateCardDesktopWeb,
+            // Mobile/APK: trim the card's own padding so the word bank uses close to
+            // the full screen width instead of the roomier desktop-web spacing.
+            !isDesktopWeb && { padding: 10 },
+            {
+              backgroundColor: 'transparent',
+              shadowOpacity: 0,
+              elevation: 0,
+            },
           ]}
         >
-          <View style={wordBankStyles.checkAnswerButtonInner}>
-            <MaterialIcons name="check" size={isDesktopWeb ? scaleValue(20, webScale) : 20} color={colors.buttonText} />
-            <Text style={[wordBankStyles.checkAnswerButtonText, { color: colors.buttonText }, isDesktopWeb && { fontSize: scaleValue(16, webScale) }]}>Check</Text>
+          <View
+            style={[
+              wordBankStyles.wordBankPanel,
+              !isDesktopWeb && { padding: 10 },
+              { backgroundColor: grammarGame.wordBankSurface, borderColor: grammarGame.wordBankBorder },
+            ]}
+          >
+            <View style={[wordBankStyles.wordBank, { gap: wordBankGap }]}>
+              {wordBank.map(({ word, index }) => {
+                const isSelected = selectedWordIndexes.includes(index);
+
+                return (
+                  <WordBankChipFade key={`${word}-${index}`} used={isSelected}>
+                  <TouchableOpacity
+                    accessibilityRole="button"
+                    accessibilityLabel={`${isSelected ? 'Selected word' : 'Add word'} ${word}`}
+                    accessibilityState={{ disabled: isSelected || userAnswer !== '', selected: isSelected }}
+                    onPress={() => handleWordPress(index)}
+                    activeOpacity={0.84}
+                    disabled={isSelected || userAnswer !== ''}
+                    style={[
+                      wordBankStyles.wordChip,
+                      isDesktopWeb && wordBankStyles.wordChipDesktopWeb,
+                      { paddingVertical: chipVerticalPadding, paddingHorizontal: chipHorizontalPadding },
+                      {
+                        backgroundColor: grammarGame.wordChipSurface,
+                        shadowColor: isDarkMode ? '#000' : grammarGame.panelShadow,
+                        shadowOpacity: isDarkMode ? 0.2 : 0.08,
+                      },
+                    ]}
+                  >
+                    <Text style={[
+                      wordBankStyles.wordChipText,
+                      isDesktopWeb && wordBankStyles.wordChipTextDesktopWeb,
+                      { fontSize: wordChipFontSize },
+                      { color: grammarGame.wordChipText },
+                      isSelected && [wordBankStyles.disabledWordChipText, { color: grammarGame.metaText }],
+                    ]}>{word}</Text>
+                  </TouchableOpacity>
+                  </WordBankChipFade>
+                );
+              })}
+            </View>
           </View>
-        </TouchableOpacity>
-        {incorrectAnswer === 'translate' && (
-          <Text style={[wordBankStyles.exerciseErrorText, { color: grammarGame.incorrectText }]}>Not quite. Try again.</Text>
-        )}
+          <TouchableOpacity
+            accessibilityRole="button"
+            accessibilityLabel="Check answer"
+            accessibilityState={{ disabled }}
+            onPress={handleSubmit}
+            disabled={disabled}
+            style={[
+              wordBankStyles.checkAnswerButton,
+              isDesktopWeb && wordBankStyles.checkAnswerButtonDesktopWeb,
+              isDesktopWeb && { minHeight: scaleValue(54, webScale) },
+              getPrimaryButtonStyle(colors, isDarkMode),
+              { backgroundColor: grammarGame.checkButtonBg, borderColor: grammarGame.checkButtonBg, borderWidth: 0 },
+              disabled && wordBankStyles.disabledCheckAnswerButton,
+            ]}
+          >
+            <View style={wordBankStyles.checkAnswerButtonInner}>
+              <MaterialIcons name="check" size={isDesktopWeb ? scaleValue(22, webScale) : 22} color="#fff" />
+              <Text style={[wordBankStyles.checkAnswerButtonText, { color: '#fff' }, isDesktopWeb && { fontSize: scaleValue(18, webScale) }]}>Check</Text>
+            </View>
+          </TouchableOpacity>
+          {incorrectAnswer === 'translate' && (
+            <Text style={[wordBankStyles.exerciseErrorText, { color: grammarGame.incorrectText }]}>Not quite. Try again.</Text>
+          )}
+        </View>
       </View>
     </View>
   );
@@ -378,33 +419,12 @@ const styles = StyleSheet.create({
   translateContainer: {
     minHeight: CARD_HEIGHT,
   },
-  translateCard: {
-    minHeight: CARD_HEIGHT,
-    padding: 16,
-    borderRadius: 16,
-    backgroundColor: '#fff',
-    borderWidth: 1.5,
-    borderBottomWidth: 3,
-    borderColor: '#E5E5E5',
-    borderBottomColor: '#D1D5DB',
-    justifyContent: 'flex-start',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.04,
-    shadowRadius: 4,
-    elevation: 2,
-  },
-  translateCardCompact: {
-    padding: 10,
-    borderBottomWidth: 3,
-  },
   translateCardDesktopWeb: {
-    padding: 18,
+    padding: 26,
   },
   answerTrayDesktopWeb: {
-    paddingHorizontal: 16,
-    paddingTop: 10,
-    paddingBottom: 14,
-    marginBottom: 6,
+    paddingHorizontal: 26,
+    paddingTop: 16,
+    paddingBottom: 24,
   },
 });

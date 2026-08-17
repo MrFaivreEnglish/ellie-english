@@ -32,6 +32,7 @@ export type VocabularyStackParamList = {
     backTarget?: string;
     initialMode?: string;
   };
+  VocabRush: undefined;
 };
 
 // ─── Global merge — gives useNavigation() a typed root ───────────────────────

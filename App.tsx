@@ -1,5 +1,6 @@
 import React from 'react';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
+import Animated, { useAnimatedStyle, useSharedValue, withSequence, withSpring } from 'react-native-reanimated';
 import { NavigationContainer, DefaultTheme as NavDefaultTheme, DarkTheme as NavDarkTheme } from '@react-navigation/native';
 import { BackHandler, View, Image, Platform, Text, useWindowDimensions } from 'react-native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
@@ -17,6 +18,7 @@ import GrammarScreen from "./features/grammar/GrammarScreen";
 import VocabularyScreen from "./features/vocabulary/VocabularyScreen";
 import LessonsScreen from "./features/lessons/LessonsScreen";
 import VocabularyLessonScreen from "./features/vocabulary/VocabularyLessonScreen";
+import VocabRushScreen from "./features/vocabulary/vocabRush/VocabRushScreen";
 import SettingsScreen from "./features/settings/SettingsScreen";
 import AccountScreen from "./features/account/AccountScreen";
 import AdminLessonPreviewScreen from "./features/lessons/AdminLessonPreviewScreen";
@@ -32,12 +34,52 @@ import {
   HOME_MENU_ROUTE_COLORS,
   SHINY_HOME_MENU_ROUTE_COLORS,
   SHINY_SPLASH_BACKGROUND,
-  SHINY_TAB_IDENTITY_BORDER_COLORS,
-  SHINY_TAB_IDENTITY_SOFT_COLORS,
 } from './features/shared/homeMenuColors';
 import { getAndroidBottomBarButtonStyle, getAndroidBottomBarColor } from './features/shared/appChromeColors';
 import { getApkPreviewContentMaxWidth, isApkLayoutPreviewEnabled } from './features/shared/apkPreview';
 import type { RootStackParamList, TabParamList, VocabularyStackParamList } from './types/navigationTypes';
+
+// Android is edge-to-edge by default now (expo-status-bar no longer exposes
+// `translucent`/`backgroundColor` — the OS always draws app content full-bleed
+// behind the status bar icons). When the user wants an opaque-looking status
+// bar, we paint that area ourselves so scrolled content can't show through it.
+function AndroidStatusBarBackdrop({ visible, color }: { visible: boolean; color: string }) {
+  const insets = useSafeAreaInsets();
+
+  if (!visible || insets.top <= 0) return null;
+
+  return (
+    <View
+      pointerEvents="none"
+      style={[styles.statusBarBackdrop, { height: insets.top, backgroundColor: color }]}
+    />
+  );
+}
+
+function TabIcon({ iconName, size, color, focused }: { iconName: React.ComponentProps<typeof MaterialIcons>['name']; size: number; color: string; focused: boolean }) {
+  const scale = useSharedValue(1);
+  const wasFocused = React.useRef(focused);
+
+  React.useEffect(() => {
+    if (focused && !wasFocused.current) {
+      scale.value = withSequence(
+        withSpring(1.28, { damping: 10, stiffness: 300 }),
+        withSpring(1, { damping: 12, stiffness: 260 })
+      );
+    }
+    wasFocused.current = focused;
+  }, [focused, scale]);
+
+  const animatedStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: scale.value }],
+  }));
+
+  return (
+    <Animated.View style={animatedStyle}>
+      <MaterialIcons name={iconName} size={size} color={color} />
+    </Animated.View>
+  );
+}
 
 const Tab = createBottomTabNavigator<TabParamList>();
 const VocabStack = createNativeStackNavigator<VocabularyStackParamList>();
@@ -49,18 +91,6 @@ const tabIcons: Record<string, MaterialIconName> = {
   Vocabulary: 'style',
   Lessons: 'menu-book',
   Settings: 'settings',
-};
-const tabIdentitySoftColors: Record<string, string> = {
-  Grammar: 'rgba(140,203,255,0.18)',
-  Vocabulary: 'rgba(116,218,210,0.18)',
-  Lessons: 'rgba(196,180,244,0.18)',
-  Settings: 'rgba(183,198,213,0.18)',
-};
-const tabIdentityBorderColors: Record<string, string> = {
-  Grammar: 'rgba(140,203,255,0.34)',
-  Vocabulary: 'rgba(116,218,210,0.34)',
-  Lessons: 'rgba(196,180,244,0.34)',
-  Settings: 'rgba(183,198,213,0.34)',
 };
 
 function VocabularyLessonBoundaryScreen(props: any) {
@@ -104,6 +134,11 @@ function VocabularyStack(): React.JSX.Element {
         component={VocabularyLessonBoundaryScreen}
         options={{ headerShown: false }}
       />
+      <VocabStack.Screen
+        name="VocabRush"
+        component={VocabRushScreen}
+        options={{ headerShown: false }}
+      />
     </VocabStack.Navigator>
   );
 }
@@ -133,8 +168,6 @@ function MainTabNavigator() {
       ? getAndroidBottomBarColor(isDarkMode, colors)
       : 'rgba(255, 255, 255, 0.82)';
   const tabRouteColors: Record<string, string> = isShinyEllieMode ? SHINY_HOME_MENU_ROUTE_COLORS : HOME_MENU_ROUTE_COLORS;
-  const tabSoftColors: Record<string, string> = isShinyEllieMode ? SHINY_TAB_IDENTITY_SOFT_COLORS : tabIdentitySoftColors;
-  const tabBorderColors: Record<string, string> = isShinyEllieMode ? SHINY_TAB_IDENTITY_BORDER_COLORS : tabIdentityBorderColors;
   const tabLabels = React.useMemo(
     () => ({
       Grammar: copy.home.grammarTitle,
@@ -153,6 +186,18 @@ function MainTabNavigator() {
 
     return activeVocabularyRoute?.name === 'VocabularyLesson'
       && activeVocabularyRoute?.params?.backTarget === 'Grammar';
+  }, [tabState]);
+  // Vocab Rush renders its own bottom nav (styled to match this one) — hide the
+  // real tab bar for it here, centrally, instead of a per-screen setOptions hack that
+  // can clobber this computed style for every other screen when it tries to restore it.
+  const isVocabRushFocused = React.useMemo(() => {
+    const activeTabRoute = tabState?.routes?.[tabState.index ?? 0];
+    if (activeTabRoute?.name !== 'Vocabulary') return false;
+
+    const vocabularyState = activeTabRoute.state;
+    const activeVocabularyRoute = vocabularyState?.routes?.[vocabularyState.index ?? 0];
+
+    return activeVocabularyRoute?.name === 'VocabRush';
   }, [tabState]);
   const getVisualTabFocus = React.useCallback(
     (routeName: string, focused: boolean) => {
@@ -178,6 +223,7 @@ function MainTabNavigator() {
       }}
       screenOptions={({ route }) => ({
         headerShown: false,
+        animation: 'fade',
         safeAreaInsets: { bottom: 0 },
         tabBarShowLabel: true,
         tabBarLabelPosition: 'below-icon',
@@ -204,18 +250,8 @@ function MainTabNavigator() {
           const identityColor = getTabIdentityColor(route.name);
           const iconColor = visuallyFocused ? identityColor : colors.secondaryText;
           return (
-            <View
-              style={[
-                styles.tabIconPill,
-                visuallyFocused
-                  ? {
-                      backgroundColor: tabSoftColors[route.name] ?? colors.primarySoft,
-                      borderColor: tabBorderColors[route.name] ?? colors.primary,
-                    }
-                  : styles.tabIconPillInactive,
-              ]}
-            >
-              <MaterialIcons name={iconName} size={tabBarIconSize} color={iconColor} />
+            <View style={styles.tabIconPill}>
+              <TabIcon iconName={iconName} size={tabBarIconSize} color={iconColor} focused={visuallyFocused} />
             </View>
           );
         },        
@@ -246,6 +282,7 @@ function MainTabNavigator() {
           backgroundColor: tabBarBackgroundColor,
           borderTopColor: isAndroidTabBarLayout ? 'transparent' : isDarkMode ? colors.border : 'rgba(0,0,0,0.08)',
           borderTopWidth: tabBarTopBorderWidth,
+          ...(isVocabRushFocused ? { display: 'none' as const } : null),
         },
       })}
     >
@@ -288,7 +325,7 @@ function RootStack() {
       <RootStackNav.Screen
         name="Home"
         component={HomeScreen}
-        options={{ gestureEnabled: false }}
+        options={{ gestureEnabled: false, animation: 'fade' }}
       />
       <RootStackNav.Screen
         name="Account"
@@ -335,7 +372,6 @@ function AppInner() {
   const showAppStatusBar = Platform.OS !== 'android' || isAndroidStatusBarEnabled;
   const shouldHideStatusBar = isImmersiveRoute || !showAppStatusBar;
   const statusBarStyle = shouldHideStatusBar || isDarkMode ? 'light' : 'dark';
-  const statusBarBackground = shouldHideStatusBar ? 'transparent' : colors.background;
   const appChromeNavColor = getAndroidBottomBarColor(isDarkMode, colors);
   const appChromeButtonStyle = getAndroidBottomBarButtonStyle(isDarkMode);
   const navigationTheme = React.useMemo(() => ({
@@ -625,6 +661,35 @@ function AppInner() {
     };
   }, []);
 
+  // Web-only: neutralise the browser's yellow autofill highlight on text inputs.
+  React.useEffect(() => {
+    if (Platform.OS !== 'web') return;
+    if (typeof document === 'undefined') return;
+
+    const style = document.createElement('style');
+    style.id = 'a0-no-autofill-yellow';
+    style.textContent = `
+      input:-webkit-autofill,
+      input:-webkit-autofill:hover,
+      input:-webkit-autofill:focus,
+      input:-webkit-autofill:active {
+        -webkit-box-shadow: 0 0 0px 1000px transparent inset !important;
+        box-shadow: 0 0 0px 1000px transparent inset !important;
+        -webkit-text-fill-color: inherit !important;
+        caret-color: inherit !important;
+        transition: background-color 9999s ease-in-out 0s;
+      }
+    `;
+    document.head.appendChild(style);
+
+    return () => {
+      try {
+        const existing = document.getElementById('a0-no-autofill-yellow');
+        if (existing && existing.parentNode) existing.parentNode.removeChild(existing);
+      } catch {}
+    };
+  }, []);
+
   return (
     <>
       {/* Full-width to capture scroll even when cursor is in the margins */}
@@ -632,8 +697,6 @@ function AppInner() {
         <Toaster />
         <StatusBar
           hidden={shouldHideStatusBar}
-          translucent={shouldHideStatusBar}
-          backgroundColor={statusBarBackground}
           style={statusBarStyle}
           animated
         />
@@ -662,6 +725,10 @@ function AppInner() {
             </NavigationContainer>
           </View>
         </View>
+        <AndroidStatusBarBackdrop
+          visible={Platform.OS === 'android' && !shouldHideStatusBar}
+          color={contentBackground}
+        />
       </SafeAreaProvider>
     </>
   );
@@ -695,13 +762,14 @@ const styles = StyleSheet.create({
   tabIconPill: {
     width: 44,
     height: 28,
-    borderRadius: 999,
-    borderWidth: 0,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  tabIconPillInactive: {
-    backgroundColor: 'transparent',
-    borderColor: 'transparent',
+  statusBarBackdrop: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    zIndex: 999,
   },
 });

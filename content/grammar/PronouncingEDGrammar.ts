@@ -3,6 +3,46 @@ const PronouncingEDGrammar = {
   title: 'Pronouncing ED',
   description: 'Master the pronunciation of -ed endings: /t/, /d/, /ɪd/ with clear examples.',
   imageUrl: 'https://i.ibb.co/5g87gJJy/Prononcer-ED.png',
+  textContent: {
+    cards: [
+      {
+        eyebrow: 'Trois prononciations',
+        paragraph: 'La terminaison « -ED » se prononce de trois manières différentes, selon le son juste avant le « -ED ».',
+        columns: [
+          {
+            label: 'Après [d] ou [t] → -ED = **[ɪd]**',
+            accent: 'blue',
+            rows: ['Decide → **Decided**', 'Start → **Started**'],
+          },
+          {
+            label: 'Après [p] [k] [f] [s] [ch] [th] → -ED = **[t]**',
+            accent: 'coral',
+            rows: ['Stop → **Stopped**', 'Talk → **Talked**', 'Cuff → **Cuffed**', 'Pass → **Passed**', 'Wash → **Washed**', 'Bath → **Bathed**'],
+          },
+          {
+            label: 'Pour tous les autres sons → -ED = **[d]**',
+            accent: 'teal',
+            rows: ['Etc.'],
+          },
+        ],
+      },
+      {
+        eyebrow: 'Astuces de prononciation',
+        subsections: [
+          {
+            text: 'Donc :',
+            accent: 'blue',
+            rows: ['**...ded** = [dɪd]', '**...ted** = [tɪd]'],
+          },
+          {
+            text: 'Par exemple :',
+            accent: 'coral',
+            rows: ['**...ped** = [pt]', '**...ked** = [kt]', '**...fed** = [ft]', '**...ssed** = [st]', '**...ched** = [cht]', '**...thed** = [tht]'],
+          },
+        ],
+      },
+    ],
+  },
 
   exercises: [
     // /t/ sound

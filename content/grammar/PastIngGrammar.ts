@@ -4,6 +4,43 @@ const PastIngGrammar = {
   description: 'Learn how to use the past continuous tense',
   category: 'Temps principaux',
   imageUrl: 'https://i.ibb.co/FGQm45L/Pr-t-rit-ING.png',
+  textContent: {
+    cards: [
+      {
+        eyebrow: 'À quoi ça sert',
+        paragraph: 'Je parle de ce qui était en train de se passer (ou non).',
+        tip: 'Formule : sujet + be au prétérit + verbe +ING.',
+        columns: [
+          {
+            label: '1/ Je repère le sujet et / ou le pronom',
+            accent: 'blue',
+            rows: ['I', 'You', 'He / She / It', 'We', 'They'],
+          },
+          {
+            label: '2/ Je conjugue BE au prétérit',
+            accent: 'coral',
+            rows: ['**was** (not)', '**were** (not)', '**was** (not)', '**were** (not)', '**were** (not)'],
+          },
+          {
+            label: "3/ J'ajoute la terminaison -ING au verbe",
+            accent: 'teal',
+            rows: ['visiting', 'speaking', 'being', 'dancing', 'Etc.'],
+          },
+        ],
+        examples: [
+          { en: 'I **was dancing** with her.', fr: "J'étais en train de danser avec elle." },
+          { en: 'Anna **was visiting** London.', fr: 'Anna était en train de visiter Londres.' },
+        ],
+      },
+      {
+        eyebrow: 'La forme négative',
+        examples: [
+          { en: "We **weren't talking**.", fr: "Nous n'étions pas en train de parler." },
+          { en: 'Owen **was not eating** a bagel.', fr: "Owen n'était pas en train de manger de bagel." },
+        ],
+      },
+    ],
+  },
 translateExercises: [
   {
     type: 'translate',

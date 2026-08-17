@@ -3,6 +3,47 @@ const ComparativeGrammar = {
   title: 'Comparatif',
   description: 'Learn how to make comparisons in English',
   imageUrl: 'https://i.ibb.co/q3NwPRgG/Comparatif-sup-riorit.png',
+  textContent: {
+    cards: [
+      {
+        eyebrow: 'À quoi ça sert',
+        paragraph: 'Comparer des choses entre elles (plus grand que, plus petit que...).',
+        tip: 'Formule : adjectif + -er + than, ou more + adjectif + than.',
+        columns: [
+          {
+            label: '-ER THAN · 1 syllabe',
+            accent: 'coral',
+            rows: ['Old → **Older** than', 'Small → **Smaller** than'],
+          },
+          {
+            label: '-ER THAN · 2 syllabes + Y',
+            accent: 'coral',
+            rows: ['Pretty → **Prettier** than', 'Funny → **Funnier** than'],
+          },
+          {
+            label: 'MORE THAN · 2 syllabes',
+            accent: 'blue',
+            rows: ['Perfect → **More perfect** than', 'Awful → **More awful** than'],
+          },
+          {
+            label: 'MORE THAN · 3 syllabes et +',
+            accent: 'blue',
+            rows: ['Beautiful → **More beautiful** than', 'Incredible → **More incredible** than'],
+          },
+        ],
+      },
+      {
+        eyebrow: 'Attention aux exceptions !',
+        subsections: [
+          {
+            text: "On regarde le nombre de syllabes de l'adjectif de départ — mais il existe deux verbes irréguliers à connaître :",
+            accent: 'amber',
+            rows: ['Good → **Better** than', 'Bad → **Worse** than'],
+          },
+        ],
+      },
+    ],
+  },
   translateExercises: [
   {
     type: 'translate',

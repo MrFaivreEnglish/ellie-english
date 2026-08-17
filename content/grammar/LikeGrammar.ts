@@ -4,6 +4,60 @@ const LikeGrammar = {
   description: 'Learn how to express likes and preferences',
   category: 'Verbs',
   imageUrl: 'https://i.ibb.co/KxkTWKBq/Like.png',
+  textContent: {
+    cards: [
+      {
+        eyebrow: 'Quand on aime un objet, une personne',
+        tip: 'Formule : sujet + verbe de goût + groupe nominal.',
+        columns: [
+          {
+            label: 'Sujet',
+            accent: 'blue',
+            rows: ['I', 'You', 'He / She / It', 'We', 'They'],
+          },
+          {
+            label: 'Verbe de goût',
+            accent: 'coral',
+            rows: ["Like(s)", "Hate(s)", "Do(es)n't like"],
+          },
+          {
+            label: 'Groupe nominal',
+            accent: 'teal',
+            rows: ['Speak', 'Love', 'Be', 'Etc.'],
+          },
+        ],
+        examples: [
+          { en: 'I **like** books.', fr: "J'aime les livres." },
+          { en: "He **doesn't like** fish.", fr: "Il n'aime pas les poissons." },
+        ],
+      },
+      {
+        eyebrow: 'Quand on aime faire quelque chose',
+        tip: 'Formule : sujet + verbe de goût + verbe +ING.',
+        columns: [
+          {
+            label: 'Sujet',
+            accent: 'blue',
+            rows: ['I', 'You', 'He / She / It', 'We', 'They'],
+          },
+          {
+            label: 'Verbe de goût',
+            accent: 'coral',
+            rows: ["Like(s)", "Hate(s)", "Do(es)n't like"],
+          },
+          {
+            label: 'Verbe +ING',
+            accent: 'teal',
+            rows: ['Dancing.', 'Singing.', 'Playing.', 'Etc.'],
+          },
+        ],
+        examples: [
+          { en: 'I **like reading** books.', fr: "J'aime lire des livres." },
+          { en: "He **doesn't like eating** fish.", fr: "Il n'aime pas manger de poisson." },
+        ],
+      },
+    ],
+  },
 translateExercises: [
   {
     type: 'translate',

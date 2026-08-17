@@ -1,11 +1,12 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { View, Text, StyleSheet, Animated, ActivityIndicator, Platform, useWindowDimensions } from 'react-native';
+import { View, Text, Image, StyleSheet, Animated, ActivityIndicator, Platform, useWindowDimensions } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import * as Font from 'expo-font';
 import { enterImmersive, exitImmersiveOpaque } from '../../lib/immersive';
 import { useTheme } from '../settings/ThemeContext';
 import { getAndroidBottomBarButtonStyle, getAndroidBottomBarColor } from '../shared/appChromeColors';
 import { DEFAULT_SPLASH_BACKGROUND, SHINY_SPLASH_BACKGROUND } from '../shared/homeMenuColors';
+import { freshFontFamily } from '../shared/freshDirection';
 
 export default function SplashScreen() {
   const navigation = useNavigation<any>();
@@ -15,7 +16,7 @@ export default function SplashScreen() {
   const appNavigationBarButtonStyle = getAndroidBottomBarButtonStyle(isDarkMode);
   const [isShiny, setIsShiny] = useState(isShinyEllieMode);
   const splashBackground = isShiny ? SHINY_SPLASH_BACKGROUND : DEFAULT_SPLASH_BACKGROUND;
-  const shinyLogoFontSize = Math.round(Math.min(58, Math.max(34, (width - 48) / 9.6)));
+  const shinyLogoFontSize = Math.round(Math.min(64, Math.max(34, (width - 48) / 6.6)));
 
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const appChromeRef = useRef<{
@@ -63,6 +64,11 @@ export default function SplashScreen() {
             useNativeDriver: true,
           }),
           Animated.delay(1200),
+          Animated.timing(fadeAnim, {
+            toValue: 0,
+            duration: 250,
+            useNativeDriver: true,
+          }),
         ]).start(() => {
           navigation.replace('Home');
         });
@@ -91,21 +97,38 @@ export default function SplashScreen() {
         { backgroundColor: splashBackground },
       ]}
     >
+      <View style={[styles.decorativeCircle, styles.decorativeCircleTopRight]} pointerEvents="none" />
+      <View style={[styles.decorativeCircle, styles.decorativeCircleBottomLeft]} pointerEvents="none" />
+
       <Animated.View style={[styles.logoContainer, { opacity: fadeAnim }]}>
+        <View style={styles.mark}>
+          {isShiny ? (
+            <Text style={styles.markEmoji}>{'\u2728'}</Text>
+          ) : (
+            <Image
+              source={require('../../assets/icony.png')}
+              style={styles.markImage}
+              resizeMode="contain"
+            />
+          )}
+        </View>
+
         <Text
-          style={[styles.logoText, isShiny && styles.logoTextShiny, isShiny && { fontSize: shinyLogoFontSize }]}
+          style={[styles.logoText, isShiny && { fontSize: shinyLogoFontSize }]}
           numberOfLines={1}
           adjustsFontSizeToFit
           minimumFontScale={0.72}
           allowFontScaling={false}
         >
-          {isShiny ? '\u2728 Shiny Ellie \u2728' : 'Ellie'}
+          {isShiny ? 'Shiny Ellie' : 'Ellie'}
         </Text>
 
         <Text style={styles.logoSubText}>{isShiny ? 'A Shiny Ellie appeared!' : 'My English Assistant'}</Text>
-        <Text style={styles.logoSubSubText}>By Mr Faivre</Text>
+      </Animated.View>
 
-        <ActivityIndicator size="large" color="white" style={styles.loader} />
+      <Animated.View style={[styles.creditRow, { opacity: fadeAnim }]}>
+        <Text style={styles.logoSubSubText}>By Mr Faivre</Text>
+        <ActivityIndicator size="small" color="white" style={styles.loader} />
       </Animated.View>
     </View>
   );
@@ -116,37 +139,80 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
+    overflow: 'hidden',
+  },
+  decorativeCircle: {
+    position: 'absolute',
+    borderRadius: 999,
+    backgroundColor: 'rgba(255,255,255,0.06)',
+  },
+  decorativeCircleTopRight: {
+    width: 220,
+    height: 220,
+    top: -60,
+    right: -60,
+  },
+  decorativeCircleBottomLeft: {
+    width: 260,
+    height: 260,
+    bottom: -80,
+    left: -60,
+    backgroundColor: 'rgba(255,255,255,0.05)',
   },
   logoContainer: {
     alignItems: 'center',
     paddingHorizontal: 24,
     width: '100%',
   },
+  mark: {
+    width: 108,
+    height: 108,
+    borderRadius: 28,
+    backgroundColor: 'white',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 22,
+    boxShadow: '0px 12px 28px rgba(0,0,0,0.15)',
+  },
+  markImage: {
+    width: '72%',
+    height: '72%',
+  },
+  markEmoji: {
+    fontSize: 46,
+  },
   logoText: {
-    fontSize: 70,
-    fontWeight: 'bold',
+    fontWeight: freshFontFamily.extrabold,
+    fontSize: 72,
+    letterSpacing: -0.6,
     color: 'white',
     textAlign: 'center',
     width: '100%',
   },
-  logoTextShiny: {
-    fontSize: 58,
-  },
   logoSubText: {
-    fontSize: 32,
+    fontWeight: freshFontFamily.semibold,
+    fontSize: 22,
     color: 'white',
-    marginTop: 16,
-    opacity: 0.9,
+    marginTop: 10,
+    opacity: 0.85,
     textAlign: 'center',
   },
+  creditRow: {
+    position: 'absolute',
+    bottom: 64,
+    left: 0,
+    right: 0,
+    alignItems: 'center',
+    gap: 14,
+  },
   logoSubSubText: {
-    fontSize: 24,
+    fontWeight: freshFontFamily.semibold,
+    fontSize: 16,
     color: 'white',
-    marginTop: 12,
-    opacity: 0.8,
+    opacity: 0.6,
     textAlign: 'center',
   },
   loader: {
-    marginTop: 20,
+    marginTop: 2,
   },
 });

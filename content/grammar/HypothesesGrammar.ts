@@ -3,6 +3,35 @@ const HypothesesGrammar = {
   title: 'Hypothèses',
   description: 'Form hypotheses using may, might, and must',
   imageUrl: 'https://i.ibb.co/B7g41zK/Hypoth-ses.png',
+  textContent: {
+    cards: [
+      {
+        eyebrow: 'Deviner des choses',
+        paragraph: 'Le choix de might, may, ou must dépend du degré de certitude.',
+        tip: 'Formule : sujet + might / may / must + base verbale.',
+        columns: [
+          {
+            label: 'Du moins sûr au plus sûr',
+            accent: 'coral',
+            rows: ['**Might** · pas sûr du tout', '**May** · moyennement sûr', '**Must** · vraiment sûr'],
+          },
+        ],
+        examples: [
+          { en: 'It **might be** a ghost!', fr: 'C’est peut-être un fantôme !' },
+          { en: 'It **may be** the cat.', fr: 'C’est peut-être le chat.' },
+          { en: '**They must think** I’m crazy.', fr: 'Ils doivent penser que je suis fou.' },
+        ],
+      },
+      {
+        eyebrow: 'Deviner une action passée',
+        paragraph: 'Formule : sujet + might / may / must + have + participe passé.',
+        examples: [
+          { en: 'I **may have talked** with a ghost!', fr: 'J’ai peut-être parlé à un fantôme !' },
+          { en: 'It **must have been** my imagination.', fr: 'C’était sûrement mon imagination.' },
+        ],
+      },
+    ],
+  },
   translateExercises: [
   {
     type: 'translate',

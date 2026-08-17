@@ -2,6 +2,34 @@ const MustGrammar = {
   id: '9',
   title: 'Must',
   description: 'Learn how to use the modal verb must - Evaluate if these sentences are grammatically correct',  imageUrl: 'https://i.ibb.co/gLCNmjj6/Must.png',
+  textContent: {
+    cards: [
+      {
+        eyebrow: 'Ce que je dois faire',
+        paragraph: 'Je parle de ce que je dois faire.',
+        tip: "Formule : sujet + must + base verbale. Must ne change jamais (pas de -s, pas de \"to\").",
+        columns: [
+          {
+            label: 'Sujet + MUST (invariable) + base verbale',
+            accent: 'blue',
+            rows: ['I', 'You', 'He / She / It', 'We', 'They'],
+          },
+        ],
+        examples: [
+          { en: 'In the game, **you must fight**.', fr: 'Dans le jeu, tu dois te battre.' },
+          { en: '**Eva must revise** for the test.', fr: 'Eva doit réviser pour le test.' },
+        ],
+      },
+      {
+        eyebrow: 'Ce que je ne dois pas faire',
+        paragraph: 'Formule : sujet + mustn\'t + base verbale.',
+        examples: [
+          { en: "No, **we mustn't laugh**.", fr: 'Non, nous ne devons pas rire.' },
+          { en: "**I mustn't be** jealous of her.", fr: "Je ne dois pas être jalouse d'elle." },
+        ],
+      },
+    ],
+  },
   translateExercises: [
   {
     type: 'translate',

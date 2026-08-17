@@ -6,7 +6,7 @@ const normalizeXP = (xp: number) => {
 export const MASTER_LEVEL_START = 100;
 export const MASTER_TIER_SIZE = 10;
 
-export const xpNeededForLevel = (level: number) => Math.min(50 + (level - 1) * 10, 200);
+export const xpNeededForLevel = (level: number) => Math.min(80 + (level - 1) * 12, 280);
 
 export const xpForLevel = (level: number) => {
   let total = 0;

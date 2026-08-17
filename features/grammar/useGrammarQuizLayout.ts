@@ -6,7 +6,7 @@ import { clampNumber, getWebLessonImageScale, getWebLessonScale, scaleValue } fr
 import { CARD_HEIGHT, type ExerciseMode } from './grammarExercises/GrammarExerciseUtils';
 
 export const ANDROID_SECOND_VIEW_LAYOUT = {
-  modeRowTopGap: 18,
+  modeRowTopGap: 8,
   modeRowTopGapWithStatusBar: 4,
 };
 
@@ -44,14 +44,22 @@ export const useGrammarQuizLayout = () => {
   );
   const lessonImageContentScale = 1;
   const webExerciseMaxWidth = Platform.OS === 'web'
-    ? isDesktopWebLayout
-      ? Math.round(clampNumber(windowWidth * 0.66, 860, 1040))
-      : scaleValue(760, webLessonScale)
+    ? (isDesktopWebLayout ? Math.round(clampNumber(windowWidth * 0.62, 760, 1080)) : scaleValue(672, webLessonScale))
     : undefined;
+  // Fill/Reorder/Translate size their own card internally and only need a
+  // small shared floor here (this is what quizCardHeight used to be, for
+  // every mode, before Quiz got its own viewport-aware height below).
+  const exerciseCardBaseHeight = Platform.OS === 'web' ? scaleValue(284, webLessonScale) : CARD_HEIGHT;
+  // On desktop, the 4-option stack targets ~40% of the viewport height (20%
+  // less than the initial ~50% pass), so it still reads as "big" while
+  // leaving the header/question card/bottom nav their own share and never
+  // forcing a scroll on typical desktop sizes.
   const quizCardHeight = Platform.OS === 'web'
-    ? scaleValue(isDesktopWebLayout ? 320 : CARD_HEIGHT, webLessonScale)
+    ? (isDesktopWebLayout
+        ? Math.round(clampNumber(lessonViewportHeight * 0.4, 340, 512))
+        : scaleValue(284, webLessonScale))
     : CARD_HEIGHT;
-  const quizOptionGap = Platform.OS === 'web' ? scaleValue(6, webLessonScale) : 6;
+  const quizOptionGap = Platform.OS === 'web' ? scaleValue(12, webLessonScale) : 10;
   const quizOptionHeight = (quizCardHeight - quizOptionGap * 3) / 4;
   const layoutTopInset = Platform.OS === 'ios'
     ? (insets.top > 0 ? insets.top : 0)
@@ -60,12 +68,16 @@ export const useGrammarQuizLayout = () => {
       : 0;
   const layoutBottomInset = Platform.OS === 'android' ? 0 : insets.bottom;
   const stickyHeaderTopPadding = Platform.OS === 'web' ? 4 : 6;
-  const androidSecondViewTopInset = Platform.OS === 'android' && isAndroidStatusBarEnabled ? layoutTopInset : 0;
   const androidModeRowTopGap = Platform.OS === 'android' && isAndroidStatusBarEnabled
     ? ANDROID_SECOND_VIEW_LAYOUT.modeRowTopGapWithStatusBar
     : ANDROID_SECOND_VIEW_LAYOUT.modeRowTopGap;
+  // Note: the status bar inset is deliberately NOT added here — it's already
+  // reserved once via layoutTopInset on the ScrollView's own
+  // contentContainerStyle. Adding it again on top of the mode-bar shell
+  // double-counted the status bar and left a large gap above the mode row on
+  // the very first view that web (no status bar inset here) never showed.
   const stickyHeaderPinnedTopPadding = Platform.OS === 'android'
-    ? androidSecondViewTopInset + androidModeRowTopGap
+    ? androidModeRowTopGap
     : stickyHeaderTopPadding;
 
   const STICKY_TOP_SNAP_OFFSET = 0;
@@ -94,9 +106,9 @@ export const useGrammarQuizLayout = () => {
     isAndroidLesson, isDesktopWebLayout, isCompactScreen, isKeyboardTightScreen, isLargeScreen,
     webLessonScale, webLessonImageScale, isScaledWebLesson, webLessonMediaMaxWidth,
     lessonMediaWidth, lessonImageContentScale, webExerciseMaxWidth,
-    quizCardHeight, quizOptionGap, quizOptionHeight,
+    quizCardHeight, quizOptionGap, quizOptionHeight, exerciseCardBaseHeight,
     layoutTopInset, layoutBottomInset, stickyHeaderTopPadding,
-    androidSecondViewTopInset, androidModeRowTopGap, stickyHeaderPinnedTopPadding,
+    androidModeRowTopGap, stickyHeaderPinnedTopPadding,
     STICKY_TOP_SNAP_OFFSET,
     QUIZ_VIEW_SNAP_EXTRA, FILL_VIEW_SNAP_EXTRA, REORDER_VIEW_SNAP_EXTRA, TRANSLATE_VIEW_SNAP_EXTRA,
     FIRST_VIEW_BOTTOM_SPACE, FIRST_VIEW_PEEK, FIRST_VIEW_MODE_RAISE, FIRST_VIEW_SECOND_VIEW_GUARD,

@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from 'react';
-import { Alert, View, Text, StyleSheet, ScrollView, TouchableOpacity, Linking, Platform } from 'react-native';
+import { Alert, View, Text, StyleSheet, ScrollView, TouchableOpacity, Linking, Platform, useWindowDimensions } from 'react-native';
 import BackButton from '../shared/BackButton';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
@@ -14,6 +14,7 @@ import { resourceCategories as resourceLinkCategories } from '../../content/less
 import { resolveChapterAppLink } from '../../content/lessons/appLessonRegistry';
 import { createMixedGrammarLesson } from '../../content/lessons/grammarRegistry';
 import type { ResolvedChapterAppLink } from '../../content/lessons/lessonTypes';
+import { getLessonImage } from '../vocabulary/vocabularyUtils';
 import { getMenuCopy } from '../shared/menuCopy';
 import {
   getCustomChapterLinkOverrides,
@@ -21,9 +22,37 @@ import {
   normalizeChapterLinkOverrides,
   type ChapterLinkOverride,
 } from './chapterLinkStorage';
-import { getStudySurfaceColors } from '../shared/uiPrimitives';
+import { getPanelStyle, getSoftShadow, uiRadii } from '../shared/uiPrimitives';
+import { FRESH_COLORS, freshRadii } from '../shared/freshDirection';
+import type { Word } from '../../types/VocabularyTypes';
 
 const bundledCustomChapterLinks = require('../../content/lessons/customChapterLinks.json') as any[];
+
+// Same sequence Grammar selection cycles through for its subcategory
+// headers (features/grammar/GrammarCategoryList.tsx `subColors`) — kept in
+// sync by hand so Chapters reads as the same visual system.
+const LEVEL_COLORS = [
+  '#ee9cb0ff',
+  '#D9A6E8',
+  '#B79CFF',
+  '#8F9BFF',
+  '#6FA8FF',
+  '#92c490ff',
+];
+
+// Mirrors VocabularyScreen.tsx's `getVocabularyLessonImageUrl` — same
+// raw-URL-with-generated-fallback resolution, so a vocabulary Mix built
+// from Chapters carries the same multi-image carousel data a Mix built
+// from the Vocabulary selection tray does.
+const getVocabularyLessonImageUrl = (lesson: any) => {
+  const rawImage = lesson?.imageUrl ?? lesson?.image;
+
+  if (typeof rawImage === 'string' && rawImage.trim().length > 0) {
+    return rawImage.trim();
+  }
+
+  return lesson?.title ? getLessonImage(lesson.title) : undefined;
+};
 
 const parseChapterTitle = (title: string) => {
   const match = title.match(/^\s*((?:Mini\s+)?Chapter\s+\d+)\s*:?\s*(.+)$/i);
@@ -47,6 +76,8 @@ const parseChapterTitle = (title: string) => {
   };
 };
 
+const vocabWordKey = (word: Word) => `${word.english.trim().toLowerCase()}|${word.french.trim().toLowerCase()}`;
+
 type LessonsNavigationProp = CompositeNavigationProp<
   BottomTabNavigationProp<TabParamList, 'Lessons'>,
   NativeStackNavigationProp<RootStackParamList>
@@ -54,8 +85,9 @@ type LessonsNavigationProp = CompositeNavigationProp<
 
 export default function LessonsScreen() {
   const navigation = useNavigation<LessonsNavigationProp>();
+  const { width: windowWidth } = useWindowDimensions();
+  const isDesktopWeb = Platform.OS === 'web' && windowWidth >= 768;
   const { isDarkMode, colors, isAndroidStatusBarEnabled } = useTheme();
-  const studySurface = useMemo(() => getStudySurfaceColors(colors, isDarkMode), [colors, isDarkMode]);
   const appCopy = getMenuCopy();
   const copy = appCopy.lessons;
   const commonCopy = appCopy.common;
@@ -66,8 +98,9 @@ export default function LessonsScreen() {
       ? insets.top
       : 0;
   const [viewMode, setViewMode] = useState<'chapters' | 'resources'>('chapters');
-  const [selectedCategory, setSelectedCategory] = useState<number | null>(null);
-  const [selectedResourceCategory, setSelectedResourceCategory] = useState<number | null>(null);
+  // Independently expandable rows (§2.14) — several levels can be open at once.
+  const [openChapterLevels, setOpenChapterLevels] = useState<Set<string>>(() => new Set());
+  const [openResourceLevels, setOpenResourceLevels] = useState<Set<string>>(() => new Set());
   const bundledChapterLinkOverrides = useMemo(
     () => normalizeChapterLinkOverrides(bundledCustomChapterLinks),
     []
@@ -162,39 +195,151 @@ export default function LessonsScreen() {
     });
   };
 
-  const handleViewModeChange = (mode: 'chapters' | 'resources') => {
-    setViewMode(mode);
-    setSelectedCategory(null);
-    setSelectedResourceCategory(null);
+  const openMixedVocabularyPractice = (
+    displayLessonTitle: string,
+    chapterTitle: string,
+    vocabularyAppLinks: ResolvedChapterAppLink[]
+  ) => {
+    const seenWords = new Set<string>();
+    const mixedWords: Word[] = [];
+
+    vocabularyAppLinks.forEach((appLink) => {
+      if (appLink.target !== 'vocabulary') return;
+      const sourceLesson = { id: String(appLink.lesson.id ?? appLink.label), title: appLink.lesson.title };
+
+      (appLink.lesson.flashcards ?? []).forEach((card: any) => {
+        const word: Word = { english: String(card?.english ?? '').trim(), french: String(card?.french ?? '').trim() };
+        if (!word.english || !word.french) return;
+        const key = vocabWordKey(word);
+        if (seenWords.has(key)) return;
+        seenWords.add(key);
+        mixedWords.push({ ...word, sourceLesson } as Word);
+      });
+    });
+
+    if (!mixedWords.length) return;
+
+    const sourceLessonImageCards = vocabularyAppLinks
+      .filter((appLink): appLink is Extract<ResolvedChapterAppLink, { target: 'vocabulary' }> => appLink.target === 'vocabulary')
+      .map((appLink) => {
+        const imageUrl = getVocabularyLessonImageUrl(appLink.lesson);
+        return imageUrl
+          ? { id: String(appLink.lesson.id ?? appLink.label), title: String(appLink.lesson.title ?? ''), imageUrl }
+          : null;
+      })
+      .filter((imageCard): imageCard is { id: string; title: string; imageUrl: string } => !!imageCard);
+    const sourceLessonImages = sourceLessonImageCards.map((imageCard) => imageCard.imageUrl);
+
+    navigation.navigate('Vocabulary', {
+      screen: 'VocabularyLesson',
+      params: {
+        lesson: {
+          id: `chapter-vocab-mix-${displayLessonTitle}`,
+          title: `${appCopy.vocabulary.mixedPracticeTitle}: ${chapterTitle}`,
+          description: appCopy.vocabulary.mixedPracticeSubtitle.replace('{count}', String(vocabularyAppLinks.length)),
+          imageUrl: sourceLessonImages[0] ?? '',
+          flashcards: mixedWords,
+          isVocabularyMix: true,
+          sourceLessonCount: vocabularyAppLinks.length,
+          sourceLessonImageCards,
+          sourceLessonImages,
+        },
+        backLabel: commonCopy.backToChapters,
+        backTarget: 'Lessons',
+      },
+    });
   };
 
+  const handleViewModeChange = (mode: 'chapters' | 'resources') => {
+    setViewMode(mode);
+  };
+
+  const toggleChapterLevel = (title: string) => {
+    setOpenChapterLevels((current) => {
+      const next = new Set(current);
+      if (next.has(title)) next.delete(title); else next.add(title);
+      return next;
+    });
+  };
+
+  const toggleResourceLevel = (title: string) => {
+    setOpenResourceLevels((current) => {
+      const next = new Set(current);
+      if (next.has(title)) next.delete(title); else next.add(title);
+      return next;
+    });
+  };
+
+  const collapseAll = () => {
+    if (viewMode === 'chapters') setOpenChapterLevels(new Set());
+    else setOpenResourceLevels(new Set());
+  };
+
+  const hasAnyOpen = viewMode === 'chapters' ? openChapterLevels.size > 0 : openResourceLevels.size > 0;
+
+  // Shows a "scroll for more" hint whenever the list overflows the screen
+  // and the user hasn't scrolled near the bottom yet — with more chapter
+  // categories than fit on one screen, there was no other cue that more
+  // content exists below the fold.
+  const [scrollViewportHeight, setScrollViewportHeight] = useState(0);
+  const [scrollContentHeight, setScrollContentHeight] = useState(0);
+  const [isNearScrollEnd, setIsNearScrollEnd] = useState(false);
+  const canShowScrollHint = scrollContentHeight > scrollViewportHeight + 40 && !isNearScrollEnd;
+
   return (
-    <ScrollView 
+    <View style={{ flex: 1 }}>
+    <ScrollView
       style={[
-        styles.container, 
+        styles.container,
         { backgroundColor: colors.background }
       ]}
       contentContainerStyle={{
         paddingTop: topContentInset,
         paddingBottom: 24,
       }}
+      onLayout={(event) => setScrollViewportHeight(event.nativeEvent.layout.height)}
+      onContentSizeChange={(_width, height) => setScrollContentHeight(height)}
+      onScroll={(event) => {
+        const { contentOffset, contentSize, layoutMeasurement } = event.nativeEvent;
+        const distanceFromBottom = contentSize.height - contentOffset.y - layoutMeasurement.height;
+        setIsNearScrollEnd(distanceFromBottom < 40);
+      }}
+      scrollEventThrottle={32}
     >
+      <View style={isDesktopWeb && styles.desktopContentWrap}>
       <BackButton label={commonCopy.backToHome} onPress={() => (navigation as any).navigate('Home')} />
-      <Text style={[styles.headerTitle, { color: colors.text }]}>{copy.header}</Text>
+
+      <View style={styles.headerRow}>
+        <Text
+          style={[styles.headerTitle, { color: colors.text }]}
+          numberOfLines={1}
+          adjustsFontSizeToFit
+          minimumFontScale={0.7}
+        >
+          {copy.header}
+        </Text>
+        {hasAnyOpen && (
+          <TouchableOpacity
+            onPress={collapseAll}
+            style={[styles.collapseAllPill, { backgroundColor: colors.card }, getSoftShadow(isDarkMode, 'soft')]}
+            accessibilityRole="button"
+            accessibilityLabel="Collapse all"
+          >
+            <Text style={[styles.collapseAllText, { color: colors.text }]} numberOfLines={1}>Collapse all</Text>
+          </TouchableOpacity>
+        )}
+      </View>
 
       <View
         style={[
           styles.modeToggle,
-          {
-            backgroundColor: studySurface.panel,
-            borderColor: studySurface.panelBorder,
-          },
+          { backgroundColor: colors.card },
+          getSoftShadow(isDarkMode, 'soft'),
         ]}
       >
         <TouchableOpacity
           style={[
             styles.modeOption,
-            viewMode === 'chapters' && styles.modeOptionActive,
             viewMode === 'chapters' && { backgroundColor: colors.buttonBackground },
           ]}
           onPress={() => handleViewModeChange('chapters')}
@@ -215,7 +360,6 @@ export default function LessonsScreen() {
         <TouchableOpacity
           style={[
             styles.modeOption,
-            viewMode === 'resources' && styles.modeOptionActive,
             viewMode === 'resources' && { backgroundColor: colors.buttonBackground },
           ]}
           onPress={() => handleViewModeChange('resources')}
@@ -235,238 +379,289 @@ export default function LessonsScreen() {
         </TouchableOpacity>
       </View>
 
-      {viewMode === 'chapters' && chapterCategories.map((category, index) => (
-        <View
-          key={index}
-          style={[
-            styles.categoryContainer,
-            selectedCategory === index && styles.categoryContainerActive,
-            {
-              backgroundColor: colors.card,
-              borderColor: category.color,
-              borderBottomColor: category.color,
-              borderBottomWidth: selectedCategory === index ? 4 : 3,
-              shadowColor: '#000000',
-              shadowOpacity: selectedCategory === index ? (isDarkMode ? 0.28 : 0.16) : (isDarkMode ? 0.2 : 0.1),
-            },
-          ]}
-        >
-          <TouchableOpacity
-            style={[styles.categoryHeader, { backgroundColor: category.color }]}
-            onPress={() => setSelectedCategory(selectedCategory === index ? null : index)}
-            activeOpacity={0.85}
-            accessibilityRole="button"
-            accessibilityLabel={`${selectedCategory === index ? commonCopy.collapse : commonCopy.expand} ${category.title} ${copy.chapterPlural}`}
-            accessibilityState={{ expanded: selectedCategory === index }}
-          >
-            <Text style={styles.categoryIcon}>{category.icon}</Text>
-            <View style={styles.categoryTitleBlock}>
-              <Text style={styles.categoryTitle}>{category.title}</Text>
-            </View>
-            <View style={styles.lessonCountPill}>
-              <Text style={styles.lessonCountText}>
-                {category.lessons.length} {category.lessons.length > 1 ? copy.chapterPlural : copy.chapterSingular}
-              </Text>
-            </View>
-            <MaterialIcons 
-              name={selectedCategory === index ? 'expand-less' : 'expand-more'} 
-              size={24} 
-              color="white" 
-            />
-          </TouchableOpacity>
-          {selectedCategory === index && (
-            <View style={styles.lessonsContainer}>
-              {category.lessons.map((lesson, lessonIndex) => {
-                const chapterLinkOverride = chapterLinkOverrideMap.get(
-                  makeChapterLinkOverrideId(category.title, lesson.title)
-                );
-                const chapterUrl = chapterLinkOverride?.url ?? lesson.url;
-                const displayLessonTitle = chapterLinkOverride?.displayTitle || lesson.title;
-                const chapter = parseChapterTitle(displayLessonTitle);
-                const appLinks = (lesson.appLinks ?? [])
-                  .filter((link) => link.target !== 'pronunciation')
-                  .map(resolveChapterAppLink)
-                  .filter((link): link is ResolvedChapterAppLink => !!link);
-                const grammarAppLinks = appLinks.filter(
-                  (appLink) => appLink.target === 'grammar' && appLink.lesson?.practiceType !== 'vocabulary'
-                );
-                return (
-                  <View
-                    key={lessonIndex}
-                    style={[
-                      styles.lessonItem,
-                      appLinks && appLinks.length > 0 ? styles.lessonItemWithAppLinks : null,
-                      {
-                        backgroundColor: isDarkMode ? colors.surface : '#F8FAFF',
-                        borderColor: colors.border,
-                      },
-                    ]}
-                  >
-                    <TouchableOpacity
-                      style={styles.chapterMainRow}
-                      activeOpacity={0.82}
-                      onPress={() => openLink(chapterUrl)}
-                      accessibilityRole="link"
-                      accessibilityLabel={`Open ${displayLessonTitle}`}
-                    >
-                      <View style={[styles.chapterLabelBadge, { backgroundColor: category.color }]}>
-                        <Text style={styles.chapterLabelPrefix}>
-                          {chapter.labelPrefix || copy.chapterFallback}
-                        </Text>
-                        <Text style={styles.chapterLabelNumber}>
-                          {chapter.labelNumber || lessonIndex + 1}
-                        </Text>
-                      </View>
-                      <View style={styles.chapterTextBlock}>
-                        <Text style={[styles.lessonTitle, styles.chapterLessonTitle, { color: colors.text }]}>{chapter.title}</Text>
-                      </View>
-                      <View style={[styles.chapterArrow, { borderColor: colors.border }]}>
-                        <MaterialIcons name="open-in-new" size={15} color={colors.secondaryText} />
-                      </View>
-                    </TouchableOpacity>
+      {viewMode === 'chapters' && chapterCategories.map((category, levelIndex) => {
+        const isOpen = openChapterLevels.has(category.title);
+        const levelColor = LEVEL_COLORS[levelIndex % LEVEL_COLORS.length];
 
-                    {!!appLinks?.length && (
-                      <View style={styles.appLinksBlock}>
-                        <View style={styles.appLinksGrid}>
+        return (
+          <View
+            key={category.title}
+            style={[
+              styles.categoryContainer,
+              getPanelStyle(colors, isDarkMode, isOpen ? 'raised' : 'soft'),
+              { backgroundColor: colors.card, borderWidth: 0 },
+            ]}
+          >
+            <TouchableOpacity
+              style={[styles.levelRow, { backgroundColor: levelColor }]}
+              onPress={() => toggleChapterLevel(category.title)}
+              activeOpacity={0.85}
+              accessibilityRole="button"
+              accessibilityLabel={`${isOpen ? commonCopy.collapse : commonCopy.expand} ${category.title} ${copy.chapterPlural}`}
+              accessibilityState={{ expanded: isOpen }}
+            >
+              <Text style={styles.levelIcon}>{category.icon}</Text>
+              <Text style={styles.levelTitle} numberOfLines={1}>{category.title}</Text>
+              <View style={styles.levelCountPill}>
+                <Text style={styles.levelCountText}>
+                  {category.lessons.length} {category.lessons.length > 1 ? copy.chapterPlural : copy.chapterSingular}
+                </Text>
+              </View>
+              <MaterialIcons name={isOpen ? 'expand-less' : 'expand-more'} size={22} color="white" />
+            </TouchableOpacity>
+
+            {isOpen && (
+              <View style={styles.lessonsContainer}>
+                {category.lessons.map((lesson, lessonIndex) => {
+                  const chapterLinkOverride = chapterLinkOverrideMap.get(
+                    makeChapterLinkOverrideId(category.title, lesson.title)
+                  );
+                  const chapterUrl = chapterLinkOverride?.url ?? lesson.url;
+                  const displayLessonTitle = chapterLinkOverride?.displayTitle || lesson.title;
+                  const chapter = parseChapterTitle(displayLessonTitle);
+                  const appLinks = (lesson.appLinks ?? [])
+                    .filter((link) => link.target !== 'pronunciation')
+                    .map(resolveChapterAppLink)
+                    .filter((link): link is ResolvedChapterAppLink => !!link);
+                  const vocabularyAppLinks = appLinks.filter((link) => link.target === 'vocabulary');
+                  const grammarAppLinks = appLinks.filter(
+                    (link) => link.target === 'grammar' && link.lesson?.practiceType !== 'vocabulary'
+                  );
+                  // "Irregular Verbs" is a standalone reference chapter, not paired
+                  // vocab/grammar content — it links straight to each verb-group
+                  // lesson instead of showing the usual two-column split.
+                  const isLinksOnlyChapter = category.title === 'Irregular Verbs';
+
+                  return (
+                    <View
+                      key={lessonIndex}
+                      style={[
+                        styles.chapterCard,
+                        {
+                          backgroundColor: isDarkMode ? colors.surface : '#FDFCFA',
+                          borderColor: colors.border,
+                          // Rows otherwise all share the same flat card background —
+                          // this left-edge accent ties each chapter's lessons back to
+                          // its own category color so open chapters read as distinct.
+                          borderLeftWidth: 4,
+                          borderLeftColor: levelColor,
+                        },
+                      ]}
+                    >
+                      <View style={styles.chapterCardHeaderRow}>
+                        <View style={[styles.chapterBadge, { backgroundColor: levelColor }]}>
+                          <Text style={styles.chapterBadgePrefix} numberOfLines={1}>
+                            {chapter.labelPrefix ? chapter.labelPrefix.toUpperCase() : copy.chapterFallback.toUpperCase()}
+                          </Text>
+                          <Text style={styles.chapterBadgeNumber}>
+                            {chapter.labelNumber || lessonIndex + 1}
+                          </Text>
+                        </View>
+                        <Text style={[styles.chapterCardTitle, { color: colors.text }]} numberOfLines={2}>
+                          {chapter.title}
+                        </Text>
+                        <TouchableOpacity
+                          style={[styles.openChapterPill, { backgroundColor: colors.card, borderColor: levelColor }]}
+                          onPress={() => openLink(chapterUrl)}
+                          activeOpacity={0.82}
+                          accessibilityRole="link"
+                          accessibilityLabel={`Open ${displayLessonTitle}`}
+                        >
+                          <Text style={[styles.openChapterPillText, { color: colors.text }]} numberOfLines={1}>
+                            Open chapter ↗
+                          </Text>
+                        </TouchableOpacity>
+                      </View>
+
+                      <View style={[styles.chapterDivider, { backgroundColor: colors.border }]} />
+
+                      {isLinksOnlyChapter ? (
+                        <View style={styles.chipRow}>
                           {appLinks.map((appLink) => (
                             <TouchableOpacity
-                              key={`${lesson.title}-${appLink.label}`}
+                              key={appLink.label}
                               style={[
-                                styles.appLinkButton,
-                                {
-                                  backgroundColor: studySurface.control,
-                                  borderColor: colors.border,
-                                },
+                                styles.chip,
+                                { backgroundColor: FRESH_COLORS.grammarLavenderFill, borderColor: FRESH_COLORS.grammarLavenderBorder },
                               ]}
                               onPress={() => openAppLink(appLink)}
-                              activeOpacity={0.86}
+                              activeOpacity={0.84}
                               accessibilityRole="button"
                               accessibilityLabel={`${copy.practice} ${appLink.label}`}
                             >
-                              <MaterialIcons name={appLink.icon} size={18} color={category.color} />
-                              <Text style={[styles.appLinkText, { color: colors.text }]}>
+                              <Text style={[styles.chipText, { color: FRESH_COLORS.grammarLavenderText }]} numberOfLines={1}>
                                 {appLink.label}
                               </Text>
                             </TouchableOpacity>
                           ))}
-                          {grammarAppLinks.length >= 2 && (
-                            <TouchableOpacity
-                              key={`${lesson.title}-grammar-mix`}
-                              style={[
-                                styles.appLinkButton,
-                                styles.mixedGrammarButton,
-                                {
-                                  backgroundColor: isDarkMode ? colors.surface : '#F8FAFF',
-                                  borderColor: colors.primary,
-                                },
-                              ]}
-                              onPress={() => openMixedGrammarPractice(displayLessonTitle, chapter.title, grammarAppLinks)}
-                              activeOpacity={0.86}
-                              accessibilityRole="button"
-                              accessibilityLabel={`${copy.practice} ${copy.mixedGrammarPractice}`}
-                            >
-                              <View
-                                style={[
-                                  styles.mixedGrammarIconBadge,
-                                  {
-                                    backgroundColor: colors.buttonBackground,
-                                    borderColor: '#FFFFFF',
-                                  },
-                                ]}
-                              >
-                                <MaterialIcons name="shuffle" size={17} color={colors.buttonText} />
-                              </View>
-                              <Text style={[styles.appLinkText, { color: colors.text }]}>
-                                {copy.mixedGrammarPractice}
-                              </Text>
-                            </TouchableOpacity>
+                        </View>
+                      ) : (
+                      <View style={styles.chapterColumns}>
+                        <View style={styles.chapterColumn}>
+                          <Text style={[styles.chapterColumnHeader, { color: colors.secondaryText }]}>
+                            📕 VOCABULARY
+                          </Text>
+                          {vocabularyAppLinks.length ? (
+                            <View style={styles.chipRow}>
+                              {vocabularyAppLinks.map((appLink) => (
+                                <TouchableOpacity
+                                  key={appLink.label}
+                                  style={[
+                                    styles.chip,
+                                    { backgroundColor: FRESH_COLORS.vocabCoralChipFill, borderColor: FRESH_COLORS.vocabCoralChipBorder },
+                                  ]}
+                                  onPress={() => openAppLink(appLink)}
+                                  activeOpacity={0.84}
+                                  accessibilityRole="button"
+                                  accessibilityLabel={`${copy.practice} ${appLink.label}`}
+                                >
+                                  <Text style={[styles.chipText, { color: FRESH_COLORS.vocabCoralChipText }]} numberOfLines={1}>
+                                    {appLink.label}
+                                  </Text>
+                                </TouchableOpacity>
+                              ))}
+                              {vocabularyAppLinks.length >= 2 && (
+                                <TouchableOpacity
+                                  style={[styles.mixChip, { backgroundColor: FRESH_COLORS.vocabCoralSolid }]}
+                                  onPress={() => openMixedVocabularyPractice(displayLessonTitle, chapter.title, vocabularyAppLinks)}
+                                  activeOpacity={0.86}
+                                  accessibilityRole="button"
+                                  accessibilityLabel={`${copy.practice} Mix`}
+                                >
+                                  <Text style={styles.mixChipText}>🎲 Mix</Text>
+                                </TouchableOpacity>
+                              )}
+                            </View>
+                          ) : (
+                            <Text style={[styles.emptyColumnText, { color: colors.secondaryText }]}>
+                              No vocabulary lesson in this chapter
+                            </Text>
+                          )}
+                        </View>
+
+                        <View style={[styles.chapterColumnVerticalDivider, { backgroundColor: colors.border }]} />
+
+                        <View style={styles.chapterColumn}>
+                          <Text style={[styles.chapterColumnHeader, { color: colors.secondaryText }]}>
+                            ✏️ GRAMMAR
+                          </Text>
+                          {grammarAppLinks.length ? (
+                            <View style={styles.chipRow}>
+                              {grammarAppLinks.map((appLink) => (
+                                <TouchableOpacity
+                                  key={appLink.label}
+                                  style={[
+                                    styles.chip,
+                                    { backgroundColor: FRESH_COLORS.grammarLavenderFill, borderColor: FRESH_COLORS.grammarLavenderBorder },
+                                  ]}
+                                  onPress={() => openAppLink(appLink)}
+                                  activeOpacity={0.84}
+                                  accessibilityRole="button"
+                                  accessibilityLabel={`${copy.practice} ${appLink.label}`}
+                                >
+                                  <Text style={[styles.chipText, { color: FRESH_COLORS.grammarLavenderText }]} numberOfLines={1}>
+                                    {appLink.label}
+                                  </Text>
+                                </TouchableOpacity>
+                              ))}
+                              {grammarAppLinks.length >= 2 && (
+                                <TouchableOpacity
+                                  style={[styles.mixChip, { backgroundColor: FRESH_COLORS.primaryBlue }]}
+                                  onPress={() => openMixedGrammarPractice(displayLessonTitle, chapter.title, grammarAppLinks)}
+                                  activeOpacity={0.86}
+                                  accessibilityRole="button"
+                                  accessibilityLabel={`${copy.practice} ${copy.mixedGrammarPractice}`}
+                                >
+                                  <Text style={styles.mixChipText}>🎲 Mix</Text>
+                                </TouchableOpacity>
+                              )}
+                            </View>
+                          ) : (
+                            <Text style={[styles.emptyColumnText, { color: colors.secondaryText }]}>
+                              No grammar lesson in this chapter
+                            </Text>
                           )}
                         </View>
                       </View>
-                    )}
-                  </View>
-                );
-              })}
-            </View>          )}
-        </View>
-      ))}
+                      )}
+                    </View>
+                  );
+                })}
+              </View>
+            )}
+          </View>
+        );
+      })}
 
-      {viewMode === 'resources' && resourceLinkCategories.map((category, index) => (
-        <View
-          key={category.title}
-          style={[
-            styles.categoryContainer,
-            selectedResourceCategory === index && styles.categoryContainerActive,
-            {
-              backgroundColor: colors.card,
-              borderColor: category.color,
-              borderBottomColor: category.color,
-              borderBottomWidth: selectedResourceCategory === index ? 4 : 3,
-              shadowColor: '#000000',
-              shadowOpacity: selectedResourceCategory === index ? (isDarkMode ? 0.28 : 0.16) : (isDarkMode ? 0.2 : 0.1),
-            },
-          ]}
-        >
-          <TouchableOpacity
-            style={[styles.categoryHeader, { backgroundColor: category.color }]}
-            onPress={() => setSelectedResourceCategory(selectedResourceCategory === index ? null : index)}
-            activeOpacity={0.85}
-            accessibilityRole="button"
-            accessibilityLabel={`${selectedResourceCategory === index ? commonCopy.collapse : commonCopy.expand} ${category.title} ${copy.resources}`}
-            accessibilityState={{ expanded: selectedResourceCategory === index }}
+      {viewMode === 'resources' && resourceLinkCategories.map((category) => {
+        const isOpen = openResourceLevels.has(category.title);
+
+        return (
+          <View
+            key={category.title}
+            style={[
+              styles.categoryContainer,
+              getPanelStyle(colors, isDarkMode, isOpen ? 'raised' : 'soft'),
+              { backgroundColor: colors.card, borderWidth: 0 },
+            ]}
           >
-            <Text style={styles.categoryIcon}>{category.icon}</Text>
-            <View style={styles.categoryTitleBlock}>
-              <Text style={styles.categoryTitle}>{category.title}</Text>
-            </View>
-            <View style={styles.lessonCountPill}>
-              <Text style={styles.lessonCountText}>
-                {category.resources.length} {category.resources.length > 1 ? copy.linkPlural : copy.linkSingular}
-              </Text>
-            </View>
-            <MaterialIcons
-              name={selectedResourceCategory === index ? 'expand-less' : 'expand-more'}
-              size={24}
-              color="white"
-            />
-          </TouchableOpacity>
-          {selectedResourceCategory === index && (
-            <View style={styles.lessonsContainer}>
-              {category.resources.map((resource, resourceIndex) => (
-                <TouchableOpacity
-                  key={resource.title}
-                  style={[
-                    styles.lessonItem,
-                    {
-                      backgroundColor: isDarkMode ? colors.surface : '#F8FAFF',
-                      borderColor: colors.border,
-                    },
-                  ]}
-                  activeOpacity={0.82}
-                  onPress={() => openLink(resource.url)}
-                  accessibilityRole="link"
-                  accessibilityLabel={`Open ${resource.title}`}
-                >
-                  <View style={[styles.lessonNumberBadge, { backgroundColor: category.color }]}>
-                    <Text style={styles.lessonNumberText}>{resourceIndex + 1}</Text>
-                  </View>
-                  <View style={styles.resourceTextBlock}>
-                    <Text style={[styles.lessonTitle, { color: colors.text }]}>
-                      {resource.title}
-                    </Text>
-                    <Text style={[styles.resourceDescription, { color: colors.secondaryText }]}>
-                      {resource.description}
-                    </Text>
-                  </View>
-                  <MaterialIcons name="open-in-new" size={18} color={colors.secondaryText} />
-                </TouchableOpacity>
-              ))}
-            </View>
-          )}
-        </View>
-      ))}
+            <TouchableOpacity
+              style={[styles.levelRow, { backgroundColor: category.color }]}
+              onPress={() => toggleResourceLevel(category.title)}
+              activeOpacity={0.85}
+              accessibilityRole="button"
+              accessibilityLabel={`${isOpen ? commonCopy.collapse : commonCopy.expand} ${category.title} ${copy.resources}`}
+              accessibilityState={{ expanded: isOpen }}
+            >
+              <Text style={styles.levelIcon}>{category.icon}</Text>
+              <Text style={styles.levelTitle} numberOfLines={1}>{category.title}</Text>
+              <View style={styles.levelCountPill}>
+                <Text style={styles.levelCountText}>
+                  {category.resources.length} {category.resources.length > 1 ? copy.linkPlural : copy.linkSingular}
+                </Text>
+              </View>
+              <MaterialIcons name={isOpen ? 'expand-less' : 'expand-more'} size={22} color="white" />
+            </TouchableOpacity>
 
+            {isOpen && (
+              <View style={styles.lessonsContainer}>
+                {category.resources.map((resource, resourceIndex) => (
+                  <TouchableOpacity
+                    key={resource.title}
+                    style={[
+                      styles.resourceItem,
+                      { backgroundColor: isDarkMode ? colors.surface : '#FDFCFA', borderColor: colors.border },
+                    ]}
+                    activeOpacity={0.82}
+                    onPress={() => openLink(resource.url)}
+                    accessibilityRole="link"
+                    accessibilityLabel={`Open ${resource.title}`}
+                  >
+                    <View style={[styles.resourceNumberBadge, { backgroundColor: category.color }]}>
+                      <Text style={styles.resourceNumberText}>{resourceIndex + 1}</Text>
+                    </View>
+                    <View style={styles.resourceTextBlock}>
+                      <Text style={[styles.resourceTitle, { color: colors.text }]}>{resource.title}</Text>
+                      <Text style={[styles.resourceDescription, { color: colors.secondaryText }]}>{resource.description}</Text>
+                    </View>
+                    <MaterialIcons name="open-in-new" size={18} color={colors.secondaryText} />
+                  </TouchableOpacity>
+                ))}
+              </View>
+            )}
+          </View>
+        );
+      })}
+      </View>
     </ScrollView>
+    {canShowScrollHint && (
+      <View pointerEvents="none" style={styles.scrollHintWrap}>
+        <View style={[styles.scrollHintBubble, { backgroundColor: colors.card }]}>
+          <MaterialIcons name="keyboard-arrow-down" size={20} color={colors.secondaryText} />
+        </View>
+      </View>
+    )}
+    </View>
   );
 }
 
@@ -474,109 +669,219 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
   },
-  headerTitle: {
-    fontSize: 32,
-    fontWeight: 'bold',
+  scrollHintWrap: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    bottom: 14,
+    alignItems: 'center',
+  },
+  scrollHintBubble: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  desktopContentWrap: {
+    width: '100%',
+    maxWidth: 1000,
+    alignSelf: 'center',
+  },
+  headerRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 12,
     paddingHorizontal: 24,
     paddingBottom: 16,
   },
+  headerTitle: {
+    flex: 1,
+    minWidth: 0,
+    fontSize: 30,
+    fontWeight: '800',
+  },
+  collapseAllPill: {
+    flexShrink: 0,
+    borderRadius: freshRadii.pill,
+    paddingHorizontal: 16,
+    paddingVertical: 9,
+  },
+  collapseAllText: {
+    fontSize: 13,
+    fontWeight: '700',
+  },
   modeToggle: {
-    borderRadius: 20,
-    borderWidth: 2,
+    borderRadius: freshRadii.pill,
     flexDirection: 'row',
     marginBottom: 18,
     marginHorizontal: 16,
-    padding: 6,
+    padding: 5,
+    gap: 2,
   },
   modeOption: {
     alignItems: 'center',
-    borderRadius: 14,
+    borderRadius: freshRadii.pill,
     flex: 1,
     justifyContent: 'center',
     minHeight: 44,
   },
-  modeOptionActive: {
-    backgroundColor: '#1F7AD1',
-  },
   modeOptionText: {
-    fontSize: 16,
+    fontSize: 13.5,
     fontWeight: '800',
   },
   categoryContainer: {
     marginBottom: 16,
     marginHorizontal: 16,
-    borderRadius: 16,
+    borderRadius: uiRadii.card,
     overflow: 'hidden',
-    borderWidth: 2,
-    shadowOffset: { width: 0, height: 2 },
-    shadowRadius: 4,
-    elevation: 3,
-  },
-  categoryContainerActive: {
-    shadowOffset: { width: 0, height: 5 },
-    shadowRadius: 10,
-    elevation: 6,
-  },
-  categoryHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: 16,
-    justifyContent: 'space-between',
-  },  categoryIcon: {
-    fontSize: 24,
-  },
-  categoryTitleBlock: {
-    flex: 1,
-    marginLeft: 12,
-  },
-  categoryTitle: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    color: 'white',
-  },
-  lessonCountPill: {
-    minWidth: 92,
-    height: 28,
-    paddingHorizontal: 10,
-    borderRadius: 999,
-    backgroundColor: 'rgba(255,255,255,0.24)',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginRight: 8,
-    borderWidth: 1.5,
-    borderColor: '#FFFFFF',
-  },
-  lessonCountText: {
-    color: '#fff',
-    fontSize: 13,
-    fontWeight: '800',
   },
   lessonsContainer: {
     padding: 14,
     gap: 10,
   },
-  lessonItem: {
+  levelRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 16,
+    paddingHorizontal: 18,
+    gap: 12,
+  },
+  levelIcon: {
+    fontSize: 20,
+  },
+  levelTitle: {
+    flex: 1,
+    fontSize: 17,
+    fontWeight: '800',
+    color: 'white',
+  },
+  levelCountPill: {
+    borderRadius: freshRadii.pill,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    backgroundColor: 'rgba(255,255,255,0.28)',
+  },
+  levelCountText: {
+    color: 'white',
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  chapterCard: {
+    borderWidth: 1,
+    borderRadius: freshRadii.card,
+    padding: 14,
+    paddingHorizontal: 16,
+    overflow: 'hidden',
+  },
+  chapterCardHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 14,
+  },
+  chapterBadge: {
+    minWidth: 64,
+    borderRadius: freshRadii.chapterBadge,
+    paddingHorizontal: 11,
+    paddingVertical: 7,
+    alignItems: 'center',
+  },
+  chapterBadgePrefix: {
+    color: 'rgba(255,255,255,0.85)',
+    fontSize: 9,
+    fontWeight: '800',
+    letterSpacing: 0.4,
+  },
+  chapterBadgeNumber: {
+    color: 'white',
+    fontSize: 19,
+    fontWeight: '800',
+    lineHeight: 22,
+  },
+  chapterCardTitle: {
+    flex: 1,
+    fontSize: 17,
+    fontWeight: '800',
+    minWidth: 0,
+  },
+  openChapterPill: {
+    borderRadius: freshRadii.pill,
+    borderWidth: 1.5,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+  },
+  openChapterPillText: {
+    fontSize: 12.5,
+    fontWeight: '800',
+  },
+  chapterDivider: {
+    height: 1,
+    marginVertical: 12,
+  },
+  chapterColumns: {
+    flexDirection: 'row',
+    gap: 18,
+  },
+  chapterColumn: {
+    flex: 1,
+    minWidth: 0,
+    alignItems: 'center',
+  },
+  chapterColumnVerticalDivider: {
+    width: 1,
+  },
+  chapterColumnHeader: {
+    fontSize: 10,
+    fontWeight: '800',
+    letterSpacing: 0.7,
+    textTransform: 'uppercase',
+    marginBottom: 9,
+    textAlign: 'center',
+  },
+  chipRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    justifyContent: 'center',
+  },
+  chip: {
+    borderRadius: freshRadii.pill,
+    borderWidth: 1.5,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+  },
+  chipText: {
+    fontSize: 13.5,
+    fontWeight: '700',
+  },
+  mixChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderRadius: freshRadii.pill,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    gap: 4,
+  },
+  mixChipText: {
+    color: 'white',
+    fontSize: 13,
+    fontWeight: '800',
+  },
+  emptyColumnText: {
+    fontSize: 13,
+    fontWeight: '600',
+  },
+  resourceItem: {
     flexDirection: 'row',
     alignItems: 'center',
     minHeight: 72,
     paddingVertical: 10,
     paddingHorizontal: 12,
-    borderRadius: 12,
+    borderRadius: freshRadii.card,
     borderWidth: 1,
-    borderBottomWidth: 2,
   },
-  lessonItemWithAppLinks: {
-    alignItems: 'stretch',
-    flexDirection: 'column',
-  },
-  chapterMainRow: {
-    alignItems: 'center',
-    alignSelf: 'stretch',
-    flexDirection: 'row',
-    minHeight: 52,
-    width: '100%',
-  },
-  lessonNumberBadge: {
+  resourceNumberBadge: {
     width: 30,
     height: 30,
     borderRadius: 999,
@@ -584,105 +889,19 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     marginRight: 12,
   },
-  lessonNumberText: {
+  resourceNumberText: {
     color: '#fff',
     fontSize: 13,
     fontWeight: '800',
-  },
-  chapterLabelBadge: {
-    width: 74,
-    minHeight: 52,
-    borderRadius: 8,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginRight: 12,
-    paddingHorizontal: 6,
-    paddingVertical: 7,
-  },
-  chapterLabelPrefix: {
-    color: '#fff',
-    fontSize: 10,
-    fontWeight: '800',
-    lineHeight: 12,
-    textAlign: 'center',
-    textTransform: 'uppercase',
-  },
-  chapterLabelNumber: {
-    color: '#fff',
-    fontSize: 20,
-    fontWeight: '900',
-    lineHeight: 23,
-    marginTop: 1,
-    textAlign: 'center',
-  },
-  lessonTitle: {
-    fontSize: 17,
-    flex: 1,
-    fontWeight: '800',
-    lineHeight: 22,
-  },
-  chapterTextBlock: {
-    alignSelf: 'stretch',
-    flex: 1,
-    justifyContent: 'center',
-    marginRight: 10,
-    minHeight: 52,
-  },
-  chapterLessonTitle: {
-    flex: 0,
-    includeFontPadding: false,
-    textAlignVertical: 'center',
-  },
-  chapterArrow: {
-    alignItems: 'center',
-    borderRadius: 999,
-    borderWidth: 1,
-    height: 32,
-    justifyContent: 'center',
-    width: 32,
-  },
-  appLinksBlock: {
-    marginTop: 6,
-  },
-  appLinksGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 8,
-  },
-  appLinkButton: {
-    alignItems: 'center',
-    borderRadius: 8,
-    borderWidth: 1,
-    borderBottomWidth: 2,
-    flexDirection: 'row',
-    minHeight: 40,
-    paddingHorizontal: 10,
-    paddingVertical: 8,
-  },
-  mixedGrammarButton: {
-    borderWidth: 1.5,
-    borderBottomWidth: 3,
-    minHeight: 44,
-    paddingLeft: 9,
-    paddingRight: 12,
-  },
-  mixedGrammarIconBadge: {
-    alignItems: 'center',
-    borderRadius: 10,
-    borderWidth: 1.5,
-    borderBottomWidth: 2,
-    height: 26,
-    justifyContent: 'center',
-    width: 26,
-  },
-  appLinkText: {
-    fontSize: 13,
-    fontWeight: '800',
-    marginLeft: 6,
   },
   resourceTextBlock: {
     flex: 1,
     marginRight: 12,
+  },
+  resourceTitle: {
+    fontSize: 17,
+    fontWeight: '800',
+    lineHeight: 22,
   },
   resourceDescription: {
     fontSize: 13,

@@ -6,25 +6,23 @@ import {
   SectionList,
   TouchableOpacity,
   Image,
-  Animated,
-  Easing,
   TextInput,
   Platform,
   Pressable,
-  Modal,
   useWindowDimensions,
 } from 'react-native';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { MaterialIcons } from '@expo/vector-icons';
-import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import Animated, { FadeIn, FadeOut } from 'react-native-reanimated';
 import { useTheme } from '../settings/ThemeContext';
 import BackButton from '../shared/BackButton';
+import { useSearchFocusAnimation } from '../shared/useSearchFocusAnimation';
 import { getLessonImage, getLessonThumbnailSource, shuffleArray } from './vocabularyUtils';
 import { vocabularyCategories } from '../../content/lessons/vocabularyRegistry';
 import { getCustomVocabularyLessons } from '../lessons/customLessonStorage';
 import { getMenuCopy } from '../shared/menuCopy';
+import { MAX_XP_PER_PAIR } from './vocabRush/VocabRushGame';
 import type { Word } from '../../types/VocabularyTypes';
 import type { VocabularyLesson } from '../../types/lessonTypes';
 import {
@@ -40,18 +38,11 @@ import {
   uiRadii,
 } from '../shared/uiPrimitives';
 import VocabularyLessonCard from './VocabularyLessonCard';
+import { freshFontFamily } from '../shared/freshDirection';
 
 const bundledCustomVocabularyLessons = require('../../content/lessons/customVocabularyLessons.json') as any[];
 
 const STAR_EMOJI = '\u2B50';
-const LEARNT_MIX_MAX_WORDS = 36;
-const LEARNT_MIX_UNLOCK_COUNT = 50;
-const LEARNT_MIX_UNLOCK_SEEN_KEY = '@learnt_words_challenge_unlock_seen_overlay_v1';
-const LEARNT_MIX_UNLOCK_GRADIENT: [string, string, string] = [
-  'rgba(0,0,0,0.18)',
-  'rgba(0,0,0,0.62)',
-  'rgba(0,0,0,0.94)',
-];
 
 const CATEGORY_EMOJI_MAP: Record<string, string> = {
   'Classroom English': '\u{1F3EB}',
@@ -236,16 +227,13 @@ export default function VocabularyScreen() {
   const commonCopy = appCopy.common;
   const insets = useSafeAreaInsets();
   const { width: windowWidth } = useWindowDimensions();
+  const isDesktopWeb = Platform.OS === 'web' && windowWidth >= 768;
   const topContentInset = Platform.OS === 'ios'
     ? insets.top
     : Platform.OS === 'android' && isAndroidStatusBarEnabled
       ? insets.top
       : 0;
-  const thumbX = useRef(new Animated.Value(0)).current;
-  const unlockOverlayOpacity = useRef(new Animated.Value(0)).current;
-  const unlockOverlayScale = useRef(new Animated.Value(0.96)).current;
   const isPortraitTight = windowWidth < 430;
-  const isMobileHeader = windowWidth < 640;
 
   const bundledCustomLessons = useMemo(
     () => bundledCustomVocabularyLessons.map(normalizeCustomLesson).filter(Boolean),
@@ -255,17 +243,18 @@ export default function VocabularyScreen() {
   const [customLessons, setCustomLessons] = useState<any[]>([]);
   const [selectedDifficulty, setSelectedDifficulty] = useState<number | null>(null);
   const [showDifficultyMenu, setShowDifficultyMenu] = useState(false);
+  const [showSortMenu, setShowSortMenu] = useState(false);
   const [viewMode, setViewMode] = useState<'category' | 'abc'>('category');
   const [cardView, setCardView] = useState<'list' | 'tile'>(vocabLessonCardView);
   const [searchText, setSearchText] = useState('');
-  const [toggleWidth, setToggleWidth] = useState(0);
   const [difficultyAnchor, setDifficultyAnchor] = useState({ x: 16, y: 0, width: 180, height: 50 });
+  const [sortAnchor, setSortAnchor] = useState({ x: 16, y: 0, width: 100, height: 30 });
+  const difficultyAnchorRef = useRef<View>(null);
+  const sortAnchorRef = useRef<View>(null);
   const [failedLessonImageKeys, setFailedLessonImageKeys] = useState<Set<string>>(() => new Set());
   const [learnedMixWords, setLearnedMixWords] = useState<Word[]>([]);
-  const [learnedMixUnlockMessageVisible, setLearnedMixUnlockMessageVisible] = useState(false);
   const [selectionMode, setSelectionMode] = useState(false);
   const [selectedLessonKeys, setSelectedLessonKeys] = useState<Set<string>>(() => new Set());
-  const segmentPadding = isPortraitTight ? 5 : 6;
 
   const markLessonImageFailed = useCallback((key: string) => {
     setFailedLessonImageKeys((current) => {
@@ -323,64 +312,8 @@ export default function VocabularyScreen() {
   );
 
   useEffect(() => {
-    const half = Math.max(0, (toggleWidth - segmentPadding * 2) / 2);
-    const toValue = viewMode === 'category' ? 0 : half;
-    Animated.timing(thumbX, {
-      toValue,
-      duration: 200,
-      easing: Easing.out(Easing.cubic),
-      useNativeDriver: true,
-    }).start();
-  }, [thumbX, toggleWidth, viewMode]);
-
-  useEffect(() => {
     setCardView(vocabLessonCardView);
   }, [vocabLessonCardView]);
-
-  useEffect(() => {
-    if (!learnedMixUnlockMessageVisible) {
-      unlockOverlayOpacity.setValue(0);
-      unlockOverlayScale.setValue(0.96);
-      return;
-    }
-
-    Animated.parallel([
-      Animated.timing(unlockOverlayOpacity, {
-        toValue: 1,
-        duration: 260,
-        easing: Easing.out(Easing.cubic),
-        useNativeDriver: true,
-      }),
-      Animated.spring(unlockOverlayScale, {
-        toValue: 1,
-        friction: 8,
-        tension: 80,
-        useNativeDriver: true,
-      }),
-    ]).start();
-  }, [learnedMixUnlockMessageVisible, unlockOverlayOpacity, unlockOverlayScale]);
-
-  useEffect(() => {
-    let active = true;
-
-    if (learnedMixWords.length < LEARNT_MIX_UNLOCK_COUNT) {
-      setLearnedMixUnlockMessageVisible(false);
-      return () => {
-        active = false;
-      };
-    }
-
-    AsyncStorage.getItem(LEARNT_MIX_UNLOCK_SEEN_KEY)
-      .then((seen) => {
-        if (!active || seen === 'true') return;
-        setLearnedMixUnlockMessageVisible(true);
-      })
-      .catch(() => {});
-
-    return () => {
-      active = false;
-    };
-  }, [learnedMixWords.length]);
 
   const handleDifficultySelect = (level: number | null) => {
     setSelectedDifficulty(level === selectedDifficulty ? null : level);
@@ -446,23 +379,11 @@ export default function VocabularyScreen() {
   };
 
   const startLearnedMix = () => {
-    if (learnedMixWords.length < LEARNT_MIX_UNLOCK_COUNT) return;
-
-    const mixedWords = shuffleArray(learnedMixWords).slice(0, LEARNT_MIX_MAX_WORDS);
+    if (!learnedMixWords.length) return;
 
     setSelectionMode(false);
     setSelectedLessonKeys(new Set());
-    navigation.navigate('VocabularyLesson', {
-      lesson: {
-        id: 'learned-mix',
-        title: 'Learnt Words Challenge',
-        description: 'A random matching game with words you marked as learnt.',
-        flashcards: mixedWords,
-        isLearnedMix: true,
-      },
-      initialMode: 'matching',
-      backLabel: 'Back to Vocabulary',
-    });
+    navigation.navigate('VocabRush');
   };
 
   const startSelectedVocabularyMix = () => {
@@ -528,16 +449,6 @@ export default function VocabularyScreen() {
     });
   };
 
-  const closeLearnedMixUnlock = () => {
-    setLearnedMixUnlockMessageVisible(false);
-    AsyncStorage.setItem(LEARNT_MIX_UNLOCK_SEEN_KEY, 'true').catch(() => {});
-  };
-
-  const startLearnedMixFromUnlock = () => {
-    closeLearnedMixUnlock();
-    startLearnedMix();
-  };
-
   const visibleSections = useMemo(
     () => (viewMode === 'category' ? categories : [{ title: 'All', lessons: allLessons }])
       .map((category) => ({
@@ -547,7 +458,7 @@ export default function VocabularyScreen() {
       .filter((category) => category.lessons.length > 0),
     [allLessons, categories, filterLessons, viewMode]
   );
-  const learnedMixPlayable = learnedMixWords.length >= LEARNT_MIX_UNLOCK_COUNT;
+  const knownWordsAvailable = learnedMixWords.length > 0;
   const selectionTrayBottomPadding = Platform.OS === 'web' ? 16 : Math.max(insets.bottom, 12);
   const studySurface = useMemo(() => getStudySurfaceColors(colors, isDarkMode), [colors, isDarkMode]);
   const trayColors = useMemo(() => getSelectionTrayColors(colors, isDarkMode), [colors, isDarkMode]);
@@ -576,18 +487,7 @@ export default function VocabularyScreen() {
   const searchSurfaceColor = studySurface.search;
   const searchBorderColor = studySurface.searchBorder;
   const searchActiveColor = studySurface.searchActive;
-  const learnedMixColors = {
-    background: studySurface.goldSurface,
-    border: studySurface.goldBorder,
-    iconBackground: colors.buttonBackground,
-    iconColor: colors.buttonText,
-    countBackground: isDarkMode ? 'rgba(255, 209, 102, 0.14)' : '#FFFFFF',
-    countText: studySurface.goldText,
-    actionBackground: colors.buttonBackground,
-    actionForeground: colors.buttonText,
-    actionBorder: colors.buttonBackground,
-    shadow: isDarkMode ? '#000000' : '#8DBFDB',
-  };
+  const searchFocusAnim = useSearchFocusAnimation(!!searchText.trim(), searchBorderColor, searchActiveColor);
 
   const sectionListData = useMemo<LessonSection[]>(() =>
     visibleSections.map((category) => {
@@ -679,279 +579,183 @@ export default function VocabularyScreen() {
         renderItem={renderLessonItem}
         renderSectionHeader={renderSectionHeader}
         renderSectionFooter={renderSectionFooter}
-        contentContainerStyle={{ paddingTop: topContentInset, paddingBottom: selectionScrollPadding }}
-        onScrollBeginDrag={() => setShowDifficultyMenu(false)}
+        contentContainerStyle={[
+          { paddingTop: topContentInset, paddingBottom: selectionScrollPadding },
+          isDesktopWeb && styles.desktopContentWrap,
+        ]}
+        onScrollBeginDrag={() => { setShowDifficultyMenu(false); setShowSortMenu(false); }}
         keyboardShouldPersistTaps="handled"
         stickySectionHeadersEnabled={false}
         ListHeaderComponent={<>
         <BackButton label={commonCopy.backToHome} onPress={() => navigation.navigate('Home')} />
 
-        <View style={[styles.headerTitleContainer, isMobileHeader && styles.headerTitleContainerMobile]}>
-          <View style={[styles.headerTitleRow, isMobileHeader && styles.headerTitleRowCompact]}>
-            <Text
-              style={[styles.headerTitle, isMobileHeader && styles.headerTitleCompact, { color: colors.text }]}
-              numberOfLines={isMobileHeader ? 2 : 1}
-            >
-              {copy.header}
-            </Text>
-            <View style={[styles.headerActions, isMobileHeader && styles.headerActionsCompact]}>
-              {learnedMixPlayable && !selectionMode && (
-                <TouchableOpacity
-                  activeOpacity={0.84}
-                  onPress={startLearnedMix}
-                  style={[
-                    styles.headerChallengeChip,
-                    {
-                      backgroundColor: learnedMixColors.background,
-                      borderColor: learnedMixColors.border,
-                    },
-                  ]}
-                  accessibilityRole="button"
-                  accessibilityLabel="Start Learnt Words Challenge"
-                >
-                  <MaterialIcons name="confirmation-number" size={17} color={learnedMixColors.countText} />
-                  {(!isPortraitTight || isMobileHeader) && (
-                    <Text style={[styles.headerChallengeChipText, { color: learnedMixColors.countText }]} numberOfLines={1}>
-                      Challenge
-                    </Text>
-                  )}
-                  <View style={[styles.headerChallengeChipCount, { backgroundColor: learnedMixColors.countBackground }]}>
-                    <Text style={[styles.headerChallengeChipCountText, { color: learnedMixColors.countText }]}>
-                      {Math.min(learnedMixWords.length, LEARNT_MIX_MAX_WORDS)}
-                    </Text>
-                  </View>
-                </TouchableOpacity>
-              )}
-              <TouchableOpacity
-                activeOpacity={0.84}
-                onPress={toggleSelectionMode}
-                style={[
-                  styles.headerSelectButton,
-                  isMobileHeader && styles.headerSelectButtonCompact,
-                  {
-                    backgroundColor: selectionMode ? colors.primarySoft : studySurface.control,
-                    borderColor: selectionMode ? colors.primary : studySurface.controlBorder,
-                  },
-                ]}
-                accessibilityRole="button"
-                accessibilityState={{ selected: selectionMode }}
-              >
-                <MaterialIcons
-                  name={selectionMode ? 'close' : 'checklist'}
-                  size={18}
-                  color={selectionMode ? colors.primary : colors.secondaryText}
-                />
-                <Text
-                  style={[styles.headerSelectText, { color: selectionMode ? colors.primary : colors.text }]}
-                  numberOfLines={1}
-                >
-                  {selectionMode ? copy.cancelSelection : copy.selectLessons}
-                </Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-
-          <View
+        <View style={styles.headerRow}>
+          <Text style={[styles.headerTitle, { color: colors.text }]}>
+            {copy.header}
+          </Text>
+          <TouchableOpacity
+            activeOpacity={0.84}
+            onPress={toggleSelectionMode}
             style={[
-              styles.browsePanel,
-              getSoftShadow(isDarkMode, 'soft'),
+              styles.headerSelectButton,
               {
-                backgroundColor: studySurface.panel,
-                borderColor: studySurface.panelBorder,
-                shadowColor: colors.primary,
+                backgroundColor: selectionMode ? colors.primarySoft : studySurface.control,
+                borderColor: selectionMode ? colors.primary : studySurface.controlBorder,
               },
             ]}
+            accessibilityRole="button"
+            accessibilityState={{ selected: selectionMode }}
           >
-            <View
-              style={[
-                styles.controlPanel,
-                isPortraitTight && styles.controlPanelCompact,
-              ]}
+            <MaterialIcons
+              name={selectionMode ? 'close' : 'checklist'}
+              size={18}
+              color={selectionMode ? colors.primary : colors.secondaryText}
+            />
+            <Text
+              style={[styles.headerSelectText, { color: selectionMode ? colors.primary : colors.text }]}
+              numberOfLines={1}
             >
-              <View style={styles.controlsRow}>
-                <View
-                  onLayout={(event) => setToggleWidth(event.nativeEvent.layout.width)}
-                  style={[
-                    styles.modeToggle,
-                    getInsetSurfaceStyle(colors, isDarkMode),
-                    isPortraitTight && styles.modeToggleCompact,
-                    {
-                      backgroundColor: studySurface.control,
-                      borderColor: studySurface.controlBorder,
-                    },
-                  ]}
-                >
-                  <Animated.View
-                    pointerEvents="none"
-                    style={{
-                      position: 'absolute',
-                      top: segmentPadding,
-                      bottom: segmentPadding,
-                      left: segmentPadding,
-                      width: Math.max(0, (toggleWidth - segmentPadding * 2) / 2),
-                      borderRadius: 16,
-                      backgroundColor: colors.buttonBackground,
-                      borderWidth: 1,
-                      borderColor: isDarkMode ? colors.primary : 'rgba(255,255,255,0.66)',
-                      shadowColor: colors.primary,
-                      shadowOpacity: 0.2,
-                      shadowRadius: 5,
-                      shadowOffset: { width: 0, height: 2 },
-                      elevation: 2,
-                      transform: [{ translateX: thumbX }],
-                    }}
-                  />
-                  <TouchableOpacity
-                    style={styles.modeOption}
-                    onPress={() => setViewMode('category')}
-                    activeOpacity={0.9}
-                    accessibilityRole="button"
-                    accessibilityLabel={copy.showByCategory}
-                    accessibilityState={{ selected: viewMode === 'category' }}
-                  >
-                    <Text style={[styles.modeOptionText, isPortraitTight && styles.modeOptionTextCompact, { color: viewMode === 'category' ? colors.buttonText : colors.text }]}>
-                      {copy.category}
-                    </Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity
-                    style={styles.modeOption}
-                    onPress={() => setViewMode('abc')}
-                    activeOpacity={0.9}
-                    accessibilityRole="button"
-                    accessibilityLabel={copy.showAlphabetically}
-                    accessibilityState={{ selected: viewMode === 'abc' }}
-                  >
-                    <Text style={[styles.modeOptionText, isPortraitTight && styles.modeOptionTextCompact, { color: viewMode === 'abc' ? colors.buttonText : colors.text }]}>
-                      {copy.abc}
-                    </Text>
-                  </TouchableOpacity>
-                </View>
+              {selectionMode ? copy.cancelSelection : copy.selectLessons}
+            </Text>
+          </TouchableOpacity>
+        </View>
 
-                <View
-                  style={[
-                    styles.viewToggleGroup,
-                    isPortraitTight && styles.viewToggleGroupCompact,
-                    {
-                      backgroundColor: studySurface.control,
-                      borderColor: studySurface.controlBorder,
-                    },
-                  ]}
-                >
-                  <TouchableOpacity
-                    onPress={() => handleCardViewChange('list')}
-                    accessibilityRole="button"
-                    accessibilityLabel={copy.useListLayout}
-                    accessibilityState={{ selected: cardView === 'list' }}
-                    style={[
-                      styles.iconToggleButton,
-                      isPortraitTight && styles.iconToggleButtonCompact,
-                      {
-                        backgroundColor: cardView === 'list' ? colors.buttonBackground : studySurface.control,
-                        borderColor: cardView === 'list' ? colors.primary : 'transparent',
-                        shadowColor: cardView === 'list' ? colors.primary : '#000',
-                      },
-                      cardView === 'list' && styles.iconToggleButtonSelected,
-                    ]}
-                  >
-                    <MaterialIcons name="view-list" size={20} color={cardView === 'list' ? colors.buttonText : colors.primary} />
-                  </TouchableOpacity>
-                  <TouchableOpacity
-                    onPress={() => handleCardViewChange('tile')}
-                    accessibilityRole="button"
-                    accessibilityLabel={copy.useTileLayout}
-                    accessibilityState={{ selected: cardView === 'tile' }}
-                    style={[
-                      styles.iconToggleButton,
-                      isPortraitTight && styles.iconToggleButtonCompact,
-                      {
-                        backgroundColor: cardView === 'tile' ? colors.buttonBackground : studySurface.control,
-                        borderColor: cardView === 'tile' ? colors.primary : 'transparent',
-                        shadowColor: cardView === 'tile' ? colors.primary : '#000',
-                      },
-                      cardView === 'tile' && styles.iconToggleButtonSelected,
-                    ]}
-                  >
-                    <MaterialIcons name="grid-view" size={19} color={cardView === 'tile' ? colors.buttonText : colors.primary} />
-                  </TouchableOpacity>
-                </View>
+        <Animated.View
+          style={[
+            styles.searchShell,
+            getInsetSurfaceStyle(colors, isDarkMode),
+            {
+              backgroundColor: searchSurfaceColor,
+              borderRadius: uiRadii.control,
+            },
+            searchFocusAnim.animatedStyle,
+          ]}
+        >
+          <TextInput
+            value={searchText}
+            onChangeText={setSearchText}
+            onFocus={searchFocusAnim.onFocus}
+            onBlur={searchFocusAnim.onBlur}
+            placeholder={copy.searchPlaceholder}
+            placeholderTextColor={colors.secondaryText}
+            style={[
+              styles.searchInput,
+              {
+                backgroundColor: 'transparent',
+                color: colors.text,
+                borderWidth: 0,
+                paddingRight: 45,
+                paddingLeft: 44,
+                paddingVertical: 14,
+                fontSize: 16,
+              },
+            ]}
+          />
 
-                <View
-                  style={[styles.levelControlWrap, isPortraitTight && styles.levelControlWrapCompact]}
-                  onLayout={(event) => {
-                    const { x, y, width, height } = event.nativeEvent.layout;
-                    setDifficultyAnchor({ x, y, width, height });
-                  }}
-                >
-                  <TouchableOpacity
-                    style={[
-                      styles.dropdownButton,
-                      isPortraitTight && styles.dropdownButtonCompact,
-                      {
-                        backgroundColor: selectedDifficulty ? colors.primarySoft : studySurface.control,
-                        borderColor: selectedDifficulty ? colors.primary : studySurface.controlBorder,
-                      },
-                    ]}
-                    onPress={() => setShowDifficultyMenu((current) => !current)}
-                    accessibilityRole="button"
-                    accessibilityLabel={copy.chooseLevel}
-                    accessibilityState={{ expanded: showDifficultyMenu }}
-                  >
-                    <Text style={[styles.dropdownButtonText, isPortraitTight && styles.dropdownButtonTextCompact, { color: selectedDifficulty ? colors.primary : colors.text }]}>
-                      {getLevelLabel(selectedDifficulty)}
-                    </Text>
-                    <MaterialIcons name="arrow-drop-down" size={22} color={colors.primary} />
-                  </TouchableOpacity>
-                </View>
-              </View>
-            </View>
+          <View style={styles.searchIconWrap}>
+            <MaterialIcons name="search" size={20} color={searchActiveColor} />
+          </View>
 
-            <View
+          {searchText.length > 0 && (
+            <Animated.View entering={FadeIn.duration(140)} exiting={FadeOut.duration(110)} style={styles.searchClearButton}>
+              <TouchableOpacity
+                onPress={() => setSearchText('')}
+                hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                accessibilityRole="button"
+                accessibilityLabel={copy.clearSearch}
+              >
+                <MaterialIcons name="close" size={20} color={searchActiveColor} />
+              </TouchableOpacity>
+            </Animated.View>
+          )}
+        </Animated.View>
+
+        <View style={[styles.newFilterRow, styles.newFilterRowSpacing, viewMode === 'abc' && styles.newFilterRowSpacingAbc]}>
+          <View ref={sortAnchorRef}>
+          <TouchableOpacity
+            onPress={() => {
+              if (showSortMenu) { setShowSortMenu(false); return; }
+              sortAnchorRef.current?.measureInWindow((x, y, width, height) => {
+                setSortAnchor({ x, y, width, height });
+                setShowSortMenu(true);
+              });
+            }}
+            accessibilityRole="button"
+            accessibilityLabel={copy.openFilters}
+            accessibilityState={{ expanded: showSortMenu }}
+          >
+            <Text style={[styles.newFilterLink, { color: colors.text }]} numberOfLines={1}>
+              Sort: {viewMode === 'category' ? copy.category : copy.abc} ▾
+            </Text>
+          </TouchableOpacity>
+          </View>
+
+          <Text style={[styles.newFilterDivider, { color: isDarkMode ? colors.border : '#D9D3C7' }]}>·</Text>
+
+          <View ref={difficultyAnchorRef}>
+            <TouchableOpacity
+              onPress={() => {
+                if (showDifficultyMenu) { setShowDifficultyMenu(false); return; }
+                difficultyAnchorRef.current?.measureInWindow((x, y, width, height) => {
+                  setDifficultyAnchor({ x, y, width, height });
+                  setShowDifficultyMenu(true);
+                });
+              }}
+              accessibilityRole="button"
+              accessibilityLabel={copy.openFilters}
+              accessibilityState={{ expanded: showDifficultyMenu }}
+            >
+              <Text
+                style={[
+                  styles.newFilterLink,
+                  { color: selectedDifficulty ? colors.primary : colors.text },
+                ]}
+                numberOfLines={1}
+              >
+                {getLevelLabel(selectedDifficulty)} ▾
+              </Text>
+            </TouchableOpacity>
+          </View>
+
+          <View style={styles.newFilterSpacer} />
+
+          <View style={styles.newViewToggleGroup}>
+            <TouchableOpacity
+              onPress={() => handleCardViewChange('list')}
               style={[
-                styles.searchShell,
-                getInsetSurfaceStyle(colors, isDarkMode),
+                styles.newGridToggle,
                 {
-                  backgroundColor: searchSurfaceColor,
-                  borderColor: searchText.trim() ? searchActiveColor : searchBorderColor,
-                  borderWidth: searchText.trim() ? 1.5 : 1,
-                  borderRadius: uiRadii.control,
+                  backgroundColor: cardView === 'list' ? (isDarkMode ? colors.primarySoft : '#EAF2FF') : (isDarkMode ? colors.surface : 'transparent'),
                 },
               ]}
+              accessibilityRole="button"
+              accessibilityState={{ selected: cardView === 'list' }}
+              accessibilityLabel="Switch to list view"
             >
-              <TextInput
-                placeholder={copy.searchPlaceholder}
-                placeholderTextColor={colors.secondaryText}
-                value={searchText}
-                onChangeText={setSearchText}
-                style={[
-                  styles.searchInput,
-                  {
-                    backgroundColor: 'transparent',
-                    color: colors.text,
-                    borderWidth: 0,
-                    paddingRight: 45,
-                    paddingLeft: 44,
-                    paddingVertical: 14,
-                    fontSize: 16,
-                  },
-                ]}
+              <MaterialIcons
+                name="view-list"
+                size={17}
+                color={cardView === 'list' ? colors.primary : colors.text}
               />
-
-              <View style={styles.searchIconWrap}>
-                <MaterialIcons name="search" size={20} color={searchActiveColor} />
-              </View>
-
-              {searchText.length > 0 && (
-                <TouchableOpacity
-                  onPress={() => setSearchText('')}
-                  style={styles.searchClearButton}
-                  hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-                  accessibilityRole="button"
-                  accessibilityLabel={copy.clearSearch}
-                >
-                  <MaterialIcons name="close" size={20} color={searchActiveColor} />
-                </TouchableOpacity>
-              )}
-            </View>
+            </TouchableOpacity>
+            <TouchableOpacity
+              onPress={() => handleCardViewChange('tile')}
+              style={[
+                styles.newGridToggle,
+                {
+                  backgroundColor: cardView === 'tile' ? (isDarkMode ? colors.primarySoft : '#EAF2FF') : (isDarkMode ? colors.surface : 'transparent'),
+                },
+              ]}
+              accessibilityRole="button"
+              accessibilityState={{ selected: cardView === 'tile' }}
+              accessibilityLabel="Switch to grid view"
+            >
+              <MaterialIcons
+                name="grid-view"
+                size={17}
+                color={cardView === 'tile' ? colors.primary : colors.text}
+              />
+            </TouchableOpacity>
           </View>
         </View>
 
@@ -1137,99 +941,53 @@ export default function VocabularyScreen() {
         </View>
       )}
 
-      <Modal
-        visible={learnedMixUnlockMessageVisible}
-        transparent={true}
-        animationType="fade"
-        statusBarTranslucent={true}
-        presentationStyle="overFullScreen"
-        hardwareAccelerated
-        onRequestClose={closeLearnedMixUnlock}
-      >
-        <Animated.View
-          style={[styles.learnedMixUnlockOverlay, { opacity: unlockOverlayOpacity }]}
-          pointerEvents={learnedMixUnlockMessageVisible ? 'auto' : 'none'}
-        >
-          <LinearGradient
-            style={StyleSheet.absoluteFill}
-            colors={LEARNT_MIX_UNLOCK_GRADIENT}
-            start={[0.5, 0]}
-            end={[0.5, 1]}
-          />
-
-          <Animated.View
+      {showSortMenu && (
+        <Pressable style={styles.menuBackdrop} onPress={() => setShowSortMenu(false)}>
+          <View
             style={[
-              styles.learnedMixUnlockModalCard,
+              styles.dropdownMenu,
+              styles.sortMenu,
+              getSoftShadow(isDarkMode, 'strong'),
               {
-                backgroundColor: learnedMixColors.background,
-                borderColor: learnedMixColors.border,
-                shadowColor: learnedMixColors.shadow,
-                transform: [{ scale: unlockOverlayScale }],
+                backgroundColor: colors.card,
+                borderColor: colors.border,
+                shadowColor: '#000',
+                top: sortAnchor.y + sortAnchor.height + 8,
+                left: sortAnchor.x,
               },
             ]}
           >
             <TouchableOpacity
-              onPress={closeLearnedMixUnlock}
-              style={styles.learnedMixUnlockClose}
-              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-              accessibilityRole="button"
-              accessibilityLabel="Close learnt words challenge message"
-            >
-              <MaterialIcons name="close" size={21} color={learnedMixColors.countText} />
-            </TouchableOpacity>
-
-            <View style={styles.learnedMixUnlockHero}>
-              <Text style={styles.learnedMixUnlockHeroStar}>{STAR_EMOJI}</Text>
-              <View
-                style={[
-                  styles.learnedMixUnlockIcon,
-                  {
-                    backgroundColor: learnedMixColors.iconBackground,
-                    borderColor: learnedMixColors.border,
-                  },
-                ]}
-              >
-                <MaterialIcons name="workspace-premium" size={42} color={learnedMixColors.iconColor} />
-              </View>
-            </View>
-
-            <Text style={[styles.learnedMixUnlockTitle, { color: colors.text }]}>Learnt Words Challenge Unlocked!</Text>
-            <Text style={[styles.learnedMixUnlockText, { color: colors.secondaryText }]}>
-              You have {LEARNT_MIX_UNLOCK_COUNT} learnt cards. A big matching challenge is ready.
-            </Text>
-
-            <TouchableOpacity
-              onPress={startLearnedMixFromUnlock}
               style={[
-                styles.learnedMixUnlockStartButton,
-                {
-                  backgroundColor: learnedMixColors.actionBackground,
-                  borderColor: learnedMixColors.actionBorder,
-                  shadowColor: learnedMixColors.shadow,
-                },
+                styles.difficultyMenuItem,
+                viewMode === 'category' && { backgroundColor: colors.primarySoft },
               ]}
-              activeOpacity={0.9}
+              onPress={() => { setViewMode('category'); setShowSortMenu(false); }}
               accessibilityRole="button"
-              accessibilityLabel="Start Learnt Words Challenge"
+              accessibilityLabel={copy.showByCategory}
+              accessibilityState={{ selected: viewMode === 'category' }}
             >
-              <MaterialIcons name="play-arrow" size={22} color={learnedMixColors.actionForeground} />
-              <Text style={[styles.learnedMixUnlockStartText, { color: learnedMixColors.actionForeground }]}>Start Challenge</Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              onPress={closeLearnedMixUnlock}
-              style={styles.learnedMixUnlockLaterButton}
-              activeOpacity={0.85}
-              accessibilityRole="button"
-              accessibilityLabel="Close and stay on vocabulary"
-            >
-              <Text style={[styles.learnedMixUnlockLaterText, { color: learnedMixColors.countText }]}>
-                Later
+              <Text style={[styles.difficultyMenuText, { color: viewMode === 'category' ? colors.primary : colors.text }]}>
+                {copy.category}
               </Text>
             </TouchableOpacity>
-          </Animated.View>
-        </Animated.View>
-      </Modal>
+            <TouchableOpacity
+              style={[
+                styles.difficultyMenuItem,
+                viewMode === 'abc' && { backgroundColor: colors.primarySoft },
+              ]}
+              onPress={() => { setViewMode('abc'); setShowSortMenu(false); }}
+              accessibilityRole="button"
+              accessibilityLabel={copy.showAlphabetically}
+              accessibilityState={{ selected: viewMode === 'abc' }}
+            >
+              <Text style={[styles.difficultyMenuText, { color: viewMode === 'abc' ? colors.primary : colors.text }]}>
+                {copy.abc}
+              </Text>
+            </TouchableOpacity>
+          </View>
+        </Pressable>
+      )}
 
       {showDifficultyMenu && (
         <Pressable style={styles.menuBackdrop} onPress={() => setShowDifficultyMenu(false)}>
@@ -1242,7 +1000,7 @@ export default function VocabularyScreen() {
                 backgroundColor: colors.card,
                 borderColor: colors.border,
                 shadowColor: '#000',
-                top: insets.top + difficultyAnchor.y + difficultyAnchor.height + 8,
+                top: difficultyAnchor.y + difficultyAnchor.height + 8,
                 left: Math.max(16, difficultyAnchor.x + difficultyAnchor.width - 188),
               },
             ]}
@@ -1277,176 +1035,102 @@ export default function VocabularyScreen() {
           </View>
         </Pressable>
       )}
+
+      {knownWordsAvailable && !selectionMode && (
+        <TouchableOpacity
+          onPress={startLearnedMix}
+          style={[
+            styles.vocabRushFab,
+            getSoftShadow(isDarkMode, 'strong'),
+            {
+              bottom: Math.max(insets.bottom, 16) + 24,
+              backgroundColor: isDarkMode ? '#b3282c' : '#d73337',
+              borderColor: '#ffffff',
+            },
+          ]}
+          accessibilityRole="button"
+          accessibilityLabel={`Start Vocab Rush — up to ${learnedMixWords.length * MAX_XP_PER_PAIR} XP possible`}
+        >
+          <MaterialIcons name="bolt" size={28} color="#ffffff" />
+          <View style={[styles.vocabRushFabBadge, { backgroundColor: '#ffffff', borderColor: isDarkMode ? '#b3282c' : '#d73337' }]}>
+            <Text style={[styles.vocabRushFabBadgeText, { color: isDarkMode ? '#b3282c' : '#d73337' }]} numberOfLines={1}>
+              {(() => {
+                const maxXp = learnedMixWords.length * MAX_XP_PER_PAIR;
+                return `${maxXp > 999 ? '999+' : maxXp} XP`;
+              })()}
+            </Text>
+          </View>
+        </TouchableOpacity>
+      )}
     </View>
   );
 }
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
-  headerTitleContainer: { paddingHorizontal: 16, paddingBottom: 6 },
-  headerTitleContainerMobile: {
-    paddingTop: 4,
-    paddingBottom: 8,
-  },
-  headerTitleRow: {
-    alignItems: 'center',
-    flexDirection: 'row',
-    gap: 10,
-    marginBottom: 6,
-  },
-  headerTitleRowCompact: {
-    alignItems: 'stretch',
-    flexDirection: 'column',
-    gap: 8,
-    marginBottom: 12,
-  },
-  headerTitle: { flex: 1, fontSize: 32, fontWeight: 'bold', minWidth: 0 },
-  headerTitleCompact: {
-    alignSelf: 'stretch',
-    flex: 0,
-    flexShrink: 0,
-    lineHeight: 42,
-    minHeight: 44,
+  desktopContentWrap: {
     width: '100%',
+    maxWidth: 1000,
+    alignSelf: 'center',
   },
-  headerActions: {
+  headerRow: {
     alignItems: 'center',
     flexDirection: 'row',
-    flexShrink: 0,
-    gap: 7,
+    gap: 12,
+    paddingBottom: 14,
+    paddingHorizontal: 24,
   },
-  headerActionsCompact: {
-    alignSelf: 'stretch',
-    flexWrap: 'wrap',
-    justifyContent: 'flex-end',
+  headerTitle: {
+    flex: 1,
+    fontSize: 32,
+    fontWeight: 'bold',
+    minWidth: 0,
   },
   headerSelectButton: {
     alignItems: 'center',
-    borderRadius: 12,
-    borderWidth: 1,
+    borderRadius: uiRadii.control,
+    borderWidth: 1.5,
     flexDirection: 'row',
-    gap: 6,
-    minHeight: 38,
-    maxWidth: 154,
-    paddingHorizontal: 10,
-  },
-  headerSelectButtonCompact: {
-    maxWidth: 180,
-    paddingHorizontal: 8,
+    gap: 7,
+    minHeight: 42,
+    maxWidth: 174,
+    paddingHorizontal: 12,
   },
   headerSelectText: {
     flexShrink: 1,
-    fontSize: 13,
+    fontSize: 14,
     fontWeight: '800',
-    lineHeight: 16,
   },
-  headerChallengeChip: {
-    alignItems: 'center',
-    borderRadius: 10,
-    borderWidth: 1.5,
-    borderBottomWidth: 2.5,
-    flexDirection: 'row',
-    gap: 5,
-    minHeight: 34,
-    minWidth: 0,
-    paddingHorizontal: 8,
+  newFilterSpacer: {
+    flex: 1,
   },
-  headerChallengeChipText: {
-    flexShrink: 1,
-    fontSize: 12,
-    fontWeight: '900',
-    lineHeight: 14,
-  },
-  headerChallengeChipCount: {
-    alignItems: 'center',
-    borderRadius: 999,
-    justifyContent: 'center',
-    minWidth: 22,
-    paddingHorizontal: 5,
-    paddingVertical: 2,
-  },
-  headerChallengeChipCountText: {
+  filterMenuSection: { marginBottom: 4 },
+  filterMenuSectionLabel: {
     fontSize: 10,
     fontWeight: '900',
-    lineHeight: 12,
+    textTransform: 'uppercase',
+    paddingHorizontal: 14,
+    paddingTop: 12,
+    paddingBottom: 6,
   },
-  browsePanel: {
-    borderRadius: 22,
-    borderWidth: 2,
+  filterMenuViewRow: {
+    flexDirection: 'row',
     gap: 8,
-    marginTop: 4,
-    padding: 9,
+    paddingHorizontal: 12,
+    paddingBottom: 10,
   },
-  controlPanel: {
-    borderRadius: 16,
-    paddingHorizontal: 0,
-    paddingTop: 0,
-    paddingBottom: 0,
-  },
-  controlPanelCompact: {
-    paddingTop: 0,
-    paddingBottom: 0,
-  },
-  controlsRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 6 },
-  viewToggleGroup: {
-    flexDirection: 'row',
-    gap: 4,
-    width: '20%',
-    minWidth: 88,
-    maxWidth: 104,
-    minHeight: 46,
-    padding: 4,
-    borderRadius: 13,
-    borderWidth: 1.5,
-  },
-  viewToggleGroupCompact: { minHeight: 48, minWidth: 78, maxWidth: 90, padding: 4, gap: 3 },
-  dropdownButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 4,
-    borderWidth: 1.5,
-    borderRadius: 12,
-    minHeight: 46,
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-    width: '100%',
-  },
-  dropdownButtonCompact: {
-    minHeight: 48,
-    paddingHorizontal: 8,
-    paddingVertical: 5,
-  },
-  dropdownButtonText: { fontSize: 12, fontWeight: '700' },
-  dropdownButtonTextCompact: { fontSize: 10, lineHeight: 12 },
-  modeToggle: { flexDirection: 'row', borderRadius: 13, borderWidth: 1.5, padding: 5, minHeight: 46, width: '30%', minWidth: 122, maxWidth: 136, marginRight: 0, overflow: 'hidden' },
-  modeToggleCompact: { padding: 5, minHeight: 52, minWidth: 108, maxWidth: 120 },
-  modeOption: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingVertical: 9 },
-  modeOptionText: { fontSize: 12, fontWeight: '700' },
-  modeOptionTextCompact: { fontSize: 10, lineHeight: 12 },
-  iconToggleButton: {
-    minHeight: 38,
+  filterMenuViewOption: {
     flex: 1,
-    borderRadius: 10,
-    borderWidth: 1,
+    flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    shadowOpacity: 0,
-    shadowRadius: 0,
-    shadowOffset: { width: 0, height: 0 },
-    elevation: 0,
+    gap: 6,
+    minHeight: 40,
+    borderRadius: 10,
+    borderWidth: 1.5,
   },
-  iconToggleButtonCompact: {
-    minHeight: 38,
-  },
-  iconToggleButtonSelected: {
-    shadowOpacity: 0.18,
-    shadowRadius: 5,
-    shadowOffset: { width: 0, height: 2 },
-    elevation: 3,
-  },
-  levelControlWrap: { width: '30%', minWidth: 124, maxWidth: 156 },
-  levelControlWrapCompact: { minWidth: 104, maxWidth: 128 },
+  filterMenuViewOptionText: { fontSize: 12, fontWeight: '700' },
+  filterMenuDivider: { height: 1, marginHorizontal: 12 },
   menuBackdrop: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, zIndex: 9998 },
   dropdownMenu: {
     position: 'absolute',
@@ -1460,6 +1144,7 @@ const styles = StyleSheet.create({
     elevation: 8,
   },
   difficultyMenu: { width: 210 },
+  sortMenu: { width: 150 },
   difficultyMenuItem: {
     paddingVertical: 14,
     paddingHorizontal: 14,
@@ -1476,15 +1161,15 @@ const styles = StyleSheet.create({
   difficultyMenuText: { fontSize: 15, fontWeight: '700' },
   difficultyMenuLabel: { fontSize: 13, fontWeight: '700' },
   searchShell: {
-    marginHorizontal: 0,
-    marginTop: 0,
-    marginBottom: 0,
-    borderWidth: 1,
-    borderRadius: 14,
+    marginHorizontal: 16,
+    marginTop: 10,
+    marginBottom: 14,
+    borderWidth: 1.5,
+    borderRadius: uiRadii.control,
     overflow: 'hidden',
     position: 'relative',
   },
-  searchInput: { minHeight: 44, padding: 14, fontSize: 16 },
+  searchInput: { minHeight: 46, padding: 14, fontSize: 16 },
   searchIconWrap: {
     position: 'absolute',
     left: 16,
@@ -1505,6 +1190,66 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
+  newFilterRowSpacing: {
+    paddingHorizontal: 16,
+  },
+  // ABC (alphabetical) mode has no category section header below this row to
+  // provide breathing room before the first lesson card, unlike category mode.
+  newFilterRowSpacingAbc: {
+    marginBottom: 28,
+  },
+  newFilterRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    minHeight: 34,
+    marginBottom: 16,
+  },
+  newFilterLink: {
+    fontSize: 14.5,
+    fontWeight: '700',
+  },
+  newFilterDivider: {
+    fontSize: 15,
+    fontWeight: '600',
+  },
+  vocabRushFab: {
+    position: 'absolute',
+    right: 16,
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    borderWidth: 2.5,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  vocabRushFabBadge: {
+    position: 'absolute',
+    top: -6,
+    right: -10,
+    minWidth: 20,
+    height: 20,
+    borderRadius: 10,
+    borderWidth: 1.5,
+    paddingHorizontal: 6,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  vocabRushFabBadgeText: {
+    fontSize: 10,
+    fontWeight: '800',
+  },
+  newViewToggleGroup: {
+    flexDirection: 'row',
+    gap: 4,
+  },
+  newGridToggle: {
+    width: 34,
+    height: 34,
+    borderRadius: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   emptyStateCard: {
     marginHorizontal: 16,
     marginTop: 8,
@@ -1514,114 +1259,14 @@ const styles = StyleSheet.create({
     borderWidth: 1.5,
   },
   emptyStateTitle: {
+    fontWeight: freshFontFamily.extrabold,
     fontSize: 18,
-    fontWeight: '800',
     marginBottom: 4,
   },
   emptyStateText: {
+    fontWeight: freshFontFamily.semibold,
     fontSize: 14,
     lineHeight: 20,
-    fontWeight: '600',
-  },
-  learnedMixUnlockOverlay: {
-    flex: 1,
-    paddingHorizontal: 18,
-    paddingVertical: 24,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  learnedMixUnlockModalCard: {
-    width: '100%',
-    maxWidth: 540,
-    minHeight: 340,
-    borderRadius: 22,
-    borderWidth: 3,
-    paddingHorizontal: 24,
-    paddingTop: 34,
-    paddingBottom: 22,
-    alignItems: 'center',
-    justifyContent: 'center',
-    shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.52,
-    shadowRadius: 18,
-    elevation: 10,
-  },
-  learnedMixUnlockHero: {
-    width: 122,
-    height: 122,
-    marginBottom: 18,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  learnedMixUnlockHeroStar: {
-    position: 'absolute',
-    top: 0,
-    right: 4,
-    fontSize: 32,
-    zIndex: 1,
-  },
-  learnedMixUnlockIcon: {
-    width: 96,
-    height: 96,
-    borderRadius: 28,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 1,
-  },
-  learnedMixUnlockTitle: {
-    fontSize: 25,
-    lineHeight: 31,
-    fontWeight: '900',
-    textAlign: 'center',
-  },
-  learnedMixUnlockText: {
-    marginTop: 9,
-    fontSize: 16,
-    lineHeight: 23,
-    fontWeight: '700',
-    textAlign: 'center',
-    maxWidth: 390,
-  },
-  learnedMixUnlockStartButton: {
-    marginTop: 22,
-    minHeight: 50,
-    borderRadius: 999,
-    paddingHorizontal: 22,
-    borderWidth: 1.5,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 5,
-    shadowOffset: { width: 0, height: 3 },
-    shadowOpacity: 0.28,
-    shadowRadius: 6,
-    elevation: 4,
-  },
-  learnedMixUnlockStartText: {
-    color: '#3F2E02',
-    fontSize: 16,
-    fontWeight: '900',
-  },
-  learnedMixUnlockLaterButton: {
-    marginTop: 12,
-    minHeight: 36,
-    paddingHorizontal: 14,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  learnedMixUnlockLaterText: {
-    fontSize: 14,
-    fontWeight: '800',
-  },
-  learnedMixUnlockClose: {
-    position: 'absolute',
-    top: 12,
-    right: 12,
-    width: 38,
-    height: 38,
-    borderRadius: 19,
-    alignItems: 'center',
-    justifyContent: 'center',
   },
   selectionControls: {
     alignItems: 'stretch',
@@ -1794,8 +1439,8 @@ const styles = StyleSheet.create({
   categoryHeaderRow: { flexDirection: 'row', alignItems: 'flex-start', marginTop: 12, marginBottom: 12 },
   categoryEmoji: { fontSize: 34, marginRight: 8 },
   categoryTitleBlock: { flex: 1 },
-  categoryHeader: { fontSize: 22, fontWeight: '800' },
-  categoryMeta: { fontSize: 12, fontWeight: '700', marginTop: 2 },
+  categoryHeader: { fontWeight: freshFontFamily.extrabold, fontSize: 22 },
+  categoryMeta: { fontWeight: freshFontFamily.semibold, fontSize: 12, marginTop: 2 },
   categoryRule: {
     width: '100%',
     height: 2,

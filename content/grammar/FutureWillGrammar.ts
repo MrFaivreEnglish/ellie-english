@@ -4,6 +4,34 @@ const FutureWillGrammar = {
   description: 'Translate the sentences into English using "will" for future tense.',
   category: 'Main Tenses',
   imageUrl: 'https://i.ibb.co/F4pH7Bf7/Will.png',
+  textContent: {
+    cards: [
+      {
+        eyebrow: 'Le futur (will)',
+        paragraph: 'Pour parler de ce qui arrivera dans longtemps.',
+        tip: 'Formule : sujet + will + base verbale.',
+        columns: [
+          {
+            label: 'Sujet + WILL (invariable) + base verbale',
+            accent: 'blue',
+            rows: ['I', 'You', 'He / She / It', 'We', 'They'],
+          },
+        ],
+        examples: [
+          { en: '**I will confess** tomorrow.', fr: 'J’avouerai mes sentiments demain.' },
+          { en: '**He will be** heartbroken.', fr: 'Il aura le coeur brisé.' },
+        ],
+      },
+      {
+        eyebrow: "Ce qui n'arrivera pas",
+        paragraph: "Formule : sujet + won't + base verbale.",
+        examples: [
+          { en: "**I won't confess** tomorrow.", fr: 'Je n’avouerai pas mes sentiments demain.' },
+          { en: "**He won't be** heartbroken.", fr: 'Il n’aura pas le coeur brisé.' },
+        ],
+      },
+    ],
+  },
 
 translateExercises: [
   {

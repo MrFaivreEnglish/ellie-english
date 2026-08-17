@@ -29,6 +29,33 @@ export const SHINY_HOME_MENU_CARD_COLORS = {
   settings: '#4EA7F5',
 } as const;
 
+export const TODAY_CARD_COLORS = {
+  normal: {
+    solid: '#D64938',
+    shadow: '#B32517',
+    text: '#FFFFFF',
+    mutedText: 'rgba(255,255,255,0.85)',
+    subtleText: 'rgba(255,255,255,0.75)',
+    faintText: 'rgba(255,255,255,0.7)',
+    surface: 'rgba(255,255,255,0.14)',
+    strongSurface: 'rgba(255,255,255,0.18)',
+    ringTrack: 'rgba(255,255,255,0.25)',
+    decoration: 'rgba(255,255,255,0.08)',
+  },
+  shiny: {
+    solid: '#A56A00',
+    shadow: '#7A4B00',
+    text: '#FFFFFF',
+    mutedText: 'rgba(255,255,255,0.85)',
+    subtleText: 'rgba(255,255,255,0.75)',
+    faintText: 'rgba(255,255,255,0.7)',
+    surface: 'rgba(255,255,255,0.14)',
+    strongSurface: 'rgba(255,255,255,0.18)',
+    ringTrack: 'rgba(255,255,255,0.25)',
+    decoration: 'rgba(255,255,255,0.08)',
+  },
+} as const;
+
 export const HOME_MENU_ROUTE_COLORS = {
   Grammar: HOME_MENU_CARD_COLORS.grammar,
   Vocabulary: HOME_MENU_CARD_COLORS.vocabulary,

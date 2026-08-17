@@ -1,16 +1,35 @@
-import { Platform, type ViewStyle } from 'react-native';
+import type { ViewStyle } from 'react-native';
 import type { ThemeColors } from '../settings/ThemeContext';
+import { FRESH_COLORS, FRESH_COLORS_DARK } from './freshDirection';
 
 export const uiRadii = {
-  card: 18,
-  panel: 16,
+  card: 15,
+  panel: 18,
   control: 12,
   thumbnail: 14,
   pill: 999,
+  promptCard: 24,
+  exerciseCard: 20,
+  quizOption: 14,
+  chip: 10,
+  headerButton: 14,
 } as const;
 
 type ShadowLevel = 'soft' | 'raised' | 'strong';
 type ButtonTone = 'primary' | 'secondary' | 'danger' | 'warning' | 'special';
+
+// Shared "Fresh Direction" accent palette: one hue per context (primary blue,
+// plus the four sparingly-used secondary accents), each with a solid, a
+// darker "shadow" shade (used as the flat-offset bottom-border), and soft
+// tint backgrounds for light/dark mode.
+export const DESIGN_ACCENTS = {
+  blue: { solid: FRESH_COLORS.primaryBlue, shadow: FRESH_COLORS.primaryBlueShadow, soft: '#DBEAFE', softDark: '#173259' },
+  teal: { solid: '#17B8A6', shadow: '#0F8A7D', soft: '#CCFBF1', softDark: '#0F332F' },
+  mauve: { solid: '#9B7EDE', shadow: '#6E52B0', soft: '#EDE4FB', softDark: '#2E2350' },
+  amber: { solid: '#E0A458', shadow: '#B8823A', soft: '#FDF0DC', softDark: '#3D2B0F' },
+  coral: { solid: '#FF7A59', shadow: '#D65A3D', soft: '#FFE4DA', softDark: '#3D1E14' },
+  grey: { solid: '#94A3B8', shadow: '#64748B', soft: '#F1F5F9', softDark: '#28303D' },
+} as const;
 
 export const studySurfaceTokens = {
   light: {
@@ -60,123 +79,124 @@ export const selectionTrayTokens = {
   },
 } as const;
 
+// "Fresh Direction" palette for the four grammar exercise screens (Quiz, Fill,
+// Reorder, Translate): a single accent-blue prompt card with a soft diffuse
+// shadow, pill-shaped progress dashes, and white/cream answer surfaces —
+// replaces the old flat-offset-border look. Colors are converted from the
+// design mockups' oklch values to hex for React Native.
 export const grammarGameTokens = {
   light: {
-    panelSurface: '#FFFFFF',
-    panelBorder: '#C7D8E6',
-    panelBottom: '#9EC6E2',
-    panelShadow: '#0D3B66',
-    promptSurface: '#EAF5FF',
-    promptBorder: '#B9D6EA',
-    promptBottom: '#83B7DC',
-    promptText: '#172B3F',
-    metaText: '#52657A',
-    metaStrong: '#165E9C',
-    statusSurface: '#EFF7FF',
-    statusBorder: '#C6DCEB',
-    progressTrack: '#CFE4F7',
-    progressFill: '#1F7AD1',
-    badgeSurface: '#E8F4FF',
-    badgeBorder: '#AFCFE8',
-    badgeText: '#0E5D9E',
-    answerSurface: '#FFFFFF',
-    answerBorder: '#D4E0EA',
-    answerBottom: '#B5CADC',
-    answerText: '#172B3F',
-    answerSelectedSurface: '#D8EDFF',
-    answerSelectedBorder: '#5DA7DE',
-    answerSelectedBottom: '#2C7DBA',
+    panelSurface: '#FFFDF9',
+    panelBorder: '#FFFDF9',
+    panelBottom: '#FFFDF9',
+    panelShadow: '#000000',
+    promptSurface: '#4AA3D2',
+    promptBorder: '#4AA3D2',
+    promptBottom: '#4AA3D2',
+    promptText: '#FFFFFF',
+    metaText: '#767165',
+    metaStrong: 'rgba(255,255,255,0.85)',
+    progressLabelText: '#595549',
+    checkButtonBg: '#4AA3D2',
+    trayDivider: 'rgba(255,255,255,0.25)',
+    blankSlotColor: '#4AA3D2',
+    statusSurface: '#FFFFFF',
+    statusBorder: '#FFFFFF',
+    progressTrack: '#DCD7C9',
+    progressFill: '#4AA3D2',
+    badgeSurface: '#FFFFFF',
+    badgeBorder: '#FFFFFF',
+    badgeText: '#374151',
+    answerSurface: '#FFFDF9',
+    answerBorder: '#E3DECF',
+    answerBottom: '#E3DECF',
+    answerText: '#1E1A10',
+    answerSelectedSurface: '#DBEAFE',
+    answerSelectedBorder: '#4AA3D2',
+    answerSelectedBottom: '#2584B2',
     inputSurface: '#FFFFFF',
-    inputFocusedSurface: '#D8EDFF',
-    wordBankSurface: '#EDF7FF',
-    wordBankBorder: '#C1D8E9',
+    inputFocusedSurface: '#EAF4FB',
+    wordBankSurface: '#F4F2EA',
+    wordBankBorder: '#E2DED3',
     wordChipSurface: '#FFFFFF',
-    wordChipBorder: '#B8D5EA',
-    wordChipBottom: '#86BDE2',
-    wordChipText: '#17324A',
-    selectedWordSurface: '#1F7AD1',
-    selectedWordBorder: '#8CC7F0',
-    selectedWordBottom: '#2C7DBA',
+    wordChipBorder: '#EDE8DB',
+    wordChipBottom: '#EDE8DB',
+    wordChipText: '#252117',
+    selectedWordSurface: '#4AA3D2',
+    selectedWordBorder: '#4AA3D2',
+    selectedWordBottom: '#4AA3D2',
     selectedWordText: '#FFFFFF',
-    heartFilled: '#E91E63',
-    heartEmpty: '#8AA0B6',
-    heartLost: '#D90452',
-    correctSurface: '#DDF7E9',
-    correctBorder: '#56BE82',
-    correctBottom: '#279461',
-    correctText: '#074D2A',
-    incorrectSurface: '#FFE3EA',
-    incorrectBorder: '#F06A7F',
-    incorrectBottom: '#CC435B',
-    incorrectText: '#7E112C',
-    feedbackSurface: '#19A85E',
-    feedbackBorder: '#087D44',
+    heartFilled: '#CC272E',
+    heartEmpty: '#D0CEC7',
+    heartLost: '#E0201F',
+    correctSurface: '#CCFBF1',
+    correctBorder: '#17B8A6',
+    correctBottom: '#0F8A7D',
+    correctText: '#0B5B52',
+    incorrectSurface: '#FFE4DA',
+    incorrectBorder: '#FF7A59',
+    incorrectBottom: '#D65A3D',
+    incorrectText: '#7A2E1C',
+    feedbackSurface: '#22C55E',
+    feedbackBorder: '#16A34A',
     feedbackText: '#FFFFFF',
   },
   dark: {
-    panelSurface: '#071423',
-    panelBorder: '#2B4763',
-    panelBottom: '#4D8DC4',
+    panelSurface: '#0D1A2E',
+    panelBorder: '#0D1A2E',
+    panelBottom: '#0D1A2E',
     panelShadow: '#000000',
-    promptSurface: '#0E2A46',
-    promptBorder: '#31506B',
-    promptBottom: '#4D8DC4',
-    promptText: '#F7FBFF',
-    metaText: '#BED7EF',
-    metaStrong: '#9AD8FF',
-    statusSurface: '#0B1D33',
-    statusBorder: '#28445F',
-    progressTrack: '#17324D',
-    progressFill: '#64B5FF',
-    badgeSurface: '#102542',
-    badgeBorder: '#3D6389',
-    badgeText: '#D7ECFF',
-    answerSurface: '#12365A',
-    answerBorder: '#6FA8D4',
-    answerBottom: '#4D8DC4',
-    answerText: '#FFFFFF',
-    answerSelectedSurface: '#155D9E',
-    answerSelectedBorder: '#75B8E8',
-    answerSelectedBottom: '#4D8DC4',
-    inputSurface: '#0B1728',
-    inputFocusedSurface: '#155D9E',
-    wordBankSurface: '#06101D',
-    wordBankBorder: '#35536F',
-    wordChipSurface: '#243A55',
-    wordChipBorder: '#7A9BB8',
-    wordChipBottom: '#466986',
-    wordChipText: '#F7FAFF',
-    selectedWordSurface: '#6B5AE8',
-    selectedWordBorder: '#C9C2FF',
-    selectedWordBottom: '#5748C8',
+    promptSurface: '#004E75',
+    promptBorder: '#004E75',
+    promptBottom: '#004E75',
+    promptText: '#FFFFFF',
+    metaText: '#7D8086',
+    metaStrong: 'rgba(255,255,255,0.75)',
+    progressLabelText: '#BABEC4',
+    checkButtonBg: '#0092D7',
+    trayDivider: 'rgba(255,255,255,0.15)',
+    blankSlotColor: '#0092D7',
+    statusSurface: '#FFFFFF',
+    statusBorder: '#FFFFFF',
+    progressTrack: '#16233A',
+    progressFill: '#16A4E2',
+    badgeSurface: '#1E293B',
+    badgeBorder: '#1E293B',
+    badgeText: '#E2E8F0',
+    answerSurface: '#0D1A2E',
+    answerBorder: '#26374F',
+    answerBottom: '#26374F',
+    answerText: '#E3E5E8',
+    answerSelectedSurface: '#1B3E6E',
+    answerSelectedBorder: '#16A4E2',
+    answerSelectedBottom: '#5AA8F5',
+    inputSurface: '#0D1A2E',
+    inputFocusedSurface: '#12345A',
+    wordBankSurface: '#0A1526',
+    wordBankBorder: '#2E4262',
+    wordChipSurface: '#FFFFFF',
+    wordChipBorder: '#FFFFFF',
+    wordChipBottom: '#FFFFFF',
+    wordChipText: '#252117',
+    selectedWordSurface: '#0092D7',
+    selectedWordBorder: '#0092D7',
+    selectedWordBottom: '#0092D7',
     selectedWordText: '#FFFFFF',
-    heartFilled: '#FF4F8B',
-    heartEmpty: '#5C7EA3',
-    heartLost: '#FF2E63',
-    correctSurface: '#0E3C2A',
-    correctBorder: '#44E08A',
-    correctBottom: '#20B864',
-    correctText: '#E9FFF2',
-    incorrectSurface: '#4A1223',
-    incorrectBorder: '#FF6F8F',
-    incorrectBottom: '#FF3B68',
-    incorrectText: '#FFE8EE',
-    feedbackSurface: '#15A967',
-    feedbackBorder: '#8FF2B3',
+    heartFilled: '#D74745',
+    heartEmpty: '#2A3B58',
+    heartLost: '#FF3B3B',
+    correctSurface: '#0F332F',
+    correctBorder: '#4FD9C4',
+    correctBottom: '#17B8A6',
+    correctText: '#E9FFFC',
+    incorrectSurface: '#3D1E14',
+    incorrectBorder: '#FF9478',
+    incorrectBottom: '#FF7A59',
+    incorrectText: '#FFEDE7',
+    feedbackSurface: '#22C55E',
+    feedbackBorder: '#4ADE80',
     feedbackText: '#FFFFFF',
   },
-} as const;
-
-export const darkGameAccents = {
-  answerArea: grammarGameTokens.dark.answerSurface,
-  answerAreaBorder: grammarGameTokens.dark.answerBorder,
-  answerAreaBottom: grammarGameTokens.dark.answerBottom,
-  wordArea: grammarGameTokens.dark.wordBankSurface,
-  wordAreaBorder: grammarGameTokens.dark.wordBankBorder,
-  wordCard: grammarGameTokens.dark.wordChipSurface,
-  wordCardPressed: grammarGameTokens.dark.selectedWordSurface,
-  wordCardBorder: grammarGameTokens.dark.wordChipBorder,
-  wordText: grammarGameTokens.dark.wordChipText,
 } as const;
 
 export const getStudySurfaceColors = (colors: ThemeColors, isDarkMode: boolean) => {
@@ -223,25 +243,26 @@ export const getGrammarGameColors = (colors: ThemeColors, isDarkMode: boolean) =
   buttonText: colors.buttonText,
 });
 
+// "Hard offset + soft ambient" signature shadow (Fresh Direction §1): a
+// crisp opaque offset in a darker tone of the surface, plus a soft ambient
+// blur — never a plain single-value box-shadow. `level` grades how
+// prominent the card reads (soft = ordinary card, raised = control/pill,
+// strong = modal/elevated surface); each step scales both the hard offset
+// and the ambient blur together so the two parts always read as one shadow.
 export const getSoftShadow = (
   isDarkMode: boolean,
   level: ShadowLevel = 'soft'
 ): ViewStyle => {
-  const height = level === 'strong' ? 6 : level === 'raised' ? 4 : 2;
-  const radius = Platform.OS === 'web'
-    ? (level === 'strong' ? 8 : level === 'raised' ? 5 : 3)
-    : (level === 'strong' ? 12 : level === 'raised' ? 8 : 5);
-  const opacity = isDarkMode
-    ? (level === 'strong' ? 0.28 : level === 'raised' ? 0.2 : 0.14)
-    : (level === 'strong' ? 0.12 : level === 'raised' ? 0.08 : 0.05);
+  const offsetColor = isDarkMode ? FRESH_COLORS_DARK.whiteCardShadow : FRESH_COLORS.whiteCardShadow;
+  const hard = level === 'strong' ? '3px 5px 0' : level === 'raised' ? '2px 4px 0' : '2px 3px 0';
+  const blur = level === 'strong' ? 20 : level === 'raised' ? 16 : 12;
+  const ambientAlpha = isDarkMode
+    ? (level === 'strong' ? 0.36 : level === 'raised' ? 0.32 : 0.28)
+    : (level === 'strong' ? 0.08 : level === 'raised' ? 0.06 : 0.04);
 
   return {
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height },
-    shadowOpacity: opacity,
-    shadowRadius: radius,
-    elevation: Platform.OS === 'android' ? (level === 'strong' ? 5 : level === 'raised' ? 3 : 1) : 0,
-  };
+    boxShadow: `${hard} ${offsetColor}, 0px ${Math.round(blur / 3)}px ${blur}px rgba(0,0,0,${ambientAlpha})`,
+  } as ViewStyle;
 };
 
 export const getPanelStyle = (
@@ -250,15 +271,15 @@ export const getPanelStyle = (
   level: ShadowLevel = 'soft'
 ): ViewStyle => ({
   backgroundColor: colors.card,
-  borderColor: isDarkMode ? colors.border : '#D6E2EE',
+  borderColor: isDarkMode ? colors.border : '#E7E1D6',
   borderWidth: isDarkMode ? 1.5 : 1.25,
   borderRadius: uiRadii.card,
   ...getSoftShadow(isDarkMode, level),
 });
 
 export const getInsetSurfaceStyle = (colors: ThemeColors, isDarkMode: boolean): ViewStyle => ({
-  backgroundColor: isDarkMode ? colors.surface : '#F8FAFF',
-  borderColor: isDarkMode ? colors.border : '#D6E2EE',
+  backgroundColor: isDarkMode ? colors.surface : '#F4F1EA',
+  borderColor: isDarkMode ? colors.border : '#E7E1D6',
   borderWidth: isDarkMode ? 1.5 : 1,
   borderRadius: uiRadii.panel,
 });
@@ -279,7 +300,7 @@ export const getButtonToneColors = (colors: ThemeColors, isDarkMode: boolean, to
       return {
         background: isDarkMode ? colors.surface : '#FFFFFF',
         border: isDarkMode ? colors.borderStrong : colors.border,
-        bottom: isDarkMode ? colors.borderStrong : '#B9C8D6',
+        bottom: isDarkMode ? colors.borderStrong : '#D9D2C4',
         text: colors.text,
       };
     case 'danger':

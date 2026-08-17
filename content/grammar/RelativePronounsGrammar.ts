@@ -3,6 +3,37 @@ const RelativePronounsGrammar = {
   title: 'Les pronoms relatifs',
   description: 'Use relative pronouns (who, which, that, whose, where) to connect clauses',
   imageUrl: 'https://i.ibb.co/hFx8bVrJ/Pronoms-relatifs.png',
+  textContent: {
+    cards: [
+      {
+        eyebrow: 'Pour les personnes et les objets',
+        paragraph: "Je relie deux phrases. Je parle d'un nom (l'antécédent) pour ajouter une information sur lui. Le choix du pronom relatif dépend du rôle de l'antécédent dans la phrase.",
+        columns: [
+          { label: 'WHO · Personne', accent: 'blue', rows: ['**Who**'] },
+          { label: 'WHICH · Objet, animal', accent: 'coral', rows: ['**Which**'] },
+          { label: 'THAT · Personnes et objets', accent: 'teal', rows: ['**That**'] },
+        ],
+        examples: [
+          { en: 'The girl **who** sings is my friend.', fr: 'La fille qui chante est mon amie.' },
+          { en: 'The phone **which** I lost is new.', fr: "Le téléphone que j'ai perdu est neuf." },
+          { en: 'I have a cat **that** can talk.', fr: 'J\'ai un chat qui sait parler.' },
+        ],
+      },
+      {
+        eyebrow: 'Pour le possesseur, le lieu et la date',
+        columns: [
+          { label: 'WHOSE · Possesseur', accent: 'amber', rows: ['**Whose**'] },
+          { label: 'WHERE · Lieu', accent: 'coral', rows: ['**Where**'] },
+          { label: 'WHEN · Date', accent: 'teal', rows: ['**When**'] },
+        ],
+        examples: [
+          { en: 'The boy **whose** dog is cute.', fr: 'Le garçon dont le chien est mignon.' },
+          { en: 'This is the café **where** we met.', fr: "C'est le café où on s'est rencontrés." },
+          { en: 'The day **when** it rained.', fr: 'Le jour où il a plu.' },
+        ],
+      },
+    ],
+  },
 translateExercises: [
   {
     type: 'translate',

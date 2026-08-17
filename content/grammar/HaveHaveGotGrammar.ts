@@ -3,6 +3,51 @@ const HaveHaveGotGrammar = {
   title: 'Have / Have got',
   description: "Using 'have' and 'have got' for possession: affirmative and negative forms (present tense)",
   imageUrl: 'https://i.ibb.co/rKDdd054/Have-Have-got.png',
+  textContent: {
+    cards: [
+      {
+        eyebrow: 'La forme positive',
+        paragraph: "Je parle de ce que j'ai, ce que je possède (objets, caractéristiques physiques...).",
+        tip: "Formule : sujet + have / has (got).",
+        columns: [
+          {
+            label: 'HAVE (GOT)',
+            accent: 'blue',
+            rows: ['I have (got)', 'You have (got)', 'He / She / It **has** (got)', 'We have (got)', 'They have (got)'],
+          },
+          {
+            label: 'Contraction à l’oral (have got)',
+            accent: 'teal',
+            rows: ['I’ve got', 'You’ve got', 'He / She / It’s got', 'We’ve got', 'They’ve got'],
+          },
+        ],
+        examples: [
+          { en: 'I **have** (got) a nice friend.', fr: 'J’ai une amie gentille.' },
+          { en: 'You**’ve got** blue eyes.', fr: 'Tu as les yeux bleus.' },
+        ],
+      },
+      {
+        eyebrow: 'La forme négative',
+        paragraph: "On utilise don't / doesn't have, ou haven't / hasn't got.",
+        columns: [
+          {
+            label: "DON'T / DOESN'T HAVE",
+            accent: 'coral',
+            rows: ["I don't have", "You don't have", "He / She / It **doesn't** have", "We don't have", "They don't have"],
+          },
+          {
+            label: "HAVEN'T / HASN'T GOT",
+            accent: 'amber',
+            rows: ["I haven't got", "You haven't got", "He / She / It **hasn't** got", "We haven't got", "They haven't got"],
+          },
+        ],
+        examples: [
+          { en: "I **don't have** a car.", fr: 'Je n’ai pas de voiture.' },
+          { en: "They **haven't got** a big house.", fr: 'Ils n’ont pas une grande maison.' },
+        ],
+      },
+    ],
+  },
 translateExercises: [
   {
     type: 'translate',

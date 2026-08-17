@@ -3,6 +3,29 @@ const SinceForGrammar = {
   title: 'Since et For',
   description: 'Use since and for to talk about time durations',
   imageUrl: 'https://i.ibb.co/ZzBLNz2m/Since-et-For.png',
+  textContent: {
+    cards: [
+      {
+        eyebrow: '« For » montre la durée d\'une action',
+        paragraph: 'Par exemple, un nombre et une unité de temps : one week, two minutes, four hours, a hundred years...',
+        tip: 'Formule : for + durée.',
+        examples: [
+          { en: 'We have been talking **for hours**.', fr: 'Nous avons parlé pendant des heures.' },
+          { en: 'Emily will go to Paris **for a week**.', fr: 'Emily ira à Paris pendant une semaine.' },
+          { en: 'I have built a house **for six years**.', fr: 'J\'ai construit une maison pendant six ans.' },
+        ],
+      },
+      {
+        eyebrow: '« Since » montre le point de départ d\'une action',
+        paragraph: 'Par exemple, une année, un jour, un moment...',
+        tip: 'Formule : since + date.',
+        examples: [
+          { en: 'I have been sick **since Friday**.', fr: 'Je suis malade depuis vendredi.' },
+          { en: 'He has been a teacher **since 2018**.', fr: 'Il est professeur depuis 2018.' },
+        ],
+      },
+    ],
+  },
 translateExercises: [
   {
     type: 'translate',

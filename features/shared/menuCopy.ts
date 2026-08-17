@@ -71,11 +71,6 @@ type MenuCopy = {
     timerModeDescription: string;
     saveBestTimesTitle: string;
     saveBestTimesDescription: string;
-    resetBestTimesTitle: string;
-    resetBestTimesDescription: string;
-    reset: string;
-    resetConfirmTitle: string;
-    resetConfirmMessage: string;
     cancel: string;
     exactTypingTitle: string;
     exactTypingDescription: string;
@@ -94,6 +89,7 @@ type MenuCopy = {
     creditsImages: string;
     creditsBuiltWith: string;
     version: string;
+    creditsSchool: string;
     adminAccessTitle: string;
     adminAccessDescription: string;
     wrongPin: string;
@@ -124,6 +120,8 @@ type MenuCopy = {
     showAlphabetically: string;
     useListLayout: string;
     useTileLayout: string;
+    openFilters: string;
+    layoutLabel: string;
     chooseLevel: string;
     allLevels: string;
     showAllLevels: string;
@@ -203,13 +201,13 @@ const englishCopy: MenuCopy = {
     wordPlural: 'words',
     toDailyTarget: 'for today',
     grammarTitle: 'Grammar',
-    grammarDescription: 'Review grammar lessons with interactive exercises.',
+    grammarDescription: 'Sharpen your grammar skills',
     vocabularyTitle: 'Vocabulary',
-    vocabularyDescription: 'Learn vocabulary by topic and review with cards.',
+    vocabularyDescription: 'Build your word bank',
     lessonsTitle: 'Chapters & Resources',
-    lessonsDescription: 'Find class chapters, useful links, and course tools.',
+    lessonsDescription: 'Everything from class',
     settingsTitle: 'Settings',
-    settingsDescription: 'Change how the app looks and works.',
+    settingsDescription: 'Make Ellie yours',
   },
   settings: {
     header: 'Settings',
@@ -242,11 +240,6 @@ const englishCopy: MenuCopy = {
     timerModeDescription: 'Use a timer in the matching game.',
     saveBestTimesTitle: 'Save Best Times',
     saveBestTimesDescription: 'Save your best matching times here.',
-    resetBestTimesTitle: 'Clear Best Times',
-    resetBestTimesDescription: 'Delete your saved matching times.',
-    reset: 'Reset',
-    resetConfirmTitle: 'Clear Saved Times?',
-    resetConfirmMessage: 'This deletes all saved matching times on this device.',
     cancel: 'Cancel',
     exactTypingTitle: 'Typing Hard Mode',
     exactTypingDescription: 'Accents and punctuation required. Hints disabled.',
@@ -264,7 +257,8 @@ const englishCopy: MenuCopy = {
     creditsConcept: 'Application concept & development: Mr Faivre',
     creditsImages: 'Images: Mr Faivre with icons from Flaticon',
     creditsBuiltWith: 'Built with React Native & Expo',
-    version: 'Ellie Version 2.2',
+    version: 'Ellie Version 2.4',
+    creditsSchool: 'Mr Faivre - Collège Jean Jacques Rousseau - Voujeaucourt',
     adminAccessTitle: 'Teacher Area',
     adminAccessDescription: 'Enter the teacher PIN to open Lesson Studio.',
     wrongPin: 'Wrong PIN',
@@ -295,6 +289,8 @@ const englishCopy: MenuCopy = {
     showAlphabetically: 'Show vocabulary alphabetically',
     useListLayout: 'Use list layout',
     useTileLayout: 'Use tile layout',
+    openFilters: 'Filters',
+    layoutLabel: 'Layout',
     chooseLevel: 'Choose vocabulary level',
     allLevels: 'All Levels',
     showAllLevels: 'Show all vocabulary levels',

@@ -3,7 +3,7 @@ const MoreFoodBasicsVocab = {
   title: 'Food +',
   description: 'Learn more basic food vocabulary: vegetables, fruits, desserts, meat, and other food',
   imageUrl: 'https://i.ibb.co/CpW5rF58/food-2.webp',
-  thumbnail: require('../../assets/thumbnails/food-basics-thumbnail.png'),
+  thumbnail: require('../../assets/thumbnails/foodplus-thumbnail.png'),
   categoryPickerTitle: 'Choose a food category',
   categoryPickerLabel: 'Food category',
   categoryPickerAllLabel: 'All more food basics',

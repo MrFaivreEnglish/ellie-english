@@ -4,6 +4,34 @@ const CanGrammar = {
   title: 'Can',
   description: 'Learn how to use the modal verb can.',
   imageUrl: 'https://i.ibb.co/1fBG5Rhj/Can.png',
+  textContent: {
+    cards: [
+      {
+        eyebrow: 'Ce que je peux (ou sais) faire',
+        paragraph: 'Je parle de ce que je peux (ou sais) faire.',
+        tip: 'Formule : sujet + can + base verbale. Can ne change jamais (pas de -s, pas de "to").',
+        columns: [
+          {
+            label: 'Sujet + CAN (invariable) + base verbale',
+            accent: 'blue',
+            rows: ['I', 'You', 'He / She / It', 'We', 'They'],
+          },
+        ],
+        examples: [
+          { en: 'Yes, **I can speak** English well.', fr: 'Oui, je sais bien parler anglais.' },
+          { en: '**We can be** friends.', fr: 'Nous pouvons être amis.' },
+        ],
+      },
+      {
+        eyebrow: 'Ce que je ne peux (ou ne sais) pas faire',
+        paragraph: "Formule : sujet + can't + base verbale.",
+        examples: [
+          { en: "No, **Lyra can't swim**.", fr: 'Non, Lyra ne sait pas nager.' },
+          { en: "**They can't speak**.", fr: 'Ils ne peuvent pas se parler.' },
+        ],
+      },
+    ],
+  },
 
   translateExercises: [
     {

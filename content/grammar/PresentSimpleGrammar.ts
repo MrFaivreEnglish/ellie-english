@@ -3,6 +3,52 @@ const PresentSimpleGrammar = {
   title: 'Present Simple',
   description: 'Learn how to use the present simple tense',
   imageUrl: 'https://i.ibb.co/WNS3Tfgm/Present-simple.png',
+  textContent: {
+    cards: [
+      {
+        eyebrow: 'À quoi ça sert',
+        paragraph: 'Pour parler des habitudes, des vérités générales, des sentiments ou des goûts.',
+        tip: 'Pour conjuguer, on utilise la base verbale, et on ajoute un « -s » avec he, she et it.',
+        columns: [
+          {
+            label: '1/ Je repère le sujet et le pronom correspondant',
+            accent: 'blue',
+            rows: ['I', 'You', 'He / She / It', 'We', 'They'],
+          },
+          {
+            label: '2/ Je conjugue le verbe. Par exemple :',
+            accent: 'coral',
+            rows: [
+              ['Like', 'Do'],
+              ['Like', 'Do'],
+              ['**Likes**', '**Does**'],
+              ['Like', 'Do'],
+              ['Like', 'Do'],
+            ],
+          },
+        ],
+        examples: [
+          { en: '**I speak** English well.', fr: 'Je parle bien anglais.' },
+          { en: '**She lives** in London.', fr: 'Elle vit à Londres.' },
+        ],
+      },
+      {
+        eyebrow: 'Be et Have',
+        subsections: [
+          {
+            text: '**Be** (« être ») sert à décrire. Be a une conjugaison particulière :',
+            accent: 'amber',
+            rows: ['I **am**', 'You **are**', 'He / She / It **is**', 'We **are**', 'They **are**'],
+          },
+          {
+            text: '**Have** (« avoir ») sert à dire ce que quelqu’un possède :',
+            accent: 'teal',
+            rows: ['I have', 'You have', 'He / She / It **has**', 'We have', 'They have'],
+          },
+        ],
+      },
+    ],
+  },
 translateExercises: [
   {
     type: 'translate',

@@ -1,4 +1,5 @@
-import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
+import React, { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
+import { AppState } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import {
   AccountSession,
@@ -382,6 +383,51 @@ const AccountProviderInner = ({ children }: { children: React.ReactNode }) => {
         setError('Profile changes are saved on this device. Tap Retry to save them online.');
       });
   }, [session]);
+
+  const autoSyncInFlightRef = useRef(false);
+
+  const autoSyncQuietly = useCallback(async () => {
+    if (!session || autoSyncInFlightRef.current) return;
+
+    autoSyncInFlightRef.current = true;
+
+    try {
+      const localProgressItems = await getLocalStudentProgressCloudItems();
+      await upsertCloudProgressItems(localProgressItems);
+      await syncAccountPreferencesToCloudIfSignedIn();
+      setLastSyncAt(new Date());
+      setError('');
+      setSyncStatus('synced');
+    } catch {
+      setSyncStatus('failed');
+    } finally {
+      autoSyncInFlightRef.current = false;
+    }
+  }, [session]);
+
+  // While signed in, keep the online backup fresh without requiring a manual Sync tap.
+  useEffect(() => {
+    if (!session) return;
+
+    const intervalId = setInterval(() => {
+      void autoSyncQuietly();
+    }, 90000);
+
+    return () => clearInterval(intervalId);
+  }, [session, autoSyncQuietly]);
+
+  // Also catch progress right before the app is backgrounded or closed.
+  useEffect(() => {
+    if (!session) return;
+
+    const subscription = AppState.addEventListener('change', (nextState) => {
+      if (nextState === 'background' || nextState === 'inactive') {
+        void autoSyncQuietly();
+      }
+    });
+
+    return () => subscription.remove();
+  }, [session, autoSyncQuietly]);
 
   const signOut = useCallback(async () => {
     setError('');

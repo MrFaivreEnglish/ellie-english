@@ -3,6 +3,33 @@ const ComparativeInferiorityEqualityGrammar = {
   title: "Comparatif d'infériorité et d'égalité",
   description: "Practice making comparisons of inferiority (less...than) and equality (as...as)",
   imageUrl: 'https://i.ibb.co/0jTN4jQT/Comparatif-inf-riorit.png',
+  textContent: {
+    cards: [
+      {
+        eyebrow: "Le comparatif d'infériorité",
+        paragraph: 'Pour comparer des choses entre elles (moins grande, moins intelligent...).',
+        tip: "Ici, on ne se préoccupe pas des syllabes, c'est toujours less + adjectif + than.",
+        columns: [
+          {
+            label: 'LESS + adjectif + THAN (peu importe les syllabes)',
+            accent: 'coral',
+            rows: ['Old → **Less old** than', 'Pretty → **Less pretty** than', 'Perfect → **Less perfect** than', 'Beautiful → **Less beautiful** than'],
+          },
+        ],
+      },
+      {
+        eyebrow: "Le comparatif d'égalité",
+        paragraph: "Pour dire que deux choses sont aussi grandes, petites, etc. l'une que l'autre.",
+        columns: [
+          {
+            label: 'AS + adjectif + AS (peu importe les syllabes)',
+            accent: 'blue',
+            rows: ['Old → **As old as**', 'Pretty → **As pretty as**', 'Perfect → **As perfect as**', 'Beautiful → **As beautiful as**'],
+          },
+        ],
+      },
+    ],
+  },
 translateExercises: [
   {
     type: 'translate',

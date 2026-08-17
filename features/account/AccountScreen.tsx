@@ -1,5 +1,5 @@
 import React from 'react';
-import { ActivityIndicator, Alert, Platform, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, Alert, Platform, ScrollView, StyleSheet, Text, TouchableOpacity, useWindowDimensions, View } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import type { RootStackParamList } from '../../types/navigationTypes';
@@ -9,7 +9,7 @@ import AccountPanel from './AccountPanel';
 import BackButton from '../shared/BackButton';
 import { useAccount } from './AccountContext';
 import { useTheme } from '../settings/ThemeContext';
-import { getButtonStyle, getButtonTextColor } from '../shared/uiPrimitives';
+import { getButtonStyle, getButtonTextColor, getSoftShadow } from '../shared/uiPrimitives';
 
 const cleanDisplayName = (value: string) => value.trim().replace(/\s+/g, ' ');
 
@@ -25,6 +25,8 @@ export default function AccountScreen() {
     clearError,
   } = useAccount();
   const insets = useSafeAreaInsets();
+  const { width: windowWidth } = useWindowDimensions();
+  const isDesktopWeb = Platform.OS === 'web' && windowWidth >= 768;
   const [resetMessage, setResetMessage] = React.useState('');
   const [isAdvancedOpen, setIsAdvancedOpen] = React.useState(false);
   const accountName = cleanDisplayName(session?.user.displayName || session?.user.username || '');
@@ -145,6 +147,7 @@ export default function AccountScreen() {
       keyboardShouldPersistTaps="handled"
       keyboardDismissMode="none"
     >
+      <View style={isDesktopWeb && styles.desktopContentWrap}>
       <BackButton onPress={() => navigation.goBack()} />
 
       <View style={styles.header}>
@@ -166,7 +169,7 @@ export default function AccountScreen() {
         <TouchableOpacity
           onPress={confirmSignOut}
           disabled={isSyncing}
-          style={[styles.signOutCard, { backgroundColor: colors.card, borderColor: colors.danger }]}
+          style={[styles.signOutCard, getSoftShadow(isDarkMode, 'soft'), { backgroundColor: colors.card, borderColor: colors.danger }]}
           accessibilityRole="button"
           accessibilityLabel="Sign out"
         >
@@ -190,7 +193,7 @@ export default function AccountScreen() {
       <View style={styles.accountSection}>
         <TouchableOpacity
           onPress={() => setIsAdvancedOpen((current) => !current)}
-          style={[styles.advancedToggle, { backgroundColor: colors.card, borderColor: colors.border }]}
+          style={[styles.advancedToggle, getSoftShadow(isDarkMode, 'soft'), { backgroundColor: colors.card, borderColor: colors.border }]}
           accessibilityRole="button"
           accessibilityLabel={isAdvancedOpen ? 'Close advanced account actions' : 'Open advanced account actions'}
           accessibilityState={{ expanded: isAdvancedOpen }}
@@ -209,7 +212,7 @@ export default function AccountScreen() {
 
         {isAdvancedOpen && (
           <>
-            <View style={[styles.resetCard, { backgroundColor: colors.card, borderColor: colors.warning }]}>
+            <View style={[styles.resetCard, getSoftShadow(isDarkMode, 'soft'), { backgroundColor: colors.card, borderColor: colors.warning }]}>
               <View style={styles.dangerCopy}>
                 <MaterialIcons name="restart-alt" size={22} color={colors.warning} />
                 <View style={styles.dangerTextBlock}>
@@ -237,7 +240,7 @@ export default function AccountScreen() {
             </View>
 
             {session && (
-              <View style={[styles.dangerCard, { backgroundColor: colors.card, borderColor: colors.danger }]}>
+              <View style={[styles.dangerCard, getSoftShadow(isDarkMode, 'soft'), { backgroundColor: colors.card, borderColor: colors.danger }]}>
                 <View style={styles.dangerCopy}>
                   <MaterialIcons name="delete-outline" size={22} color={colors.danger} />
                   <View style={styles.dangerTextBlock}>
@@ -265,6 +268,7 @@ export default function AccountScreen() {
           </>
           )}
       </View>
+      </View>
     </ScrollView>
   );
 }
@@ -272,6 +276,11 @@ export default function AccountScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+  },
+  desktopContentWrap: {
+    width: '100%',
+    maxWidth: 760,
+    alignSelf: 'center',
   },
   header: {
     flexDirection: 'row',

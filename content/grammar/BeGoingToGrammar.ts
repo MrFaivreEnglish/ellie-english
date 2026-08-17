@@ -3,6 +3,44 @@ const BeGoingToGrammar = {
   title: 'Futur Proche (Be Going To)',
   description: 'Learn how to use be going to for near future',
   category: 'Temps principaux',  imageUrl: 'https://i.ibb.co/6cxHGw3F/Be-Going-to.png',
+  textContent: {
+    cards: [
+      {
+        eyebrow: 'À quoi ça sert',
+        paragraph: "Pour parler d'une action qui va arriver prochainement (ou non).",
+        tip: 'Formule : sujet + be going to + base verbale.',
+        columns: [
+          {
+            label: '1/ Je repère le sujet et / ou le pronom',
+            accent: 'blue',
+            rows: ['I', 'You', 'He / She / It', 'We', 'They'],
+          },
+          {
+            label: '2/ Je conjugue BE au présent',
+            accent: 'coral',
+            rows: ['**am** (not) going to', '**are** (not) going to', '**is** (not) going to', '**are** (not) going to', '**are** (not) going to'],
+          },
+          {
+            label: "3/ J'ajoute la base verbale",
+            accent: 'teal',
+            rows: ['Speak', 'Love', 'Be', 'Etc...'],
+          },
+        ],
+        examples: [
+          { en: "**I'm going to tell** her now!", fr: 'Je vais lui dire tout de suite !' },
+          { en: '**We are going to date**.', fr: 'On va sortir ensemble.' },
+        ],
+      },
+      {
+        eyebrow: 'La forme négative',
+        paragraph: "On ajoute **not** après be : am not / isn't / aren't + going to + base verbale.",
+        examples: [
+          { en: "**I'm not going to tell** her.", fr: 'Je ne vais pas lui dire.' },
+          { en: '**We are not going to date**.', fr: 'On ne va pas sortir ensemble.' },
+        ],
+      },
+    ],
+  },
 translateExercises: [
   // POSITIVE
 

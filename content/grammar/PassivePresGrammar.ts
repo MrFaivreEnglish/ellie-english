@@ -4,6 +4,43 @@ const PassivePresGrammar = {
   description: 'Learn how to use the passive voice in present tense',
   category: 'Voix passive',
   imageUrl: 'https://i.ibb.co/mV0xzQRY/Voix-passive-pr-sent.png',
+  textContent: {
+    cards: [
+      {
+        eyebrow: 'À quoi ça sert',
+        paragraph: 'Je parle de ce qui était subi (être disputé, être construit...).',
+        tip: 'Formule : sujet + be au présent + participe passé.',
+        columns: [
+          {
+            label: '1/ Je repère le sujet et / ou le pronom',
+            accent: 'blue',
+            rows: ['I', 'You', 'He / She / It', 'We', 'They'],
+          },
+          {
+            label: '2/ Je conjugue BE au présent',
+            accent: 'coral',
+            rows: ['**am** (not)', '**are** (not)', '**is** (not)', '**are** (not)', '**are** (not)'],
+          },
+          {
+            label: '3/ Je trouve le participe passé du verbe',
+            accent: 'teal',
+            rows: ['Verbe régulier : **+ED**', 'Verbe irrégulier : **par cœur**'],
+          },
+        ],
+        examples: [
+          { en: 'The dog **is taken** to the zoo.', fr: 'Le chien est emmené au zoo.' },
+          { en: 'Pandas **are protected**.', fr: 'Les pandas sont protégés.' },
+        ],
+      },
+      {
+        eyebrow: 'La forme négative',
+        examples: [
+          { en: 'Cars **are not repaired** here.', fr: 'Les voitures ne sont pas réparées ici.' },
+          { en: "The text **isn't written** by AI.", fr: "Le texte n'est pas écrit par IA." },
+        ],
+      },
+    ],
+  },
 translateExercises: [
   {
     type: 'translate',

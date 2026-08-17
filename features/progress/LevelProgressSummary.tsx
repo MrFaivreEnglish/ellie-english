@@ -88,7 +88,6 @@ export default function LevelProgressSummary({
   const isMaster = isMasterLevel(stats.level);
   const levelDisplayLabel = getLevelDisplayLabel(stats.level);
   const levelBadgeLabel = getLevelBadgeLabel(stats.level);
-  const nextLevelDisplayLabel = getLevelDisplayLabel(stats.level + 1);
   const displayedLevelLabel = getLevelDisplayLabel(displayedLevel);
   const displayedNextLevelLabel = getLevelDisplayLabel(displayedLevel + 1);
   const masterTierLabel = getMasterTierLabel(stats.level);
@@ -189,14 +188,14 @@ export default function LevelProgressSummary({
   const borderColor = colors?.borderStrong ?? colors?.border ?? (isDarkMode ? '#2A5C84' : '#D7E3EE');
   const textColor = colors?.text ?? (isDarkMode ? '#F7FAFF' : '#0F172A');
   const subTextColor = colors?.secondaryText ?? (isDarkMode ? '#C9DDF0' : '#64748B');
-  const primaryColor = colors?.primary ?? colors?.buttonBackground ?? '#3B82F6';
-  const successColor = colors?.success ?? '#24B75A';
+  const primaryColor = colors?.primary ?? colors?.buttonBackground ?? '#0D7DD4';
+  const successColor = colors?.success ?? '#17B8A6';
   const warningColor = colors?.warning ?? (isDarkMode ? '#FFD166' : '#F4B740');
   const warningSoftColor = colors?.warningSoft ?? (isDarkMode ? '#6B4D00' : '#FFF6DE');
   const warningTextColor = isDarkMode ? '#FFF7D6' : '#7A4B00';
-  const surfaceColor = colors?.surface ?? (isDarkMode ? '#123B61' : '#F6FBFF');
-  const surfaceAltColor = colors?.surfaceAlt ?? (isDarkMode ? '#1B527F' : '#EAF7FF');
-  const trackColor = colors?.border ?? (isDarkMode ? '#1B527F' : '#CFE8F8');
+  const surfaceColor = colors?.surface ?? (isDarkMode ? '#123B61' : '#F4F1EA');
+  const surfaceAltColor = colors?.surfaceAlt ?? (isDarkMode ? '#1B527F' : '#EFF6FF');
+  const trackColor = colors?.border ?? (isDarkMode ? '#1B527F' : '#E2E8F0');
   const progressColor = isMaster ? warningColor : primaryColor;
   const progressPercentLabel = `${stats.progressXP}/${stats.neededXP} XP`;
 
@@ -296,19 +295,11 @@ export default function LevelProgressSummary({
               },
             ]}
           >
-            {primaryAvatarUnlock.type === 'thumbnail' ? (
-              <Image
-                source={primaryAvatarUnlock.image}
-                style={styles.avatarUnlockImage}
-                resizeMode={primaryAvatarUnlock.imageFit ?? 'cover'}
-              />
-            ) : (
-              <MaterialIcons
-                name={primaryAvatarUnlock.icon as React.ComponentProps<typeof MaterialIcons>['name']}
-                size={24}
-                color={primaryAvatarUnlock.accentColor}
-              />
-            )}
+            <Image
+              source={primaryAvatarUnlock.image}
+              style={styles.avatarUnlockImage}
+              resizeMode={primaryAvatarUnlock.imageFit ?? 'cover'}
+            />
           </View>
           <View style={styles.avatarUnlockCopy}>
             <Text style={[styles.avatarUnlockTitle, { color: textColor }]}>New profile picture unlocked</Text>
@@ -552,7 +543,7 @@ const styles = StyleSheet.create({
   },
   progressTrack: {
     width: '100%',
-    height: 12,
+    height: 26,
     marginTop: 8,
     borderRadius: 999,
     overflow: 'hidden',

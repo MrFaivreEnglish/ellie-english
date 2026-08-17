@@ -6,11 +6,67 @@ import {
   TouchableOpacity,
   Pressable,
   ScrollView,
-  useWindowDimensions,
   Platform,
   InteractionManager,
+  useWindowDimensions,
 } from 'react-native';
 import { Svg, Circle } from 'react-native-svg';
+import Animated, { FadeInDown, useAnimatedProps, useSharedValue, withTiming, ZoomIn } from 'react-native-reanimated';
+import { useSpringPress } from '../shared/useSpringPress';
+
+const AnimatedCircle = Animated.createAnimatedComponent(Circle);
+
+function TodayProgressRing({
+  progress,
+  size,
+  strokeWidth,
+  trackColor,
+  fillColor,
+}: {
+  progress: number;
+  size: number;
+  strokeWidth: number;
+  trackColor: string;
+  fillColor: string;
+}) {
+  const radius = (size - strokeWidth) / 2;
+  const circumference = 2 * Math.PI * radius;
+  const progressValue = useSharedValue(0);
+
+  React.useEffect(() => {
+    progressValue.value = withTiming(Math.min(progress / 100, 1), { duration: 700 });
+  }, [progress, progressValue]);
+
+  const animatedProps = useAnimatedProps(() => ({
+    strokeDashoffset: circumference * (1 - progressValue.value),
+  }));
+
+  return (
+    <Svg width={size} height={size}>
+      <Circle
+        cx={size / 2}
+        cy={size / 2}
+        r={radius}
+        stroke={trackColor}
+        strokeWidth={strokeWidth}
+        fill="none"
+      />
+      <AnimatedCircle
+        cx={size / 2}
+        cy={size / 2}
+        r={radius}
+        stroke={fillColor}
+        strokeWidth={strokeWidth}
+        fill="none"
+        strokeDasharray={circumference}
+        animatedProps={animatedProps}
+        strokeLinecap="round"
+        rotation="-90"
+        origin={`${size / 2}, ${size / 2}`}
+      />
+    </Svg>
+  );
+}
 
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
@@ -37,7 +93,8 @@ import { checkAndMarkFirstVisit } from './firstVisitStorage';
 import FirstVisitModal from './FirstVisitModal';
 import { grammarLessons } from '../../content/lessons/grammarRegistry';
 import { vocabularyLessons } from '../../content/lessons/vocabularyRegistry';
-import { getPanelStyle, getSoftShadow, getStudySurfaceColors, uiRadii } from '../shared/uiPrimitives';
+import { DESIGN_ACCENTS, getSoftShadow, getStudySurfaceColors, uiRadii } from '../shared/uiPrimitives';
+import { freshFontFamily, freshRadii, freshSmallPillShadow, freshTileShadow } from '../shared/freshDirection';
 import {
   HOME_MENU_CARD_COLORS,
   HOME_MENU_CARD_GRADIENT_ENDS,
@@ -45,16 +102,12 @@ import {
   SHINY_HOME_MENU_CARD_COLORS,
   SHINY_HOME_MENU_CARD_GRADIENT_ENDS,
   SHINY_HOME_MENU_TEXT_COLOR,
+  TODAY_CARD_COLORS,
 } from '../shared/homeMenuColors';
 import { getAndroidBottomBarButtonStyle, getAndroidBottomBarColor } from '../shared/appChromeColors';
 
 type MaterialIconName = React.ComponentProps<typeof MaterialIcons>['name'];
 
-const DAILY_GREEN = '#58CC02';
-const DAILY_GREEN_DARK = '#3F9700';
-const DAILY_GREEN_SOFT = '#E5F8D2';
-const DAILY_BLUE = '#7CB7FF';
-const DAILY_BLUE_SOFT = '#DDF4FF';
 const cleanDisplayName = (value: string) => value.trim().replace(/\s+/g, ' ');
 
 const getFirstName = (value: string) => {
@@ -98,6 +151,8 @@ const findLastLessonTarget = (entry: LastLessonEntry | null) => {
 export default function HomeScreen() {
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const { colors, isDarkMode, isTodayCardEnabled, isAndroidStatusBarEnabled, isShinyEllieMode } = useTheme();
+  const { width: windowWidth } = useWindowDimensions();
+  const isDesktopWeb = Platform.OS === 'web' && windowWidth >= 768;
   const {
     isLoading: isAccountLoading,
     lastSyncAt,
@@ -107,13 +162,12 @@ export default function HomeScreen() {
   } = useAccount();
   const copy = getMenuCopy().home;
   const insets = useSafeAreaInsets();
-  const { width } = useWindowDimensions();
   const studySurface = React.useMemo(() => getStudySurfaceColors(colors, isDarkMode), [colors, isDarkMode]);
   const homeHeaderTopPadding = Platform.OS === 'ios'
     ? (insets.top > 0 ? insets.top : 24)
     : Platform.OS === 'android' && isAndroidStatusBarEnabled
       ? insets.top + 16
-      : 16;
+      : 10;
   const [todayGrammarAnswerCount, setTodayGrammarAnswerCount] = React.useState(0);
   const [todayLearntCount, setTodayLearntCount] = React.useState(0);
   const [localXP, setLocalXP] = React.useState(0);
@@ -123,11 +177,12 @@ export default function HomeScreen() {
   const isNavigatingFromMenuRef = React.useRef(false);
   const dailyPracticeGoal = 15;
   const todaySavedProgressCount = todayGrammarAnswerCount + todayLearntCount;
-  const savedItemsRemaining = Math.max(0, dailyPracticeGoal - todaySavedProgressCount);
   const todayProgress = Math.min(100, Math.round((todaySavedProgressCount / dailyPracticeGoal) * 100));
   const homeMenuCardColors = isShinyEllieMode ? SHINY_HOME_MENU_CARD_COLORS : HOME_MENU_CARD_COLORS;
   const homeMenuCardGradientEnds = isShinyEllieMode ? SHINY_HOME_MENU_CARD_GRADIENT_ENDS : HOME_MENU_CARD_GRADIENT_ENDS;
   const homeMenuTextColor = isShinyEllieMode ? SHINY_HOME_MENU_TEXT_COLOR : HOME_MENU_TEXT_COLOR;
+  const todayCardColors = isShinyEllieMode ? TODAY_CARD_COLORS.shiny : TODAY_CARD_COLORS.normal;
+  const continueCardPress = useSpringPress();
   const localizedCategories = React.useMemo(() => [
     {
       title: copy.grammarTitle,
@@ -162,22 +217,9 @@ export default function HomeScreen() {
       route: 'Settings'
     }
   ], [copy, homeMenuCardColors, homeMenuCardGradientEnds]);
-  const todayStatus =
-    todaySavedProgressCount >= dailyPracticeGoal
-      ? copy.dailyTargetReached
-      : todaySavedProgressCount > 0
-        ? `${savedItemsRemaining} ${savedItemsRemaining === 1 ? copy.practiceRemainingSingular : copy.practiceRemainingPlural} ${copy.toDailyTarget}`
-        : copy.noPracticeYet;
-  const dailyBlueSoft = isDarkMode ? colors.primarySoft : DAILY_BLUE_SOFT;
-  const dailyGreenSoft = isDarkMode ? colors.successSoft : DAILY_GREEN_SOFT;
-  const todayAccentColor = todaySavedProgressCount >= dailyPracticeGoal
-    ? (isDarkMode ? colors.success : DAILY_GREEN)
-    : (isDarkMode ? colors.primary : DAILY_BLUE);
-  const todayCardBorderColor = isDarkMode ? colors.borderStrong : todayAccentColor;
   const androidNavigationBarColor = getAndroidBottomBarColor(isDarkMode, colors);
   const androidNavigationBarButtonStyle = getAndroidBottomBarButtonStyle(isDarkMode);
 
-  const isDesktop = Platform.OS !== 'web' && width > 0 && width >= 640;
   const accountDisplayName = cleanDisplayName(session?.user.displayName || session?.user.username || '');
   const accountFirstName = getFirstName(accountDisplayName);
   const welcomeText = accountFirstName ? `Welcome, ${accountFirstName}!` : copy.welcome;
@@ -290,21 +332,28 @@ export default function HomeScreen() {
       style={[styles.container, { backgroundColor: colors.background }]}
       contentContainerStyle={{ paddingBottom: insets.bottom + 24 }}
     >
-      <View 
+      <View style={isDesktopWeb && styles.desktopContentWrap}>
+      <View
         style={[
-          styles.header, 
-          { 
-            backgroundColor: colors.card,
-            borderBottomColor: isDarkMode ? colors.border : '#E1EAF3',
-            borderBottomWidth: 1,
+          styles.header,
+          {
+            backgroundColor: colors.background,
             paddingTop: homeHeaderTopPadding
           }
         ]}
       >
         <View style={styles.headerTopRow}>
           <View style={styles.headerCopy}>
-            <Text style={[styles.headerTitle, { color: colors.text }]} numberOfLines={1}>{welcomeText}</Text>
-            <Text style={[styles.subtitle, { color: colors.secondaryText }]}>{copy.subtitle}</Text>
+            <Text
+              style={[
+                styles.headerTitle,
+                { color: colors.text },
+                isDesktopWeb ? styles.headerTitleDesktop : styles.headerTitleMobile,
+              ]}
+              numberOfLines={1}
+            >
+              {welcomeText}
+            </Text>
           </View>
           <View style={styles.headerRightGroup}>
           <TouchableOpacity
@@ -314,25 +363,25 @@ export default function HomeScreen() {
             accessibilityLabel="Open account"
           >
             {!isAccountLoading ? (
-              <AccountAvatar avatarId={unlockedAccountAvatarId} colorId={unlockedAccountAvatarColorId} size={58} />
+              <AccountAvatar avatarId={unlockedAccountAvatarId} colorId={unlockedAccountAvatarColorId} size={isDesktopWeb ? 64 : 60} />
             ) : (
               <MaterialIcons
                 name="account-circle"
-                size={58}
+                size={isDesktopWeb ? 64 : 48}
                 color={accountPillAccent}
               />
             )}
             <View
               style={[
                 styles.levelBadge,
-                {
-                  backgroundColor: isAccountMaster ? (isDarkMode ? colors.warningSoft : '#FFF7D7') : (isDarkMode ? colors.primarySoft : '#E8F4FF'),
-                  borderColor: isAccountMaster ? colors.warning : colors.borderStrong,
-                },
+                isAccountMaster
+                  ? { backgroundColor: isDarkMode ? colors.warningSoft : '#FFF7D7' }
+                  : { backgroundColor: colors.primary },
+                freshSmallPillShadow(isAccountMaster ? colors.warning : DESIGN_ACCENTS.blue.shadow),
               ]}
             >
               {isAccountMaster && <Text style={styles.levelBadgeIcon}>★</Text>}
-              <Text style={[styles.levelBadgeText, { color: isAccountMaster ? (isDarkMode ? '#FFD166' : '#7A4B00') : colors.primary }]}>
+              <Text style={[styles.levelBadgeText, { color: isAccountMaster ? (isDarkMode ? '#FFD166' : '#7A4B00') : '#FFFFFF' }]}>
                 {accountLevelBadgeLabel.replace('Level ', 'Lv.')}
               </Text>
             </View>
@@ -345,105 +394,65 @@ export default function HomeScreen() {
         <View
           style={[
             styles.todayCard,
-            getPanelStyle(colors, isDarkMode, 'raised'),
-            {
-              backgroundColor: colors.card,
-              borderColor: todayCardBorderColor,
-            },
+            { backgroundColor: todayCardColors.solid },
+            freshTileShadow(todayCardColors.shadow, true),
           ]}
         >
-          <View style={[styles.todayTopStripe, { backgroundColor: todayAccentColor }]} />
+          <View style={[styles.todayDecorCircle, { backgroundColor: todayCardColors.decoration }]} pointerEvents="none" />
           <View style={styles.todayHeaderRow}>
             <View style={styles.todayLeftBlock}>
               <View style={styles.todayTitleRow}>
-                <Text style={[styles.todayTitle, { color: colors.text }]}>{copy.today}</Text>
+                <Text style={[styles.todayTitle, { color: todayCardColors.text }]}>{copy.today}</Text>
                 {streak.currentStreak >= 2 && (
-                  <View style={[styles.streakChip, { backgroundColor: isDarkMode ? '#3D2800' : '#FFF3DC', borderColor: isDarkMode ? '#7A5200' : '#F4B740' }]}>
+                  <Animated.View
+                    entering={ZoomIn.springify().damping(14)}
+                    style={[styles.todayStreakChip, { backgroundColor: todayCardColors.strongSurface }]}
+                  >
                     <Text style={styles.streakFlame}>🔥</Text>
-                    <Text style={[styles.streakCount, { color: isDarkMode ? '#FFD166' : '#B36B00' }]}>{streak.currentStreak}</Text>
-                  </View>
+                    <Text style={[styles.todayStreakText, { color: todayCardColors.text }]}>
+                      {streak.currentStreak}-day streak
+                    </Text>
+                  </Animated.View>
                 )}
               </View>
-              <Text style={[styles.todaySubtitle, { color: colors.secondaryText }]}>
+              <Text style={[styles.todaySubtitle, { color: todayCardColors.mutedText }]} numberOfLines={2}>
                 {todaySavedProgressCount > 0 ? copy.todayLogged : copy.todayStart}
               </Text>
-              <Text style={[styles.todayStatusInline, { color: colors.secondaryText }]} numberOfLines={2}>{todayStatus}</Text>
             </View>
             <View style={styles.todayRingWrap}>
-              {(() => {
-                const size = 80;
-                const strokeWidth = 7;
-                const radius = (size - strokeWidth) / 2;
-                const circumference = 2 * Math.PI * radius;
-                const offset = circumference * (1 - Math.min(todayProgress / 100, 1));
-                return (
-                  <Svg width={size} height={size}>
-                    <Circle
-                      cx={size / 2}
-                      cy={size / 2}
-                      r={radius}
-                      stroke={isDarkMode ? colors.surfaceAlt : '#E8F0F8'}
-                      strokeWidth={strokeWidth}
-                      fill="none"
-                    />
-                    <Circle
-                      cx={size / 2}
-                      cy={size / 2}
-                      r={radius}
-                      stroke={todayAccentColor}
-                      strokeWidth={strokeWidth}
-                      fill="none"
-                      strokeDasharray={circumference}
-                      strokeDashoffset={offset}
-                      strokeLinecap="round"
-                      rotation="-90"
-                      origin={`${size / 2}, ${size / 2}`}
-                    />
-                  </Svg>
-                );
-              })()}
+              <TodayProgressRing
+                progress={todayProgress}
+                size={42}
+                strokeWidth={4}
+                trackColor={todayCardColors.ringTrack}
+                fillColor={todayCardColors.text}
+              />
               <View style={styles.todayRingCenter} pointerEvents="none">
-                <Text style={[styles.todayRingValue, { color: todayAccentColor }]}>{todaySavedProgressCount}</Text>
-                <Text style={[styles.todayRingGoal, { color: colors.secondaryText }]}>/{dailyPracticeGoal}</Text>
+                <Text style={[styles.todayRingValue, { color: todayCardColors.text, fontSize: 14, lineHeight: 17 }]}>{todaySavedProgressCount}</Text>
+                <Text style={[styles.todayRingGoal, { color: todayCardColors.faintText, fontSize: 9, lineHeight: 11 }]}>/{dailyPracticeGoal}</Text>
               </View>
             </View>
           </View>
 
           <View style={styles.todayRows}>
-            <View
-              style={[
-                styles.todayMetricRow,
-                {
-                  backgroundColor: colors.surface,
-                  borderColor: isDarkMode ? colors.border : DAILY_BLUE,
-                },
-              ]}
-            >
-              <View style={[styles.todayMetricIcon, { backgroundColor: dailyBlueSoft }]}>
-                <MaterialIcons name="edit" size={20} color={DAILY_BLUE} />
+            <View style={[styles.todayMetricRow, { backgroundColor: todayCardColors.surface }]}>
+              <View style={[styles.todayMetricIcon, { backgroundColor: todayCardColors.strongSurface }]}>
+                <MaterialIcons name="edit" size={20} color={todayCardColors.text} />
               </View>
               <View style={styles.todayMetricCopy}>
-                <Text style={[styles.todayMetricLabel, { color: colors.secondaryText }]}>{copy.itemsToday}</Text>
-                <Text style={[styles.todayMetricValue, { color: colors.text }]}>
+                <Text style={[styles.todayMetricLabel, { color: todayCardColors.subtleText }]} numberOfLines={2}>{copy.itemsToday}</Text>
+                <Text style={[styles.todayMetricValue, { color: todayCardColors.text }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.7}>
                   {todayGrammarAnswerCount} {todayGrammarAnswerCount === 1 ? copy.practiceItemSingular : copy.practiceItemPlural}
                 </Text>
               </View>
             </View>
-            <View
-              style={[
-                styles.todayMetricRow,
-                {
-                  backgroundColor: colors.surface,
-                  borderColor: isDarkMode ? colors.border : DAILY_GREEN,
-                },
-              ]}
-            >
-              <View style={[styles.todayMetricIcon, { backgroundColor: dailyGreenSoft }]}>
-                <MaterialIcons name="style" size={20} color={isDarkMode ? DAILY_GREEN : DAILY_GREEN_DARK} />
+            <View style={[styles.todayMetricRow, { backgroundColor: todayCardColors.surface }]}>
+              <View style={[styles.todayMetricIcon, { backgroundColor: todayCardColors.strongSurface }]}>
+                <MaterialIcons name="style" size={20} color={todayCardColors.text} />
               </View>
               <View style={styles.todayMetricCopy}>
-                <Text style={[styles.todayMetricLabel, { color: colors.secondaryText }]}>{copy.learntToday}</Text>
-                <Text style={[styles.todayMetricValue, { color: colors.text }]}>
+                <Text style={[styles.todayMetricLabel, { color: todayCardColors.subtleText }]} numberOfLines={2}>{copy.learntToday}</Text>
+                <Text style={[styles.todayMetricValue, { color: todayCardColors.text }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.7}>
                   {todayLearntCount} {todayLearntCount === 1 ? copy.wordSingular : copy.wordPlural}
                 </Text>
               </View>
@@ -453,65 +462,80 @@ export default function HomeScreen() {
       )}
 
       {continueLessonTarget && (
-        <TouchableOpacity
-          style={[
-            styles.continueCard,
-            getPanelStyle(colors, isDarkMode),
-            {
-              backgroundColor: colors.card,
-              borderColor: isDarkMode ? colors.border : colors.borderStrong,
-            },
-          ]}
-          onPress={openContinueLesson}
-          accessibilityRole="button"
-          accessibilityLabel={`Continue ${continueLessonTarget.title}`}
-        >
-          <View style={[styles.continueIcon, { backgroundColor: isDarkMode ? studySurface.control : '#DDF4FF', borderColor: isDarkMode ? colors.border : 'transparent' }]}>
-            <MaterialIcons
-              name={continueLessonTarget.type === 'grammar' ? 'edit' : 'style'}
-              size={24}
-              color={colors.primary}
-            />
-          </View>
-          <View style={styles.continueCopy}>
-            <Text style={[styles.continueLabel, { color: colors.secondaryText }]}>Continue</Text>
-            <Text style={[styles.continueTitle, { color: colors.text }]} numberOfLines={1}>
-              {continueLessonTarget.title}
-            </Text>
-            <Text style={[styles.continueMeta, { color: colors.secondaryText }]}>
-              {continueLessonTarget.type === 'grammar' ? 'Grammar' : 'Vocabulary'}
-            </Text>
-          </View>
-          <MaterialIcons name="arrow-forward" size={24} color={colors.secondaryText} />
-        </TouchableOpacity>
+        <Animated.View style={continueCardPress.animatedStyle}>
+          <TouchableOpacity
+            style={[
+              styles.continueCard,
+              { backgroundColor: colors.card },
+              getSoftShadow(isDarkMode, 'soft'),
+            ]}
+            onPress={openContinueLesson}
+            onPressIn={continueCardPress.onPressIn}
+            onPressOut={continueCardPress.onPressOut}
+            accessibilityRole="button"
+            accessibilityLabel={`Continue ${continueLessonTarget.title}`}
+          >
+            <View style={[styles.continueIcon, { backgroundColor: isDarkMode ? studySurface.control : '#DDF4FF', borderColor: isDarkMode ? colors.border : 'transparent' }]}>
+              <MaterialIcons
+                name={continueLessonTarget.type === 'grammar' ? 'edit' : 'style'}
+                size={24}
+                color={colors.primary}
+              />
+            </View>
+            <View style={styles.continueCopy}>
+              <Text style={[styles.continueLabel, { color: colors.primary }]}>Continue</Text>
+              <Text style={[styles.continueTitle, { color: colors.text }]} numberOfLines={1}>
+                {continueLessonTarget.title}
+              </Text>
+              <Text style={[styles.continueMeta, { color: colors.secondaryText }]}>
+                {continueLessonTarget.type === 'grammar' ? 'Grammar' : 'Vocabulary'}
+              </Text>
+            </View>
+            <MaterialIcons name="arrow-forward" size={24} color={colors.secondaryText} />
+          </TouchableOpacity>
+        </Animated.View>
       )}
 
-      <View style={[styles.categoriesContainer, isDesktop && styles.categoriesContainerDesktop]}>
-        {localizedCategories.map((category) => (
-          <Pressable
+      <Text style={[styles.pickCategoryLabel, { color: colors.secondaryText }]}>✨ pick a category ✨</Text>
+
+      <View style={[styles.categoriesContainer, styles.categoriesContainerDesktop]}>
+        {localizedCategories.map((category, index) => (
+          <Animated.View
             key={category.route}
-            style={({ pressed }) => [
-              styles.categoryCard,
-              getSoftShadow(isDarkMode, 'raised'),
-              isDesktop && styles.categoryCardDesktop,
-              pressed && styles.categoryCardPressed,
-              {
-                backgroundColor: category.color,
-                borderColor: 'rgba(255,255,255,0.62)',
-                borderBottomColor: 'rgba(0,0,0,0.12)',
-              }
-            ]}
-            android_ripple={{ color: 'rgba(255,255,255,0.26)' }}
-            unstable_pressDelay={0}
-            onPress={() => openHomeMenuRoute(category.route)}
-            accessibilityRole="button"
-            accessibilityLabel={category.title}
+            entering={FadeInDown.delay(index * 60).duration(320)}
+            style={isTodayCardEnabled ? styles.categoryCardDesktop : styles.categoryCardFullRow}
           >
-            <MaterialIcons name={category.icon} size={32} color={homeMenuTextColor} />
-            <Text style={[styles.categoryTitle, { color: homeMenuTextColor }]}>{category.title}</Text>
-            <Text style={[styles.categoryDescription, { color: homeMenuTextColor }]}>{category.description}</Text>
-          </Pressable>
+            <Pressable
+              style={({ pressed }) => [
+                styles.categoryCard,
+                styles.categoryCardGrid,
+                pressed && styles.categoryCardPressed,
+                { backgroundColor: category.color, width: '100%' },
+                freshTileShadow(category.gradientEnd, true, pressed),
+              ]}
+              android_ripple={{ color: 'rgba(255,255,255,0.26)' }}
+              unstable_pressDelay={0}
+              onPress={() => openHomeMenuRoute(category.route)}
+              accessibilityRole="button"
+              accessibilityLabel={category.title}
+            >
+              <View style={[styles.categoryTitleRow, styles.categoryTitleRowCentered]}>
+                <MaterialIcons name={category.icon} size={22} color={homeMenuTextColor} />
+                <Text style={[styles.categoryTitle, { color: homeMenuTextColor }]}>{category.title}</Text>
+              </View>
+              <Text
+                style={[
+                  styles.categoryDescription,
+                  { color: homeMenuTextColor },
+                  styles.categoryDescriptionCentered,
+                ]}
+              >
+                {category.description}
+              </Text>
+            </Pressable>
+          </Animated.View>
         ))}
+      </View>
       </View>
 
       <FirstVisitModal
@@ -530,8 +554,14 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
   },
+  desktopContentWrap: {
+    width: '100%',
+    maxWidth: 760,
+    alignSelf: 'center',
+  },
   header: {
-    padding: 24,
+    paddingHorizontal: 22,
+    paddingBottom: 18,
   },
   headerTopRow: {
     flexDirection: 'row',
@@ -547,12 +577,27 @@ const styles = StyleSheet.create({
     height: 24,
   },
   headerTitle: {
-    fontSize: 36,
-    fontWeight: 'bold',
+    fontWeight: freshFontFamily.extrabold,
+    fontSize: 29,
   },
-  subtitle: {
-    fontSize: 16,
-    marginTop: 8,
+  headerTitleMobile: {
+    fontSize: 32,
+  },
+  headerTitleDesktop: {
+    fontSize: 44,
+  },
+  todayStreakChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    borderRadius: 999,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+  },
+  todayStreakText: {
+    fontWeight: freshFontFamily.extrabold,
+    fontSize: 10,
+    lineHeight: 13,
   },
   headerRightGroup: {
     flexDirection: 'row',
@@ -568,7 +613,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 3,
     borderRadius: 999,
-    borderWidth: 1.5,
     paddingHorizontal: 8,
     paddingVertical: 3,
     minWidth: 48,
@@ -579,31 +623,27 @@ const styles = StyleSheet.create({
     lineHeight: 11,
   },
   levelBadgeText: {
+    fontWeight: freshFontFamily.extrabold,
     fontSize: 11,
-    fontWeight: '900',
     lineHeight: 13,
   },
   todayCard: {
     marginHorizontal: 16,
-    marginTop: 14,
+    marginTop: 10,
     marginBottom: 4,
-    padding: 16,
-    paddingTop: 18,
-    borderRadius: uiRadii.card,
-    borderWidth: 2,
+    padding: 12,
+    borderRadius: 18,
     overflow: 'hidden',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 5 },
-    shadowOpacity: 0.13,
-    shadowRadius: 10,
-    elevation: 5,
+    position: 'relative',
   },
-  todayTopStripe: {
+  todayDecorCircle: {
     position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    height: 6,
+    top: -24,
+    right: -16,
+    width: 90,
+    height: 90,
+    borderRadius: 45,
+    backgroundColor: 'rgba(255,255,255,0.08)',
   },
   todayHeaderRow: {
     flexDirection: 'row',
@@ -614,50 +654,31 @@ const styles = StyleSheet.create({
   todayLeftBlock: {
     flex: 1,
     minWidth: 0,
-    gap: 3,
+    gap: 4,
   },
   todayTitleRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
+    flexWrap: 'wrap',
   },
   todayTitle: {
-    fontSize: 21,
-    lineHeight: 25,
-    fontWeight: '900',
-  },
-  streakChip: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 3,
-    borderRadius: 999,
-    borderWidth: 1.5,
-    paddingHorizontal: 8,
-    paddingVertical: 3,
+    fontWeight: freshFontFamily.extrabold,
+    fontSize: 17,
+    lineHeight: 20,
   },
   streakFlame: {
-    fontSize: 13,
-    lineHeight: 16,
-  },
-  streakCount: {
-    fontSize: 13,
-    fontWeight: '900',
-    lineHeight: 16,
+    fontSize: 11,
+    lineHeight: 13,
   },
   todaySubtitle: {
-    fontSize: 13,
-    fontWeight: '800',
-    lineHeight: 18,
-  },
-  todayStatusInline: {
-    fontSize: 12,
-    fontWeight: '700',
-    lineHeight: 16,
-    marginTop: 2,
+    fontWeight: freshFontFamily.bold,
+    fontSize: 11.5,
+    lineHeight: 15,
   },
   todayRingWrap: {
-    width: 80,
-    height: 80,
+    width: 42,
+    height: 42,
     alignItems: 'center',
     justifyContent: 'center',
     flexShrink: 0,
@@ -670,58 +691,56 @@ const styles = StyleSheet.create({
     gap: 0,
   },
   todayRingValue: {
-    fontSize: 22,
-    fontWeight: '900',
-    lineHeight: 26,
+    fontWeight: freshFontFamily.extrabold,
+    fontSize: 17,
+    lineHeight: 20,
   },
   todayRingGoal: {
-    fontSize: 12,
-    fontWeight: '800',
-    lineHeight: 14,
-    marginTop: 6,
+    fontWeight: freshFontFamily.extrabold,
+    fontSize: 10,
+    lineHeight: 12,
+    marginTop: 4,
   },
   todayRows: {
     flexDirection: 'row',
-    gap: 10,
-    marginTop: 12,
+    gap: 6,
+    marginTop: 6,
   },
   todayMetricRow: {
     flex: 1,
-    minHeight: 96,
+    minWidth: 0,
+    minHeight: 56,
     borderRadius: uiRadii.panel,
-    borderWidth: 2,
-    paddingHorizontal: 10,
-    paddingVertical: 11,
+    paddingHorizontal: 8,
+    paddingVertical: 6,
     alignItems: 'center',
     justifyContent: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 3 },
-    shadowOpacity: 0.08,
-    shadowRadius: 5,
-    elevation: 2,
+    overflow: 'hidden',
   },
   todayMetricIcon: {
-    width: 38,
-    height: 38,
-    borderRadius: 14,
+    width: 30,
+    height: 30,
+    borderRadius: 11,
     alignItems: 'center',
     justifyContent: 'center',
   },
   todayMetricCopy: {
     alignItems: 'center',
+    alignSelf: 'stretch',
     minWidth: 0,
-    marginTop: 6,
+    marginTop: 4,
   },
   todayMetricLabel: {
+    fontWeight: freshFontFamily.extrabold,
     fontSize: 10,
-    fontWeight: '900',
     textTransform: 'uppercase',
     marginBottom: 2,
+    textAlign: 'center',
   },
   todayMetricValue: {
+    fontWeight: freshFontFamily.extrabold,
     fontSize: 16,
     lineHeight: 20,
-    fontWeight: '900',
     textAlign: 'center',
   },
   continueCard: {
@@ -730,17 +749,11 @@ const styles = StyleSheet.create({
     marginTop: 12,
     marginBottom: 2,
     borderRadius: uiRadii.panel,
-    borderWidth: 2,
     paddingHorizontal: 14,
     paddingVertical: 12,
     flexDirection: 'row',
     alignItems: 'center',
     gap: 12,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 3 },
-    shadowOpacity: 0.08,
-    shadowRadius: 6,
-    elevation: 3,
   },
   continueIcon: {
     width: 48,
@@ -755,21 +768,22 @@ const styles = StyleSheet.create({
     minWidth: 0,
   },
   continueLabel: {
-    fontSize: 12,
-    lineHeight: 15,
-    fontWeight: '900',
+    fontWeight: freshFontFamily.bold,
+    fontSize: 10,
+    lineHeight: 13,
     textTransform: 'uppercase',
+    letterSpacing: 0.6,
   },
   continueTitle: {
-    fontSize: 18,
-    lineHeight: 23,
-    fontWeight: '900',
+    fontWeight: freshFontFamily.extrabold,
+    fontSize: 16,
+    lineHeight: 20,
     marginTop: 2,
   },
   continueMeta: {
-    fontSize: 13,
-    lineHeight: 17,
-    fontWeight: '700',
+    fontWeight: freshFontFamily.semibold,
+    fontSize: 12,
+    lineHeight: 16,
     marginTop: 1,
   },
   categoriesContainer: {
@@ -782,42 +796,57 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
   },
   categoryCard: {
-    padding: 24,
-    paddingBottom: 32,
-    borderRadius: uiRadii.card,
-    borderWidth: 2,
-    borderBottomWidth: 4,
+    padding: 20,
+    borderRadius: freshRadii.largeTile,
     marginBottom: 16,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 5 },
-    shadowOpacity: 0.14,
-    shadowRadius: 9,
-    elevation: 5,
+  },
+  categoryCardGrid: {
+    minHeight: 108,
+    padding: 16,
+    justifyContent: 'center',
+  },
+  pickCategoryLabel: {
+    textAlign: 'center',
+    fontWeight: freshFontFamily.bold,
+    fontSize: 12,
+    letterSpacing: 0.8,
+    marginTop: 22,
+    marginBottom: 2,
   },
   categoryCardPressed: {
-    opacity: 0.9,
-    transform: [{ scale: 0.985 }],
+    transform: [{ translateX: 1 }, { translateY: 1 }],
   },
   categoryCardDesktop: {
     width: '48%',
+    alignItems: 'center',
+  },
+  categoryCardFullRow: {
+    width: '100%',
+    alignItems: 'center',
+  },
+  categoryTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  categoryTitleRowCentered: {
+    justifyContent: 'center',
   },
   categoryTitle: {
-    fontSize: 27,
-    fontWeight: '800',
+    fontWeight: freshFontFamily.extrabold,
+    fontSize: 21,
     color: 'white',
-    marginTop: 4,
     textAlign: 'center',
-    textShadowColor: 'rgba(10,28,48,0.16)',
-    textShadowOffset: { width: 0, height: 1 },
-    textShadowRadius: 1,
   },
   categoryDescription: {
-    fontSize: 16,
+    fontWeight: freshFontFamily.semibold,
+    fontSize: 14.5,
     color: 'white',
-    marginTop: 16,
-    opacity: 0.9,
-    textShadowColor: 'rgba(10,28,48,0.14)',
-    textShadowOffset: { width: 0, height: 1 },
-    textShadowRadius: 1,
+    marginTop: 8,
+    opacity: 0.85,
+  },
+  categoryDescriptionCentered: {
+    textAlign: 'center',
+    fontSize: 12.5,
   },
 });

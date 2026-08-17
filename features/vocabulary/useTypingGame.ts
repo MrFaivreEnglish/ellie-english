@@ -132,12 +132,6 @@ const buildDifficultyQueue = (
   });
 };
 
-const buildRewardText = (attempts: number, comboLabel: string) => {
-  if (comboLabel) return comboLabel;
-  if (attempts === 1) return 'Strong recall';
-  return 'Answer saved';
-};
-
 export function useTypingGame(words: Word[], options: TypingGameOptions = {}) {
   const { isTypingStrictMode } = useTheme();
   const allowSlashAlternatives = options.allowSlashAlternatives ?? true;
@@ -166,6 +160,7 @@ export function useTypingGame(words: Word[], options: TypingGameOptions = {}) {
     type: FeedbackType;
     text: string;
     streak: number;
+    answer?: string;
   }>(null);
   const previousWordsRef = useRef<Word[]>(words);
   const awardedWordKeysRef = useRef<Set<string>>(new Set());
@@ -355,28 +350,18 @@ export function useTypingGame(words: Word[], options: TypingGameOptions = {}) {
       });
       const newStreak = streak + 1;
       const hintsForWord = hintsUsed[currentWordKey] ?? 0;
-      const { xpGain, comboReward } = getTypingAnswerXP({
+      const { xpGain } = getTypingAnswerXP({
         attempts: hintsForWord > 0 ? Math.max(newAttempts, 2) : newAttempts,
         streak: newStreak,
         isStrictMode: isTypingStrictMode,
         isReviewMode,
       });
-      const rewardText = alreadyAnswered
-        ? 'Correct!'
-        : buildRewardText(newAttempts, comboReward.label);
-
       setStreak(newStreak);
       setMaxStreak((prev) => Math.max(prev, newStreak));
-      setFeedbackEvent({ type: 'correct', text: rewardText, streak: newStreak });
+      setFeedbackEvent({ type: 'correct', text: 'Great job!', streak: newStreak });
       setFeedback(newAttempts === 1 ? 'Perfect answer' : 'Good recovery');
 
-      if (comboReward.bonus > 0) {
-        setInlineMessage(comboReward.label);
-      } else if (!alreadyAnswered) {
-        setInlineMessage(newAttempts === 1 ? 'Perfect answer' : 'Good recovery');
-      } else {
-        setInlineMessage('Already cleared');
-      }
+      setInlineMessage(alreadyAnswered ? 'Already cleared' : '');
 
       setDifficultyByWord((prev) => ({
         ...prev,
@@ -417,13 +402,15 @@ export function useTypingGame(words: Word[], options: TypingGameOptions = {}) {
     if (close) {
       const closeCount = (closeAttempts[currentWordKey] || 0) + 1;
       const shouldBreakCombo = streak > 0 && closeCount >= CLOSE_TRIES_BEFORE_COMBO_LOSS;
-      const remainingCloseTries = Math.max(CLOSE_TRIES_BEFORE_COMBO_LOSS - closeCount, 0);
 
       setCloseAttempts((prev) => ({ ...prev, [currentWordKey]: closeCount }));
-      setTypingFeedback('close');
 
       if (shouldBreakCombo) {
-        setFeedbackEvent({ type: 'close', text: `Answer: ${currentWord.english}`, streak: 0 });
+        // Repeated near-misses ultimately count as a miss — treat it the same
+        // way as a wrong answer: reveal the answer and give it the same
+        // longer, softer display time.
+        setTypingFeedback('wrong');
+        setFeedbackEvent({ type: 'wrong', text: 'Not this time.', streak: 0, answer: currentWord.english });
         setInlineMessage('');
         setDifficultyByWord((prev) => ({
           ...prev,
@@ -442,32 +429,27 @@ export function useTypingGame(words: Word[], options: TypingGameOptions = {}) {
           answerLockedRef.current = false;
           setIsAdvancing(false);
           advanceToNextWord();
-        }, 1500);
+        }, 2400);
         return;
       }
 
+      setTypingFeedback('close');
       setFeedbackEvent({
         type: 'close',
-        text: isTypingStrictMode
-          ? 'Almost — check accents and punctuation.'
-          : 'Almost! Check your spelling.',
+        text: "So close — one more try before you lose your combo!",
         streak,
       });
-      if (streak > 0) {
-        setInlineMessage(
-          `${remainingCloseTries} more close ${remainingCloseTries === 1 ? 'try' : 'tries'} before losing combo.`
-        );
-      } else {
-        setInlineMessage('Almost. Try once more.');
-      }
+      setInlineMessage('');
       return;
     }
 
-    // Wrong — reveal answer and auto-advance
+    // Wrong — reveal answer gently and auto-advance, with extra time to read
+    // it and a heads-up that the word isn't gone for good: it's queued for
+    // review at the end of the round (see advanceToNextWord).
     answerLockedRef.current = true;
     setIsAdvancing(true);
     setTypingFeedback('wrong');
-    setFeedbackEvent({ type: 'wrong', text: `Answer: ${currentWord.english}`, streak: 0 });
+    setFeedbackEvent({ type: 'wrong', text: 'Not this time.', streak: 0, answer: currentWord.english });
     setInlineMessage('');
     setDifficultyByWord((prev) => ({
       ...prev,
@@ -484,7 +466,7 @@ export function useTypingGame(words: Word[], options: TypingGameOptions = {}) {
       answerLockedRef.current = false;
       setIsAdvancing(false);
       advanceToNextWord();
-    }, 1500);
+    }, 2400);
 
   }, [
     advanceToNextWord,

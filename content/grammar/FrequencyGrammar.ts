@@ -4,6 +4,35 @@ const FrequencyGrammar = {
   description: 'Learn how to use frequency adverbs',
   category: 'Adverbes',
   imageUrl: 'https://i.ibb.co/gZ9sKLZ0/Fr-quence.png',
+  textContent: {
+    cards: [
+      {
+        eyebrow: 'Les adverbes de fréquence',
+        paragraph: "Pour parler des habitudes de quelqu'un, on utilise les adverbes de fréquence.",
+        tip: 'Formule : sujet + adverbe + verbe conjugué.',
+        columns: [
+          {
+            label: 'Du plus fréquent au moins fréquent',
+            accent: 'blue',
+            rows: ['Always (100%)', 'Usually (90%)', 'Often (70%)', 'Sometimes (50%)', 'Rarely (20%)', 'Never (0%)'],
+          },
+        ],
+        examples: [
+          { en: 'She **always knew** the answer.', fr: 'Elle connaissait toujours la réponse.' },
+          { en: 'I **never talk** with her.', fr: 'Je ne lui parle jamais.' },
+        ],
+      },
+      {
+        eyebrow: 'Attention avec le verbe BE',
+        paragraph: "Avec be, l'adverbe se place après le verbe conjugué, pas avant.",
+        tip: 'Formule : sujet + be conjugué + adverbe.',
+        examples: [
+          { en: 'I **am never** late.', fr: 'Je ne suis jamais en retard.' },
+          { en: 'We **were always** nice.', fr: 'Nous étions toujours gentils.' },
+        ],
+      },
+    ],
+  },
 translateExercises: [
   {
     type: 'translate',

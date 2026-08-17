@@ -3,6 +3,44 @@ const PresentPerfectGrammar = {
   title: 'Present Perfect',
   description: 'Learn how to use the present perfect tense',
   imageUrl: 'https://i.ibb.co/HDSX4Gn7/Present-perfect.png',
+  textContent: {
+    cards: [
+      {
+        eyebrow: 'À quoi ça sert',
+        paragraph: "Dire ce que j'ai déjà fait dans ma vie.",
+        tip: 'Formule : sujet + have au présent + participe passé.',
+        columns: [
+          {
+            label: '1/ Je repère le sujet et / ou le pronom',
+            accent: 'blue',
+            rows: ['I', 'You', 'He / She / It', 'We', 'They'],
+          },
+          {
+            label: '2/ Je conjugue HAVE au présent',
+            accent: 'coral',
+            rows: ['have (not)', 'have (not)', '**has** (not)', 'have (not)', 'have (not)'],
+          },
+          {
+            label: '3/ Je trouve le participe passé du verbe',
+            accent: 'teal',
+            rows: ['Verbe régulier : **+ED**', 'Verbe irrégulier : **par cœur**'],
+          },
+        ],
+        examples: [
+          { en: '**I have talked** with the King.', fr: 'J\'ai parlé au roi.' },
+          { en: '**Emma has seen** dolphins.', fr: 'Emma a vu des dauphins.' },
+        ],
+      },
+      {
+        eyebrow: 'La forme négative',
+        paragraph: "On utilise **haven't** ou **hasn't** + participe passé.",
+        examples: [
+          { en: "**I haven't spoken** to him.", fr: 'Je ne lui ai pas parlé.' },
+          { en: "**They haven't watched** bears.", fr: "Ils n'ont pas regardé d'ours." },
+        ],
+      },
+    ],
+  },
   translateExercises: [
   {
     type: 'translate',

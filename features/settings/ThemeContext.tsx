@@ -1,6 +1,6 @@
 import { createContext, useContext, useState, useEffect, useCallback, useMemo } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { Platform } from 'react-native';
+import { Appearance, Platform, useColorScheme } from 'react-native';
 import { hapticsAreSupported, setHapticsEnabled } from '../shared/haptics';
 import { setSoundEffectsEnabled } from '../shared/soundEffects';
 import {
@@ -9,6 +9,7 @@ import {
   SHINY_ELLIE_UNLOCKED_KEY,
 } from '../progress/shinyEllieStorage';
 import { ENABLE_SHINY_ELLIE_COLOR_MODE } from '../../lib/featureFlags';
+import { DESIGN_ACCENTS } from '../shared/uiPrimitives';
 import {
   ANDROID_STATUS_BAR_ENABLED_KEY,
   GRAMMAR_GAME_MODE_KEY,
@@ -22,10 +23,26 @@ import {
   VOCAB_LESSON_CARD_VIEW_KEY,
   VOCAB_TIMER_MODE_KEY,
   VOCAB_TIMER_RECORD_SAVING_KEY,
+  VOCAB_AUDIO_MATCH_MODE_KEY,
   WEB_HAPTICS_RESTORED_KEY,
   syncAccountPreferencesToCloudIfSignedIn,
   type AccountPreferenceSnapshot,
 } from '../account/accountPreferencesStorage';
+
+const TEXT_SIZE_LEVEL_KEY = '@text_size_level';
+
+export type TextSizeLevel = 'normal' | 'large' | 'xlarge';
+
+// Multiplier applied to lesson/exercise reading text (grammar text mode,
+// vocabulary word prompts, quiz options) — the one true accessibility lever
+// this app can offer in-app, since RN's OS-level `allowFontScaling` scale is
+// no longer JS-overridable and a full-codebase font-size refactor is out of
+// scope. Consumers do `Math.round(baseFontSize * textScale)`.
+export const TEXT_SCALE_BY_LEVEL: Record<TextSizeLevel, number> = {
+  normal: 1,
+  large: 1.15,
+  xlarge: 1.3,
+};
 
 export type ThemeColors = {
   background: string;
@@ -54,6 +71,9 @@ type ThemeContextType = {
   isDarkMode: boolean;
   colors: ThemeColors;
   toggleTheme: () => void;
+  textSizeLevel: TextSizeLevel;
+  textScale: number;
+  updateTextSizeLevel: (level: TextSizeLevel) => void;
   isGrammarGameMode: boolean;
   toggleGrammarGameMode: () => void;
   updateGrammarGameMode: (value: boolean) => void;
@@ -66,6 +86,9 @@ type ThemeContextType = {
   isVocabTimerRecordSavingEnabled: boolean;
   toggleVocabTimerRecordSaving: () => void;
   updateVocabTimerRecordSaving: (value: boolean) => void;
+  isVocabAudioMatchMode: boolean;
+  toggleVocabAudioMatchMode: () => void;
+  updateVocabAudioMatchMode: (value: boolean) => void;
   vocabLessonCardView: 'list' | 'tile';
   updateVocabLessonCardView: (value: 'list' | 'tile') => void;
 isTypingStrictMode: boolean;
@@ -93,25 +116,25 @@ isTypingStrictMode: boolean;
 };
 
 const lightColors: ThemeColors = {
-  background: '#F3F6FA',
-  card: '#ffffff',
-  surface: '#F8FAFF',
-  surfaceAlt: '#EAF5FF',
+  background: '#F7F4EE',
+  card: '#FDFCFA',
+  surface: '#F4F1EA',
+  surfaceAlt: '#EFF6FF',
   text: '#243041',
   secondaryText: '#607089',
-  border: '#D6E2EE',
-  borderStrong: '#7ABCF2',
-  primary: '#1F7AD1',
-  primarySoft: '#EAF5FF',
-  success: '#2FBF72',
-  successSoft: '#E9F8EF',
-  successText: '#11633B',
-  danger: '#F06A7F',
-  dangerSoft: '#FFE8EC',
-  dangerText: '#8F2234',
+  border: '#E7E1D6',
+  borderStrong: DESIGN_ACCENTS.blue.shadow,
+  primary: DESIGN_ACCENTS.blue.solid,
+  primarySoft: DESIGN_ACCENTS.blue.soft,
+  success: DESIGN_ACCENTS.teal.solid,
+  successSoft: DESIGN_ACCENTS.teal.soft,
+  successText: '#0B5B52',
+  danger: DESIGN_ACCENTS.coral.solid,
+  dangerSoft: DESIGN_ACCENTS.coral.soft,
+  dangerText: '#7A2E1C',
   warning: '#F4B740',
   warningSoft: '#FFF6DE',
-  buttonBackground: '#1F7AD1',
+  buttonBackground: DESIGN_ACCENTS.blue.solid,
   buttonText: '#ffffff',
 };
 
@@ -123,18 +146,18 @@ const darkColors: ThemeColors = {
   text: '#F7FAFF',
   secondaryText: '#C8D5EA',
   border: '#334D68',
-  borderStrong: '#78C7F8',
-  primary: '#8ED2FF',
-  primarySoft: '#123657',
-  success: '#8FF2B3',
-  successSoft: '#153F31',
-  successText: '#EFFFF4',
-  danger: '#FFB4C2',
-  dangerSoft: '#5B2737',
-  dangerText: '#FFF3F6',
+  borderStrong: '#7BAAFB',
+  primary: '#7BAAFB',
+  primarySoft: DESIGN_ACCENTS.blue.softDark,
+  success: '#4FD9C4',
+  successSoft: DESIGN_ACCENTS.teal.softDark,
+  successText: '#E9FFFC',
+  danger: '#FF9478',
+  dangerSoft: DESIGN_ACCENTS.coral.softDark,
+  dangerText: '#FFEDE7',
   warning: '#FFD166',
-  warningSoft: '#FCC30B',
-  buttonBackground: '#126EC6',
+  warningSoft: DESIGN_ACCENTS.amber.softDark,
+  buttonBackground: '#5AA8F5',
   buttonText: '#FFFFFF',
 };
 
@@ -142,6 +165,9 @@ export const ThemeContext = createContext<ThemeContextType>({
   isDarkMode: false,
   colors: lightColors,
   toggleTheme: () => {},
+  textSizeLevel: 'normal',
+  textScale: 1,
+  updateTextSizeLevel: () => {},
   isGrammarGameMode: false,
   toggleGrammarGameMode: () => {},
   updateGrammarGameMode: () => {},
@@ -154,6 +180,9 @@ export const ThemeContext = createContext<ThemeContextType>({
   isVocabTimerRecordSavingEnabled: false,
   toggleVocabTimerRecordSaving: () => {},
   updateVocabTimerRecordSaving: () => {},
+  isVocabAudioMatchMode: false,
+  toggleVocabAudioMatchMode: () => {},
+  updateVocabAudioMatchMode: () => {},
   vocabLessonCardView: 'list',
   updateVocabLessonCardView: () => {},
 isTypingStrictMode: false,
@@ -181,12 +210,19 @@ isTypingStrictMode: false,
 });
 
 export const ThemeProvider = ({ children }: { children: React.ReactNode }) => {
-  const [isDarkMode, setIsDarkMode] = useState(false);
+  const systemColorScheme = useColorScheme();
+  const [isDarkMode, setIsDarkMode] = useState(() => Appearance.getColorScheme() === 'dark');
+  // Whether the user (or a synced account) has ever made an explicit choice.
+  // Until then, `isDarkMode` tracks the OS setting live; once set, the
+  // explicit choice always wins over the OS value (§2b).
+  const [hasExplicitThemeChoice, setHasExplicitThemeChoice] = useState(false);
   const [isThemeLoaded, setIsThemeLoaded] = useState(false);
+  const [textSizeLevel, setTextSizeLevel] = useState<TextSizeLevel>('normal');
   const [isGrammarGameMode, setIsGrammarGameMode] = useState(false);
   const [isGrammarSpeechEnabled, setIsGrammarSpeechEnabled] = useState(false);
   const [isVocabTimerMode, setIsVocabTimerMode] = useState(false);
   const [isVocabTimerRecordSavingEnabled, setIsVocabTimerRecordSavingEnabled] = useState(false);
+  const [isVocabAudioMatchMode, setIsVocabAudioMatchMode] = useState(false);
   const [vocabLessonCardView, setVocabLessonCardView] = useState<'list' | 'tile'>('list');
 const [isTypingStrictMode, setIsTypingStrictMode] = useState(false);
   const [isHapticsEnabled, setIsHapticsEnabled] = useState(hapticsAreSupported);
@@ -205,6 +241,7 @@ const [isTypingStrictMode, setIsTypingStrictMode] = useState(false);
           savedGrammarMode,
           savedVocabMode,
           savedVocabTimerRecordSaving,
+          savedVocabAudioMatchMode,
           savedVocabLessonCardView,
           savedTypingStrictMode,
           savedHapticsEnabled,
@@ -216,11 +253,13 @@ const [isTypingStrictMode, setIsTypingStrictMode] = useState(false);
           savedShinyEllieUnlocked,
           savedShinyEllieMode,
           savedGrammarSpeech,
+          savedTextSizeLevel,
         ] = await Promise.all([
           AsyncStorage.getItem(THEME_STORAGE_KEY),
           AsyncStorage.getItem(GRAMMAR_GAME_MODE_KEY),
           AsyncStorage.getItem(VOCAB_TIMER_MODE_KEY),
           AsyncStorage.getItem(VOCAB_TIMER_RECORD_SAVING_KEY),
+          AsyncStorage.getItem(VOCAB_AUDIO_MATCH_MODE_KEY),
           AsyncStorage.getItem(VOCAB_LESSON_CARD_VIEW_KEY),
           AsyncStorage.getItem(TYPING_STRICT_MODE_KEY),
           AsyncStorage.getItem(HAPTICS_ENABLED_KEY),
@@ -232,12 +271,18 @@ const [isTypingStrictMode, setIsTypingStrictMode] = useState(false);
           AsyncStorage.getItem(SHINY_ELLIE_UNLOCKED_KEY),
           AsyncStorage.getItem(SHINY_ELLIE_MODE_KEY),
           AsyncStorage.getItem(GRAMMAR_SPEECH_ENABLED_KEY),
+          AsyncStorage.getItem(TEXT_SIZE_LEVEL_KEY),
         ]);
         
         if (savedTheme !== null) {
           setIsDarkMode(savedTheme === 'dark');
+          setHasExplicitThemeChoice(true);
         }
-        
+
+        if (savedTextSizeLevel === 'large' || savedTextSizeLevel === 'xlarge') {
+          setTextSizeLevel(savedTextSizeLevel);
+        }
+
         if (savedGrammarMode !== null) {
           setIsGrammarGameMode(savedGrammarMode === 'true');
         }
@@ -252,6 +297,10 @@ const [isTypingStrictMode, setIsTypingStrictMode] = useState(false);
 
         if (savedVocabTimerRecordSaving !== null) {
           setIsVocabTimerRecordSavingEnabled(savedVocabTimerRecordSaving === 'true');
+        }
+
+        if (savedVocabAudioMatchMode !== null) {
+          setIsVocabAudioMatchMode(savedVocabAudioMatchMode === 'true');
         }
 
         if (savedVocabLessonCardView === 'list' || savedVocabLessonCardView === 'tile') {
@@ -324,6 +373,15 @@ const [isTypingStrictMode, setIsTypingStrictMode] = useState(false);
     loadPreferences();
   }, []);
 
+  // Follow the OS theme live as long as the user hasn't made an explicit
+  // in-app choice — an explicit choice (toggle, or a synced account
+  // preference) always wins over the OS value from then on (§2b).
+  useEffect(() => {
+    if (hasExplicitThemeChoice) return;
+    if (systemColorScheme == null) return;
+    setIsDarkMode(systemColorScheme === 'dark');
+  }, [systemColorScheme, hasExplicitThemeChoice]);
+
   // === Helpers ===
   const syncAccountPreferences = () => {
     void syncAccountPreferencesToCloudIfSignedIn();
@@ -360,7 +418,13 @@ const [isTypingStrictMode, setIsTypingStrictMode] = useState(false);
   };
 
   // === Memoised toggle handlers ===
+  const updateTextSizeLevel = useCallback((level: TextSizeLevel) => {
+    setTextSizeLevel(level);
+    persistStringPreference(TEXT_SIZE_LEVEL_KEY, level);
+  }, []);
+
   const toggleTheme = useCallback(() => {
+    setHasExplicitThemeChoice(true);
     setIsDarkMode(prev => {
       const next = !prev;
       // Persist asynchronously; no need to await for UI updates.
@@ -409,6 +473,19 @@ const [isTypingStrictMode, setIsTypingStrictMode] = useState(false);
   const updateVocabTimerRecordSaving = useCallback((value: boolean) => {
     setIsVocabTimerRecordSavingEnabled(value);
     persistBoolean(VOCAB_TIMER_RECORD_SAVING_KEY, value);
+  }, []);
+
+  const toggleVocabAudioMatchMode = useCallback(() => {
+    setIsVocabAudioMatchMode(prev => {
+      const next = !prev;
+      persistBoolean(VOCAB_AUDIO_MATCH_MODE_KEY, next);
+      return next;
+    });
+  }, []);
+
+  const updateVocabAudioMatchMode = useCallback((value: boolean) => {
+    setIsVocabAudioMatchMode(value);
+    persistBoolean(VOCAB_AUDIO_MATCH_MODE_KEY, value);
   }, []);
 
   const updateVocabLessonCardView = useCallback((value: 'list' | 'tile') => {
@@ -548,10 +625,12 @@ const [isTypingStrictMode, setIsTypingStrictMode] = useState(false);
   }, []);
 
   const applyAccountPreferences = useCallback((snapshot: AccountPreferenceSnapshot) => {
+    setHasExplicitThemeChoice(true);
     setIsDarkMode(snapshot.theme === 'dark');
     setIsGrammarGameMode(snapshot.grammarGameMode);
     setIsVocabTimerMode(snapshot.vocabTimerMode);
     setIsVocabTimerRecordSavingEnabled(snapshot.vocabTimerRecordSaving);
+    setIsVocabAudioMatchMode(snapshot.vocabAudioMatchMode);
     setVocabLessonCardView(snapshot.vocabLessonCardView);
     setIsTypingStrictMode(snapshot.typingStrictMode);
     const nextHapticsEnabled = hapticsAreSupported && snapshot.hapticsEnabled;
@@ -565,6 +644,7 @@ const [isTypingStrictMode, setIsTypingStrictMode] = useState(false);
   }, []);
 
   const colors = useMemo(() => isDarkMode ? darkColors : lightColors, [isDarkMode]);
+  const textScale = useMemo(() => TEXT_SCALE_BY_LEVEL[textSizeLevel], [textSizeLevel]);
 
   // Elegantly sync the browser page background colour on web
   const usePageBackgroundColor = (bgColor: string) => {
@@ -587,9 +667,12 @@ const [isTypingStrictMode, setIsTypingStrictMode] = useState(false);
   }
 
   return (    <ThemeContext.Provider value={{ 
-      isDarkMode, 
-      colors, 
+      isDarkMode,
+      colors,
       toggleTheme,
+      textSizeLevel,
+      textScale,
+      updateTextSizeLevel,
       isGrammarGameMode,
       toggleGrammarGameMode,
       updateGrammarGameMode,
@@ -602,6 +685,9 @@ const [isTypingStrictMode, setIsTypingStrictMode] = useState(false);
       isVocabTimerRecordSavingEnabled,
       toggleVocabTimerRecordSaving,
       updateVocabTimerRecordSaving,
+      isVocabAudioMatchMode,
+      toggleVocabAudioMatchMode,
+      updateVocabAudioMatchMode,
       vocabLessonCardView,
       updateVocabLessonCardView,
       isTypingStrictMode,

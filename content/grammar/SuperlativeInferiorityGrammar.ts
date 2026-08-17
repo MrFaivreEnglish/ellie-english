@@ -3,6 +3,37 @@ const SuperlativeInferiorityGrammar = {
   title: "Superlatif d'infériorité",
   description: 'Learn how to use superlatives of inferiority in English',
   imageUrl: 'https://i.ibb.co/whqPnFQh/Superlatif-inf-riorit.png',
+  textContent: {
+    cards: [
+      {
+        eyebrow: 'À quoi ça sert',
+        paragraph: 'Décrire ce qui est « le moins » (le moins beau, la moins gentille...).',
+        tip: 'Formule : the + least + adjectif. Ici, on ne se préoccupe pas des syllabes, c\'est toujours the least + adjectif.',
+        columns: [
+          {
+            label: '1 syllabe',
+            accent: 'coral',
+            rows: ['Old → **The least old**', 'Small → **The least small**'],
+          },
+          {
+            label: '2 syllabes + Y',
+            accent: 'coral',
+            rows: ['Pretty → **The least pretty**', 'Funny → **The least funny**'],
+          },
+          {
+            label: '2 syllabes',
+            accent: 'blue',
+            rows: ['Perfect → **The least perfect**', 'Awful → **The least awful**'],
+          },
+          {
+            label: '3 syllabes et +',
+            accent: 'blue',
+            rows: ['Beautiful → **The least beautiful**', 'Incredible → **The least incredible**'],
+          },
+        ],
+      },
+    ],
+  },
 translateExercises: [
   {
     type: 'translate',

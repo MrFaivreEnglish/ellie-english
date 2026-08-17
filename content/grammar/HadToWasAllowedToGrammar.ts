@@ -3,6 +3,34 @@ const HadToWasAllowedToGrammar = {
   title: 'Had to / Was Allowed To',
   description: 'Practice past obligations and permissions using had to and was allowed to',
   imageUrl: 'https://i.ibb.co/hR1QLZJ3/Had-to-was-allowed-to.png',
+  textContent: {
+    cards: [
+      {
+        eyebrow: 'Ce qui était obligé, imposé',
+        paragraph: 'Pour parler de ce qui était obligé, imposé, dans le passé.',
+        tip: "Formule : sujet + had to / didn't have to + base verbale.",
+        columns: [
+          {
+            label: "Sujet + HAD TO (ou DIDN'T HAVE TO) + base verbale",
+            accent: 'blue',
+            rows: ['I', 'You', 'He / She / It', 'We', 'They'],
+          },
+        ],
+        examples: [
+          { en: '**He had to leave** early.', fr: 'Il devait partir tôt.' },
+          { en: "**They didn't have to wait**.", fr: 'Ils ne devaient pas attendre.' },
+        ],
+      },
+      {
+        eyebrow: 'Ce qui était autorisé',
+        paragraph: 'Formule : sujet + was/were (not) allowed to + base verbale.',
+        examples: [
+          { en: '**He was allowed to play**.', fr: 'Il avait le droit de jouer à 22h.' },
+          { en: "**They weren't allowed to enter**.", fr: 'Ils n’avaient pas le droit d’entrer.' },
+        ],
+      },
+    ],
+  },
 translateExercises: [
   {
     type: 'translate',

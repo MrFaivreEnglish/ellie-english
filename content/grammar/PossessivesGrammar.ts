@@ -3,6 +3,38 @@ const PossessivesGrammar = {
   title: 'Les pronoms possessifs',
   description: 'Use possessive adjectives and possessive pronouns (my, your, his, hers, mine, yours)',
   imageUrl: 'https://i.ibb.co/zhsFKsfS/Possessifs.png',
+  textContent: {
+    cards: [
+      {
+        eyebrow: 'La possession',
+        paragraph: "Contrairement au français, c'est le possesseur qui compte, pas l'objet.",
+        columns: [
+          {
+            label: 'Pronom du possesseur',
+            accent: 'blue',
+            rows: ['I', 'You', 'He', 'She', 'It', 'We', 'They'],
+          },
+          {
+            label: 'Possessif',
+            accent: 'coral',
+            rows: ['My', 'Your', 'His', 'Her', 'Its', 'Our', 'Their'],
+          },
+        ],
+        examples: [
+          { en: '**Your** dog. **Your** dogs.', fr: 'Ton chien. Tes chiens.' },
+          { en: 'She has a dog. **Her** dog is cute.', fr: 'Elle a un chien. Son chien est mignon.' },
+        ],
+      },
+      {
+        eyebrow: 'Attention au genre du possesseur',
+        paragraph: "En anglais, his/her dépend du genre de la personne qui possède, pas de l'objet possédé.",
+        examples: [
+          { en: 'This is **his** brother.', fr: 'C\'est son frère (à lui).' },
+          { en: 'This is **her** brother.', fr: 'C\'est son frère (à elle).' },
+        ],
+      },
+    ],
+  },
 translateExercises: [
   {
     type: 'translate',

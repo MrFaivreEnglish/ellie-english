@@ -3,6 +3,52 @@ const CouldGrammar = {
   title: 'Could / Was able to',
   description: 'Practice past ability with could and was able to',
   imageUrl: 'https://i.ibb.co/PsDv5rG6/Could-Was-able-to.png',
+  textContent: {
+    cards: [
+      {
+        eyebrow: 'Could + base verbale',
+        paragraph: 'Je parle de ce qui était possible.',
+        tip: 'Formule : sujet + could (ou couldn’t) + base verbale. Could ne change jamais.',
+        columns: [
+          {
+            label: 'Sujet',
+            accent: 'blue',
+            rows: ['I', 'You', 'He / She / It', 'We', 'They'],
+          },
+          {
+            label: 'Could (affirmatif) / Couldn’t (négatif)',
+            accent: 'coral',
+            rows: ['**Could**', '**Couldn’t**'],
+          },
+        ],
+        examples: [
+          { en: '**She could sleep** anywhere.', fr: 'Elle pouvait dormir n’importe où.' },
+          { en: '**You couldn’t speak** Korean.', fr: 'Tu ne pouvais pas parler coréen.' },
+        ],
+      },
+      {
+        eyebrow: 'Be able to + base verbale',
+        paragraph: 'On peut également utiliser was / were (not) able to + base verbale.',
+        columns: [
+          {
+            label: 'Be able to (selon le sujet, au passé)',
+            accent: 'amber',
+            rows: [
+              'I **was** (not) able to',
+              'You **were** (not) able to',
+              'He / She / It **was** (not) able to',
+              'We **were** (not) able to',
+              'They **were** (not) able to',
+            ],
+          },
+        ],
+        examples: [
+          { en: '**She was able to see** ghosts.', fr: 'Elle a été capable de voir des fantômes.' },
+          { en: '**You weren’t able to go** there.', fr: 'Tu n’as pas été capable d’y aller.' },
+        ],
+      },
+    ],
+  },
   translateExercises: [
   {
     type: 'translate',

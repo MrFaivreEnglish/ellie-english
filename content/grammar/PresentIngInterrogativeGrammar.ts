@@ -3,6 +3,57 @@ const PresentIngInterrogativeGrammar = {
   title: 'Présent ING Interrogatif',
   description: 'Learn how to form questions in the present continuous tense',
   imageUrl: 'https://i.ibb.co/DPPrM4Z3/Pr-sent-ING-Interrogatif.png',
+  textContent: {
+    cards: [
+      {
+        eyebrow: 'Poser une question',
+        paragraph: 'Je demande ce qui est en train de se passer.',
+        tip: 'Formule : be au présent + sujet + verbe-ing ?',
+        columns: [
+          {
+            label: '1/ Je repère le sujet',
+            accent: 'blue',
+            rows: ['I', 'You', 'He / She / It', 'We', 'They'],
+          },
+          {
+            label: '2/ Je conjugue BE au présent avant le sujet',
+            accent: 'coral',
+            rows: ['**Am** I', '**Are** you', '**Is** he / she / it', '**Are** we', '**Are** they'],
+          },
+          {
+            label: "3/ J'ajoute la terminaison -ING au verbe",
+            accent: 'teal',
+            rows: ['visiting', 'speaking', 'being', 'dancing', 'Etc.'],
+          },
+        ],
+        examples: [
+          { en: '**Is Owen eating** a bagel?', fr: 'Owen est-il en train de manger... ?' },
+          { en: '**Are we talking**?', fr: 'Sommes-nous en train de parler ?' },
+        ],
+      },
+      {
+        eyebrow: 'Les mots interrogatifs',
+        subsections: [
+          {
+            text: 'Les mots interrogatifs se placent avant le verbe be :',
+            accent: 'amber',
+            rows: ['What', 'When', 'Where', 'Why', 'Who'],
+          },
+          {
+            text: 'Par exemple :',
+            accent: 'teal',
+            rows: [
+              '**am** I seeing?',
+              '**are** you coming?',
+              '**is** he / she / it going?',
+              '**are** we laughing?',
+              '**are** they talking to?',
+            ],
+          },
+        ],
+      },
+    ],
+  },
   translateExercises: [
   {
     type: 'translate',

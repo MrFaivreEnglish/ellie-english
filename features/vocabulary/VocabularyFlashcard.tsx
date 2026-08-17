@@ -4,6 +4,7 @@ import { MaterialIcons } from '@expo/vector-icons';
 import { Word } from '../../types/VocabularyTypes';
 import { clampNumber, getWebLessonScale, scaleValue } from '../shared/responsiveLayout';
 import type { ThemeColors } from '../settings/ThemeContext';
+import { FRESH_COLORS } from '../shared/freshDirection';
 
 import Animated, {
   useSharedValue,
@@ -14,12 +15,7 @@ import Animated, {
 } from 'react-native-reanimated';
 
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
-
-// Lazy-load so the app doesn't crash if the native module isn't compiled in the build yet.
-// Once the development build includes expo-speech, this can become a normal import.
-const Speech = (() => {
-  try { return require('expo-speech') as typeof import('expo-speech'); } catch { return null; }
-})();
+import { useEnglishSpeech } from '../shared/useEnglishSpeech';
 
 interface FlashcardProps {
   words: Word[];
@@ -110,8 +106,8 @@ export default function VocabularyFlashcard({
       ? scaleValue(isLarge ? 46 : 42, webScale)
       : isLarge ? 46 : 42;
   const navButtonSize = scaleValue(isCompact ? 48 : 52, controlScale);
-  const knowledgeActionWidth = scaleValue(isCompact ? 84 : 90, controlScale);
-  const knowledgeActionHeight = scaleValue(isCompact ? 48 : 52, controlScale);
+  const knowledgeActionWidth = navButtonSize;
+  const knowledgeActionHeight = navButtonSize;
   const navigationTopGap = isCompact ? 38 : scaleValue(44, controlScale);
   const navigationGap = hasKnowledgeActions
     ? scaleValue(isCompact ? 8 : 10, controlScale)
@@ -149,10 +145,15 @@ export default function VocabularyFlashcard({
   const contentPadding = Math.round((isCompact ? 16 : scaleValue(isDesktopWeb ? 24 : 20, controlScale)) * clampNumber(cardFitScale, 0.82, 1));
   const knowledgeButtonRadius = scaleValue(14, controlScale);
   const navButtonRadius = scaleValue(15, controlScale);
-  const gameAccentColor = colors.primary ?? '#1671B6';
-  const gameAccentSoft = colors.primarySoft;
+  // Vocabulary lesson modes (Cards/Match/Write) share one accent — the
+  // "exercise blue" family, distinct from the app-wide primary blue.
+  const gameAccentColor = isDarkMode ? '#3FA0DB' : FRESH_COLORS.exerciseBlue;
+  const gameAccentSoft = isDarkMode ? '#12345A' : FRESH_COLORS.exerciseBlueTint;
   const gameAccentSofter = colors.surface;
-  const gameAccentBorder = colors.borderStrong;
+  const gameAccentBorder = isDarkMode ? '#2584B2' : '#a8d5f0';
+  // "Mark Known" confirm state — oklch(0.7 0.13 150) bg / oklch(0.5 0.14 150) border
+  const confirmKnownBg = '#5cb572';
+  const confirmKnownBorder = '#007834';
   const controlSurfaceBackground = isDarkMode ? colors.surface : '#FFFFFF';
   const controlSurfaceAltBackground = gameAccentSofter;
   const controlSurfaceBorder = gameAccentBorder;
@@ -175,12 +176,14 @@ export default function VocabularyFlashcard({
   const swipeExitDistance = windowWidth * 1.15;
   const frontIsEnglish = !reverseDirection;
   const englishSideBackground = isDarkMode ? colors.surface : (colors.card ?? '#FFFFFF');
-  const englishSideBorder = gameAccentBorder;
+  // Not-flipped card border matches the neutral tile border used on the
+  // Match screen, rather than a blue accent tint.
+  const matchTileBorderNeutral = isDarkMode ? '#3A3E48' : '#e3decf';
+  const englishSideBorder = matchTileBorderNeutral;
   const frenchSideBackground = isDarkMode ? (colors.buttonBackground ?? gameAccentColor) : gameAccentColor;
   const frenchSideBorder = isDarkMode ? colors.borderStrong : gameAccentColor;
   const cardShadowColor = '#000000';
   const cardShadowOpacity = isDarkMode ? 0.34 : 0.18;
-  const physicalCardBorderColor = isDarkMode ? 'rgba(255,255,255,0.16)' : '#CDE6F6';
   const englishCardInnerBorderColor = isDarkMode ? 'rgba(255,255,255,0.14)' : 'rgba(255,255,255,0.82)';
   const colorCardInnerBorderColor = 'rgba(255,255,255,0.24)';
   const cardFaceShadowStyle = {
@@ -361,76 +364,15 @@ export default function VocabularyFlashcard({
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [canGoNext, canGoPrevious, flip, isFlipped, onFlip, onNext, onPrevious]);
 
-  const [isSpeakingEnglish, setIsSpeakingEnglish] = React.useState(false);
-  const [preferredEnglishVoice, setPreferredEnglishVoice] = React.useState<string | undefined>(undefined);
+  const { speak: speakEnglish, stop: stopEnglishSpeech, isSpeaking: isSpeakingEnglish } = useEnglishSpeech();
 
   React.useEffect(() => {
-    let mounted = true;
-
-    const scoreVoice = (voice: import('expo-speech').Voice) => {
-      const language = voice.language?.toLowerCase() ?? '';
-      if (!language.startsWith('en')) return -1;
-
-      const name = `${voice.name ?? ''} ${voice.identifier ?? ''}`.toLowerCase();
-      let score = 20;
-
-      if (language === 'en-gb' || language.startsWith('en-gb-')) score += 90;
-      if (language === 'en-ie' || language === 'en-au' || language === 'en-nz') score += 28;
-      if (language === 'en-us') score += 4;
-      if (language.startsWith('en-')) score += 8;
-      if (voice.quality === Speech?.VoiceQuality?.Enhanced) score += 22;
-      if (/british|united kingdom|\buk\b|serena|daniel|martha|susan/.test(name)) score += 18;
-      if (/natural|neural|premium|enhanced|siri|samantha|karen|moira/.test(name)) score += 12;
-      if (/compact|novelty|whisper|bells|boing|cellos|organ|trinoids|zarvox/.test(name)) score -= 16;
-
-      return score;
-    };
-
-    Speech?.getAvailableVoicesAsync()
-      .then((voices) => {
-        if (!mounted) return;
-
-        const bestVoice = voices
-          .map((voice) => ({ voice, score: scoreVoice(voice) }))
-          .filter(({ score }) => score >= 0)
-          .sort((a, b) => b.score - a.score)[0]?.voice;
-
-        setPreferredEnglishVoice(bestVoice?.identifier);
-      })
-      .catch(() => {
-        if (mounted) setPreferredEnglishVoice(undefined);
-      });
-
-    return () => {
-      mounted = false;
-    };
-  }, []);
-
-  React.useEffect(() => {
-    Speech?.stop();
-    setIsSpeakingEnglish(false);
-  }, [currentWord?.english]);
-
-  React.useEffect(() => () => {
-    Speech?.stop();
-  }, []);
+    stopEnglishSpeech();
+  }, [currentWord?.english, stopEnglishSpeech]);
 
   const speakEnglishWord = React.useCallback(() => {
-    const text = currentWord?.english?.trim();
-    if (!text) return;
-
-    Speech?.stop();
-    setIsSpeakingEnglish(true);
-    Speech?.speak(text, {
-      language: 'en-GB',
-      voice: preferredEnglishVoice,
-      rate: 0.82,
-      pitch: 1.02,
-      onDone: () => setIsSpeakingEnglish(false),
-      onStopped: () => setIsSpeakingEnglish(false),
-      onError: () => setIsSpeakingEnglish(false),
-    });
-  }, [currentWord?.english, preferredEnglishVoice]);
+    speakEnglish(currentWord?.english);
+  }, [currentWord?.english, speakEnglish]);
 
   // =========================
   // RENDER
@@ -440,9 +382,14 @@ export default function VocabularyFlashcard({
   const englishSideLabel = sideLabels?.english ?? 'English';
   const frenchSideLabel = sideLabels?.french ?? 'French';
   const formatSideBadgeLabel = (label: string) => label.toUpperCase();
+  const abbreviateDirectionLabel = (label: string) => {
+    if (label === 'English') return 'EN';
+    if (label === 'French') return 'FR';
+    return label;
+  };
   const directionLabel = reverseDirection
-    ? `${frenchSideLabel} -> ${englishSideLabel}`
-    : `${englishSideLabel} -> ${frenchSideLabel}`;
+    ? `${abbreviateDirectionLabel(frenchSideLabel)}-${abbreviateDirectionLabel(englishSideLabel)}`
+    : `${abbreviateDirectionLabel(englishSideLabel)}-${abbreviateDirectionLabel(frenchSideLabel)}`;
   const visibleTerm = isFlipped
     ? (frontIsEnglish ? currentWord.french : currentWord.english)
     : (frontIsEnglish ? currentWord.english : currentWord.french);
@@ -455,19 +402,17 @@ export default function VocabularyFlashcard({
       : isCurrentWordLearned;
   const showStatusBadge = hasKnowledgeActions;
   const canChooseKnowledge = isCurrentWordLearned || currentWordReadyToMarkKnown;
-  const trackerMetaLabel = progressTotal > 0 ? `${learnedCount}/${progressTotal}` : '';
-  const notYetColor = colors.warning ?? '#F4B740';
-  const iKnowColor = colors.success ?? '#58CC02';
+  // Swipe/save controls — "Again" (remove) oklch(0.8 0.13 25) / oklch(0.55 0.16 25) border;
+  // "Known" (confirm) oklch(0.7 0.13 150) / oklch(0.5 0.14 150) border.
+  const notYetColor = isDarkMode ? '#E8998F' : '#c96b64';
+  const notYetSoftBg = isDarkMode ? '#3A1512' : '#f4b8b2';
+  const iKnowColor = isDarkMode ? '#7DD9A0' : '#3a8f5c';
+  const iKnowSoftBg = isDarkMode ? '#0E2E1E' : '#9bd4ae';
   const disabledChoiceColor = colors.secondaryText;
   const knowledgeActionDisabled = !canChooseKnowledge;
   const notYetSelected = canChooseKnowledge && !isCurrentWordLearned;
   const iKnowSelected = isCurrentWordLearned;
   const waitingToChoose = hasKnowledgeActions && !canChooseKnowledge;
-  const deckMetaLabel = waitingToChoose
-    ? 'Flip first'
-    : trackerMetaLabel
-      ? `Known ${trackerMetaLabel}`
-      : '';
   const chooseNotYet = () => {
     if (!canChooseKnowledge) return;
     if (isCurrentWordLearned) onToggleLearned?.();
@@ -479,37 +424,22 @@ export default function VocabularyFlashcard({
     if (canGoNext) onNext();
   };
 
-  const renderStatusBadges = () => {
-    if (!showStatusBadge) return null;
+  const renderStatusBadges = (appearance: ReturnType<typeof getSideAppearance>) => {
+    // Only shown while a card hasn't been decided (saved/discarded) yet.
+    if (!showStatusBadge || statusKnown) return null;
 
-    const badgeColor = waitingToChoose ? gameAccentColor : statusKnown ? iKnowColor : notYetColor;
-    const badgeBackgroundColor = waitingToChoose
-      ? gameAccentSoft
-      : statusKnown
-      ? (colors.successSoft ?? (isDarkMode ? '#123E36' : '#E7F8E8'))
-      : (colors.warningSoft ?? (isDarkMode ? '#493912' : '#FFF4D8'));
-    const badgeTextColor = waitingToChoose
-      ? gameAccentColor
-      : statusKnown
-      ? (colors.successText ?? (isDarkMode ? '#D6FBE4' : '#2F8F2F'))
-      : (isDarkMode ? '#FFD36D' : '#7A4F00');
+    const badgeColor = appearance.tapHintColor;
     const badgeIcon = (
-      waitingToChoose ? 'visibility' : statusKnown ? 'check-circle' : 'hourglass-empty'
+      waitingToChoose ? 'visibility' : 'hourglass-empty'
     ) as React.ComponentProps<typeof MaterialIcons>['name'];
-    const badgeLabel = waitingToChoose ? 'Flip first' : statusKnown ? 'Known' : 'Not yet';
+    const badgeLabel = waitingToChoose ? 'Flip first' : 'Not yet';
 
     return (
       <View style={styles.statusBadgeStack}>
-        <View style={[styles.statusBadge, { backgroundColor: badgeBackgroundColor, borderColor: badgeColor }]}>
-          <MaterialIcons
-            name={badgeIcon}
-            size={14}
-            color={badgeColor}
-          />
-          <Text style={[styles.statusBadgeText, { color: badgeTextColor }]}>
-            {badgeLabel}
-          </Text>
-        </View>
+        <MaterialIcons name={badgeIcon} size={14} color={badgeColor} />
+        <Text style={[styles.statusBadgeText, { color: badgeColor }]}>
+          {badgeLabel}
+        </Text>
       </View>
     );
   };
@@ -561,20 +491,22 @@ export default function VocabularyFlashcard({
             <View
               style={styles.cardShadowFrame}
             >
+              {/* Shadow lives on this static, non-rotating shell rather than on the
+                  flipping faces below — elevation/shadow props are computed from a
+                  view's layout bounds, not its rendered rotateY transform, so a
+                  shadow on the rotating face visibly distorts mid-flip. */}
               <View
-                style={styles.cardShadowShell}
+                style={[styles.cardShadowShell, styles.cardPhysicalShadow, cardFaceShadowStyle]}
               >
                 <View style={styles.flipCard}>
 
               {/* FRONT */}
                 <Animated.View style={[
                   styles.card,
-                  styles.cardPhysicalShadow,
                   frontStyle,
-                  cardFaceShadowStyle,
                   {
                     backgroundColor: frontAppearance.backgroundColor,
-                    borderColor: physicalCardBorderColor,
+                    borderColor: frontAppearance.borderColor,
                   },
                 ] as any}>
                   <View style={[styles.cardContent, { padding: contentPadding }]}>
@@ -585,7 +517,7 @@ export default function VocabularyFlashcard({
                         { borderColor: frontIsEnglish ? englishCardInnerBorderColor : colorCardInnerBorderColor },
                       ]}
                     />
-                    {renderStatusBadges()}
+                    {renderStatusBadges(frontAppearance)}
                     {renderSourceLessonBadge(frontAppearance)}
 
                     <View style={[
@@ -622,12 +554,10 @@ export default function VocabularyFlashcard({
                 {/* BACK */}
                 <Animated.View style={[
                   styles.card,
-                  styles.cardPhysicalShadow,
                   backStyle,
-                  cardFaceShadowStyle,
                   {
                     backgroundColor: backAppearance.backgroundColor,
-                    borderColor: physicalCardBorderColor,
+                    borderColor: backAppearance.borderColor,
                   },
                 ] as any}>
                   <View style={[styles.cardContent, { padding: contentPadding }]}>
@@ -638,7 +568,7 @@ export default function VocabularyFlashcard({
                         { borderColor: frontIsEnglish ? colorCardInnerBorderColor : englishCardInnerBorderColor },
                       ]}
                     />
-                    {renderStatusBadges()}
+                    {renderStatusBadges(backAppearance)}
                     {renderSourceLessonBadge(backAppearance)}
 
                     <View style={[
@@ -729,10 +659,8 @@ export default function VocabularyFlashcard({
                   width: knowledgeActionWidth,
                   height: knowledgeActionHeight,
                   borderRadius: knowledgeButtonRadius,
-                  backgroundColor: notYetSelected
-                    ? (colors.warningSoft ?? (isDarkMode ? '#493912' : '#FFF4D8'))
-                    : controlSurfaceBackground,
-                  borderColor: notYetSelected ? notYetColor : controlSurfaceBorder,
+                  backgroundColor: controlSurfaceBackground,
+                  borderColor: notYetColor,
                 },
               ]}
             >
@@ -740,46 +668,29 @@ export default function VocabularyFlashcard({
                 style={[
                   styles.knowledgeIconDisc,
                   {
-                    backgroundColor: notYetSelected
-                      ? notYetColor
-                      : (colors.warningSoft ?? (isDarkMode ? '#493912' : '#FFF4D8')),
-                    borderColor: knowledgeActionDisabled ? colors.border : notYetColor,
+                    backgroundColor: notYetSoftBg,
+                    borderColor: notYetColor,
                   },
                 ]}
               >
                 <MaterialIcons
                   name="close"
-                  size={scaleValue(16, controlScale)}
-                  color={knowledgeActionDisabled ? disabledChoiceColor : notYetSelected ? colors.buttonText : notYetColor}
+                  size={scaleValue(20, controlScale)}
+                  color={knowledgeActionDisabled ? disabledChoiceColor : notYetColor}
                 />
               </View>
-              <Text
-                style={[
-                  styles.knowledgeNavLabel,
-                  { color: knowledgeActionDisabled ? disabledChoiceColor : notYetSelected ? '#7A4F00' : notYetColor },
-                ]}
-                numberOfLines={1}
-              >
-                Again
-              </Text>
             </Pressable>
 
             <View
               style={[
                 styles.deckCounterPill,
-                styles.deckCounterPillProgress,
                 styles.controlSurfaceShadow,
-                { backgroundColor: controlSurfaceAltBackground, borderColor: controlSurfaceBorder },
+                { backgroundColor: controlSurfaceAltBackground, borderColor: matchTileBorderNeutral },
               ]}
             >
-              <Text style={[styles.deckCounterText, { color: colors.secondaryText }]}>
-                Card {safeIndex + 1} / {words.length}
+              <Text style={[styles.deckCounterText, { color: isDarkMode ? colors.text : '#4c473c' }]}>
+                {safeIndex + 1} / {words.length}
               </Text>
-              {!!deckMetaLabel && (
-                <Text style={[styles.deckCounterMetaText, { color: statusKnown ? iKnowColor : colors.secondaryText }]}>
-                  {deckMetaLabel}
-                </Text>
-              )}
             </View>
 
             <Pressable
@@ -800,10 +711,8 @@ export default function VocabularyFlashcard({
                   width: knowledgeActionWidth,
                   height: knowledgeActionHeight,
                   borderRadius: knowledgeButtonRadius,
-                  backgroundColor: iKnowSelected
-                    ? (colors.successSoft ?? (isDarkMode ? '#123E36' : '#E7F8E8'))
-                    : controlSurfaceBackground,
-                  borderColor: iKnowSelected ? iKnowColor : controlSurfaceBorder,
+                  backgroundColor: controlSurfaceBackground,
+                  borderColor: iKnowColor,
                 },
               ]}
             >
@@ -811,28 +720,17 @@ export default function VocabularyFlashcard({
                 style={[
                   styles.knowledgeIconDisc,
                   {
-                    backgroundColor: iKnowSelected
-                      ? iKnowColor
-                      : (colors.successSoft ?? (isDarkMode ? '#123E36' : '#E7F8E8')),
+                    backgroundColor: iKnowSelected ? iKnowColor : iKnowSoftBg,
                     borderColor: knowledgeActionDisabled ? colors.border : iKnowColor,
                   },
                 ]}
               >
                 <MaterialIcons
                   name="check"
-                  size={scaleValue(17, controlScale)}
+                  size={scaleValue(20, controlScale)}
                   color={knowledgeActionDisabled ? disabledChoiceColor : iKnowSelected ? colors.buttonText : iKnowColor}
                 />
               </View>
-              <Text
-                style={[
-                  styles.knowledgeNavLabel,
-                  { color: knowledgeActionDisabled ? disabledChoiceColor : iKnowSelected ? colors.successText : iKnowColor },
-                ]}
-                numberOfLines={1}
-              >
-                Known
-              </Text>
             </Pressable>
           </>
         ) : (
@@ -853,16 +751,16 @@ export default function VocabularyFlashcard({
                   height: navButtonSize,
                   borderRadius: navButtonRadius,
                   backgroundColor: controlSurfaceBackground,
-                  borderColor: controlSurfaceBorder,
+                  borderColor: matchTileBorderNeutral,
                 },
               ]}
             >
-              <MaterialIcons name="chevron-left" size={scaleValue(29, controlScale)} color={canGoPrevious ? gameAccentColor : colors.secondaryText} />
+              <MaterialIcons name="chevron-left" size={scaleValue(29, controlScale)} color={canGoPrevious ? '#a39e91' : colors.secondaryText} />
             </Pressable>
 
-            <View style={[styles.deckCounterPill, styles.controlSurfaceShadow, { backgroundColor: controlSurfaceAltBackground, borderColor: controlSurfaceBorder }]}>
-              <Text style={[styles.deckCounterText, { color: colors.secondaryText }]}>
-                Card {safeIndex + 1} / {words.length}
+            <View style={[styles.deckCounterPill, styles.controlSurfaceShadow, { backgroundColor: controlSurfaceAltBackground, borderColor: matchTileBorderNeutral }]}>
+              <Text style={[styles.deckCounterText, { color: isDarkMode ? colors.text : '#4c473c' }]}>
+                {safeIndex + 1} / {words.length}
               </Text>
             </View>
 
@@ -882,7 +780,7 @@ export default function VocabularyFlashcard({
                   height: navButtonSize,
                   borderRadius: navButtonRadius,
                   backgroundColor: controlSurfaceBackground,
-                  borderColor: controlSurfaceBorder,
+                  borderColor: '#71add0',
                 },
               ]}
             >
@@ -938,9 +836,9 @@ export default function VocabularyFlashcard({
             pressed && styles.toolButtonPressed,
             {
               backgroundColor: isShuffled ? gameAccentSoft : controlSurfaceBackground,
-              borderColor: isShuffled ? gameAccentColor : controlSurfaceBorder,
-              minHeight: scaleValue(40, controlScale),
-              paddingHorizontal: scaleValue(11, controlScale),
+              borderColor: isShuffled ? gameAccentColor : matchTileBorderNeutral,
+              minHeight: isDesktopWeb ? 40 : scaleValue(50, controlScale),
+              paddingHorizontal: scaleValue(16, controlScale),
             },
           ]}
         >
@@ -948,15 +846,17 @@ export default function VocabularyFlashcard({
             style={[
               styles.toolIconDisc,
               {
+                width: scaleValue(30, controlScale),
+                height: scaleValue(30, controlScale),
                 backgroundColor: isShuffled ? gameAccentColor : gameAccentSoft,
-                borderColor: isShuffled ? gameAccentColor : controlSurfaceBorder,
+                borderColor: isShuffled ? gameAccentColor : matchTileBorderNeutral,
               },
             ]}
           >
-            <MaterialIcons name="shuffle" size={scaleValue(16, controlScale)} color={isShuffled ? colors.buttonText : gameAccentColor} />
+            <MaterialIcons name="shuffle" size={scaleValue(19, controlScale)} color={isShuffled ? colors.buttonText : gameAccentColor} />
           </View>
           <Text
-            style={[styles.toolButtonText, { color: isShuffled ? gameAccentColor : colors.text, fontSize: scaleValue(13, controlScale) }]}
+            style={[styles.toolButtonText, { color: isShuffled ? gameAccentColor : (isDarkMode ? colors.text : '#3e3a2f'), fontSize: scaleValue(14, controlScale) }]}
             numberOfLines={1}
             adjustsFontSizeToFit
             minimumFontScale={0.82}
@@ -979,17 +879,27 @@ export default function VocabularyFlashcard({
             pressed && styles.toolButtonPressed,
             {
               backgroundColor: controlSurfaceBackground,
-              borderColor: controlSurfaceBorder,
-              minHeight: scaleValue(40, controlScale),
-              paddingHorizontal: scaleValue(11, controlScale),
+              borderColor: matchTileBorderNeutral,
+              minHeight: isDesktopWeb ? 40 : scaleValue(50, controlScale),
+              paddingHorizontal: scaleValue(16, controlScale),
             },
           ]}
         >
-          <View style={[styles.toolIconDisc, { backgroundColor: gameAccentSoft, borderColor: controlSurfaceBorder }]}>
-            <MaterialIcons name="swap-horiz" size={scaleValue(16, controlScale)} color={gameAccentColor} />
+          <View
+            style={[
+              styles.toolIconDisc,
+              {
+                width: scaleValue(30, controlScale),
+                height: scaleValue(30, controlScale),
+                backgroundColor: gameAccentSoft,
+                borderColor: matchTileBorderNeutral,
+              },
+            ]}
+          >
+            <MaterialIcons name="swap-horiz" size={scaleValue(19, controlScale)} color={gameAccentColor} />
           </View>
           <Text
-            style={[styles.toolButtonText, { color: colors.text, fontSize: scaleValue(13, controlScale) }]}
+            style={[styles.toolButtonText, { color: isDarkMode ? colors.text : '#3e3a2f', fontSize: scaleValue(14, controlScale) }]}
             numberOfLines={1}
             adjustsFontSizeToFit
             minimumFontScale={0.72}
@@ -1010,8 +920,8 @@ export default function VocabularyFlashcard({
               {
                 backgroundColor: lessonModeEnabled ? gameAccentSoft : controlSurfaceBackground,
                 borderColor: lessonModeEnabled ? gameAccentColor : controlSurfaceBorder,
-                minHeight: scaleValue(40, controlScale),
-                paddingHorizontal: scaleValue(11, controlScale),
+                minHeight: isDesktopWeb ? 40 : scaleValue(50, controlScale),
+                paddingHorizontal: scaleValue(16, controlScale),
               },
             ]}
           >
@@ -1019,6 +929,8 @@ export default function VocabularyFlashcard({
               style={[
                 styles.toolIconDisc,
                 {
+                  width: scaleValue(30, controlScale),
+                  height: scaleValue(30, controlScale),
                   backgroundColor: lessonModeEnabled ? gameAccentColor : gameAccentSoft,
                   borderColor: lessonModeEnabled ? gameAccentColor : controlSurfaceBorder,
                 },
@@ -1026,14 +938,14 @@ export default function VocabularyFlashcard({
             >
               <MaterialIcons
                 name="school"
-                size={16}
+                size={19}
                 color={lessonModeEnabled ? colors.buttonText : gameAccentColor}
               />
             </View>
             <Text
               style={[
                 styles.toolButtonText,
-                { color: lessonModeEnabled ? gameAccentColor : colors.text, fontSize: scaleValue(13, controlScale) },
+                { color: lessonModeEnabled ? gameAccentColor : colors.text, fontSize: scaleValue(15, controlScale) },
               ]}
               numberOfLines={1}
               adjustsFontSizeToFit
@@ -1066,7 +978,7 @@ export default function VocabularyFlashcard({
               style={({ pressed }) => [
                 styles.reviewButton,
                 pressed && styles.toolButtonPressed,
-                { backgroundColor: controlSurfaceAltBackground, borderColor: controlSurfaceBorder },
+                { backgroundColor: controlSurfaceAltBackground, borderColor: matchTileBorderNeutral },
               ]}
             >
               <MaterialIcons name="bookmark-border" size={17} color={colors.text} />
@@ -1079,8 +991,8 @@ export default function VocabularyFlashcard({
                 styles.knownButton,
                 (isCurrentWordKnown || !currentWordReadyToMarkKnown) && styles.knownButtonDone,
                 {
-                  backgroundColor: isCurrentWordKnown || !currentWordReadyToMarkKnown ? colors.borderStrong : colors.success,
-                  borderColor: isCurrentWordKnown || !currentWordReadyToMarkKnown ? colors.borderStrong : colors.success,
+                  backgroundColor: isCurrentWordKnown || !currentWordReadyToMarkKnown ? colors.borderStrong : confirmKnownBg,
+                  borderColor: isCurrentWordKnown || !currentWordReadyToMarkKnown ? colors.borderStrong : confirmKnownBorder,
                 },
               ]}
             >
@@ -1175,7 +1087,7 @@ const styles = StyleSheet.create({
     position: 'relative',
   },
   cardInnerHighlight: {
-    ...StyleSheet.absoluteFillObject,
+    ...StyleSheet.absoluteFill,
     borderRadius: 20,
     borderWidth: 1,
   },
@@ -1190,27 +1102,27 @@ const styles = StyleSheet.create({
   },
   tapHintText: {
     position: 'absolute',
-    bottom: 14,
-    color: 'rgba(151, 151, 151, 1)',
-    fontSize: 12,
+    bottom: 18,
+    color: '#999288',
+    fontSize: 11,
     fontStyle: 'italic',
     fontWeight: '500',
   },
   speechButton: {
     alignItems: 'center',
     borderRadius: 999,
-    borderWidth: 1.4,
-    bottom: 12,
-    height: 34,
+    borderWidth: 1.5,
+    bottom: 16,
+    height: 36,
     justifyContent: 'center',
     position: 'absolute',
-    right: 12,
+    right: 20,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.08,
     shadowRadius: 4,
     elevation: 3,
-    width: 34,
+    width: 36,
     zIndex: 8,
   },
   speechButtonPressed: {
@@ -1219,34 +1131,26 @@ const styles = StyleSheet.create({
   },
   badge: {
     position: 'absolute',
-    top: 12,
-    right: 12,
-    paddingHorizontal: 9,
-    paddingVertical: 4,
+    top: 16,
+    right: 16,
+    paddingHorizontal: 12,
+    paddingVertical: 5,
     borderRadius: 999,
-    borderWidth: 1,
+    borderWidth: 1.5,
     zIndex: 999,
   },
   statusBadgeStack: {
     position: 'absolute',
-    top: 12,
-    left: 12,
-    gap: 4,
-    zIndex: 999,
-  },
-  statusBadge: {
+    top: 16,
+    left: 16,
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 3,
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 999,
-    borderWidth: 1,
+    gap: 6,
+    zIndex: 999,
   },
   statusBadgeText: {
-    fontSize: 10,
+    fontSize: 12.5,
     fontWeight: '700',
-    color: '#2F8F2F',
   },
   sourceLessonBadge: {
     position: 'absolute',
@@ -1270,9 +1174,10 @@ const styles = StyleSheet.create({
     fontWeight: '800',
   },
   badgeText: {
-    fontSize: 10,
-    lineHeight: 13,
+    fontSize: 11,
+    lineHeight: 14,
     fontWeight: '700',
+    letterSpacing: 0.4,
     color: '#333',
   },
   navigationContainer: {
@@ -1320,9 +1225,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     borderRadius: 999,
     borderWidth: 1.4,
-    height: 24,
+    height: 30,
     justifyContent: 'center',
-    width: 24,
+    width: 30,
   },
   knowledgeNavLabel: {
     flexShrink: 1,
@@ -1340,8 +1245,8 @@ const styles = StyleSheet.create({
     minWidth: 104,
     minHeight: 34,
     paddingHorizontal: 12,
-    borderRadius: 13,
-    borderWidth: 1.4,
+    borderRadius: 999,
+    borderWidth: 1.5,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -1357,14 +1262,6 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     textAlign: 'center',
   },
-  deckCounterMetaText: {
-    marginTop: 1,
-    fontSize: 11,
-    lineHeight: 14,
-    fontWeight: '700',
-    textAlign: 'center',
-  },
-
   controlRow: {
     width: '100%',
     maxWidth: 440,
@@ -1377,7 +1274,7 @@ const styles = StyleSheet.create({
   toolButton: {
     minWidth: 112,
     borderRadius: 12,
-    borderWidth: 1.4,
+    borderWidth: 1.5,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
@@ -1388,7 +1285,7 @@ const styles = StyleSheet.create({
     transform: [{ scale: 0.99 }],
   },
   toolButtonText: {
-    fontSize: 13,
+    fontSize: 13.5,
     fontWeight: '700',
   },
   toolIconDisc: {

@@ -3,6 +3,47 @@ const SuperlativeGrammar = {
   title: 'Superlatif',
   description: 'Learn how to use superlatives in English',
   imageUrl: 'https://i.ibb.co/1fSC9tpR/Superlatif-sup-riorit.png',
+  textContent: {
+    cards: [
+      {
+        eyebrow: 'À quoi ça sert',
+        paragraph: 'Décrire ce qui bat des records (le plus beau, la plus gentille...).',
+        tip: 'Formule : the + adjectif + -est, ou the + most + adjectif.',
+        columns: [
+          {
+            label: 'THE + -EST · 1 syllabe',
+            accent: 'coral',
+            rows: ['Old → **The oldest**', 'Small → **The smallest**'],
+          },
+          {
+            label: 'THE + -EST · 2 syllabes + Y',
+            accent: 'coral',
+            rows: ['Pretty → **The prettiest**', 'Funny → **The funniest**'],
+          },
+          {
+            label: 'THE MOST · 2 syllabes',
+            accent: 'blue',
+            rows: ['Perfect → **The most perfect**', 'Awful → **The most awful**'],
+          },
+          {
+            label: 'THE MOST · 3 syllabes et +',
+            accent: 'blue',
+            rows: ['Beautiful → **The most beautiful**', 'Incredible → **The most incredible**'],
+          },
+        ],
+      },
+      {
+        eyebrow: 'Attention aux exceptions !',
+        subsections: [
+          {
+            text: "On regarde le nombre de syllabes de l'adjectif de départ — mais il existe deux verbes irréguliers à connaître :",
+            accent: 'amber',
+            rows: ['Good → **The best**', 'Bad → **The worst**'],
+          },
+        ],
+      },
+    ],
+  },
 translateExercises: [
   {
     type: 'translate',

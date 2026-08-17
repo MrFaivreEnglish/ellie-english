@@ -3,6 +3,52 @@ const WordTypesGrammar = {
   title: 'Les groupes de mots',
   description: 'Identify common word types: nouns, verbs, adjectives, pronouns',
   imageUrl: 'https://i.ibb.co/wNYxhH6t/Groupes-de-mots.png',
+  textContent: {
+    cards: [
+      {
+        eyebrow: 'Nom et pronom',
+        paragraph: "Dans une phrase, ils montrent qui fait l'action : ce sont des sujets.",
+        columns: [
+          {
+            label: 'NOM · Désigne une personne, un animal, un objet',
+            accent: 'blue',
+            rows: ['Girl', 'John', 'Dog', 'Table'],
+          },
+          {
+            label: 'PRONOM · Remplace un nom dans une phrase',
+            accent: 'teal',
+            rows: ['I', 'You', 'He, She, It', 'We', 'You', 'They'],
+          },
+        ],
+      },
+      {
+        eyebrow: 'Article, verbe, adjectif et adverbe',
+        tip: 'Exemple : "She quickly reads the big book." → Pronom, adverbe, verbe, article, adjectif, nom.',
+        columns: [
+          {
+            label: 'ARTICLE · Se place devant un nom pour le préciser',
+            accent: 'amber',
+            rows: ['A', 'The', 'My', 'This'],
+          },
+          {
+            label: 'VERBE · Décrit une action',
+            accent: 'coral',
+            rows: ['Eat', 'Drink', 'Speak'],
+          },
+          {
+            label: "ADJECTIF · Décrit quelqu'un ou quelque chose",
+            accent: 'teal',
+            rows: ['Nice', 'Blue', 'Incredible'],
+          },
+          {
+            label: "ADVERBE · Modifie le sens d'un verbe, d'un adjectif",
+            accent: 'blue',
+            rows: ['Slowly', 'Very', 'Loudly'],
+          },
+        ],
+      },
+    ],
+  },
 
   exercises: [
     { question: 'Dog est un _____ :', answer: 'nom', options: ['nom', 'verbe', 'adjectif'] },

@@ -2,6 +2,31 @@ const Conditional1Grammar = {
   id: '12',
   title: 'Conditionnel 1',
   description: 'Learn how to use the first conditional',  imageUrl: 'https://i.ibb.co/bRFdNdnS/Conditionnel-1.png',
+  textContent: {
+    cards: [
+      {
+        eyebrow: 'La formule',
+        paragraph: 'Pour parler de ce qui pourra arriver si une condition est remplie.',
+        tip: 'Formule : IF + présent, sujet + will + base verbale. La phrase est construite en deux temps.',
+        columns: [
+          {
+            label: '1/ La subordonnée : si une condition est remplie...',
+            accent: 'blue',
+            rows: ['If **you go** with me,', 'If **Juliet’s family sees** Romeo,'],
+          },
+          {
+            label: '2/ La principale : ... il y aura telle conséquence',
+            accent: 'coral',
+            rows: ['I **will be** very happy.', 'They **will kill** him.'],
+          },
+        ],
+        examples: [
+          { en: '**If you go** with me, **I will be** very happy.', fr: 'Si tu viens avec moi, je serai très heureux.' },
+          { en: '**If Juliet’s family sees** Romeo, **they will kill** him.', fr: 'Si la famille de Juliette voit Roméo, ils le tueront.' },
+        ],
+      },
+    ],
+  },
   translateExercises: [
 
   {

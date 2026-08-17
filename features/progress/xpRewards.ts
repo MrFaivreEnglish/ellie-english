@@ -1,18 +1,24 @@
 export const XP_REWARDS = {
-  grammarCorrect: 5,
-  grammarGameModeBonus: 2,
+  // Grammar: once-ever per question (permanent dedup), so each answer is worth more
+  grammarCorrect: 7,
+  grammarGameModeBonus: 3,         // 3 lives, pressure — deserves a bigger bonus
+
+  // Typing: daily per word — base rates stay, combos already reward skill
   vocabularyTypingCorrect: 5,
   vocabularyTypingFirstTryBonus: 3,
   vocabularyTypingStrictModeBonus: 2,
   vocabularyTypingReviewBonus: 2,
-  vocabularyMatchingPair: 1,
-  vocabularyMatchingCleanPair: 2,
-  vocabularyMatchingRetryPair: 1,
-  vocabularyMatchingTimerCleanPair: 3,
-  vocabularyMatchingTimerRetryPair: 1,
-  vocabularyMatchingTimerBestBonus: 5,
-  flashcardLearned: 0,
-  pronunciationPractice: 0,
+
+  // Matching: boosted to close the 4× gap with typing (daily per word+category)
+  vocabularyMatchingPair: 1,          // unused placeholder
+  vocabularyMatchingCleanPair: 4,     // was 2 — clean pair takes real memory effort
+  vocabularyMatchingRetryPair: 2,     // was 1 — still rewarded for eventual success
+  vocabularyMatchingTimerCleanPair: 6, // was 3 — timer adds meaningful pressure
+  vocabularyMatchingTimerRetryPair: 2, // was 1
+  vocabularyMatchingTimerBestBonus: 12, // was 5 — beating a PB should feel significant
+
+  flashcardLearned: 0,        // not yet wired up
+  pronunciationPractice: 0,   // not yet wired up
 } as const;
 
 export type TypingComboReward = {

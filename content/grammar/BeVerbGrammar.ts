@@ -3,6 +3,50 @@ const BeVerbGrammar = {
   title: 'Le verbe BE',
   description: 'Present and past forms of the verb to be: am/is/are, was/were',
   imageUrl: 'https://i.ibb.co/QBtZC55/Be.png',
+  textContent: {
+    cards: [
+      {
+        eyebrow: 'Forme positive',
+        paragraph: 'Je parle de mon nom, mon âge, ma personnalité, d’où je viens...',
+        columns: [
+          {
+            label: 'Forme complète',
+            accent: 'blue',
+            rows: ['I **am**', 'You **are**', 'He / She / It **is**', 'We **are**', 'They **are**'],
+          },
+          {
+            label: 'Forme contractée (à l’oral)',
+            accent: 'teal',
+            rows: ["I**’m**", "You**’re**", "He / She / It**’s**", "We**’re**", "They**’re**"],
+          },
+        ],
+        examples: [
+          { en: '**I am** Emma. **She is** Chloe.', fr: 'Je suis Emma. C’est Chloé.' },
+          { en: '**You are** 12 years old. **I am** 8.', fr: 'Tu as 12 ans. J’ai 8 ans.' },
+        ],
+      },
+      {
+        eyebrow: 'Forme négative',
+        tip: 'À l’oral, on peut contracter : is not → isn’t, are not → aren’t.',
+        columns: [
+          {
+            label: 'Forme complète',
+            accent: 'coral',
+            rows: ['I **am not**', 'You **are not**', 'He / She / It **is not**', 'We **are not**', 'They **are not**'],
+          },
+          {
+            label: 'Forme contractée',
+            accent: 'amber',
+            rows: ["I**’m not**", 'You **aren’t**', 'He / She / It **isn’t**', 'We **aren’t**', 'They **aren’t**'],
+          },
+        ],
+        examples: [
+          { en: '**I am not** Emma. I’m Chloe.', fr: 'Je ne suis pas Emma. Je suis Chloé.' },
+          { en: '**You are not** very nice.', fr: 'Tu n’es pas très gentil.' },
+        ],
+      },
+    ],
+  },
 translateExercises: [
   {
     type: 'translate',

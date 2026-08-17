@@ -146,3 +146,52 @@ export const normalizeAnswer = (value: string) =>
     .replace(/\s+'s\b/g, "'s")
     .replace(/\s+([.,!?;:])/g, '$1')
     .replace(/[.!?]+$/g, '');
+
+// Which word-bank chips (each possibly spanning multiple words, e.g. "to the
+// left") are actually needed to reconstruct the answer sentence, ignoring
+// distractor chips. Greedily matches the longest available chip at each
+// position in the answer so a multi-word chip isn't miscounted as several
+// single-word slots. Returns both the count and the matched chip text (the
+// text is used to reserve accurate layout space before anything is selected).
+export const matchAnswerChips = (answer: string, bankWords: string[]): { count: number; matchedWords: string[] } => {
+  const answerWords = answer.trim().split(/\s+/).filter(Boolean);
+  if (answerWords.length === 0) return { count: 0, matchedWords: [] };
+
+  const candidates = bankWords.map((word, index) => ({
+    index,
+    word,
+    tokens: word.trim().split(/\s+/).filter(Boolean).map(normalizeAnswer),
+  }));
+  const usedIndexes = new Set<number>();
+  const matchedWords: string[] = [];
+
+  let position = 0;
+
+  while (position < answerWords.length) {
+    let bestMatch: { index: number; word: string; length: number } | null = null;
+
+    for (const candidate of candidates) {
+      if (usedIndexes.has(candidate.index)) continue;
+      const len = candidate.tokens.length;
+      if (len === 0 || position + len > answerWords.length) continue;
+      if (bestMatch && len <= bestMatch.length) continue;
+
+      const slice = answerWords.slice(position, position + len).map(normalizeAnswer);
+      const matches = slice.every((token, i) => token === candidate.tokens[i]);
+      if (matches) {
+        bestMatch = { index: candidate.index, word: candidate.word, length: len };
+      }
+    }
+
+    if (bestMatch) {
+      usedIndexes.add(bestMatch.index);
+      matchedWords.push(bestMatch.word);
+      position += bestMatch.length;
+    } else {
+      matchedWords.push(answerWords[position]);
+      position += 1;
+    }
+  }
+
+  return { count: matchedWords.length, matchedWords };
+};

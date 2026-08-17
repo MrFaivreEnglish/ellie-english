@@ -2,6 +2,33 @@ const WouldLikeGrammar = {
   id: '11',
   title: 'Would Like',
   description: 'Learn how to use would like - Evaluate if these sentences are grammatically correct',  imageUrl: 'https://i.ibb.co/ZzXpFqXm/Would-like.png',
+  textContent: {
+    cards: [
+      {
+        eyebrow: "Dire ce qu'on voudrait (ou non)",
+        tip: "Formule : sujet + would like (ou wouldn't like) + groupe nominal.",
+        columns: [
+          {
+            label: "Sujet + WOULD LIKE / WOULDN'T LIKE + groupe nominal",
+            accent: 'blue',
+            rows: ['I', 'You', 'He / She / It', 'We', 'They'],
+          },
+        ],
+        examples: [
+          { en: '**I would like an apple**, please.', fr: 'Je voudrais une pomme.' },
+          { en: "**We wouldn't like a black cat**.", fr: "Nous n'aimerions pas un chat noir." },
+        ],
+      },
+      {
+        eyebrow: "Dire ce qu'on voudrait faire (ou non)",
+        paragraph: "Formule : sujet + would like to (ou wouldn't like to) + base verbale.",
+        examples: [
+          { en: '**He would like to eat** a scone.', fr: 'Il aimerait manger un scone.' },
+          { en: "**They wouldn't like to be** vets.", fr: "Ils n'aimeraient pas être vétérinaires." },
+        ],
+      },
+    ],
+  },
 translateExercises: [
   {
     type: 'translate',

@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { createAudioPlayer } from 'expo-audio';
 import type { AudioPlayer } from 'expo-audio';
 import { Word, GameCard, MatchingGamePairs, GameState } from '../../types/VocabularyTypes';
-import { getMatchingSetCount, getMatchingSetWords, shuffleArray } from './vocabularyUtils';
+import { PAIRS_PER_SET, getMatchingSetCount, getMatchingSetWords, shuffleArray } from './vocabularyUtils';
 import { getVocabularyTimerBests, saveVocabularyTimerBest } from './vocabularyTimerStorage';
 import { SOUND_EFFECT_OPTIONS, SUCCESS_SOUND, replaySoundEffect } from '../shared/soundEffects';
 import { awardActivityXPOnceToday } from '../progress/xpStorage';
@@ -36,12 +36,58 @@ const getMatchingPairXP = (isTimerMode: boolean, hadMistake: boolean) => {
     : XP_REWARDS.vocabularyMatchingCleanPair;
 };
 
+const REFILL_MATCH_DELAY_MS = 150;
+const WRONG_MATCH_FEEDBACK_MS = 650;
+const NEXT_SET_DELAY_MS = 420;
+
+const buildMatchingCards = (word: Word, pairId: number) => ({
+  english: {
+    id: `english-${pairId}`,
+    text: word.english,
+    type: 'english' as const,
+    pairId,
+  },
+  french: {
+    id: `french-${pairId}`,
+    text: word.french,
+    type: 'french' as const,
+    pairId,
+  },
+});
+
+const buildMatchingPairs = (
+  words: Word[],
+  getPairId: (index: number) => number
+): MatchingGamePairs => {
+  const englishCards: GameCard[] = [];
+  const frenchCards: GameCard[] = [];
+
+  words.forEach((word, index) => {
+    const cards = buildMatchingCards(word, getPairId(index));
+    englishCards.push(cards.english);
+    frenchCards.push(cards.french);
+  });
+
+  return {
+    english: shuffleArray(englishCards),
+    french: shuffleArray(frenchCards),
+  };
+};
+
+const insertCardAt = (cards: GameCard[], card: GameCard, index: number) => {
+  const nextCards = [...cards];
+  const insertionIndex = index >= 0 ? Math.min(index, nextCards.length) : nextCards.length;
+  nextCards.splice(insertionIndex, 0, card);
+  return nextCards;
+};
+
 export const useVocabularyGame = (
   words: Word[],
   timerMode: boolean,
   isActive: boolean,
   categoryKey: string = 'default',
-  saveTimerRecords: boolean = false
+  saveTimerRecords: boolean = false,
+  refillOnMatch: boolean = false
 ) => {
   const setCompletePlayerRef = useRef<AudioPlayer | null>(null);
 
@@ -73,8 +119,13 @@ export const useVocabularyGame = (
     english: [],
     french: [],
   });
+  const matchingGamePairsRef = useRef<MatchingGamePairs>({
+    english: [],
+    french: [],
+  });
 
   const [sessionWords, setSessionWords] = useState<Word[]>([]);
+  const sessionWordsRef = useRef<Word[]>([]);
   const [matchingReviewWords, setMatchingReviewWords] = useState<Word[]>([]);
   const [matchingSessionXp, setMatchingSessionXp] = useState(0);
   const [lastMatchingXpGain, setLastMatchingXpGain] = useState(0);
@@ -90,6 +141,8 @@ export const useVocabularyGame = (
   const recordedMatchingActivityKeysRef = useRef<Set<string>>(new Set());
   const mistakenMatchingActivityKeysRef = useRef<Set<string>>(new Set());
   const matchingXpTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const refillTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const nextRefillWordIndexRef = useRef(0);
 
   // ---------------- TIMER ----------------
   const startTimer = useCallback(() => {
@@ -183,6 +236,10 @@ export const useVocabularyGame = (
   }, [gameState]);
 
   useEffect(() => {
+    matchingGamePairsRef.current = matchingGamePairs;
+  }, [matchingGamePairs]);
+
+  useEffect(() => {
     let active = true;
 
     if (!saveTimerRecords) return;
@@ -208,6 +265,11 @@ export const useVocabularyGame = (
   const resetGameState = useCallback((options?: { preserveTimer?: boolean }) => {
     completionLockedRef.current = false;
     setAdvanceLockedRef.current = false;
+    if (refillTimeoutRef.current) {
+      clearTimeout(refillTimeoutRef.current);
+      refillTimeoutRef.current = null;
+    }
+    nextRefillWordIndexRef.current = 0;
     recordedMatchingActivityKeysRef.current = new Set();
     mistakenMatchingActivityKeysRef.current = new Set();
     if (matchingXpTimeoutRef.current) {
@@ -252,38 +314,32 @@ export const useVocabularyGame = (
 
     const shuffled = shuffleArray(words);
     setSessionWords(shuffled);
+    sessionWordsRef.current = shuffled;
 
-    const currentWords = getMatchingSetWords(shuffled, 0);
+    const currentWords = refillOnMatch
+      ? shuffled.slice(0, Math.min(PAIRS_PER_SET, shuffled.length))
+      : getMatchingSetWords(shuffled, 0);
+    nextRefillWordIndexRef.current = currentWords.length;
 
-    const englishCards = currentWords.map((word, index) => ({
-      id: `english-${index}`,
-      text: word.english,
-      type: 'english' as const,
-      pairId: index,
-    }));
-
-    const frenchCards = currentWords.map((word, index) => ({
-      id: `french-${index}`,
-      text: word.french,
-      type: 'french' as const,
-      pairId: index,
-    }));
-
-    setMatchingGamePairs({
-      english: shuffleArray(englishCards),
-      french: shuffleArray(frenchCards),
-    });
-  }, [words, resetGameState]);
+    setMatchingGamePairs(buildMatchingPairs(currentWords, (index) => index));
+  }, [refillOnMatch, resetGameState, stopTimer, words]);
 
   // ---------------- SET COMPLETE ----------------
   const isSetComplete = useMemo(() => {
+    if (refillOnMatch) return false;
+
     const size = matchingGamePairs?.english?.length || 0;
     return size > 0 && gameState.matchedPairs.length === size * 2;
-  }, [matchingGamePairs, gameState.matchedPairs.length]);
+  }, [refillOnMatch, matchingGamePairs, gameState.matchedPairs.length]);
 
   // ---------------- ALL COMPLETE ----------------
   const isGameComplete = useMemo(() => {
     const setReady = (matchingGamePairs?.english?.length || 0) > 0;
+
+    if (refillOnMatch) {
+      return setReady && words.length > 0 && gameState.totalScore >= words.length;
+    }
+
     const totalSets = getMatchingSetCount(words.length);
     const isLastSet = gameState.currentSet >= totalSets - 1;
 
@@ -292,8 +348,10 @@ export const useVocabularyGame = (
     matchingGamePairs,
     gameState.currentSet,
     gameState.matchedPairs.length,
+    gameState.totalScore,
     words.length,
-    isSetComplete
+    isSetComplete,
+    refillOnMatch
   ]);
 
   // ---------------- BEST TIME (FIXED CORE) ----------------
@@ -456,12 +514,12 @@ export const useVocabularyGame = (
       if (isMatch) {
         return {
           ...prev,
-          matchedPairs: [...prev.matchedPairs, first.id, card.id],
+          matchedPairs: refillOnMatch ? [first.id, card.id] : [...prev.matchedPairs, first.id, card.id],
           totalScore: prev.totalScore + 1,
           consecutiveCorrect: prev.consecutiveCorrect + 1,
           selectedCard: null,
           incorrectPair: null,
-          isInputLocked: false,
+          isInputLocked: refillOnMatch,
         };
       }
 
@@ -474,7 +532,74 @@ export const useVocabularyGame = (
       };
     });
 
-  }, [addMatchingReviewWord, markMatchingPairMistake]);
+  }, [addMatchingReviewWord, markMatchingPairMistake, refillOnMatch]);
+
+  const refillMatchedPair = useCallback((matchedCardIds: string[]) => {
+    if (!matchedCardIds.length) return;
+
+    const matchedIds = new Set(matchedCardIds);
+    const currentPairs = matchingGamePairsRef.current;
+    const englishIndex = currentPairs.english.findIndex((card) => matchedIds.has(card.id));
+    const frenchIndex = currentPairs.french.findIndex((card) => matchedIds.has(card.id));
+    const baseWords = sessionWordsRef.current.length ? sessionWordsRef.current : words;
+    const nextWordIndex = nextRefillWordIndexRef.current;
+    const nextWord = baseWords[nextWordIndex];
+    const nextCards = nextWord ? buildMatchingCards(nextWord, nextWordIndex) : null;
+
+    const remainingEnglish = currentPairs.english.filter((card) => !matchedIds.has(card.id));
+    const remainingFrench = currentPairs.french.filter((card) => !matchedIds.has(card.id));
+
+    if (nextCards) {
+      nextRefillWordIndexRef.current = nextWordIndex + 1;
+    }
+
+    setMatchingGamePairs({
+      english: nextCards ? insertCardAt(remainingEnglish, nextCards.english, englishIndex) : remainingEnglish,
+      french: nextCards ? insertCardAt(remainingFrench, nextCards.french, frenchIndex) : remainingFrench,
+    });
+
+    setGameState(prev => ({
+      ...prev,
+      currentSet: Math.min(
+        Math.max(0, getMatchingSetCount(words.length) - 1),
+        Math.floor(prev.totalScore / PAIRS_PER_SET)
+      ),
+      matchedPairs: [],
+      selectedCard: null,
+      incorrectPair: null,
+      hasAdvancedSet: false,
+      isInputLocked: false,
+    }));
+  }, [words]);
+
+  useEffect(() => {
+    if (!refillOnMatch || !gameState.isInputLocked || gameState.incorrectPair || gameState.matchedPairs.length < 2) {
+      return undefined;
+    }
+
+    const matchedCardIds = [...gameState.matchedPairs];
+    const timeoutId = setTimeout(() => {
+      refillMatchedPair(matchedCardIds);
+      if (refillTimeoutRef.current === timeoutId) {
+        refillTimeoutRef.current = null;
+      }
+    }, REFILL_MATCH_DELAY_MS);
+
+    refillTimeoutRef.current = timeoutId;
+
+    return () => {
+      clearTimeout(timeoutId);
+      if (refillTimeoutRef.current === timeoutId) {
+        refillTimeoutRef.current = null;
+      }
+    };
+  }, [
+    refillMatchedPair,
+    refillOnMatch,
+    gameState.incorrectPair,
+    gameState.isInputLocked,
+    gameState.matchedPairs,
+  ]);
 
   // Clear wrong-answer feedback and unlock input after a short pause.
   useEffect(() => {
@@ -486,7 +611,7 @@ export const useVocabularyGame = (
         incorrectPair: null,
         isInputLocked: false,
       }));
-    }, 1000);
+    }, WRONG_MATCH_FEEDBACK_MS);
 
     return () => clearTimeout(timeoutId);
   }, [gameState.isInputLocked, gameState.incorrectPair]);
@@ -499,25 +624,7 @@ export const useVocabularyGame = (
       const base = sessionWords.length ? sessionWords : words;
 
       const nextWords = getMatchingSetWords(base, nextSet);
-
-      const englishCards = nextWords.map((word, index) => ({
-        id: `english-${index}`,
-        text: word.english,
-        type: 'english' as const,
-        pairId: index,
-      }));
-
-      const frenchCards = nextWords.map((word, index) => ({
-        id: `french-${index}`,
-        text: word.french,
-        type: 'french' as const,
-        pairId: index,
-      }));
-
-      setMatchingGamePairs({
-        english: shuffleArray(englishCards),
-        french: shuffleArray(frenchCards),
-      });
+      setMatchingGamePairs(buildMatchingPairs(nextWords, (index) => index));
 
       return {
         ...prev,
@@ -539,7 +646,7 @@ export const useVocabularyGame = (
     const timeoutId = setTimeout(() => {
       advanceToNextSet();
       setAdvanceLockedRef.current = false;
-    }, 650);
+    }, NEXT_SET_DELAY_MS);
 
     return () => {
       clearTimeout(timeoutId);

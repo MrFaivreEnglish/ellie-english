@@ -1,6 +1,7 @@
-import { useCallback, useEffect, useRef, useState, type Dispatch, type SetStateAction } from 'react';
-import { Animated, Platform, PanResponder, type LayoutChangeEvent, type PanResponderGestureState } from 'react-native';
+import { useCallback, useRef, useState, type Dispatch, type SetStateAction } from 'react';
+import type { LayoutChangeEvent } from 'react-native';
 import { triggerSelectionHaptic } from '../../shared/haptics';
+import type { DragGestureState } from './DraggableWordChip';
 
 type ChipLayout = {
   x: number;
@@ -9,31 +10,18 @@ type ChipLayout = {
   height: number;
 };
 
-const DRAG_THRESHOLD = 5;
-
-const isMeaningfulDrag = (gestureState: PanResponderGestureState) =>
-  Math.abs(gestureState.dx) > DRAG_THRESHOLD || Math.abs(gestureState.dy) > DRAG_THRESHOLD;
-
 export const useSelectedWordDrag = <T,>(
   itemCount: number,
-  setItems: Dispatch<SetStateAction<T[]>>,
-  disabled: boolean
+  setItems: Dispatch<SetStateAction<T[]>>
 ) => {
   const itemCountRef = useRef(itemCount);
   itemCountRef.current = itemCount;
 
   const chipLayoutsRef = useRef<Record<number, ChipLayout>>({});
-  const hasDraggedRef = useRef(false);
   const dragJustEndedRef = useRef(false);
-  const dragOffset = useRef(new Animated.ValueXY()).current;
-  const draggingScale = useRef(new Animated.Value(1)).current;
 
   const [draggingPosition, setDraggingPosition] = useState<number | null>(null);
   const [dropTargetPosition, setDropTargetPosition] = useState<number | null>(null);
-
-  // Cache PanResponder instances so they are not recreated on every render.
-  // Indexed by position; cleared when key dependencies change.
-  const panHandlerCacheRef = useRef<Record<number, ReturnType<typeof PanResponder.create>['panHandlers']>>({});
 
   const handleChipLayout = useCallback((position: number, event: LayoutChangeEvent) => {
     chipLayoutsRef.current[position] = event.nativeEvent.layout;
@@ -58,7 +46,7 @@ export const useSelectedWordDrag = <T,>(
     });
   }, [setItems]);
 
-  const getDropTargetPosition = useCallback((fromPosition: number, gestureState: PanResponderGestureState) => {
+  const getDropTargetPosition = useCallback((fromPosition: number, gestureState: DragGestureState) => {
     const currentLayout = chipLayoutsRef.current[fromPosition];
     const positions = Object.keys(chipLayoutsRef.current)
       .map(Number)
@@ -89,21 +77,17 @@ export const useSelectedWordDrag = <T,>(
     }, fromPosition);
   }, []);
 
-  const resetDrag = useCallback(() => {
-    dragOffset.setValue({ x: 0, y: 0 });
-    Animated.spring(draggingScale, {
-      toValue: 1,
-      useNativeDriver: false,
-      speed: 50,
-      bounciness: 0,
-    }).start();
-    setDraggingPosition(null);
-    setDropTargetPosition(null);
-  }, [dragOffset, draggingScale]);
+  const handleDragStart = useCallback((position: number) => {
+    setDraggingPosition(position);
+  }, []);
 
-  const finishDrag = useCallback((fromPosition: number, gestureState: PanResponderGestureState) => {
-    const didDrag = hasDraggedRef.current;
-    const targetPosition = didDrag ? getDropTargetPosition(fromPosition, gestureState) : fromPosition;
+  const handleDragMove = useCallback((position: number, gestureState: DragGestureState) => {
+    const target = getDropTargetPosition(position, gestureState);
+    setDropTargetPosition(target !== position ? target : null);
+  }, [getDropTargetPosition]);
+
+  const handleDragEnd = useCallback((position: number, didDrag: boolean, gestureState: DragGestureState) => {
+    const targetPosition = didDrag ? getDropTargetPosition(position, gestureState) : position;
 
     if (didDrag) {
       dragJustEndedRef.current = true;
@@ -112,85 +96,24 @@ export const useSelectedWordDrag = <T,>(
       }, 120);
     }
 
-    resetDrag();
+    setDraggingPosition(null);
+    setDropTargetPosition(null);
 
-    if (didDrag && targetPosition !== fromPosition) {
+    if (didDrag && targetPosition !== position) {
       triggerSelectionHaptic();
-      if (Platform.OS === 'ios') {
-        // Animate the reorder on iOS where LayoutAnimation is reliable
-        const { LayoutAnimation } = require('react-native');
-        LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
-      }
-      moveItem(fromPosition, targetPosition);
+      moveItem(position, targetPosition);
     }
-  }, [getDropTargetPosition, moveItem, resetDrag]);
-
-  // Invalidate PanHandler cache whenever key callbacks change
-  useEffect(() => {
-    panHandlerCacheRef.current = {};
-  }, [disabled, finishDrag, resetDrag]);
-
-  const getPanHandlers = useCallback((position: number) => {
-    if (!panHandlerCacheRef.current[position]) {
-      panHandlerCacheRef.current[position] = PanResponder.create({
-        onMoveShouldSetPanResponder: (_, gestureState) => !disabled && isMeaningfulDrag(gestureState),
-        onPanResponderGrant: () => {
-          if (disabled) return;
-          hasDraggedRef.current = false;
-          dragOffset.setValue({ x: 0, y: 0 });
-          setDraggingPosition(position);
-          triggerSelectionHaptic();
-          Animated.spring(draggingScale, {
-            toValue: 1.15,
-            useNativeDriver: false,
-            speed: 50,
-            bounciness: 4,
-          }).start();
-        },
-        onPanResponderMove: (_, gestureState) => {
-          if (disabled) return;
-          if (isMeaningfulDrag(gestureState)) {
-            hasDraggedRef.current = true;
-            const target = getDropTargetPosition(position, gestureState);
-            setDropTargetPosition(target !== position ? target : null);
-          }
-          dragOffset.setValue({ x: gestureState.dx, y: gestureState.dy });
-        },
-        onPanResponderRelease: (_, gestureState) => {
-          finishDrag(position, gestureState);
-        },
-        onPanResponderTerminate: resetDrag,
-        onPanResponderTerminationRequest: () => false,
-      }).panHandlers;
-    }
-    return panHandlerCacheRef.current[position];
-  }, [disabled, dragOffset, draggingScale, finishDrag, getDropTargetPosition, resetDrag]);
-
-  const getDragStyle = useCallback((position: number) => {
-    if (draggingPosition !== position) return null;
-
-    return {
-      elevation: 14,
-      zIndex: 20,
-      shadowColor: '#000',
-      shadowOffset: { width: 0, height: 6 },
-      shadowOpacity: 0.28,
-      shadowRadius: 10,
-      transform: [
-        ...dragOffset.getTranslateTransform(),
-        { scale: draggingScale },
-      ],
-    };
-  }, [dragOffset, draggingPosition, draggingScale]);
+  }, [getDropTargetPosition, moveItem]);
 
   const shouldIgnorePress = useCallback(() => dragJustEndedRef.current, []);
 
   return {
-    getDragStyle,
-    getPanHandlers,
-    handleChipLayout,
-    shouldIgnorePress,
     draggingPosition,
     dropTargetPosition,
+    handleChipLayout,
+    handleDragStart,
+    handleDragMove,
+    handleDragEnd,
+    shouldIgnorePress,
   };
 };

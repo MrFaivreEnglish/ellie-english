@@ -3,7 +3,7 @@ import { Platform, Pressable, StyleSheet, Text, TextInput, TouchableOpacity, Vie
 import { MaterialIcons } from '@expo/vector-icons';
 import { CARD_HEIGHT, Exercise, normalizeAnswer } from './GrammarExerciseUtils';
 import { clampNumber, getWebLessonScale, scaleValue } from '../../shared/responsiveLayout';
-import { getGrammarGameColors, getPrimaryButtonStyle } from '../../shared/uiPrimitives';
+import { getGrammarGameColors } from '../../shared/uiPrimitives';
 import { triggerSelectionHaptic } from '../../shared/haptics';
 import { usePersistentExerciseKeyboard } from '../../shared/usePersistentExerciseKeyboard';
 import type { ThemeColors } from '../../settings/ThemeContext';
@@ -43,7 +43,6 @@ const GrammarFillExercise: React.FC<GrammarFillExerciseProps> = ({
 }) => {
   const { width, height } = useWindowDimensions();
   const responsiveHeight = layoutHeight ?? height;
-  const isCompact = responsiveHeight < 760 || width < 390;
   const isDesktopWeb = Platform.OS === 'web' && width >= 768;
   const isAndroid = Platform.OS === 'android';
   const webScale = getWebLessonScale(width, responsiveHeight);
@@ -54,17 +53,27 @@ const GrammarFillExercise: React.FC<GrammarFillExerciseProps> = ({
   const inputRef = useRef<TextInput | null>(null);
   const [fillAnswer, setFillAnswer] = useState('');
   const [isInputFocused, setIsInputFocused] = useState(false);
-  const desktopFillCardHeight = Math.min(scaleValue(300, webScale), Math.max(scaleValue(260, webScale), Math.round(responsiveHeight * 0.34)));
+  // Sized to just fit the input + Check button plus a little breathing room —
+  // not a generous fraction of screen height — since fillCard hugs its
+  // content from the top now instead of centering it in a tall box (that
+  // combo was what left a huge void above and below the input on desktop).
+  const desktopFillCardHeight = Math.round(clampNumber(responsiveHeight * 0.22, 190, 260));
   const androidFillCardHeight = keyboardMode
-    ? Math.round(clampNumber(responsiveHeight * 0.29, isCompact ? 208 : 224, isCompact ? 242 : 264))
-    : Math.round(clampNumber(responsiveHeight * (isCompact ? 0.31 : 0.34), isCompact ? 226 : 268, isCompact ? 286 : 336));
-  const fillCardHeight = isDesktopWeb ? desktopFillCardHeight : isAndroid ? androidFillCardHeight : keyboardMode ? 158 : isCompact ? 180 : 224;
-  const fillCardPadding = isDesktopWeb ? scaleValue(16, webScale) : isAndroid ? (keyboardMode ? 13 : 16) : keyboardMode ? 9 : isCompact ? 12 : 15;
-  const inputShellMinHeight = isDesktopWeb ? scaleValue(108, webScale) : isAndroid ? (keyboardMode ? 78 : isCompact ? 84 : 104) : keyboardMode ? 54 : isCompact ? 60 : 78;
-  const inputShellVerticalPadding = isDesktopWeb ? scaleValue(12, webScale) : isAndroid ? (keyboardMode ? 8 : 12) : keyboardMode ? 5 : isCompact ? 7 : 11;
-  const inputShellMarginBottom = isDesktopWeb ? scaleValue(14, webScale) : isAndroid ? (keyboardMode ? 11 : 15) : keyboardMode ? 7 : isCompact ? 9 : 13;
-  const fillInputMinHeight = isDesktopWeb ? scaleValue(64, webScale) : isAndroid ? (keyboardMode ? 46 : isCompact ? 52 : 60) : keyboardMode ? 36 : isCompact ? 40 : 48;
-  const fillInputFontSize = isDesktopWeb ? scaleValue(24, webScale) : isAndroid ? (keyboardMode ? 19 : isCompact ? 20 : 22) : keyboardMode ? 16 : isCompact ? 17 : 19;
+    ? Math.round(clampNumber(responsiveHeight * 0.29, 224, 264))
+    : Math.round(clampNumber(responsiveHeight * 0.22, 200, 250));
+  const fillCardHeight = isDesktopWeb
+    ? desktopFillCardHeight
+    : isAndroid
+      ? androidFillCardHeight
+      : keyboardMode
+        ? 158
+        : Math.round(clampNumber(responsiveHeight * 0.22, 180, 230));
+  const fillCardPadding = isDesktopWeb ? scaleValue(30, webScale) : isAndroid ? (keyboardMode ? 13 : 16) : keyboardMode ? 9 : 18;
+  const inputShellMinHeight = isDesktopWeb ? scaleValue(52, webScale) : isAndroid ? (keyboardMode ? 78 : 104) : keyboardMode ? 54 : 86;
+  const inputShellVerticalPadding = isDesktopWeb ? 0 : isAndroid ? (keyboardMode ? 8 : 12) : keyboardMode ? 5 : 13;
+  const inputShellMarginBottom = isDesktopWeb ? scaleValue(28, webScale) : isAndroid ? (keyboardMode ? 11 : 15) : keyboardMode ? 7 : 15;
+  const fillInputMinHeight = isDesktopWeb ? scaleValue(46, webScale) : isAndroid ? (keyboardMode ? 46 : 60) : keyboardMode ? 36 : 56;
+  const fillInputFontSize = isDesktopWeb ? scaleValue(22, webScale) : isAndroid ? (keyboardMode ? 21 : 27) : keyboardMode ? 18 : 24;
   const grammarGame = getGrammarGameColors(colors, isDarkMode);
   const {
     shouldKeepKeyboardOpen: shouldAllowKeyboardFocus,
@@ -134,15 +143,14 @@ const GrammarFillExercise: React.FC<GrammarFillExerciseProps> = ({
         }}
         style={[
           styles.fillCard,
-          { height: fillCardHeight, padding: fillCardPadding },
           {
-            backgroundColor: grammarGame.panelSurface,
-            borderColor: grammarGame.panelBorder,
-            borderBottomColor: grammarGame.panelBottom,
-            shadowColor: grammarGame.panelShadow,
-            shadowOpacity: isDarkMode ? 0.22 : 0.08,
-            shadowRadius: isDarkMode ? 9 : 6,
-            elevation: isDarkMode ? 4 : 2,
+            height: fillCardHeight,
+            padding: fillCardPadding,
+            backgroundColor: 'transparent',
+            borderWidth: 0,
+            borderRadius: 0,
+            shadowOpacity: 0,
+            elevation: 0,
           },
         ]}
       >
@@ -178,8 +186,6 @@ const GrammarFillExercise: React.FC<GrammarFillExerciseProps> = ({
             ref={inputRef}
             value={fillAnswer}
             onChangeText={handleFillAnswerChange}
-            placeholder="Type your answer..."
-            placeholderTextColor={grammarGame.metaText}
             autoCapitalize="none"
             autoCorrect={false}
             blurOnSubmit={false}
@@ -199,6 +205,20 @@ const GrammarFillExercise: React.FC<GrammarFillExerciseProps> = ({
               { outlineStyle: 'none' } as any,
             ]}
           />
+          {!fillAnswer && (
+            <View style={styles.fillPlaceholderOverlay} pointerEvents="none">
+              <Text
+                style={[
+                  styles.fillPlaceholderText,
+                  useTightKeyboardStyles && styles.fillInputTight,
+                  isDesktopWeb && styles.fillInputDesktopWeb,
+                  { fontSize: fillInputFontSize, color: grammarGame.metaText },
+                ]}
+              >
+                Type your answer...
+              </Text>
+            </View>
+          )}
           {canClear && (
             <TouchableOpacity
               onPress={handleClear}
@@ -216,11 +236,14 @@ const GrammarFillExercise: React.FC<GrammarFillExerciseProps> = ({
             styles.checkAnswerButton,
             useTightKeyboardStyles && styles.checkAnswerButtonTight,
             isDesktopWeb && styles.checkAnswerButtonDesktopWeb,
-            getPrimaryButtonStyle(colors, isDarkMode),
+            { backgroundColor: grammarGame.checkButtonBg, borderColor: grammarGame.checkButtonBg, borderBottomColor: grammarGame.checkButtonBg, borderRadius: 999 },
             disabled && styles.disabledCheckAnswerButton,
           ]}
         >
-          <Text style={[styles.checkAnswerButtonText, { color: colors.buttonText }, isDesktopWeb && { fontSize: scaleValue(16, webScale) }]}>Check</Text>
+          <View style={styles.checkAnswerButtonInner}>
+            <MaterialIcons name="check" size={isDesktopWeb ? scaleValue(17, webScale) : 22} color="#fff" />
+            <Text style={[styles.checkAnswerButtonText, { color: '#fff' }, isDesktopWeb && { fontSize: scaleValue(15, webScale) }]}>Check</Text>
+          </View>
         </TouchableOpacity>
         {incorrectAnswer === 'fill' && (
           <Text style={[styles.fillErrorText, { color: grammarGame.incorrectText }]}>Try again.</Text>
@@ -239,26 +262,23 @@ const styles = StyleSheet.create({
   fillCard: {
     height: CARD_HEIGHT,
     padding: 20,
-    borderRadius: 8,
+    borderRadius: 20,
     backgroundColor: '#fff',
-    borderWidth: 1.5,
-    borderBottomWidth: 3,
-    borderColor: '#E5E5E5',
-    borderBottomColor: '#D1D5DB',
-    justifyContent: 'center',
+    borderWidth: 0,
+    justifyContent: 'flex-start',
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.04,
-    shadowRadius: 4,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.05,
+    shadowRadius: 12,
     elevation: 2,
   },
   inputShell: {
     minHeight: 104,
-    borderRadius: 8,
+    borderRadius: 12,
     borderWidth: 1.5,
-    borderBottomWidth: 3,
+    borderBottomWidth: 1.5,
     borderColor: '#D6E2EE',
-    borderBottomColor: '#B9C8D6',
+    borderBottomColor: '#D6E2EE',
     backgroundColor: '#F8FBFF',
     paddingHorizontal: 22,
     paddingVertical: 18,
@@ -280,8 +300,8 @@ const styles = StyleSheet.create({
   },
   inputShellFocused: {
     backgroundColor: '#EEF3FF',
-    borderColor: '#1F7AD1',
-    borderBottomColor: '#155B9F',
+    borderColor: '#4AA3D2',
+    borderBottomColor: '#2584B2',
   },
   fillInput: {
     minHeight: 56,
@@ -289,13 +309,27 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     textAlign: 'center',
     borderWidth: 0,
-    paddingHorizontal: 44,
+    paddingLeft: 16,
+    paddingRight: 44,
   },
   fillInputTight: {
-    paddingHorizontal: 32,
+    paddingLeft: 12,
+    paddingRight: 36,
+  },
+  fillPlaceholderOverlay: {
+    ...StyleSheet.absoluteFill,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 16,
+  },
+  fillPlaceholderText: {
+    fontWeight: '500',
+    fontStyle: 'italic',
+    textAlign: 'center',
   },
   fillInputDesktopWeb: {
-    paddingHorizontal: 54,
+    paddingLeft: 16,
+    paddingRight: 44,
   },
   clearInputButton: {
     position: 'absolute',
@@ -312,21 +346,23 @@ const styles = StyleSheet.create({
   },
   checkAnswerButton: {
     minHeight: 48,
-    borderRadius: 8,
+    borderRadius: 999,
     backgroundColor: '#1F7AD1',
-    borderWidth: 1.5,
-    borderBottomWidth: 3,
-    borderColor: '#1F7AD1',
-    borderBottomColor: '#155B9F',
+    borderWidth: 0,
     alignItems: 'center',
     justifyContent: 'center',
   },
   disabledCheckAnswerButton: {
     opacity: 0.45,
   },
+  checkAnswerButtonInner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
   checkAnswerButtonText: {
     color: '#fff',
-    fontSize: 16,
+    fontSize: 18,
     fontWeight: '700',
   },
   fillErrorText: {
@@ -338,10 +374,9 @@ const styles = StyleSheet.create({
   },
   checkAnswerButtonTight: {
     minHeight: 38,
-    borderBottomWidth: 3,
   },
   checkAnswerButtonDesktopWeb: {
-    minHeight: 52,
+    minHeight: 44,
   },
   incorrectOption: {
     backgroundColor: '#FFE8EC',

@@ -2,7 +2,8 @@
   "expo": {
     "name": "Ellie by MrFaivre",
     "slug": "ellie",
-    "version": "2.2.0",
+    "version": "2.4.0",
+    "icon": "./assets/icony.png",
     "updates": {
       "enabled": false
     },
@@ -24,6 +25,19 @@
       "supabaseAnonKey": "sb_publishable_kX5uIGO8QFf4JH1oOlUfeA_0x0BCg2C",
       "eas": {
         "projectId": "52c68ae6-5457-4bf8-897a-e9e76d521e63"
+      }
+    },
+    "plugins": [
+      "expo-asset",
+      "expo-audio",
+      "expo-font",
+      "expo-status-bar"
+    ],
+    "android": {
+      "package": "com.mrfaivreenglish.ellie",
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/icony.png",
+        "backgroundColor": "#ffffff"
       }
     }
   }

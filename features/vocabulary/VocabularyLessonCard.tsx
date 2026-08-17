@@ -1,9 +1,12 @@
 import React, { useCallback, useMemo } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Image } from 'react-native';
 import type { ImageSourcePropType } from 'react-native';
+import Animated, { FadeInDown } from 'react-native-reanimated';
 import { MaterialIcons } from '@expo/vector-icons';
 import type { ThemeColors } from '../settings/ThemeContext';
 import { getPanelStyle } from '../shared/uiPrimitives';
+import { useSpringPress } from '../shared/useSpringPress';
+import { useSelectPop } from '../shared/useSelectPop';
 import type { VocabularyLesson, VocabGroup } from '../../types/lessonTypes';
 import type { getMenuCopy } from '../shared/menuCopy';
 
@@ -75,12 +78,19 @@ const VocabularyLessonCard = React.memo(({
   const handleImageError = useCallback(() => {
     onImageError(lessonImageKey);
   }, [lessonImageKey, onImageError]);
+  const cardPress = useSpringPress();
+  const selectPopStyle = useSelectPop(selected);
 
   return (
+    <Animated.View
+      entering={FadeInDown.delay(Math.min(rowIndex, 10) * 40).duration(300)}
+      style={[isTile ? { width: '48%' as const } : undefined, cardPress.animatedStyle, selectPopStyle]}
+    >
     <TouchableOpacity
       style={[
         styles.lessonCard,
         getPanelStyle(colors, isDarkMode, 'soft'),
+        styles.lessonCardNoShadow,
         isTile ? styles.lessonCardTile : styles.lessonCardList,
         selectionMode && (isTile ? styles.lessonCardTileSelectionMode : styles.lessonCardSelectionMode),
         {
@@ -89,10 +99,12 @@ const VocabularyLessonCard = React.memo(({
           borderBottomColor: selected ? colors.primary : colors.border,
           borderBottomWidth: selected ? 3 : 2,
           borderWidth: selected ? 2 : 1.5,
-          shadowColor: selected ? colors.primary : '#000',
         },
+        isTile && { width: '100%' as const },
       ]}
       onPress={handlePress}
+      onPressIn={cardPress.onPressIn}
+      onPressOut={cardPress.onPressOut}
       accessibilityRole="button"
       accessibilityLabel={`Open ${lessonTitle}`}
       accessibilityState={selectionMode ? { selected } : undefined}
@@ -121,8 +133,7 @@ const VocabularyLessonCard = React.memo(({
           style={[
             styles.lessonDifficultyBadge,
             styles.lessonDifficultyBadgeTile,
-            selectionMode && styles.lessonDifficultyBadgeTileSelection,
-            { backgroundColor: 'transparent', borderColor: 'transparent' },
+            { backgroundColor: colors.card, borderColor: colors.border },
           ]}
         >
           <Text style={[styles.lessonDifficultyText, { color: colors.primary }]}>{STAR.repeat(difficulty)}</Text>
@@ -164,7 +175,7 @@ const VocabularyLessonCard = React.memo(({
             <View
               style={[
                 styles.lessonDifficultyBadge,
-                { backgroundColor: 'transparent', borderColor: 'transparent' },
+                { backgroundColor: colors.surface, borderColor: colors.border },
               ]}
             >
               <Text style={[styles.lessonDifficultyText, { color: colors.primary }]}>{STAR.repeat(difficulty)}</Text>
@@ -185,6 +196,7 @@ const VocabularyLessonCard = React.memo(({
         )}
       </View>
     </TouchableOpacity>
+    </Animated.View>
   );
 });
 
@@ -196,13 +208,9 @@ const styles = StyleSheet.create({
     marginBottom: 10,
     padding: 10,
     borderWidth: 1.5,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.07,
-    shadowRadius: 8,
-    elevation: 3,
     position: 'relative',
   },
+  lessonCardNoShadow: { boxShadow: 'none' as any, elevation: 0 },
   lessonCardList: { flexDirection: 'row', alignItems: 'center', minHeight: 82 },
   lessonCardTile: { width: '48%', minHeight: 148, alignItems: 'center', paddingTop: 10, paddingBottom: 10 },
   lessonCardSelectionMode: { paddingRight: 46 },
@@ -241,13 +249,12 @@ const styles = StyleSheet.create({
   lessonDifficultyBadgeTile: {
     position: 'absolute',
     top: 10,
-    right: 10,
+    left: 10,
     minWidth: 36,
     paddingHorizontal: 6,
     paddingVertical: 4,
     zIndex: 2,
   },
-  lessonDifficultyBadgeTileSelection: { right: 44 },
   lessonSelectBadge: {
     alignItems: 'center',
     borderRadius: 999,

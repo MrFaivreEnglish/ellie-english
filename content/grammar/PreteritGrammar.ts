@@ -3,6 +3,51 @@ const PreteritGrammar = {
   title: 'Prétérit',
   description: 'Learn how to use the past simple tense',
   imageUrl: 'https://i.ibb.co/7hwDYYS/Pr-t-rit-simple.png',
+  textContent: {
+    cards: [
+      {
+        eyebrow: 'À quoi ça sert',
+        paragraph: 'Pour parler des actions passées et terminées.',
+        tip: 'Deux possibilités pour conjuguer : verbe régulier + ED, ou verbe irrégulier à apprendre par cœur.',
+        columns: [
+          {
+            label: 'Verbe régulier + ED',
+            accent: 'blue',
+            rows: ['Like → **Liked**', 'Empty → **Emptied**'],
+          },
+          {
+            label: 'Verbe irrégulier (par cœur)',
+            accent: 'coral',
+            rows: ['Go → **Went**', 'Build → **Built**'],
+          },
+        ],
+      },
+      {
+        eyebrow: "Après, c'est facile",
+        paragraph: 'Une forme pour tous les pronoms.',
+        columns: [
+          {
+            label: 'Sujet · verbe régulier · verbe irrégulier',
+            accent: 'teal',
+            rows: [
+              ['I', 'liked', 'went'],
+              ['You', 'liked', 'went'],
+              ['He / She / It', 'liked', 'went'],
+              ['We', 'liked', 'went'],
+              ['They', 'liked', 'went'],
+            ],
+          },
+        ],
+        subsections: [
+          {
+            text: 'Exception : le verbe **be**.',
+            accent: 'amber',
+            rows: ['I **was**', 'You **were**', 'He / She / It **was**', 'We **were**', 'They **were**'],
+          },
+        ],
+      },
+    ],
+  },
   translateExercises: [
   {
     type: 'translate',

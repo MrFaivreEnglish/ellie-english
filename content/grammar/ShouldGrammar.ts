@@ -2,6 +2,33 @@ const ShouldGrammar = {
   id: '10',
   title: 'Should',
   description: 'Learn how to use the modal verb should - Evaluate if these sentences are grammatically correct',  imageUrl: 'https://i.ibb.co/7tN4Cfgb/Should.png',
+  textContent: {
+    cards: [
+      {
+        eyebrow: 'Je conseille de faire quelque chose',
+        tip: 'Formule : sujet + should + base verbale.',
+        columns: [
+          {
+            label: 'Sujet + SHOULD + base verbale',
+            accent: 'blue',
+            rows: ['I', 'You', 'He / She / It', 'We', 'They'],
+          },
+        ],
+        examples: [
+          { en: '**You should confess** to her.', fr: 'Tu devrais lui avouer tes sentiments.' },
+          { en: '**They should speak**.', fr: 'Ils devraient se parler.' },
+        ],
+      },
+      {
+        eyebrow: 'Pour déconseiller quelque chose',
+        paragraph: "Formule : sujet + shouldn't + base verbale.",
+        examples: [
+          { en: "**We shouldn't argue**.", fr: 'Nous ne devrions pas nous disputer.' },
+          { en: "**I shouldn't be** afraid.", fr: "Je ne devrais pas avoir peur." },
+        ],
+      },
+    ],
+  },
 translateExercises: [
   {
     type: 'translate',
