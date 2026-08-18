@@ -1598,7 +1598,7 @@ const goToPrevWord = () => {
                 allowSlashAlternatives={allowTypingSlashAlternatives}
                 promptLabel={lesson?.typingPromptLabel}
                 answerPlaceholder={lesson?.typingAnswerPlaceholder}
-                keyboardVisible={isTypingKeyboardOpen}
+                keyboardVisible={false}
                 layoutHeight={
                   isAndroidLesson
                     ? typingViewportMinHeight
@@ -1990,7 +1990,7 @@ const goToPrevWord = () => {
               allowSlashAlternatives={allowTypingSlashAlternatives}
               promptLabel={lesson?.typingPromptLabel}
               answerPlaceholder={lesson?.typingAnswerPlaceholder}
-              keyboardVisible={isTypingKeyboardOpen}
+              keyboardVisible={false}
               layoutHeight={
                 isAndroidLesson
                   ? typingViewportMinHeight

@@ -150,9 +150,8 @@ export function useLessonLayout({
       : (isCompactScreen ? 14 : 18)
     : 0;
   const flashcardSectionTopSpace = (isAndroidLesson ? 0 : 8) + flashcardModuleTopDrop;
-  const typingKeyboardInset = isTypingKeyboardOpen
-    ? isWebLessonLayout ? 12 : (isCompactScreen ? 24 : 32)
-    : 0;
+  // Keep Write's full-size layout when the keyboard opens.
+  const typingKeyboardInset = 0;
   const secondViewBottomReserve = isWebLessonLayout || isTypingKeyboardOpen ? 0 : BOTTOM_NAVIGATION_RESERVE;
   const scrollBottomPadding = isAndroidLesson && !isTypingKeyboardOpen ? 0 : Math.max(insets.bottom, 4);
   const compactModeButtons = lessonLayoutWidth < 390;
