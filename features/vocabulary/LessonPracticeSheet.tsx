@@ -21,7 +21,7 @@ import type { VocabularyMode } from './useLessonSheetLayout';
 // convention on the app's shared palette. Kept local since this palette is specific to the
 // rising-sheet spec and isn't otherwise used in the app.
 const SHEET_COLORS = {
-  scrim: 'rgba(26,22,11,0.34)', // oklch(0.2 0.02 90 / .34)
+  scrim: 'rgba(26,22,11,0.26)', // oklch(0.2 0.02 90 / .26)
   handle: '#DAD7D0', // oklch(0.88 0.01 90)
   chipIdleBg: '#F4F2EC', // oklch(0.96 0.008 90)
   chipIdleText: '#3C382C', // oklch(0.34 0.02 90)
@@ -44,9 +44,12 @@ const DEFAULT_SEGMENTS: { key: VocabularyMode; label: string }[] = [
   { key: 'typing', label: 'Write' },
 ];
 
-const OPEN_DURATION = 540;
-const OPEN_EASING = Easing.bezier(0.22, 0.92, 0.24, 1);
-const SCRIM_DURATION = 420;
+const OPEN_DURATION = 280;
+const CLOSE_DURATION = 220;
+const OPEN_EASING = Easing.out(Easing.cubic);
+const CLOSE_EASING = Easing.inOut(Easing.quad);
+const SCRIM_OPEN_DURATION = 220;
+const SCRIM_CLOSE_DURATION = 180;
 
 type SheetThemeColors = {
   card: string;
@@ -103,7 +106,7 @@ export default function LessonPracticeSheet<TMode extends string = VocabularyMod
   const [mounted, setMounted] = useState(visible);
   const translateY = useRef(new Animated.Value(height)).current;
   const scrimOpacity = useRef(new Animated.Value(0)).current;
-  const sheetTop = isDesktop ? 30 : 46;
+  const sheetTop = isDesktop ? 24 : 38;
   const sheetHeight = Math.max(1, height - sheetTop);
   // Read via a ref inside the animation effect (not as a dependency) — the
   // on-screen keyboard opening for Write mode can change the reported window
@@ -130,7 +133,7 @@ export default function LessonPracticeSheet<TMode extends string = VocabularyMod
         }),
         Animated.timing(scrimOpacity, {
           toValue: 1,
-          duration: SCRIM_DURATION,
+          duration: SCRIM_OPEN_DURATION,
           easing: Easing.out(Easing.ease),
           useNativeDriver: Platform.OS !== 'web',
         }),
@@ -143,13 +146,13 @@ export default function LessonPracticeSheet<TMode extends string = VocabularyMod
     Animated.parallel([
       Animated.timing(translateY, {
         toValue: sheetHeightRef.current * 1.02,
-        duration: OPEN_DURATION,
-        easing: OPEN_EASING,
+        duration: CLOSE_DURATION,
+        easing: CLOSE_EASING,
         useNativeDriver: Platform.OS !== 'web',
       }),
       Animated.timing(scrimOpacity, {
         toValue: 0,
-        duration: SCRIM_DURATION,
+        duration: SCRIM_CLOSE_DURATION,
         easing: Easing.in(Easing.ease),
         useNativeDriver: Platform.OS !== 'web',
       }),
@@ -173,7 +176,7 @@ export default function LessonPracticeSheet<TMode extends string = VocabularyMod
           }
           Animated.timing(translateY, {
             toValue: 0,
-            duration: 220,
+            duration: 180,
             easing: OPEN_EASING,
             useNativeDriver: Platform.OS !== 'web',
           }).start();
@@ -281,14 +284,15 @@ function ModeSegmentedControl<TMode extends string>({
   const [trackWidth, setTrackWidth] = useState(0);
   const knobX = useRef(new Animated.Value(0)).current;
   const activeIndex = Math.max(0, segments.findIndex((segment) => segment.key === mode));
-  const segmentWidth = trackWidth / segments.length;
+  const trackPadding = 4;
+  const segmentWidth = Math.max(0, (trackWidth - trackPadding * 2) / segments.length);
 
   useEffect(() => {
     if (!trackWidth) return;
     Animated.timing(knobX, {
       toValue: activeIndex * segmentWidth,
-      duration: 360,
-      easing: Easing.bezier(0.2, 1.15, 0.3, 1),
+      duration: 220,
+      easing: Easing.out(Easing.cubic),
       useNativeDriver: Platform.OS !== 'web',
     }).start();
   }, [activeIndex, segmentWidth, trackWidth, knobX]);
@@ -303,7 +307,7 @@ function ModeSegmentedControl<TMode extends string>({
           <Animated.View
             style={[
               styles.segmentedKnob,
-              { width: segmentWidth - 4, backgroundColor: theme.knobBg, transform: [{ translateX: knobX }] },
+              { width: segmentWidth, backgroundColor: theme.knobBg, transform: [{ translateX: knobX }] },
             ]}
           />
         )}
@@ -355,8 +359,8 @@ const styles = StyleSheet.create({
   },
   handleWrap: {
     alignItems: 'center',
-    paddingTop: 10,
-    paddingBottom: 8,
+    paddingTop: 6,
+    paddingBottom: 3,
   },
   handle: {
     width: 44,

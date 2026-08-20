@@ -146,4 +146,20 @@ describe('VocabularyLessonScreen', () => {
       expect(getByLabelText('Switch to Write').props.accessibilityState).toEqual({ selected: true });
     });
   });
+
+  it('opens every explicitly requested initial practice mode, including Cards', async () => {
+    const flashcardRoute = {
+      ...mockRoute,
+      params: { ...mockRoute.params, initialMode: 'flashcards' },
+    } as any;
+
+    const { getByLabelText } = render(
+      <VocabularyLessonScreen route={flashcardRoute} navigation={mockNavigation} />
+    );
+
+    await waitFor(() => {
+      expect(getByLabelText('Back to lesson')).toBeTruthy();
+      expect(getByLabelText('Switch to Cards').props.accessibilityState).toEqual({ selected: true });
+    });
+  });
 });

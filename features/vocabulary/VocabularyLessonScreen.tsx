@@ -50,6 +50,11 @@ const LESSON_CHROME_COLORS = {
   accent: '#0D7DD4', // oklch(0.58 0.16 250)
 };
 
+const IMAGE_STAGE_INSETS = {
+  desktop: { horizontal: 32, top: 6, bottom: 10 },
+  mobile: { horizontal: 14, top: 4, bottom: 8 },
+} as const;
+
 type Props = CompositeScreenProps<
   NativeStackScreenProps<VocabularyStackParamList, 'VocabularyLesson'>,
   NativeStackScreenProps<RootStackParamList>
@@ -63,7 +68,9 @@ const fmtMs = (ms: number) => {
 
 export default function VocabularyLessonScreen({ route, navigation }: Props) {
   const { isDarkMode, colors, isVocabTimerMode, isVocabTimerRecordSavingEnabled, isAndroidStatusBarEnabled, isVocabAudioMatchMode, toggleVocabAudioMatchMode } = useTheme();
-  const initialRouteMode = resolveVocabularyMode(route?.params?.initialMode);
+  const initialRouteMode = route?.params?.initialMode == null
+    ? null
+    : resolveVocabularyMode(route.params.initialMode);
   const [sheetMode, setSheetMode] = useState<VocabularyMode | null>(null);
   const mode = sheetMode ?? 'flashcards';
 
@@ -350,6 +357,11 @@ const categories = useMemo<string[]>(() => {
   // rather than an oversized, partly-transparent box.
   const [stageSize, setStageSize] = useState({ width: 0, height: 0 });
   const [imageAspectRatio, setImageAspectRatio] = useState<number | null>(null);
+  const imageStageInsets = isDesktopWebLesson ? IMAGE_STAGE_INSETS.desktop : IMAGE_STAGE_INSETS.mobile;
+  const imageStageContentSize = useMemo(() => ({
+    width: Math.max(0, stageSize.width - imageStageInsets.horizontal * 2),
+    height: Math.max(0, stageSize.height - imageStageInsets.top - imageStageInsets.bottom),
+  }), [imageStageInsets, stageSize.height, stageSize.width]);
 
   useEffect(() => {
     setImageAspectRatio(null);
@@ -360,13 +372,13 @@ const categories = useMemo<string[]>(() => {
   }, []);
 
   const fittedImageSize = useMemo(() => {
-    const { width: stageWidth, height: stageHeightPx } = stageSize;
+    const { width: stageWidth, height: stageHeightPx } = imageStageContentSize;
     if (stageWidth <= 0 || stageHeightPx <= 0) return { width: undefined as number | undefined, height: undefined as number | undefined };
     if (!imageAspectRatio) return { width: stageWidth, height: stageHeightPx };
 
     const width = Math.min(stageWidth, stageHeightPx * imageAspectRatio);
     return { width, height: width / imageAspectRatio };
-  }, [stageSize, imageAspectRatio]);
+  }, [imageAspectRatio, imageStageContentSize]);
 
   // Filtered words
   const filteredWords = useMemo(() => {
@@ -634,13 +646,11 @@ const categories = useMemo<string[]>(() => {
   // Respect an explicit initialMode request (e.g. a shortcut from Grammar) by
   // opening the sheet straight into that mode on first mount for this lesson.
   useEffect(() => {
-    const lessonKey = `${lessonIdentity}::${initialRouteMode}`;
+    const lessonKey = `${lessonIdentity}::${initialRouteMode ?? 'overview'}`;
     if (initializedLessonKeyRef.current === lessonKey) return;
     initializedLessonKeyRef.current = lessonKey;
 
-    if (initialRouteMode === 'matching' || initialRouteMode === 'typing') {
-      setSheetMode(initialRouteMode);
-    }
+    setSheetMode(initialRouteMode);
   }, [initialRouteMode, lessonIdentity]);
 
   const handleShuffleTypingWords = () => {
@@ -1301,7 +1311,14 @@ const goToPrevWord = () => {
       </View>
 
       <View
-        style={[styles.imageStage, isDesktopWebLesson ? styles.imageStageDesktop : styles.imageStageMobile]}
+        style={[
+          styles.imageStage,
+          {
+            paddingHorizontal: imageStageInsets.horizontal,
+            paddingTop: imageStageInsets.top,
+            paddingBottom: imageStageInsets.bottom,
+          },
+        ]}
         onLayout={(event) => setStageSize({ width: event.nativeEvent.layout.width, height: event.nativeEvent.layout.height })}
       >
         {shouldShowMixedImageCarousel ? (
@@ -1309,21 +1326,21 @@ const goToPrevWord = () => {
             horizontal
             pagingEnabled
             showsHorizontalScrollIndicator={false}
-            snapToInterval={stageSize.width}
+            snapToInterval={imageStageContentSize.width}
             decelerationRate="fast"
             directionalLockEnabled
             disableIntervalMomentum
             nestedScrollEnabled
-            style={{ width: stageSize.width, height: stageSize.height }}
+            style={{ width: imageStageContentSize.width, height: imageStageContentSize.height }}
           >
             {mixedLessonImageCards.map((imageCard: MixedVocabularyImageCard, imageIndex: number) => (
               <View
                 key={`${imageCard.id}-${imageIndex}`}
-                style={{ width: stageSize.width, height: stageSize.height, alignItems: 'center', justifyContent: 'center' }}
+                style={{ width: imageStageContentSize.width, height: imageStageContentSize.height, alignItems: 'center', justifyContent: 'center' }}
               >
                 <ImageWithCredit
                   source={{ uri: imageCard.imageUrl }}
-                  style={[{ width: stageSize.width, height: stageSize.height, borderRadius: isDesktopWebLesson ? 12 : 10 }]}
+                  style={[{ width: imageStageContentSize.width, height: imageStageContentSize.height, borderRadius: isDesktopWebLesson ? 12 : 10 }]}
                   accessibilityLabel={imageCard.title ? `${imageCard.title} lesson image` : 'Lesson image'}
                 />
               </View>
@@ -1491,16 +1508,6 @@ const styles = StyleSheet.create({
     minHeight: 0,
     alignItems: 'center',
     justifyContent: 'center',
-  },
-  imageStageDesktop: {
-    paddingHorizontal: 32,
-    paddingTop: 6,
-    paddingBottom: 10,
-  },
-  imageStageMobile: {
-    paddingHorizontal: 14,
-    paddingTop: 4,
-    paddingBottom: 8,
   },
   dock: {
     flexShrink: 0,
