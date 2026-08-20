@@ -2,6 +2,7 @@ import React, { useRef, useState } from 'react';
 import {
   Animated,
   Modal,
+  Platform,
   Pressable,
   StyleSheet,
   Text,
@@ -61,9 +62,9 @@ export default function FirstVisitModal({ visible, onDismiss, onSetupAccount }: 
   const isLast = slide === SLIDES.length - 1;
 
   const goToSlide = (next: number) => {
-    Animated.timing(fadeAnim, { toValue: 0, duration: 130, useNativeDriver: true }).start(() => {
+    Animated.timing(fadeAnim, { toValue: 0, duration: 130, useNativeDriver: Platform.OS !== 'web' }).start(() => {
       setSlide(next);
-      Animated.timing(fadeAnim, { toValue: 1, duration: 170, useNativeDriver: true }).start();
+      Animated.timing(fadeAnim, { toValue: 1, duration: 170, useNativeDriver: Platform.OS !== 'web' }).start();
     });
   };
 
@@ -164,10 +165,7 @@ const styles = StyleSheet.create({
     paddingBottom: 24,
     paddingHorizontal: 28,
     alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 10 },
-    shadowOpacity: 0.22,
-    shadowRadius: 24,
+    boxShadow: '0px 10px 24px rgba(0,0,0,0.22)',
     elevation: 12,
   },
   slideContent: {

@@ -134,9 +134,9 @@ const GrammarLessonRow = React.memo(({
   return (
     <Animated.View
       entering={FadeInDown.delay(Math.min(rowIndex, 10) * 40).duration(300)}
-      style={[rowPress.animatedStyle, selectPopStyle]}
     >
-    <TouchableOpacity
+      <Animated.View style={[rowPress.animatedStyle, selectPopStyle]}>
+      <TouchableOpacity
       style={[
         styles.lessonItem,
         getInsetSurfaceStyle(colors, isDarkMode),
@@ -171,8 +171,11 @@ const GrammarLessonRow = React.memo(({
             backgroundColor: isMixedGrammarLesson ? 'transparent' : studySurface.photoFrame,
             borderColor: isMixedGrammarLesson ? 'transparent' : studySurface.photoFrameBorder,
             borderWidth: isMixedGrammarLesson ? 0 : 2.5,
-            shadowColor: isDarkMode ? '#000000' : '#6C8EAA',
-            shadowOpacity: isMixedGrammarLesson ? 0 : isDarkMode ? 0.25 : 0.14,
+            boxShadow: isMixedGrammarLesson
+              ? 'none'
+              : isDarkMode
+                ? '0px 2px 5px rgba(0,0,0,0.25)'
+                : '0px 2px 5px rgba(108,142,170,0.14)',
           },
         ]}
       >
@@ -301,7 +304,8 @@ const GrammarLessonRow = React.memo(({
           color={colors.secondaryText}
         />
       )}
-    </TouchableOpacity>
+      </TouchableOpacity>
+      </Animated.View>
     </Animated.View>
   );
 });
@@ -778,11 +782,11 @@ const GrammarCategoryList: React.FC<{ onSelectLesson: (lesson: GrammarLesson) =>
 
     {selectionMode && (
       <View
-        pointerEvents="box-none"
         style={[
           styles.selectionTrayWrap,
           {
             paddingBottom: selectionTrayBottomPadding,
+            pointerEvents: 'box-none',
           },
         ]}
       >
@@ -1146,10 +1150,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     overflow: 'hidden',
     position: 'absolute',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.16,
-    shadowRadius: 5,
+    boxShadow: '0px 2px 5px rgba(0,0,0,0.16)',
     top: 3,
     width: 56,
   },
@@ -1287,8 +1288,6 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     overflow: 'hidden',
     elevation: 2,
-    shadowOffset: { width: 0, height: 2 },
-    shadowRadius: 5,
   },
   mixedLessonThumbnail: {
     backgroundColor: 'transparent',

@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Animated,
   Easing,
@@ -146,7 +146,6 @@ const buildTheme = (colors?: ThemeColors) => {
 //   correct card:  oklch(0.60 0.15 150)
 //   almost avatar: oklch(0.92 0.07  90)   almost bubble: oklch(0.95 0.04  90)   almost text: oklch(0.48 0.11  90)
 //   wrong avatar:  oklch(0.92 0.06  25)   wrong bubble:  oklch(0.95 0.03  25)   wrong text:  oklch(0.48 0.13  25)
-const FEEDBACK_CORRECT_BG = '#25984D';
 const FEEDBACK_ALMOST_AVATAR_BG = '#F7E3B0';
 const FEEDBACK_ALMOST_BUBBLE_BG = '#F9EED1';
 const FEEDBACK_ALMOST_TEXT = '#765900';
@@ -313,26 +312,22 @@ export default function TypingView({
         : 94;
   const promptFontSize = isAndroid
     ? keyboardMode
-      ? 37
-      : isCompact ? 44 : 48
+      ? 34
+      : 40
     : keyboardMode
       ? 30
       : isDesktopWeb
         ? scaleValue(54, typingWebScale)
-        : isCompact
-          ? 37
-          : 46;
+        : 40;
   const promptLineHeight = isAndroid
     ? keyboardMode
-      ? 45
-      : isCompact ? 52 : 57
+      ? 41
+      : 48
     : keyboardMode
       ? 36
       : isDesktopWeb
         ? scaleValue(63, typingWebScale)
-        : isCompact
-          ? 44
-          : 53;
+        : 48;
   const contentHorizontalPadding = isAndroid
     ? isCompact ? 8 : 10
     : isCompact ? 12 : 18;
@@ -583,13 +578,13 @@ export default function TypingView({
         toValue: peakScale,
         friction: 4,
         tension: 160,
-        useNativeDriver: true,
+        useNativeDriver: Platform.OS !== 'web',
       }),
       Animated.spring(comboFireScale, {
         toValue: 1,
         friction: 5,
         tension: 120,
-        useNativeDriver: true,
+        useNativeDriver: Platform.OS !== 'web',
       }),
     ]).start();
   }, [comboFireScale, streak]);
@@ -599,10 +594,10 @@ export default function TypingView({
     prevStreakRef.current = streak;
     if (wasCombo && streak === 0) {
       Animated.sequence([
-        Animated.timing(comboShakeAnim, { toValue: -7, duration: 55, useNativeDriver: true }),
-        Animated.timing(comboShakeAnim, { toValue: 7, duration: 55, useNativeDriver: true }),
-        Animated.timing(comboShakeAnim, { toValue: -4, duration: 45, useNativeDriver: true }),
-        Animated.timing(comboShakeAnim, { toValue: 0, duration: 45, useNativeDriver: true }),
+        Animated.timing(comboShakeAnim, { toValue: -7, duration: 55, useNativeDriver: Platform.OS !== 'web' }),
+        Animated.timing(comboShakeAnim, { toValue: 7, duration: 55, useNativeDriver: Platform.OS !== 'web' }),
+        Animated.timing(comboShakeAnim, { toValue: -4, duration: 45, useNativeDriver: Platform.OS !== 'web' }),
+        Animated.timing(comboShakeAnim, { toValue: 0, duration: 45, useNativeDriver: Platform.OS !== 'web' }),
       ]).start();
     }
   }, [comboShakeAnim, streak]);
@@ -620,14 +615,14 @@ export default function TypingView({
 
   useEffect(() => {
     wordFadeAnim.setValue(0.45);
-    Animated.timing(wordFadeAnim, { toValue: 1, duration: 180, useNativeDriver: true }).start();
+    Animated.timing(wordFadeAnim, { toValue: 1, duration: 180, useNativeDriver: Platform.OS !== 'web' }).start();
   }, [typingIndex, wordFadeAnim]);
 
   useEffect(() => {
     if (sessionXp > prevXpRef.current) {
       Animated.sequence([
-        Animated.spring(xpPulseAnim, { toValue: 1.11, friction: 4, tension: 260, useNativeDriver: true }),
-        Animated.spring(xpPulseAnim, { toValue: 1, friction: 5, tension: 180, useNativeDriver: true }),
+        Animated.spring(xpPulseAnim, { toValue: 1.11, friction: 4, tension: 260, useNativeDriver: Platform.OS !== 'web' }),
+        Animated.spring(xpPulseAnim, { toValue: 1, friction: 5, tension: 180, useNativeDriver: Platform.OS !== 'web' }),
       ]).start();
     }
     prevXpRef.current = sessionXp;
@@ -649,7 +644,7 @@ export default function TypingView({
         style={[
           styles.contentContainer,
           {
-            backgroundColor: theme.background,
+            backgroundColor: theme.card,
             paddingTop: isAndroid ? 6 : 0,
             paddingBottom: contentBottomPadding,
             paddingHorizontal: contentHorizontalPadding,
@@ -664,7 +659,7 @@ export default function TypingView({
             isDesktopWeb && styles.interactiveCardDesktopWeb,
             isDesktopWeb && { maxWidth: scaleValue(1237, cardWidthWebScale) },
             {
-              backgroundColor: theme.background,
+              backgroundColor: theme.card,
               borderColor: 'transparent',
               borderWidth: 0,
               padding: 0,
@@ -775,7 +770,91 @@ export default function TypingView({
               { flex: 1 },
             ]}
           >
-          <View style={styles.promptCenterWrap}>
+          {showFeedbackCard && feedbackType === 'correct' && (
+            <Animated.View
+              style={[
+                styles.correctFeedbackCard,
+                isDesktopWeb && { maxWidth: scaleValue(700, typingWebScale) },
+                { pointerEvents: 'none' },
+                {
+                  backgroundColor: theme.isDark
+                    ? 'rgba(34, 197, 94, 0.90)'
+                    : 'rgba(34, 197, 94, 0.92)',
+                  borderColor: theme.isDark ? '#4ADE80' : '#16A34A',
+                  boxShadow: '0px 8px 14px rgba(34, 197, 94, 0.18)',
+                  opacity: feedbackOpacity,
+                  transform: [{ translateY: feedbackTranslateY }],
+                },
+              ]}
+            >
+              <Text style={styles.correctFeedbackEmoji}>🎉</Text>
+              <Text style={[styles.correctFeedbackTitle, { fontFamily: feedbackFont('800') }]}>
+                Great job!
+              </Text>
+              <View style={styles.correctFeedbackComboPill}>
+                <Text style={[styles.correctFeedbackComboText, { fontFamily: feedbackFont('800') }]}>
+                  Combo ×{feedbackStreak}
+                </Text>
+              </View>
+            </Animated.View>
+          )}
+          {showFeedbackCard && (feedbackType === 'close' || feedbackType === 'wrong') && (
+            <Animated.View
+              style={[
+                styles.mascotFeedbackRow,
+                isDesktopWeb && { maxWidth: scaleValue(700, typingWebScale) },
+                { pointerEvents: 'none' },
+                {
+                  opacity: feedbackOpacity,
+                  transform: [{ translateY: feedbackTranslateY }],
+                },
+              ]}
+            >
+              <Animated.View
+                style={[
+                  styles.mascotAvatar,
+                  {
+                    backgroundColor: feedbackType === 'wrong' ? FEEDBACK_WRONG_AVATAR_BG : FEEDBACK_ALMOST_AVATAR_BG,
+                    transform: [{ translateY: feedbackAvatarFloat }],
+                  },
+                ]}
+              >
+                {feedbackType === 'wrong' ? (
+                  <MaterialIcons name="sentiment-dissatisfied" size={30} color={FEEDBACK_WRONG_TEXT} />
+                ) : (
+                  <Text style={styles.mascotAvatarEmoji}>🤏</Text>
+                )}
+              </Animated.View>
+              <View
+                style={[
+                  styles.mascotBubble,
+                  { backgroundColor: feedbackType === 'wrong' ? FEEDBACK_WRONG_BUBBLE_BG : FEEDBACK_ALMOST_BUBBLE_BG },
+                ]}
+              >
+                <View
+                  style={[
+                    styles.mascotBubbleTail,
+                    { backgroundColor: feedbackType === 'wrong' ? FEEDBACK_WRONG_BUBBLE_BG : FEEDBACK_ALMOST_BUBBLE_BG },
+                  ]}
+                />
+                {feedbackType === 'wrong' ? (
+                  <>
+                    <Text style={[styles.mascotHeadline, { color: FEEDBACK_WRONG_TEXT, fontFamily: feedbackFont('700') }]}>
+                      Not this time.
+                    </Text>
+                    <Text style={[styles.mascotSubtext, { color: FEEDBACK_WRONG_TEXT, fontFamily: feedbackFont('600') }]}>
+                      Correct answer: <Text style={{ fontFamily: feedbackFont('800') }}>{feedbackAnswer}</Text>
+                    </Text>
+                  </>
+                ) : (
+                  <Text style={[styles.mascotHeadline, { color: FEEDBACK_ALMOST_TEXT, fontFamily: feedbackFont('700') }]}>
+                    So close — one more try before you lose your combo!
+                  </Text>
+                )}
+              </View>
+            </Animated.View>
+          )}
+          <View style={[styles.promptCenterWrap, showFeedbackCard && styles.promptCenterWrapAfterFeedback]}>
           <View
             style={[
               styles.promptOverlayWrap,
@@ -875,8 +954,8 @@ export default function TypingView({
                   style={[
                     styles.inputPlaceholderOverlay,
                     !strictMode && styles.inputPlaceholderOverlayWithHint,
+                    { pointerEvents: 'none' },
                   ]}
-                  pointerEvents="none"
                 >
                   <Text
                     numberOfLines={1}
@@ -975,81 +1054,6 @@ export default function TypingView({
               </TouchableOpacity>
             </View>
           </View>
-          {showFeedbackCard && feedbackType === 'correct' && (
-            <Animated.View
-              pointerEvents="none"
-              style={[
-                styles.correctFeedbackCard,
-                isDesktopWeb && { maxWidth: scaleValue(700, typingWebScale) },
-                {
-                  opacity: feedbackOpacity,
-                  transform: [{ translateY: feedbackTranslateY }],
-                },
-              ]}
-            >
-              <Text style={styles.correctFeedbackEmoji}>🎉</Text>
-              <Text style={[styles.correctFeedbackTitle, { fontFamily: feedbackFont('800') }]}>
-                Great job!
-              </Text>
-              <View style={styles.correctFeedbackComboPill}>
-                <Text style={[styles.correctFeedbackComboText, { fontFamily: feedbackFont('800') }]}>
-                  Combo ×{feedbackStreak}
-                </Text>
-              </View>
-            </Animated.View>
-          )}
-          {showFeedbackCard && (feedbackType === 'close' || feedbackType === 'wrong') && (
-            <Animated.View
-              pointerEvents="none"
-              style={[
-                styles.mascotFeedbackRow,
-                isDesktopWeb && { maxWidth: scaleValue(700, typingWebScale) },
-                {
-                  opacity: feedbackOpacity,
-                  transform: [{ translateY: feedbackTranslateY }],
-                },
-              ]}
-            >
-              <Animated.View
-                style={[
-                  styles.mascotAvatar,
-                  {
-                    backgroundColor: feedbackType === 'wrong' ? FEEDBACK_WRONG_AVATAR_BG : FEEDBACK_ALMOST_AVATAR_BG,
-                    transform: [{ translateY: feedbackAvatarFloat }],
-                  },
-                ]}
-              >
-                <Text style={styles.mascotAvatarEmoji}>{feedbackType === 'wrong' ? '🙈' : '🤏'}</Text>
-              </Animated.View>
-              <View
-                style={[
-                  styles.mascotBubble,
-                  { backgroundColor: feedbackType === 'wrong' ? FEEDBACK_WRONG_BUBBLE_BG : FEEDBACK_ALMOST_BUBBLE_BG },
-                ]}
-              >
-                <View
-                  style={[
-                    styles.mascotBubbleTail,
-                    { backgroundColor: feedbackType === 'wrong' ? FEEDBACK_WRONG_BUBBLE_BG : FEEDBACK_ALMOST_BUBBLE_BG },
-                  ]}
-                />
-                {feedbackType === 'wrong' ? (
-                  <>
-                    <Text style={[styles.mascotHeadline, { color: FEEDBACK_WRONG_TEXT, fontFamily: feedbackFont('700') }]}>
-                      Not this time.
-                    </Text>
-                    <Text style={[styles.mascotSubtext, { color: FEEDBACK_WRONG_TEXT, fontFamily: feedbackFont('600') }]}>
-                      Correct answer: <Text style={{ fontFamily: feedbackFont('800') }}>{feedbackAnswer}</Text>
-                    </Text>
-                  </>
-                ) : (
-                  <Text style={[styles.mascotHeadline, { color: FEEDBACK_ALMOST_TEXT, fontFamily: feedbackFont('700') }]}>
-                    So close — one more try before you lose your combo!
-                  </Text>
-                )}
-              </View>
-            </Animated.View>
-          )}
           </View>
         </View>
       </View>
@@ -1426,9 +1430,9 @@ const styles = StyleSheet.create({
   correctFeedbackCard: {
     width: '100%',
     alignSelf: 'center',
-    marginTop: 18,
-    backgroundColor: FEEDBACK_CORRECT_BG,
-    borderRadius: 16,
+    marginTop: 12,
+    borderRadius: 8,
+    borderWidth: 1.5,
     paddingVertical: 16,
     paddingHorizontal: 22,
     flexDirection: 'row',
@@ -1458,7 +1462,7 @@ const styles = StyleSheet.create({
   mascotFeedbackRow: {
     width: '100%',
     alignSelf: 'center',
-    marginTop: 18,
+    marginTop: 12,
     flexDirection: 'row',
     alignItems: 'flex-start',
     gap: 14,
@@ -1749,6 +1753,9 @@ const styles = StyleSheet.create({
     width: '100%',
     marginTop: 26,
   },
+  promptCenterWrapAfterFeedback: {
+    marginTop: 12,
+  },
   promptOverlayWrap: {
     alignSelf: 'center',
     width: '100%',
@@ -1766,10 +1773,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     position: 'relative',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.08,
-    shadowRadius: 5,
+    boxShadow: '0px 2px 5px rgba(0,0,0,0.08)',
     elevation: 2,
   },
   promptPanelDesktopWeb: {

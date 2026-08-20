@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { View, Text, Image, StyleSheet, Animated, ActivityIndicator, Platform, useWindowDimensions } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import * as Font from 'expo-font';
@@ -61,13 +61,13 @@ export default function SplashScreen() {
           Animated.timing(fadeAnim, {
             toValue: 1,
             duration: 800,
-            useNativeDriver: true,
+            useNativeDriver: Platform.OS !== 'web',
           }),
           Animated.delay(1200),
           Animated.timing(fadeAnim, {
             toValue: 0,
             duration: 250,
-            useNativeDriver: true,
+            useNativeDriver: Platform.OS !== 'web',
           }),
         ]).start(() => {
           navigation.replace('Home');
@@ -97,8 +97,8 @@ export default function SplashScreen() {
         { backgroundColor: splashBackground },
       ]}
     >
-      <View style={[styles.decorativeCircle, styles.decorativeCircleTopRight]} pointerEvents="none" />
-      <View style={[styles.decorativeCircle, styles.decorativeCircleBottomLeft]} pointerEvents="none" />
+      <View style={[styles.decorativeCircle, styles.decorativeCircleTopRight, { pointerEvents: 'none' }]} />
+      <View style={[styles.decorativeCircle, styles.decorativeCircleBottomLeft, { pointerEvents: 'none' }]} />
 
       <Animated.View style={[styles.logoContainer, { opacity: fadeAnim }]}>
         <View style={styles.mark}>

@@ -14,7 +14,7 @@ import { resourceCategories as resourceLinkCategories } from '../../content/less
 import { resolveChapterAppLink } from '../../content/lessons/appLessonRegistry';
 import { createMixedGrammarLesson } from '../../content/lessons/grammarRegistry';
 import type { ResolvedChapterAppLink } from '../../content/lessons/lessonTypes';
-import { getLessonImage } from '../vocabulary/vocabularyUtils';
+import { getLessonImage, getSerializableVocabularyLesson } from '../vocabulary/vocabularyUtils';
 import { getMenuCopy } from '../shared/menuCopy';
 import {
   getCustomChapterLinkOverrides,
@@ -152,7 +152,7 @@ export default function LessonsScreen() {
       navigation.navigate('Vocabulary', {
         screen: 'VocabularyLesson',
         params: {
-          lesson: appLink.lesson,
+          lesson: getSerializableVocabularyLesson(appLink.lesson),
           backLabel: commonCopy.backToChapters,
           backTarget: 'Lessons',
         },
@@ -655,7 +655,7 @@ export default function LessonsScreen() {
       </View>
     </ScrollView>
     {canShowScrollHint && (
-      <View pointerEvents="none" style={styles.scrollHintWrap}>
+      <View style={[styles.scrollHintWrap, { pointerEvents: 'none' }]}>
         <View style={[styles.scrollHintBubble, { backgroundColor: colors.card }]}>
           <MaterialIcons name="keyboard-arrow-down" size={20} color={colors.secondaryText} />
         </View>

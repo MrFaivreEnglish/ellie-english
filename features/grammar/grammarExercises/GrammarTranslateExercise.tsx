@@ -207,11 +207,11 @@ const GrammarTranslateExercise: React.FC<GrammarTranslateExerciseProps> = ({
     if (incorrectAnswer !== 'translate') return;
     trayShakeAnim.setValue(0);
     Animated.sequence([
-      Animated.timing(trayShakeAnim, { toValue: -8, duration: 45, useNativeDriver: true }),
-      Animated.timing(trayShakeAnim, { toValue: 8, duration: 90, useNativeDriver: true }),
-      Animated.timing(trayShakeAnim, { toValue: -6, duration: 80, useNativeDriver: true }),
-      Animated.timing(trayShakeAnim, { toValue: 6, duration: 70, useNativeDriver: true }),
-      Animated.timing(trayShakeAnim, { toValue: 0, duration: 60, useNativeDriver: true }),
+      Animated.timing(trayShakeAnim, { toValue: -8, duration: 45, useNativeDriver: Platform.OS !== 'web' }),
+      Animated.timing(trayShakeAnim, { toValue: 8, duration: 90, useNativeDriver: Platform.OS !== 'web' }),
+      Animated.timing(trayShakeAnim, { toValue: -6, duration: 80, useNativeDriver: Platform.OS !== 'web' }),
+      Animated.timing(trayShakeAnim, { toValue: 6, duration: 70, useNativeDriver: Platform.OS !== 'web' }),
+      Animated.timing(trayShakeAnim, { toValue: 0, duration: 60, useNativeDriver: Platform.OS !== 'web' }),
     ]).start();
   }, [incorrectAnswer, trayShakeAnim]);
 
@@ -335,7 +335,7 @@ const GrammarTranslateExercise: React.FC<GrammarTranslateExerciseProps> = ({
             !isDesktopWeb && { padding: 10 },
             {
               backgroundColor: 'transparent',
-              shadowOpacity: 0,
+              boxShadow: 'none',
               elevation: 0,
             },
           ]}
@@ -366,8 +366,9 @@ const GrammarTranslateExercise: React.FC<GrammarTranslateExerciseProps> = ({
                       { paddingVertical: chipVerticalPadding, paddingHorizontal: chipHorizontalPadding },
                       {
                         backgroundColor: grammarGame.wordChipSurface,
-                        shadowColor: isDarkMode ? '#000' : grammarGame.panelShadow,
-                        shadowOpacity: isDarkMode ? 0.2 : 0.08,
+                        boxShadow: isDarkMode
+                          ? '0px 2px 4px rgba(0,0,0,0.20)'
+                          : '0px 2px 4px rgba(0,0,0,0.08)',
                       },
                     ]}
                   >

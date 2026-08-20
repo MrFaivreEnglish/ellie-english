@@ -43,16 +43,16 @@ interface CompletionModalProps {
 
 // Cycled per stat tile — teal (XP-like), coral (accuracy-like), blue, amber.
 const STAT_TILE_PALETTE_LIGHT = [
-  { bg: '#d0fdf0', label: '#007560', value: '#006b51' },
-  { bg: '#ffedea', label: '#a04034', value: '#97271b' },
-  { bg: '#e5f0fc', label: '#32669a', value: '#00579a' },
-  { bg: '#fff0cc', label: '#825c00', value: '#784b00' },
+  { bg: '#d0fdf0', label: '#007560', valueColor: '#006b51' },
+  { bg: '#ffedea', label: '#a04034', valueColor: '#97271b' },
+  { bg: '#e5f0fc', label: '#32669a', valueColor: '#00579a' },
+  { bg: '#fff0cc', label: '#825c00', valueColor: '#784b00' },
 ];
 const STAT_TILE_PALETTE_DARK = [
-  { bg: '#0E2E28', label: '#6FE3C4', value: '#6FE3C4' },
-  { bg: '#491513', label: '#febab4', value: '#febab4' },
-  { bg: '#132A42', label: '#7FC4EE', value: '#7FC4EE' },
-  { bg: '#2D284F', label: '#D5C7FF', value: '#D5C7FF' },
+  { bg: '#0E2E28', label: '#6FE3C4', valueColor: '#6FE3C4' },
+  { bg: '#491513', label: '#febab4', valueColor: '#febab4' },
+  { bg: '#132A42', label: '#7FC4EE', valueColor: '#7FC4EE' },
+  { bg: '#2D284F', label: '#D5C7FF', valueColor: '#D5C7FF' },
 ];
 
 const Sparkle = ({ style, delay = 0, size = 12 }: { style: any; delay?: number; size?: number }) => {
@@ -61,8 +61,8 @@ const Sparkle = ({ style, delay = 0, size = 12 }: { style: any; delay?: number; 
   useEffect(() => {
     const loop = Animated.loop(
       Animated.sequence([
-        Animated.timing(anim, { toValue: 1, duration: 900, delay, useNativeDriver: true }),
-        Animated.timing(anim, { toValue: 0, duration: 900, useNativeDriver: true }),
+        Animated.timing(anim, { toValue: 1, duration: 900, delay, useNativeDriver: Platform.OS !== 'web' }),
+        Animated.timing(anim, { toValue: 0, duration: 900, useNativeDriver: Platform.OS !== 'web' }),
       ])
     );
     loop.start();
@@ -230,13 +230,13 @@ export default function VocabularyCompletionModal({
     setDisplayedXP(0);
 
     Animated.parallel([
-      Animated.timing(backdropOpacity, { toValue: 1, duration: 300, useNativeDriver: true }),
-      Animated.timing(contentScale, { toValue: 1, duration: 350, useNativeDriver: true }),
-      Animated.spring(checkScale, { toValue: 1, friction: 6, tension: 200, delay: 100, useNativeDriver: true }),
-      Animated.timing(statsCardAnim, { toValue: 1, duration: 350, delay: 250, useNativeDriver: true }),
-      Animated.timing(unlockRowAnim, { toValue: 1, duration: 350, delay: 400, useNativeDriver: true }),
-      Animated.timing(reviewRowAnim, { toValue: 1, duration: 350, delay: 500, useNativeDriver: true }),
-      Animated.timing(buttonsAnim, { toValue: 1, duration: 350, delay: 600, useNativeDriver: true }),
+      Animated.timing(backdropOpacity, { toValue: 1, duration: 300, useNativeDriver: Platform.OS !== 'web' }),
+      Animated.timing(contentScale, { toValue: 1, duration: 350, useNativeDriver: Platform.OS !== 'web' }),
+      Animated.spring(checkScale, { toValue: 1, friction: 6, tension: 200, delay: 100, useNativeDriver: Platform.OS !== 'web' }),
+      Animated.timing(statsCardAnim, { toValue: 1, duration: 350, delay: 250, useNativeDriver: Platform.OS !== 'web' }),
+      Animated.timing(unlockRowAnim, { toValue: 1, duration: 350, delay: 400, useNativeDriver: Platform.OS !== 'web' }),
+      Animated.timing(reviewRowAnim, { toValue: 1, duration: 350, delay: 500, useNativeDriver: Platform.OS !== 'web' }),
+      Animated.timing(buttonsAnim, { toValue: 1, duration: 350, delay: 600, useNativeDriver: Platform.OS !== 'web' }),
     ]).start();
 
     const xpListener = xpCountAnim.addListener(({ value }) => {
@@ -274,9 +274,12 @@ export default function VocabularyCompletionModal({
         style={[
           StyleSheet.absoluteFill,
           styles.backdrop,
-          { backgroundColor: isDarkMode ? 'rgba(7,15,28,0.44)' : 'rgba(20,20,25,0.55)', opacity: backdropOpacity },
+          {
+            backgroundColor: isDarkMode ? 'rgba(7,15,28,0.44)' : 'rgba(20,20,25,0.55)',
+            opacity: backdropOpacity,
+            pointerEvents: visible ? 'auto' : 'none',
+          },
         ]}
-        pointerEvents={visible ? 'auto' : 'none'}
       >
         <Animated.View
           style={[
@@ -330,7 +333,7 @@ export default function VocabularyCompletionModal({
                       <Text style={[styles.statLabel, { color: palette.label }]} numberOfLines={1}>
                         {item.label}
                       </Text>
-                      <Text style={[styles.statValue, { color: palette.value }]} numberOfLines={1}>
+                      <Text style={[styles.statValue, { color: palette.valueColor }]} numberOfLines={1}>
                         {isXpTile && typeof item.value === 'number' ? `+${displayedXP}` : item.value}
                       </Text>
                     </View>
@@ -505,10 +508,7 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     padding: 22,
     overflow: 'hidden',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.15,
-    shadowRadius: 20,
+    boxShadow: '0px 8px 20px rgba(0,0,0,0.15)',
     elevation: 6,
   },
   checkCircle: {

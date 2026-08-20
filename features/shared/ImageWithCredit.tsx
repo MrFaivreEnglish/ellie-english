@@ -9,6 +9,7 @@ import {
   View,
   ViewStyle,
   Animated,
+  Platform,
 } from 'react-native';
 import { useTheme } from '../settings/ThemeContext';
 
@@ -21,6 +22,8 @@ interface ImageWithCreditProps {
   showCredit?: boolean;
   creditLabel?: string;
   accessibilityLabel?: string;
+  /** Fires once the image's natural pixel size is known (or re-known after a source change). */
+  onNaturalSize?: (size: { width: number; height: number }) => void;
 }
 
 const LOADING_MESSAGES = [
@@ -44,6 +47,7 @@ const ImageWithCredit: React.FC<ImageWithCreditProps> = ({
   showCredit = true,
   creditLabel = 'Mr Faivre',
   accessibilityLabel = 'Lesson image',
+  onNaturalSize,
 }) => {
   const { colors } = useTheme();
   const isLocalBundledAsset = typeof source === 'number';
@@ -92,28 +96,34 @@ const ImageWithCredit: React.FC<ImageWithCreditProps> = ({
   useEffect(() => {
     let cancelled = false;
 
+    const applyNaturalSize = (size: { width: number; height: number }) => {
+      if (cancelled) return;
+      setNaturalSize(size);
+      onNaturalSize?.(size);
+    };
+
     if (source) {
       if (typeof source === 'number') {
         const asset = Image.resolveAssetSource(source as any);
-        if (!cancelled && asset?.width && asset?.height) {
-          setNaturalSize({ width: asset.width, height: asset.height });
+        if (asset?.width && asset?.height) {
+          applyNaturalSize({ width: asset.width, height: asset.height });
         }
       } else {
         const s = source as any;
         if (s?.uri) {
           Image.getSize(
             s.uri,
-            (w, h) => !cancelled && setNaturalSize({ width: w, height: h }),
+            (w, h) => applyNaturalSize({ width: w, height: h }),
             () => !cancelled && setNaturalSize(null)
           );
         } else if (s?.width && s?.height) {
-          setNaturalSize({ width: s.width, height: s.height });
+          applyNaturalSize({ width: s.width, height: s.height });
         }
       }
     } else if (uri) {
       Image.getSize(
         uri,
-        (w, h) => !cancelled && setNaturalSize({ width: w, height: h }),
+        (w, h) => applyNaturalSize({ width: w, height: h }),
         () => !cancelled && setNaturalSize(null)
       );
     }
@@ -121,6 +131,7 @@ const ImageWithCredit: React.FC<ImageWithCreditProps> = ({
     return () => {
       cancelled = true;
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [source, uri]);
 
   // ----------------------------
@@ -171,7 +182,7 @@ const ImageWithCredit: React.FC<ImageWithCreditProps> = ({
       Animated.timing(fadeAnim, {
         toValue: 1,
         duration: 400,
-        useNativeDriver: true,
+        useNativeDriver: Platform.OS !== 'web',
       }).start();
     }
   };
@@ -196,8 +207,7 @@ const ImageWithCredit: React.FC<ImageWithCreditProps> = ({
     >
       {loading && !hasImageError && (
         <View
-          pointerEvents="none"
-          style={[styles.placeholder, styles.placeholderContent]}
+          style={[styles.placeholder, styles.placeholderContent, { pointerEvents: 'none' }]}
         >
           {!!loadingText && (
             <View style={styles.loadingBadge}>
@@ -242,10 +252,10 @@ const ImageWithCredit: React.FC<ImageWithCreditProps> = ({
       {/* CREDIT — DO NOT TOUCH THIS */}
       {showCredit && (
         <View
-          pointerEvents="none"
           style={[
             styles.creditBadge,
             {
+              pointerEvents: 'none',
               position: 'absolute',
               top: creditVerticalInset + 12,
               right: creditHorizontalInset + 12,

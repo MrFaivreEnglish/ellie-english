@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import GrammarCategoryList from './GrammarCategoryList';
 import GrammarQuiz from './GrammarQuiz';
 import { getMenuCopy } from '../shared/menuCopy';
@@ -8,6 +8,7 @@ import type { CompositeScreenProps } from '@react-navigation/native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import type { TabParamList, RootStackParamList } from '../../types/navigationTypes';
 import type { GrammarLesson, VocabularyLesson } from '../../types/lessonTypes';
+import { getSerializableVocabularyLesson } from '../vocabulary/vocabularyUtils';
 
 type GrammarScreenProps = CompositeScreenProps<
   BottomTabScreenProps<TabParamList, 'Grammar'>,
@@ -32,7 +33,7 @@ const GrammarScreen = ({ route, navigation }: GrammarScreenProps) => {
     navigation.navigate('Vocabulary', {
       screen: 'VocabularyLesson',
       params: {
-        lesson,
+        lesson: getSerializableVocabularyLesson(lesson),
         backLabel: back.label,
         backTarget: back.target ?? 'Grammar',
       },

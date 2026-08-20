@@ -28,6 +28,7 @@ export type VocabularyLessonCardProps = {
   lesson: VocabularyLesson;
   rowIndex: number;
   cardView: 'list' | 'tile';
+  compactTile: boolean;
   selectionMode: boolean;
   selected: boolean;
   imageFailed: boolean;
@@ -46,6 +47,7 @@ const VocabularyLessonCard = React.memo(({
   lesson,
   rowIndex,
   cardView,
+  compactTile,
   selectionMode,
   selected,
   imageFailed,
@@ -66,6 +68,7 @@ const VocabularyLessonCard = React.memo(({
   const lessonImageKey = String(lesson.id || lesson.title || lessonTitle || rowIndex);
   const wordCount = getLessonWordCount(lesson);
   const isTile = cardView === 'tile';
+  const isCompactTile = isTile && compactTile;
 
   const handlePress = useCallback(() => {
     if (selectionMode) {
@@ -84,31 +87,33 @@ const VocabularyLessonCard = React.memo(({
   return (
     <Animated.View
       entering={FadeInDown.delay(Math.min(rowIndex, 10) * 40).duration(300)}
-      style={[isTile ? { width: '48%' as const } : undefined, cardPress.animatedStyle, selectPopStyle]}
+      style={isTile ? [styles.lessonTileWrap, isCompactTile && styles.lessonTileWrapCompact] : undefined}
     >
-    <TouchableOpacity
-      style={[
-        styles.lessonCard,
-        getPanelStyle(colors, isDarkMode, 'soft'),
-        styles.lessonCardNoShadow,
-        isTile ? styles.lessonCardTile : styles.lessonCardList,
-        selectionMode && (isTile ? styles.lessonCardTileSelectionMode : styles.lessonCardSelectionMode),
-        {
-          backgroundColor: selected ? colors.primarySoft : colors.card,
-          borderColor: selected ? colors.primary : colors.border,
-          borderBottomColor: selected ? colors.primary : colors.border,
-          borderBottomWidth: selected ? 3 : 2,
-          borderWidth: selected ? 2 : 1.5,
-        },
-        isTile && { width: '100%' as const },
-      ]}
-      onPress={handlePress}
-      onPressIn={cardPress.onPressIn}
-      onPressOut={cardPress.onPressOut}
-      accessibilityRole="button"
-      accessibilityLabel={`Open ${lessonTitle}`}
-      accessibilityState={selectionMode ? { selected } : undefined}
-    >
+      <Animated.View style={[cardPress.animatedStyle, selectPopStyle]}>
+        <TouchableOpacity
+          style={[
+            styles.lessonCard,
+            getPanelStyle(colors, isDarkMode, 'soft'),
+            styles.lessonCardNoShadow,
+            isTile ? styles.lessonCardTile : styles.lessonCardList,
+            isCompactTile && styles.lessonCardTileCompact,
+            selectionMode && (isTile ? styles.lessonCardTileSelectionMode : styles.lessonCardSelectionMode),
+            {
+              backgroundColor: selected ? colors.primarySoft : colors.card,
+              borderColor: selected ? colors.primary : colors.border,
+              borderBottomColor: selected ? colors.primary : colors.border,
+              borderBottomWidth: selected ? 3 : 2,
+              borderWidth: selected ? 2 : 1.5,
+            },
+            isTile && { width: '100%' as const },
+          ]}
+          onPress={handlePress}
+          onPressIn={cardPress.onPressIn}
+          onPressOut={cardPress.onPressOut}
+          accessibilityRole="button"
+          accessibilityLabel={`Open ${lessonTitle}`}
+          accessibilityState={selectionMode ? { selected } : undefined}
+        >
       {selectionMode && (
         <View
           style={[
@@ -144,7 +149,8 @@ const VocabularyLessonCard = React.memo(({
         style={[
           styles.lessonImageFrame,
           isTile && styles.lessonImageFrameTile,
-          { backgroundColor: 'transparent', borderColor: 'transparent', shadowOpacity: 0 },
+          isCompactTile && styles.lessonImageFrameTileCompact,
+          { backgroundColor: 'transparent', borderColor: 'transparent' },
           imageFailed && [styles.lessonImageFallback, { borderColor: colors.border }],
         ]}
       >
@@ -156,6 +162,7 @@ const VocabularyLessonCard = React.memo(({
           <Image
             source={imageSource}
             style={styles.lessonImage}
+            resizeMode="cover"
             fadeDuration={0}
             onError={handleImageError}
             accessibilityIgnoresInvertColors
@@ -163,10 +170,10 @@ const VocabularyLessonCard = React.memo(({
         )}
       </View>
 
-      <View style={[styles.lessonContent, isTile && styles.lessonContentTile]}>
+      <View style={[styles.lessonContent, isTile && styles.lessonContentTile, isCompactTile && styles.lessonContentTileCompact]}>
         <View style={[styles.lessonTopRow, isTile && styles.lessonTopRowTile]}>
           <Text
-            style={[styles.lessonTitle, isTile && styles.lessonTitleTile, { color: colors.text }]}
+            style={[styles.lessonTitle, isTile && styles.lessonTitleTile, isCompactTile && styles.lessonTitleTileCompact, { color: colors.text }]}
             numberOfLines={2}
           >
             {lessonTitle}
@@ -184,7 +191,7 @@ const VocabularyLessonCard = React.memo(({
         </View>
 
         <Text
-          style={[styles.lessonMetaLine, isTile && styles.lessonMetaLineTile, { color: colors.secondaryText }]}
+          style={[styles.lessonMetaLine, isTile && styles.lessonMetaLineTile, isCompactTile && styles.lessonMetaLineTileCompact, { color: colors.secondaryText }]}
         >
           {wordCount} {wordCount > 1 ? copy.wordPlural : copy.wordSingular}
         </Text>
@@ -195,7 +202,8 @@ const VocabularyLessonCard = React.memo(({
           </Text>
         )}
       </View>
-    </TouchableOpacity>
+        </TouchableOpacity>
+      </Animated.View>
     </Animated.View>
   );
 });
@@ -211,8 +219,11 @@ const styles = StyleSheet.create({
     position: 'relative',
   },
   lessonCardNoShadow: { boxShadow: 'none' as any, elevation: 0 },
+  lessonTileWrap: { width: '48%' },
+  lessonTileWrapCompact: { width: '46%' },
   lessonCardList: { flexDirection: 'row', alignItems: 'center', minHeight: 82 },
   lessonCardTile: { width: '48%', minHeight: 148, alignItems: 'center', paddingTop: 10, paddingBottom: 10 },
+  lessonCardTileCompact: { minHeight: 136, marginBottom: 16, padding: 8, paddingTop: 8, paddingBottom: 9 },
   lessonCardSelectionMode: { paddingRight: 46 },
   lessonCardTileSelectionMode: { paddingTop: 20 },
   lessonImageFrame: {
@@ -223,20 +234,21 @@ const styles = StyleSheet.create({
     elevation: 0,
     marginRight: 9,
     overflow: 'hidden',
-    shadowOffset: { width: 0, height: 3 },
-    shadowRadius: 0,
   },
   lessonImageFrameTile: { width: 90, height: 90, marginRight: 0, marginBottom: 12, borderRadius: 10 },
-  lessonImage: { width: '100%', height: '100%', resizeMode: 'cover', borderRadius: 0 },
+  lessonImageFrameTileCompact: { width: 76, height: 76, marginBottom: 9, borderRadius: 9 },
+  lessonImage: { width: '100%', height: '100%', borderRadius: 0 },
   lessonImageFallback: { alignItems: 'center', justifyContent: 'center', borderWidth: 0 },
   lessonImagePlaceholder: { width: '100%', height: '100%', alignItems: 'center', justifyContent: 'center', borderRadius: 8 },
   lessonImagePlaceholderEmoji: { fontSize: 28, lineHeight: 34 },
   lessonContent: { flex: 1, justifyContent: 'center', minWidth: 0 },
   lessonContentTile: { alignItems: 'center', justifyContent: 'flex-start', paddingTop: 2 },
+  lessonContentTileCompact: { paddingTop: 0 },
   lessonTopRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 8 },
   lessonTopRowTile: { width: '100%', justifyContent: 'center' },
   lessonTitle: { flex: 1, fontSize: 17, fontWeight: '700', lineHeight: 21, textTransform: 'capitalize' },
   lessonTitleTile: { textAlign: 'center', lineHeight: 19, fontSize: 15 },
+  lessonTitleTileCompact: { fontSize: 14, lineHeight: 18 },
   lessonDifficultyBadge: {
     minWidth: 42,
     paddingHorizontal: 8,
@@ -271,5 +283,6 @@ const styles = StyleSheet.create({
   lessonDifficultyText: { fontSize: 12, fontWeight: '800' },
   lessonMetaLine: { fontSize: 13, fontWeight: '700', marginTop: 4 },
   lessonMetaLineTile: { textAlign: 'center', marginTop: 6 },
+  lessonMetaLineTileCompact: { fontSize: 12, marginTop: 4 },
   lessonDescription: { fontSize: 13, lineHeight: 17, marginTop: 4 },
 });

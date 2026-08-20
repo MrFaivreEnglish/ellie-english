@@ -158,3 +158,22 @@ export const getLessonThumbnailSource = (lesson: { title?: string; thumbnail?: a
 
   return getLocalLessonImage(lesson.title);
 };
+
+/**
+ * React Navigation requires route params to contain plain serializable data.
+ * Web asset modules can include helper functions (notably `toString`), so keep
+ * only their URI when a lesson is placed in navigation state. Native numeric
+ * require() handles are already serializable and can pass through unchanged.
+ */
+export const getSerializableVocabularyLesson = <T extends { thumbnail?: any }>(lesson: T): T => {
+  const thumbnail = lesson?.thumbnail;
+  if (!thumbnail || typeof thumbnail === 'number') return lesson;
+
+  if (typeof thumbnail === 'object' && typeof thumbnail.uri === 'string') {
+    return { ...lesson, thumbnail: { uri: thumbnail.uri } };
+  }
+
+  const serializableLesson = { ...lesson };
+  delete serializableLesson.thumbnail;
+  return serializableLesson;
+};

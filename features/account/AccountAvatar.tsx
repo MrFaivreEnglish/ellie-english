@@ -84,10 +84,7 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
   },
   premiumAvatar: {
-    shadowColor: '#C48B00',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.22,
-    shadowRadius: 5,
+    boxShadow: '0px 2px 5px rgba(196,139,0,0.22)',
     elevation: 3,
   },
   thumbnail: {

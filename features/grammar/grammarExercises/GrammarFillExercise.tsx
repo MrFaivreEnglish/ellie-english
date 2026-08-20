@@ -149,7 +149,7 @@ const GrammarFillExercise: React.FC<GrammarFillExerciseProps> = ({
             backgroundColor: 'transparent',
             borderWidth: 0,
             borderRadius: 0,
-            shadowOpacity: 0,
+            boxShadow: 'none',
             elevation: 0,
           },
         ]}
@@ -206,7 +206,7 @@ const GrammarFillExercise: React.FC<GrammarFillExerciseProps> = ({
             ]}
           />
           {!fillAnswer && (
-            <View style={styles.fillPlaceholderOverlay} pointerEvents="none">
+            <View style={[styles.fillPlaceholderOverlay, { pointerEvents: 'none' }]}>
               <Text
                 style={[
                   styles.fillPlaceholderText,
@@ -266,10 +266,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#fff',
     borderWidth: 0,
     justifyContent: 'flex-start',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.05,
-    shadowRadius: 12,
+    boxShadow: '0px 4px 12px rgba(0,0,0,0.05)',
     elevation: 2,
   },
   inputShell: {

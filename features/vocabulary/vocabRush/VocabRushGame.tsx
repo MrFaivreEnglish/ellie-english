@@ -151,9 +151,9 @@ export default function VocabRushGame({
   const playExitAnimation = (slotKey: string) => {
     const anim = getCardAnim(slotKey);
     Animated.parallel([
-      Animated.timing(anim.opacity, { toValue: 0, duration: CARD_EXIT_MS, easing: Easing.in(Easing.cubic), useNativeDriver: true }),
-      Animated.timing(anim.scale, { toValue: 0.86, duration: CARD_EXIT_MS, easing: Easing.in(Easing.cubic), useNativeDriver: true }),
-      Animated.timing(anim.translateY, { toValue: -CARD_ENTER_OFFSET, duration: CARD_EXIT_MS, easing: Easing.in(Easing.cubic), useNativeDriver: true }),
+      Animated.timing(anim.opacity, { toValue: 0, duration: CARD_EXIT_MS, easing: Easing.in(Easing.cubic), useNativeDriver: Platform.OS !== 'web' }),
+      Animated.timing(anim.scale, { toValue: 0.86, duration: CARD_EXIT_MS, easing: Easing.in(Easing.cubic), useNativeDriver: Platform.OS !== 'web' }),
+      Animated.timing(anim.translateY, { toValue: -CARD_ENTER_OFFSET, duration: CARD_EXIT_MS, easing: Easing.in(Easing.cubic), useNativeDriver: Platform.OS !== 'web' }),
     ]).start();
   };
 
@@ -170,9 +170,9 @@ export default function VocabRushGame({
           anim.scale.setValue(0.94);
           anim.translateY.setValue(CARD_ENTER_OFFSET);
           Animated.parallel([
-            Animated.timing(anim.opacity, { toValue: 1, duration: CARD_ENTER_MS, easing: Easing.out(Easing.cubic), useNativeDriver: true }),
-            Animated.timing(anim.scale, { toValue: 1, duration: CARD_ENTER_MS, easing: Easing.out(Easing.cubic), useNativeDriver: true }),
-            Animated.timing(anim.translateY, { toValue: 0, duration: CARD_ENTER_MS, easing: Easing.out(Easing.cubic), useNativeDriver: true }),
+            Animated.timing(anim.opacity, { toValue: 1, duration: CARD_ENTER_MS, easing: Easing.out(Easing.cubic), useNativeDriver: Platform.OS !== 'web' }),
+            Animated.timing(anim.scale, { toValue: 1, duration: CARD_ENTER_MS, easing: Easing.out(Easing.cubic), useNativeDriver: Platform.OS !== 'web' }),
+            Animated.timing(anim.translateY, { toValue: 0, duration: CARD_ENTER_MS, easing: Easing.out(Easing.cubic), useNativeDriver: Platform.OS !== 'web' }),
           ]).start();
         }
 
@@ -245,8 +245,8 @@ export default function VocabRushGame({
       if (!timerPulseLoopRef.current) {
         const loop = Animated.loop(
           Animated.sequence([
-            Animated.timing(timerPulseAnim, { toValue: 1.22, duration: 260, easing: Easing.out(Easing.cubic), useNativeDriver: true }),
-            Animated.timing(timerPulseAnim, { toValue: 1, duration: 260, easing: Easing.in(Easing.cubic), useNativeDriver: true }),
+            Animated.timing(timerPulseAnim, { toValue: 1.22, duration: 260, easing: Easing.out(Easing.cubic), useNativeDriver: Platform.OS !== 'web' }),
+            Animated.timing(timerPulseAnim, { toValue: 1, duration: 260, easing: Easing.in(Easing.cubic), useNativeDriver: Platform.OS !== 'web' }),
           ])
         );
         timerPulseLoopRef.current = loop;

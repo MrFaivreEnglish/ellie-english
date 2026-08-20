@@ -218,7 +218,7 @@ const GrammarReorderExercise: React.FC<GrammarReorderExerciseProps> = ({
               backgroundColor: 'transparent',
               borderTopWidth: 0,
               borderRadius: 0,
-              shadowOpacity: 0,
+              boxShadow: 'none',
               elevation: 0,
             },
             incorrectAnswer === 'reorder' && [
@@ -315,7 +315,7 @@ const GrammarReorderExercise: React.FC<GrammarReorderExerciseProps> = ({
             isDesktopWeb && styles.reorderCardDesktopWeb,
             {
               backgroundColor: 'transparent',
-              shadowOpacity: 0,
+              boxShadow: 'none',
               elevation: 0,
             },
           ]}
@@ -346,8 +346,9 @@ const GrammarReorderExercise: React.FC<GrammarReorderExerciseProps> = ({
                       { paddingVertical: chipVerticalPadding, paddingHorizontal: chipHorizontalPadding },
                       {
                         backgroundColor: grammarGame.wordChipSurface,
-                        shadowColor: isDarkMode ? '#000' : grammarGame.panelShadow,
-                        shadowOpacity: isDarkMode ? 0.2 : 0.08,
+                        boxShadow: isDarkMode
+                          ? '0px 2px 4px rgba(0,0,0,0.20)'
+                          : '0px 2px 4px rgba(0,0,0,0.08)',
                       },
                       isSelected && wordBankStyles.disabledWordChip,
                     ]}

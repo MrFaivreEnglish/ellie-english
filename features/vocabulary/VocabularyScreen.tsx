@@ -18,7 +18,7 @@ import Animated, { FadeIn, FadeOut } from 'react-native-reanimated';
 import { useTheme } from '../settings/ThemeContext';
 import BackButton from '../shared/BackButton';
 import { useSearchFocusAnimation } from '../shared/useSearchFocusAnimation';
-import { getLessonImage, getLessonThumbnailSource, shuffleArray } from './vocabularyUtils';
+import { getLessonImage, getLessonThumbnailSource, getSerializableVocabularyLesson, shuffleArray } from './vocabularyUtils';
 import { vocabularyCategories } from '../../content/lessons/vocabularyRegistry';
 import { getCustomVocabularyLessons } from '../lessons/customLessonStorage';
 import { getMenuCopy } from '../shared/menuCopy';
@@ -359,7 +359,7 @@ export default function VocabularyScreen() {
   }, []);
 
   const openVocabularyLesson = useCallback((lesson: any) => {
-    navigation.navigate('VocabularyLesson', { lesson });
+    navigation.navigate('VocabularyLesson', { lesson: getSerializableVocabularyLesson(lesson) });
   }, [navigation]);
 
   const filterLessons = React.useCallback(
@@ -548,6 +548,7 @@ export default function VocabularyScreen() {
               lesson={lesson}
               rowIndex={i}
               cardView={cardView}
+              compactTile={windowWidth < 768}
               selectionMode={selectionMode}
               selected={selectedLessonKeys.has(lessonProgressKey)}
               imageFailed={failedLessonImageKeys.has(lessonImageKey)}
@@ -563,12 +564,12 @@ export default function VocabularyScreen() {
             />
           );
         })}
-        {isTile && item.lessons.length === 1 && <View style={{ width: '48%' }} />}
+        {isTile && item.lessons.length === 1 && <View style={{ width: windowWidth < 768 ? '46%' : '48%' }} />}
       </View>
     );
   }, [
     cardView, selectionMode, selectedLessonKeys, failedLessonImageKeys,
-    colors, isDarkMode, copy, openVocabularyLesson, toggleLessonSelection, markLessonImageFailed,
+    colors, isDarkMode, copy, openVocabularyLesson, toggleLessonSelection, markLessonImageFailed, windowWidth,
   ]);
 
   return (
@@ -776,11 +777,11 @@ export default function VocabularyScreen() {
 
       {selectionMode && (
         <View
-          pointerEvents="box-none"
           style={[
             styles.selectionTrayWrap,
             {
               paddingBottom: selectionTrayBottomPadding,
+              pointerEvents: 'box-none',
             },
           ]}
         >
@@ -951,7 +952,6 @@ export default function VocabularyScreen() {
               {
                 backgroundColor: colors.card,
                 borderColor: colors.border,
-                shadowColor: '#000',
                 top: sortAnchor.y + sortAnchor.height + 8,
                 left: sortAnchor.x,
               },
@@ -999,7 +999,6 @@ export default function VocabularyScreen() {
               {
                 backgroundColor: colors.card,
                 borderColor: colors.border,
-                shadowColor: '#000',
                 top: difficultyAnchor.y + difficultyAnchor.height + 8,
                 left: Math.max(16, difficultyAnchor.x + difficultyAnchor.width - 188),
               },
@@ -1138,9 +1137,6 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     overflow: 'hidden',
     zIndex: 9999,
-    shadowOpacity: 0.16,
-    shadowRadius: 10,
-    shadowOffset: { width: 0, height: 6 },
     elevation: 8,
   },
   difficultyMenu: { width: 210 },
@@ -1380,10 +1376,7 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
     padding: 0,
     position: 'absolute',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.18,
-    shadowRadius: 6,
+    boxShadow: '0px 2px 6px rgba(0,0,0,0.18)',
     top: 3,
     width: 74,
   },

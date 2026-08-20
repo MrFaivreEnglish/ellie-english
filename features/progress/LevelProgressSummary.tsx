@@ -1,5 +1,5 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { Animated, Image, Pressable, StyleProp, StyleSheet, Text, View, ViewStyle } from 'react-native';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { Animated, Image, Platform, Pressable, StyleProp, StyleSheet, Text, View, ViewStyle } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { getAccountAvatarUnlocksBetweenLevels, type AccountAvatarPreset } from '../account/accountAvatarStorage';
 import type { ThemeColors } from '../settings/ThemeContext';
@@ -133,13 +133,13 @@ export default function LevelProgressSummary({
         confettiScaleArr[i].setValue(0);
         confettiRotArr[i].setValue(0);
         Animated.parallel([
-          Animated.spring(confettiScaleArr[i], { toValue: 1, friction: 3.5, tension: 400, useNativeDriver: true }),
-          Animated.timing(confettiXArr[i], { toValue: Math.cos(p.angle) * p.distance, duration: 600, useNativeDriver: true }),
-          Animated.timing(confettiYArr[i], { toValue: Math.sin(p.angle) * p.distance, duration: 600, useNativeDriver: true }),
-          Animated.timing(confettiRotArr[i], { toValue: p.spinDeg, duration: 600, useNativeDriver: true }),
+          Animated.spring(confettiScaleArr[i], { toValue: 1, friction: 3.5, tension: 400, useNativeDriver: Platform.OS !== 'web' }),
+          Animated.timing(confettiXArr[i], { toValue: Math.cos(p.angle) * p.distance, duration: 600, useNativeDriver: Platform.OS !== 'web' }),
+          Animated.timing(confettiYArr[i], { toValue: Math.sin(p.angle) * p.distance, duration: 600, useNativeDriver: Platform.OS !== 'web' }),
+          Animated.timing(confettiRotArr[i], { toValue: p.spinDeg, duration: 600, useNativeDriver: Platform.OS !== 'web' }),
           Animated.sequence([
             Animated.delay(200),
-            Animated.timing(confettiOpacityArr[i], { toValue: 0, duration: 400, useNativeDriver: true }),
+            Animated.timing(confettiOpacityArr[i], { toValue: 0, duration: 400, useNativeDriver: Platform.OS !== 'web' }),
           ]),
         ]).start();
       });
@@ -155,8 +155,8 @@ export default function LevelProgressSummary({
         progressAnim.setValue(0);
         if (!isLast) {
           Animated.sequence([
-            Animated.spring(levelBumpScale, { toValue: 1.25, friction: 4, tension: 350, useNativeDriver: true }),
-            Animated.spring(levelBumpScale, { toValue: 1, friction: 5, tension: 200, useNativeDriver: true }),
+            Animated.spring(levelBumpScale, { toValue: 1.25, friction: 4, tension: 350, useNativeDriver: Platform.OS !== 'web' }),
+            Animated.spring(levelBumpScale, { toValue: 1, friction: 5, tension: 200, useNativeDriver: Platform.OS !== 'web' }),
           ]).start();
           animateStep(currentLevel + 1);
         } else {
@@ -164,14 +164,14 @@ export default function LevelProgressSummary({
           levelUpBannerScale.setValue(0.72);
           levelUpBannerOpacity.setValue(0);
           Animated.parallel([
-            Animated.spring(levelUpBannerScale, { toValue: 1, friction: 4, tension: 320, useNativeDriver: true }),
-            Animated.timing(levelUpBannerOpacity, { toValue: 1, duration: 120, useNativeDriver: true }),
+            Animated.spring(levelUpBannerScale, { toValue: 1, friction: 4, tension: 320, useNativeDriver: Platform.OS !== 'web' }),
+            Animated.timing(levelUpBannerOpacity, { toValue: 1, duration: 120, useNativeDriver: Platform.OS !== 'web' }),
           ]).start();
           fireConfetti();
           Animated.parallel([
             Animated.sequence([
-              Animated.spring(levelBumpScale, { toValue: 1.55, friction: 3, tension: 300, useNativeDriver: true }),
-              Animated.spring(levelBumpScale, { toValue: 1, friction: 4, tension: 180, useNativeDriver: true }),
+              Animated.spring(levelBumpScale, { toValue: 1.55, friction: 3, tension: 300, useNativeDriver: Platform.OS !== 'web' }),
+              Animated.spring(levelBumpScale, { toValue: 1, friction: 4, tension: 180, useNativeDriver: Platform.OS !== 'web' }),
             ]),
             Animated.timing(progressAnim, { toValue: stats.progressPercent, duration: 520, useNativeDriver: false }),
           ]).start();
@@ -204,8 +204,8 @@ export default function LevelProgressSummary({
       {didLevelUp && CONFETTI_PARTICLES.map((p, i) => (
         <Animated.View
           key={i}
-          pointerEvents="none"
           style={{
+            pointerEvents: 'none',
             position: 'absolute',
             top: '50%',
             left: '50%',
@@ -350,10 +350,7 @@ const styles = StyleSheet.create({
     padding: 16,
     marginTop: 12,
     marginBottom: 10,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 5 },
-    shadowOpacity: 0.08,
-    shadowRadius: 12,
+    boxShadow: '0px 5px 12px rgba(0,0,0,0.08)',
     elevation: 3,
   },
   levelUpBanner: {

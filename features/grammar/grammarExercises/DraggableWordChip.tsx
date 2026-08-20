@@ -80,10 +80,7 @@ const DraggableWordChip: React.FC<DraggableWordChipProps> = ({
     ],
     zIndex: isActive.value ? 20 : 0,
     elevation: isActive.value ? 14 : 0,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: isActive.value ? 6 : 0 },
-    shadowOpacity: isActive.value ? 0.28 : 0,
-    shadowRadius: isActive.value ? 10 : 0,
+    boxShadow: isActive.value ? '0px 6px 10px rgba(0,0,0,0.28)' : 'none',
   }));
 
   return (

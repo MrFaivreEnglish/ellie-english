@@ -50,8 +50,7 @@ function AndroidStatusBarBackdrop({ visible, color }: { visible: boolean; color:
 
   return (
     <View
-      pointerEvents="none"
-      style={[styles.statusBarBackdrop, { height: insets.top, backgroundColor: color }]}
+      style={[styles.statusBarBackdrop, { height: insets.top, backgroundColor: color, pointerEvents: 'none' }]}
     />
   );
 }

@@ -186,17 +186,16 @@ export default function VocabularyFlashcard({
   const cardShadowOpacity = isDarkMode ? 0.34 : 0.18;
   const englishCardInnerBorderColor = isDarkMode ? 'rgba(255,255,255,0.14)' : 'rgba(255,255,255,0.82)';
   const colorCardInnerBorderColor = 'rgba(255,255,255,0.24)';
-  const cardFaceShadowStyle = {
-    shadowColor: cardShadowColor,
-    shadowOpacity: cardShadowOpacity,
-    ...(Platform.OS === 'web'
-      ? {
-          boxShadow: isDarkMode
-            ? '0px 16px 24px rgba(0, 0, 0, 0.36), 0px 2px 7px rgba(0, 0, 0, 0.22)'
-            : '0px 14px 20px rgba(0, 0, 0, 0.20), 0px 2px 7px rgba(0, 0, 0, 0.13)',
-        }
-      : null),
-  } as const;
+  const cardFaceShadowStyle = Platform.OS === 'web'
+    ? {
+        boxShadow: isDarkMode
+          ? '0px 16px 24px rgba(0, 0, 0, 0.36), 0px 2px 7px rgba(0, 0, 0, 0.22)'
+          : '0px 14px 20px rgba(0, 0, 0, 0.20), 0px 2px 7px rgba(0, 0, 0, 0.13)',
+      }
+    : {
+        shadowColor: cardShadowColor,
+        shadowOpacity: cardShadowOpacity,
+      } as const;
 
   const getSideAppearance = (isEnglishSide: boolean) => ({
     backgroundColor: isEnglishSide ? englishSideBackground : frenchSideBackground,
@@ -511,10 +510,10 @@ export default function VocabularyFlashcard({
                 ] as any}>
                   <View style={[styles.cardContent, { padding: contentPadding }]}>
                     <View
-                      pointerEvents="none"
                       style={[
                         styles.cardInnerHighlight,
                         { borderColor: frontIsEnglish ? englishCardInnerBorderColor : colorCardInnerBorderColor },
+                        { pointerEvents: 'none' },
                       ]}
                     />
                     {renderStatusBadges(frontAppearance)}
@@ -562,10 +561,10 @@ export default function VocabularyFlashcard({
                 ] as any}>
                   <View style={[styles.cardContent, { padding: contentPadding }]}>
                     <View
-                      pointerEvents="none"
                       style={[
                         styles.cardInnerHighlight,
                         { borderColor: frontIsEnglish ? colorCardInnerBorderColor : englishCardInnerBorderColor },
+                        { pointerEvents: 'none' },
                       ]}
                     />
                     {renderStatusBadges(backAppearance)}
@@ -1074,8 +1073,10 @@ const styles = StyleSheet.create({
     borderWidth: 1.6,
   },
   cardPhysicalShadow: {
-    shadowOffset: { width: 0, height: 8 },
-    shadowRadius: 16,
+    ...(Platform.OS === 'web' ? null : {
+      shadowOffset: { width: 0, height: 8 },
+      shadowRadius: 16,
+    }),
     elevation: 12,
   },
   cardContent: {
@@ -1117,10 +1118,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     position: 'absolute',
     right: 20,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.08,
-    shadowRadius: 4,
+    boxShadow: '0px 2px 4px rgba(0,0,0,0.08)',
     elevation: 3,
     width: 36,
     zIndex: 8,
@@ -1188,20 +1186,14 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   controlSurfaceShadow: {
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.06,
-    shadowRadius: 3,
+    boxShadow: '0px 1px 3px rgba(0,0,0,0.06)',
     elevation: 2,
   },
   navButton: {
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 1.4,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.06,
-    shadowRadius: 3,
+    boxShadow: '0px 1px 3px rgba(0,0,0,0.06)',
     elevation: 2,
   },
   navButtonPressed: {
@@ -1210,7 +1202,7 @@ const styles = StyleSheet.create({
   },
   navButtonDisabled: {
     opacity: 0.42,
-    shadowOpacity: 0,
+    boxShadow: 'none',
     elevation: 0,
   },
   knowledgeNavButton: {
@@ -1237,8 +1229,7 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   knowledgeNavButtonSelected: {
-    shadowOpacity: 0.11,
-    shadowRadius: 5,
+    boxShadow: '0px 1px 5px rgba(0,0,0,0.11)',
     elevation: 3,
   },
   deckCounterPill: {

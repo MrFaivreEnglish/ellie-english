@@ -1,11 +1,10 @@
 import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Image, ScrollView, Platform, useWindowDimensions, Modal, KeyboardAvoidingView, Keyboard } from 'react-native';
-import BackButton from '../shared/BackButton';
+import { View, Text, StyleSheet, TouchableOpacity, Image, ScrollView, Modal, Keyboard } from 'react-native';
 import ImageWithCredit from '../shared/ImageWithCredit';
 import VocabularyFlashcard from './VocabularyFlashcard';
 import VocabularyMatching from './VocabularyMatching';
 import VocabularyCompletionModal from './VocabularyCompletionModal';
-import { VocabularySecondViewShell } from './VocabularySecondViewShell';
+import LessonPracticeSheet from './LessonPracticeSheet';
 import { useTheme } from '../settings/ThemeContext';
 import { useVocabularyGame } from './useVocabularyGame';
 import { getLessonImage, getLessonThumbnailSource, getMatchingSetCount, shuffleArray } from './vocabularyUtils';
@@ -14,8 +13,7 @@ import { useTypingGame } from './useTypingGame';
 import VocabularyTyping from './TypingView';
 import { useFocusEffect } from '@react-navigation/native';
 import { MaterialIcons } from '@expo/vector-icons';
-import { scaleValue } from '../shared/responsiveLayout';
-import { useLessonLayout, VocabularyMode } from './useLessonLayout';
+import { useLessonSheetLayout, VocabularyMode } from './useLessonSheetLayout';
 import { markPracticeActivityToday } from '../progress/xpStorage';
 import { saveLastLesson } from '../progress/lastLessonStorage';
 import { triggerSelectionHaptic, triggerSuccessHaptic } from '../shared/haptics';
@@ -24,9 +22,8 @@ import {
   recordLearnedFlashcardToday,
   saveLearnedFlashcardKeys,
 } from './flashcardProgressStorage';
-import { getSoftShadow, uiRadii } from '../shared/uiPrimitives';
+import { getSoftShadow } from '../shared/uiPrimitives';
 import { FRESH_COLORS } from '../shared/freshDirection';
-import SoundWaveIcon from '../shared/SoundWaveIcon';
 import type { CompositeScreenProps } from '@react-navigation/native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import type { VocabularyStackParamList, RootStackParamList } from '../../types/navigationTypes';
@@ -44,6 +41,15 @@ type MixedVocabularyImageCard = {
   imageUrl: string;
 };
 
+// Hand-converted from the design spec's oklch() source values (hue 90 near-neutral warm
+// grays + the primary blue accent) — see features/shared/freshDirection.ts for the same
+// convention applied to the app's shared palette. Kept local to this screen's new chrome.
+const LESSON_CHROME_COLORS = {
+  ink: '#1E1A10', // oklch(0.22 0.02 90)
+  chipIdleText: '#3C382C', // oklch(0.34 0.02 90)
+  accent: '#0D7DD4', // oklch(0.58 0.16 250)
+};
+
 type Props = CompositeScreenProps<
   NativeStackScreenProps<VocabularyStackParamList, 'VocabularyLesson'>,
   NativeStackScreenProps<RootStackParamList>
@@ -58,69 +64,19 @@ const fmtMs = (ms: number) => {
 export default function VocabularyLessonScreen({ route, navigation }: Props) {
   const { isDarkMode, colors, isVocabTimerMode, isVocabTimerRecordSavingEnabled, isAndroidStatusBarEnabled, isVocabAudioMatchMode, toggleVocabAudioMatchMode } = useTheme();
   const initialRouteMode = resolveVocabularyMode(route?.params?.initialMode);
-  const { width: screenWidth, height: rawScreenHeight } = useWindowDimensions();
-  const [mode, setMode] = useState<VocabularyMode>(initialRouteMode);
-  const [viewportHeight, setViewportHeight] = useState(rawScreenHeight);
-  const [isSecondViewActive, setIsSecondViewActive] = useState(false);
-  const [stableScreenHeight, setStableScreenHeight] = useState(rawScreenHeight);
-  const [keyboardHeight, setKeyboardHeight] = useState(0);
+  const [sheetMode, setSheetMode] = useState<VocabularyMode | null>(null);
+  const mode = sheetMode ?? 'flashcards';
 
   const { lesson, backLabel = 'Back to Vocabulary', backTarget } = route.params;
-  const hasMatchingCategoryControls = Array.isArray((lesson?.flashcards?.[0] as any)?.words);
   const useRefillMatching = !!lesson?.useRefillMatching;
 
   const {
     useApkPreviewLayout,
     isAndroidLesson,
-    isWebLessonLayout,
-    useReservedModeShell,
-    lessonLayoutWidth,
-    isTypingKeyboardOpen,
-    lessonViewportHeight,
-    webLessonScale,
     isDesktopWebLesson,
-    isScaledWebLesson,
-    webLessonMediaMaxWidth,
-    lessonMediaWidth,
-    lessonImageContentScale,
-    webLessonGameMaxWidth,
-    webTypingGameMaxWidth,
-    webMatchingGameMaxWidth,
     layoutTopInset,
-    stickyHeaderPinnedTopPadding,
-    STICKY_TOP_SNAP_OFFSET,
-    FLASHCARDS_VIEW_SNAP_EXTRA,
-    TYPING_VIEW_SNAP_EXTRA,
-    FIRST_VIEW_SECOND_VIEW_GUARD,
-    LESSON_BODY_TOP_BUFFER,
-    ANDROID_GAME_TOOLBAR_HEIGHT,
-    hasAndroidGameToolbar,
-    flashcardModuleTopDrop,
-    compactModeButtons,
-    typingKeyboardInset,
-    scrollBottomPadding,
-    setTitleBlockHeight,
-    stickyHeaderHeight,
-    setStickyHeaderHeight,
-    overviewMinHeight,
-    lessonImageHeight,
-    secondViewMinHeight,
-    secondViewShellMinHeight,
-    gameViewportMinHeight,
-    flashcardLayoutHeight,
-    matchingViewportMinHeight,
-    typingViewportMinHeight,
-    matchingViewSnapExtra,
-  } = useLessonLayout({
-    mode,
-    viewportHeight,
-    screenWidth,
-    rawScreenHeight,
-    keyboardHeight,
-    stableScreenHeight,
-    hasMatchingCategoryControls,
-    isAndroidStatusBarEnabled,
-  });
+  } = useLessonSheetLayout(isAndroidStatusBarEnabled);
+
   const lessonIdentity = useMemo(
     () => String(lesson?.id || lesson?.title || 'lesson'),
     [lesson?.id, lesson?.title]
@@ -205,27 +161,8 @@ export default function VocabularyLessonScreen({ route, navigation }: Props) {
     });
   }, [isBorrowedVocabularyLesson, navigation, resetBorrowedVocabularyLesson]);
 
-  const scrollViewRef = useRef<ScrollView>(null);
-  const overviewHeightRef = useRef(0);
-  const secondViewYRef = useRef(0);
-  const lastLessonScrollYRef = useRef(0);
-  const lastLessonScrollDirectionRef = useRef<'up' | 'down'>('down');
-  const secondViewThresholdRef = useRef(0);
-  const isManualLessonScrollRef = useRef(false);
-  const matchingViewportLockRef = useRef({ width: screenWidth, height: lessonViewportHeight });
   const initializedLessonKeyRef = useRef<string | null>(null);
-  const pendingKeyboardHideScrollModeRef = useRef<VocabularyMode | null>(null);
-  const getSecondViewScrollY = useCallback((snapExtra = 0) => {
-    if (isAndroidLesson) {
-      const secondViewAnchorY = secondViewYRef.current > 0
-        ? secondViewYRef.current
-        : overviewHeightRef.current + layoutTopInset;
 
-      return Math.max(0, secondViewAnchorY + snapExtra);
-    }
-
-    return Math.max(0, overviewHeightRef.current + snapExtra);
-  }, [isAndroidLesson, layoutTopInset]);
   useEffect(() => {
     if (lesson?.isLearnedMix) return;
 
@@ -239,17 +176,6 @@ export default function VocabularyLessonScreen({ route, navigation }: Props) {
       title: lesson.title,
     });
   }, [backTarget, lesson?.id, lesson?.isLearnedMix, lesson?.practiceType, lesson.title]);
-
-  const scheduleSoftLayoutChange = useCallback(() => {}, []);
-
-  useEffect(() => {
-    const heightDrop = stableScreenHeight - rawScreenHeight;
-
-    if (!isTypingKeyboardOpen || rawScreenHeight > stableScreenHeight || heightDrop < 80) {
-      scheduleSoftLayoutChange();
-      setStableScreenHeight(rawScreenHeight);
-    }
-  }, [isTypingKeyboardOpen, rawScreenHeight, scheduleSoftLayoutChange, stableScreenHeight]);
 
   // Flashcards state
   const [currentWordIndex, setCurrentWordIndex] = useState(0);
@@ -419,6 +345,29 @@ const categories = useMemo<string[]>(() => {
     return getLessonImage(lesson.title);
   }, [lesson?.imageUrl, lesson?.image, lesson?.title, localImageSource, selectedCategoryImage]);
 
+  // Image stage sizing — the container is sized to the image's own fitted (contain)
+  // box, not the full stage, so the border-radius/shadow hug the image itself
+  // rather than an oversized, partly-transparent box.
+  const [stageSize, setStageSize] = useState({ width: 0, height: 0 });
+  const [imageAspectRatio, setImageAspectRatio] = useState<number | null>(null);
+
+  useEffect(() => {
+    setImageAspectRatio(null);
+  }, [preferredImageUri]);
+
+  const handleImageNaturalSize = useCallback((size: { width: number; height: number }) => {
+    if (size.width > 0 && size.height > 0) setImageAspectRatio(size.width / size.height);
+  }, []);
+
+  const fittedImageSize = useMemo(() => {
+    const { width: stageWidth, height: stageHeightPx } = stageSize;
+    if (stageWidth <= 0 || stageHeightPx <= 0) return { width: undefined as number | undefined, height: undefined as number | undefined };
+    if (!imageAspectRatio) return { width: stageWidth, height: stageHeightPx };
+
+    const width = Math.min(stageWidth, stageHeightPx * imageAspectRatio);
+    return { width, height: width / imageAspectRatio };
+  }, [stageSize, imageAspectRatio]);
+
   // Filtered words
   const filteredWords = useMemo(() => {
     if (!categories.length) return allWords;
@@ -505,8 +454,6 @@ const categories = useMemo<string[]>(() => {
     ),
     [filteredWords, learnedFlashcardKeys]
   );
-  const matchingUnlocked = true;
-  const typingUnlocked = true;
   const currentWordReadyToMarkKnown = !!currentFlashcardKey && seenBackFlashcardKeys.has(currentFlashcardKey);
   const activeCategoryLabel = useMemo(() => {
     if (!selectedCategories.length) return categoryPickerAllLabel;
@@ -575,6 +522,8 @@ const categories = useMemo<string[]>(() => {
       startTimer();
     }
   }, [timerMode, mode, matchingGamePairs?.english?.length, allSetsCompleted, startTimer]);
+
+  const prevIsVocabTimerModeRef = useRef(isVocabTimerMode);
 
   // Sync settings
   useEffect(() => {
@@ -682,127 +631,17 @@ const categories = useMemo<string[]>(() => {
     }
   }, [mode, typingShuffleSeed]);
 
-  const getModeSnapExtra = useCallback((targetMode: VocabularyMode) => {
-    if (isWebLessonLayout) return 0;
-
-    if (targetMode === 'typing') return TYPING_VIEW_SNAP_EXTRA;
-    if (targetMode === 'flashcards') return FLASHCARDS_VIEW_SNAP_EXTRA;
-    return matchingViewSnapExtra;
-  }, [
-    FLASHCARDS_VIEW_SNAP_EXTRA,
-    TYPING_VIEW_SNAP_EXTRA,
-    isWebLessonLayout,
-    matchingViewSnapExtra,
-  ]);
-
+  // Respect an explicit initialMode request (e.g. a shortcut from Grammar) by
+  // opening the sheet straight into that mode on first mount for this lesson.
   useEffect(() => {
     const lessonKey = `${lessonIdentity}::${initialRouteMode}`;
     if (initializedLessonKeyRef.current === lessonKey) return;
     initializedLessonKeyRef.current = lessonKey;
 
-    const scrollToInitialMode = (animated: boolean) => {
-      isManualLessonScrollRef.current = false;
-      if (initialRouteMode === 'flashcards') {
-        scrollViewRef.current?.scrollTo({ y: 0, animated });
-        return;
-      }
-
-      const snapExtra = getModeSnapExtra(initialRouteMode);
-      const targetY = getSecondViewScrollY(STICKY_TOP_SNAP_OFFSET + snapExtra);
-
-      scrollViewRef.current?.scrollTo({ y: targetY, animated });
-    };
-    const delayedScrolls: ReturnType<typeof setTimeout>[] = [];
-
-    setMode(initialRouteMode);
-    if (useReservedModeShell && initialRouteMode !== 'flashcards') {
-      setIsSecondViewActive(true);
+    if (initialRouteMode === 'matching' || initialRouteMode === 'typing') {
+      setSheetMode(initialRouteMode);
     }
-
-    requestAnimationFrame(() => {
-      scrollToInitialMode(false);
-    });
-
-    if (initialRouteMode !== 'flashcards') {
-      delayedScrolls.push(setTimeout(() => scrollToInitialMode(false), 260));
-      delayedScrolls.push(setTimeout(() => scrollToInitialMode(true), 540));
-    }
-
-    return () => {
-      delayedScrolls.forEach(clearTimeout);
-    };
-  }, [
-    FLASHCARDS_VIEW_SNAP_EXTRA,
-    getModeSnapExtra,
-    getSecondViewScrollY,
-    STICKY_TOP_SNAP_OFFSET,
-    TYPING_VIEW_SNAP_EXTRA,
-    initialRouteMode,
-    lessonIdentity,
-    matchingViewSnapExtra,
-    useReservedModeShell,
-  ]);
-
-  const scrollToGame = useCallback((targetMode: VocabularyMode = mode, animated = true) => {
-    isManualLessonScrollRef.current = false;
-    const snapExtra = getModeSnapExtra(targetMode);
-    const targetY = getSecondViewScrollY(STICKY_TOP_SNAP_OFFSET + snapExtra);
-
-    if (useReservedModeShell) {
-      setIsSecondViewActive(true);
-    }
-
-    requestAnimationFrame(() => {
-      scrollViewRef.current?.scrollTo({ y: targetY, animated });
-    });
-
-    setTimeout(() => {
-      scrollViewRef.current?.scrollTo({ y: targetY, animated });
-    }, 180);
-  }, [getModeSnapExtra, getSecondViewScrollY, useReservedModeShell, STICKY_TOP_SNAP_OFFSET, mode]);
-
-  useEffect(() => {
-    if (!isWebLessonLayout) return;
-
-    const previousViewport = matchingViewportLockRef.current;
-    const viewportChanged =
-      Math.abs(previousViewport.width - screenWidth) > 1 ||
-      Math.abs(previousViewport.height - lessonViewportHeight) > 1;
-
-    matchingViewportLockRef.current = { width: screenWidth, height: lessonViewportHeight };
-
-    if (!viewportChanged || mode !== 'matching') return;
-
-    setTimeout(() => scrollToGame('matching', false), 40);
-    setTimeout(() => scrollToGame('matching', false), 220);
-  }, [isWebLessonLayout, lessonViewportHeight, mode, screenWidth, scrollToGame]);
-
-  useEffect(() => {
-    const showSub = Keyboard.addListener('keyboardDidShow', (event) => {
-      if (mode !== 'typing') return;
-
-      scheduleSoftLayoutChange();
-      setKeyboardHeight(event.endCoordinates?.height ?? Math.max(0, stableScreenHeight - rawScreenHeight));
-      setTimeout(() => scrollToGame('typing', false), 60);
-      setTimeout(() => scrollToGame('typing', false), 240);
-    });
-    const hideSub = Keyboard.addListener('keyboardDidHide', () => {
-      scheduleSoftLayoutChange();
-      setKeyboardHeight(0);
-
-      const pendingMode = pendingKeyboardHideScrollModeRef.current;
-      if (!pendingMode) return;
-
-      pendingKeyboardHideScrollModeRef.current = null;
-      setTimeout(() => scrollToGame(pendingMode, true), 40);
-      setTimeout(() => scrollToGame(pendingMode, false), 220);
-    });
-
-    return () => {
-      showSub.remove();
-      hideSub.remove();
-    };
-  }, [mode, rawScreenHeight, scheduleSoftLayoutChange, scrollToGame, stableScreenHeight]);
+  }, [initialRouteMode, lessonIdentity]);
 
   const handleShuffleTypingWords = () => {
     if (!filteredWords.length) return;
@@ -889,8 +728,7 @@ const goToPrevWord = () => {
     setCurrentWordIndex(0);
     setIsFlipped(false);
     setIsFlashcardDeckShuffled(false);
-    setMode('flashcards');
-    scrollToGame('flashcards');
+    setSheetMode('flashcards');
   };
 
   const startLearnedReviewGame = () => {
@@ -900,8 +738,7 @@ const goToPrevWord = () => {
     setCompletionVisible(false);
     resetGameState();
     initializeGameSet();
-    setMode('matching');
-    scrollToGame('matching');
+    setSheetMode('matching');
   };
 
   const handleToggleCurrentFlashcardLearned = () => {
@@ -989,34 +826,17 @@ const goToPrevWord = () => {
     }
   };
 
-  const handleModeChange = (nextMode: VocabularyMode) => {
-    if (nextMode === 'matching' && !matchingUnlocked) return;
-    if (nextMode === 'typing' && !typingUnlocked) return;
-    if (nextMode !== mode) {
-      triggerSelectionHaptic();
-    }
-
-    const shouldScrollAfterKeyboardHides = mode === 'typing' && nextMode !== 'typing' && isTypingKeyboardOpen;
-    const keepReservedSecondViewPinned = useReservedModeShell && isSecondViewActive;
-    pendingKeyboardHideScrollModeRef.current =
-      shouldScrollAfterKeyboardHides && !keepReservedSecondViewPinned ? nextMode : null;
-
+  const openOrSwitchSheet = useCallback((nextMode: VocabularyMode) => {
+    setSheetMode((current) => {
+      if (nextMode !== current) triggerSelectionHaptic();
+      return nextMode;
+    });
     Keyboard.dismiss();
-    scheduleSoftLayoutChange();
-    setMode(nextMode);
+  }, []);
 
-    if (keepReservedSecondViewPinned) {
-      setIsSecondViewActive(true);
-      scrollToGame(nextMode, false);
-      return;
-    }
-
-    scrollToGame(nextMode);
-
-    if (shouldScrollAfterKeyboardHides) {
-      setTimeout(() => scrollToGame(nextMode, false), 360);
-    }
-  };
+  const closeSheet = useCallback(() => {
+    setSheetMode(null);
+  }, []);
 
   const handleLessonTypingComplete = () => {};
 
@@ -1039,9 +859,8 @@ const goToPrevWord = () => {
     setIsPersonalBest(false);
     initializeGameSet();
 
-    setMode('matching');
+    setSheetMode('matching');
     setCompletionVisible(false);
-    scrollToGame();
   };
 
   const toggleCategory = (cat: string) => {
@@ -1067,8 +886,6 @@ const goToPrevWord = () => {
 
     setGameState((prev) => ({ ...prev, timer: 0 }));
   };
-
-  const prevIsVocabTimerModeRef = useRef(isVocabTimerMode);
 
   const renderCategoryPickerButton = () => {
     if (categories.length === 0) return null;
@@ -1201,13 +1018,9 @@ const goToPrevWord = () => {
           },
         ]}
       >
-        {compactModeButtons ? (
-          <SoundWaveIcon size={15} color={audioAccent} />
-        ) : (
-          <Text style={[styles.audioMatchToggleText, { color: colors.text }]} numberOfLines={1}>
-            Audio Mode
-          </Text>
-        )}
+        <Text style={[styles.audioMatchToggleText, { color: colors.text }]} numberOfLines={1}>
+          Audio Mode
+        </Text>
         <View
           style={[
             styles.audioMatchSwitchTrack,
@@ -1236,9 +1049,8 @@ const goToPrevWord = () => {
       <View
         style={[
           styles.categoryControlsRow,
-          isWebLessonLayout && lessonLayoutWidth >= 768 && styles.categoryControlsRowDesktopWeb,
+          isDesktopWebLesson && styles.categoryControlsRowDesktopWeb,
           isAndroidLesson && styles.categoryControlsRowAndroid,
-          isAndroidLesson && mode === 'matching' && styles.categoryControlsRowAndroidMatching,
         ]}
       >
         {categoryButton}
@@ -1248,241 +1060,44 @@ const goToPrevWord = () => {
     );
   };
 
-  const renderModeButtons = (placement: 'overview' | 'sticky' = 'sticky') => {
-    const showSideActions = placement === 'sticky' && isSecondViewActive;
+  // Measured (not formula-derived) height for whichever practice module is
+  // active — the sheet's content area minus the category-controls row.
+  const [sheetContentHeight, setSheetContentHeight] = useState(0);
+  const [categoryControlsHeight, setCategoryControlsHeight] = useState(0);
+  const SHEET_CONTENT_BOTTOM_GAP = 14;
+  const practiceViewportHeight = Math.max(160, sheetContentHeight - categoryControlsHeight - SHEET_CONTENT_BOTTOM_GAP);
+
+  const renderSheetBody = () => {
+    if (!sheetMode) return null;
 
     return (
       <View
-        style={[
-          styles.modeButtonsWrap,
-          placement === 'overview' && styles.overviewModeButtonsWrap,
-          isAndroidLesson && styles.modeButtonsWrapAndroid,
-          isScaledWebLesson && { paddingHorizontal: scaleValue(16, webLessonScale) },
-        ]}
+        style={styles.sheetBody}
+        onLayout={(event) => setSheetContentHeight(event.nativeEvent.layout.height)}
       >
-        <View style={[styles.modeHeaderRow, showSideActions && styles.modeHeaderRowFloatingActions, isScaledWebLesson && { maxWidth: scaleValue(showSideActions ? 560 : 520, webLessonScale), gap: scaleValue(8, webLessonScale) }]}>
-          <View
-            style={[
-              styles.modeButtons,
-              compactModeButtons && styles.modeButtonsCompact,
-              isScaledWebLesson && { maxWidth: scaleValue(380, webLessonScale) },
-              { backgroundColor: isDarkMode ? colors.surface : '#ECE8DD' },
-            ]}
-          >
-          {[
-            { key: 'flashcards' as const, label: 'Cards', icon: 'style' as const },
-            { key: 'matching' as const, label: 'Match', icon: 'grid-view' as const },
-            { key: 'typing' as const, label: 'Write', icon: 'edit' as const },
-          ].map((item) => {
-            const active = mode === item.key;
-
-            return (
-              <TouchableOpacity
-                key={item.key}
-                activeOpacity={0.82}
-                style={[
-                  styles.modeButton,
-                  isAndroidLesson && styles.modeButtonAndroid,
-                  compactModeButtons && styles.modeButtonCompact,
-                  {
-                    backgroundColor: 'transparent',
-                    borderColor: 'transparent',
-                    borderWidth: 0,
-                  },
-                  isScaledWebLesson && {
-                    marginHorizontal: scaleValue(8, webLessonScale),
-                    paddingVertical: scaleValue(10, webLessonScale),
-                  },
-                  active && [
-                    styles.activeMode,
-                    {
-                      backgroundColor: isDarkMode ? colors.card : '#FFFFFF',
-                      borderColor: 'transparent',
-                    },
-                  ],
-                ]}
-                onPress={() => handleModeChange(item.key)}
-                accessibilityRole="button"
-                accessibilityLabel={`Switch to ${item.label}`}
-                accessibilityState={{ selected: active }}
-              >
-                <Text
-                  style={[
-                    styles.modeText,
-                    compactModeButtons && styles.modeTextCompact,
-                    isAndroidLesson && styles.modeTextAndroid,
-                    isAndroidLesson && compactModeButtons && styles.modeTextCompactAndroid,
-                    { color: active ? (isDarkMode ? '#3FA0DB' : FRESH_COLORS.exerciseBlue) : colors.secondaryText, fontWeight: active ? '800' : '600' },
-                    isDesktopWebLesson && styles.modeTextDesktopWeb,
-                    isScaledWebLesson && { fontSize: scaleValue(16, webLessonScale) },
-                  ]}
-                  numberOfLines={1}
-                  allowFontScaling={false}
-                >
-                  {item.label}
-                </Text>
-              </TouchableOpacity>
-            );
-          })}
+        <View onLayout={(event) => setCategoryControlsHeight(event.nativeEvent.layout.height)}>
+          {renderCategoryControls()}
         </View>
-          {showSideActions && (
-            <>
-            <TouchableOpacity
-              accessibilityLabel={backLabel}
-              accessibilityRole="button"
-              onPress={handleBackPress}
-              style={[
-                styles.imageShortcutButton,
-                styles.headerFloatingActionButton,
-                styles.headerFloatingBackButton,
-                {
-                  backgroundColor: isDarkMode ? colors.surface : colors.card,
-                  borderColor: colors.border,
-                  width: scaleValue(isAndroidLesson ? 38 : 42, webLessonScale),
-                  height: scaleValue(isAndroidLesson ? 38 : 42, webLessonScale),
-                },
-              ]}
-            >
-              <MaterialIcons name="arrow-back" size={scaleValue(21, webLessonScale)} color={colors.text} />
-            </TouchableOpacity>
-            <TouchableOpacity
-              accessibilityLabel="Open lesson image"
-              accessibilityRole="button"
-              onPress={() =>
-                navigation.navigate('FullImageModal', {
-                  source: preferredImageSource,
-                  uri: preferredImageUri,
-                })
-              }
-              style={[
-                styles.imageShortcutButton,
-                styles.headerFloatingActionButton,
-                styles.headerFloatingImageButton,
-                {
-                  backgroundColor: isDarkMode ? colors.surface : colors.card,
-                  borderColor: colors.border,
-                  width: scaleValue(isAndroidLesson ? 38 : 42, webLessonScale),
-                  height: scaleValue(isAndroidLesson ? 38 : 42, webLessonScale),
-                },
-              ]}
-            >
-              <MaterialIcons name="image" size={scaleValue(21, webLessonScale)} color={colors.text} />
-            </TouchableOpacity>
-            </>
-          )}
-        </View>
-      </View>
-    );
-  };
-
-  const handleViewportLayout = useCallback((event: any) => {
-    const nextHeight = Math.round(event.nativeEvent.layout.height);
-    if (nextHeight <= 0) return;
-
-    setViewportHeight((currentHeight) => {
-      if (isTypingKeyboardOpen && nextHeight < currentHeight) {
-        return currentHeight;
-      }
-
-      return Math.abs(currentHeight - nextHeight) > 1 ? nextHeight : currentHeight;
-    });
-  }, [isTypingKeyboardOpen]);
-
-  const handleLessonScroll = useCallback((event: any) => {
-    const y = event.nativeEvent.contentOffset?.y ?? 0;
-    const previousY = lastLessonScrollYRef.current;
-    lastLessonScrollYRef.current = y;
-    if (y > previousY + 0.5) lastLessonScrollDirectionRef.current = 'down';
-    if (y < previousY - 0.5) lastLessonScrollDirectionRef.current = 'up';
-    if (overviewHeightRef.current <= 0) return;
-
-    const secondViewThreshold = isAndroidLesson
-      ? Math.max(0, (secondViewYRef.current || overviewHeightRef.current + layoutTopInset) - 2)
-      : Math.max(0, overviewHeightRef.current - stickyHeaderHeight - 2);
-    secondViewThresholdRef.current = secondViewThreshold;
-    const nextIsSecondViewActive = y >= secondViewThreshold;
-
-    setIsSecondViewActive((current) => (
-      current === nextIsSecondViewActive ? current : nextIsSecondViewActive
-    ));
-
-  }, [isAndroidLesson, layoutTopInset, stickyHeaderHeight]);
-
-  const handleManualLessonScrollStart = useCallback(() => {
-    isManualLessonScrollRef.current = true;
-  }, []);
-
-  const handleManualLessonScrollEnd = useCallback(() => {
-    if (!isManualLessonScrollRef.current) return;
-    isManualLessonScrollRef.current = false;
-
-    const secondViewThreshold = secondViewThresholdRef.current;
-    if (!isTypingKeyboardOpen && lastLessonScrollDirectionRef.current === 'down' && lastLessonScrollYRef.current > secondViewThreshold + 1) {
-      lastLessonScrollYRef.current = secondViewThreshold;
-      scrollViewRef.current?.scrollTo({ y: secondViewThreshold, animated: false });
-    }
-  }, [isTypingKeyboardOpen]);
-
-  const renderSecondViewContent = (placement: 'flow' | 'stage' = 'flow') => {
-    const isStage = placement === 'stage';
-
-    return (
-      <View
-        pointerEvents={isStage ? 'box-none' : 'auto'}
-        style={[
-          styles.lessonBody,
-          isAndroidLesson && styles.lessonBodyAndroid,
-          isStage && styles.lessonBodyAndroidStage,
-          isStage
-            ? { paddingTop: LESSON_BODY_TOP_BUFFER }
-            : { minHeight: secondViewMinHeight, paddingTop: LESSON_BODY_TOP_BUFFER },
-        ]}
-      >
-
-        {isAndroidLesson && hasAndroidGameToolbar ? (
-          <View style={[styles.gameToolbarAndroid, { height: ANDROID_GAME_TOOLBAR_HEIGHT }]}>
-            {renderCategoryControls()}
-          </View>
-        ) : (
-          renderCategoryControls()
-        )}
 
         <View
-          pointerEvents={isStage ? 'box-none' : 'auto'}
           style={[
             styles.gameViewport,
-            isAndroidLesson && styles.gameViewportAndroid,
-            isStage && styles.gameViewportAndroidStage,
-            isWebLessonLayout && lessonLayoutWidth >= 768 && styles.gameViewportDesktopWeb,
-            isAndroidLesson && mode === 'matching' && styles.gameViewportAndroidMatching,
-            isWebLessonLayout && {
-              alignSelf: 'center',
-              maxWidth: mode === 'matching'
-                ? webMatchingGameMaxWidth
-                : mode === 'typing'
-                  ? webTypingGameMaxWidth
-                  : webLessonGameMaxWidth,
-              width: '100%',
-              paddingHorizontal: scaleValue(16, webLessonScale),
-            },
-            {
-              minHeight: mode === 'matching'
-                ? matchingViewportMinHeight
-                : mode === 'typing'
-                  ? typingViewportMinHeight
-                  : gameViewportMinHeight,
-            },
+            isDesktopWebLesson && styles.gameViewportDesktopWeb,
+            { minHeight: practiceViewportHeight },
           ]}
         >
-          {mode === 'flashcards' && (
-            <View
-              style={[
-                styles.gameSection,
-                styles.flashcardsSection,
-                isAndroidLesson && styles.gameSectionAndroidUnified,
-                flashcardModuleTopDrop > 0 && { paddingTop: flashcardModuleTopDrop },
-              ]}
-            >
+          {filteredWords.length === 0 && (
+            <View style={[styles.emptyLessonState, { backgroundColor: colors.card, borderColor: colors.border }]}>
+              <MaterialIcons name="book" size={32} color={colors.secondaryText} />
+              <Text style={[styles.emptyLessonStateTitle, { color: colors.text }]}>No words yet</Text>
+              <Text style={[styles.emptyLessonStateSubtitle, { color: colors.secondaryText }]}>
+                This lesson doesn't have any words in the current selection.
+              </Text>
+            </View>
+          )}
+
+          {sheetMode === 'flashcards' && (
+            <View style={[styles.gameSection, styles.flashcardsSection]}>
               <VocabularyFlashcard
                 words={shuffledFlashcards}
                 currentIndex={currentWordIndex}
@@ -1510,7 +1125,7 @@ const goToPrevWord = () => {
                 isCurrentWordKnown={!!shuffledFlashcards[currentWordIndex] && knownFlashcardKeys.has(vocabularyWordKey(shuffledFlashcards[currentWordIndex]))}
                 knownCount={knownFlashcardKeys.size}
                 currentWordReadyToMarkKnown={currentWordReadyToMarkKnown}
-                layoutHeight={flashcardLayoutHeight}
+                layoutHeight={practiceViewportHeight}
                 forceAndroidLayout={useApkPreviewLayout}
                 colors={colors}
                 isDarkMode={isDarkMode}
@@ -1518,19 +1133,8 @@ const goToPrevWord = () => {
             </View>
           )}
 
-          {mode === 'matching' && (
-            <View
-              style={[
-                styles.gameSection,
-                styles.matchingGameSection,
-                isAndroidLesson && styles.gameSectionAndroidUnified,
-                isAndroidLesson && styles.matchingGameSectionAndroid,
-                {
-                  minHeight: matchingViewportMinHeight,
-                  ...(isAndroidLesson ? { height: matchingViewportMinHeight } : null),
-                },
-              ]}
-            >
+          {sheetMode === 'matching' && (
+            <View style={[styles.gameSection, styles.matchingGameSection]}>
               <VocabularyMatching
                 gameState={gameState}
                 matchingGamePairs={matchingGamePairs}
@@ -1543,7 +1147,7 @@ const goToPrevWord = () => {
                 matchingSessionXp={matchingSessionXp}
                 lastMatchingXpGain={lastMatchingXpGain}
                 refillOnMatch={useRefillMatching}
-                availableHeight={matchingViewportMinHeight}
+                availableHeight={practiceViewportHeight}
                 forceAndroidLayout={useApkPreviewLayout}
                 audioMode={isVocabAudioMatchMode}
               />
@@ -1579,17 +1183,8 @@ const goToPrevWord = () => {
             </View>
           )}
 
-          {mode === 'typing' && (
-            <View
-              style={[
-                styles.gameSection,
-                styles.typingGameSection,
-                isAndroidLesson && styles.gameSectionAndroidUnified,
-                isWebLessonLayout && lessonLayoutWidth >= 768 && {
-                  minHeight: typingViewportMinHeight,
-                },
-              ]}
-            >
+          {sheetMode === 'typing' && (
+            <View style={[styles.gameSection, styles.typingGameSection]}>
               <VocabularyTyping
                 words={typingWords}
                 typingGame={typingGame}
@@ -1599,13 +1194,7 @@ const goToPrevWord = () => {
                 promptLabel={lesson?.typingPromptLabel}
                 answerPlaceholder={lesson?.typingAnswerPlaceholder}
                 keyboardVisible={false}
-                layoutHeight={
-                  isAndroidLesson
-                    ? typingViewportMinHeight
-                    : isWebLessonLayout && lessonLayoutWidth >= 768
-                      ? typingViewportMinHeight
-                      : lessonViewportHeight
-                }
+                layoutHeight={practiceViewportHeight}
                 forceAndroidLayout={useApkPreviewLayout}
                 onShuffle={handleShuffleTypingWords}
                 onSessionComplete={handleLessonTypingComplete}
@@ -1619,397 +1208,165 @@ const goToPrevWord = () => {
     );
   };
 
-  return (
-    <KeyboardAvoidingView
-      style={[styles.container, { backgroundColor: colors.background }]}
-      behavior={undefined}
-      onLayout={handleViewportLayout}
-    >
-      <ScrollView
-        ref={scrollViewRef}
-        style={[styles.container, { backgroundColor: colors.background }]}
-        stickyHeaderIndices={useReservedModeShell ? [] : [1]}
-        contentContainerStyle={{
-          paddingTop: layoutTopInset,
-          paddingBottom: scrollBottomPadding + typingKeyboardInset,
-        }}
-        onScroll={handleLessonScroll}
-        onScrollBeginDrag={handleManualLessonScrollStart}
-        onScrollEndDrag={handleManualLessonScrollEnd}
-        {...(Platform.OS === 'web' ? ({
-          onWheel: handleManualLessonScrollStart,
-          onScrollEnd: handleManualLessonScrollEnd,
-        } as any) : {})}
-        scrollEventThrottle={16}
-        keyboardShouldPersistTaps="always"
-        bounces={false}
-        alwaysBounceVertical={false}
-        overScrollMode="never"
+  const renderPracticeDock = () => {
+    const actions: {
+      key: VocabularyMode;
+      label: string;
+      icon: React.ComponentProps<typeof MaterialIcons>['name'];
+    }[] = [
+      { key: 'flashcards', label: 'Cards', icon: 'view-agenda' },
+      { key: 'matching', label: 'Match', icon: 'compare-arrows' },
+      { key: 'typing', label: 'Write', icon: 'edit' },
+    ];
+
+    return (
+      <View
+        style={[
+          styles.dock,
+          isDesktopWebLesson ? styles.dockDesktop : styles.dockMobile,
+          { backgroundColor: colors.background },
+        ]}
       >
-        <View
-          style={[
-            styles.overviewSection,
-            { minHeight: overviewMinHeight },
-          ]}
-          onLayout={(event) => {
-            overviewHeightRef.current = event.nativeEvent.layout.height;
-          }}
-        >
-          <BackButton
-            label={backLabel}
-            style={isAndroidLesson ? styles.androidTopBackButton : undefined}
-            onPress={handleBackPress}
-          />
-          <View
-            style={[
-              styles.header,
-              isWebLessonLayout ? styles.webHeader : undefined,
-              { backgroundColor: colors.card },
-            ]}
-            onLayout={(event) => {
-              setTitleBlockHeight(event.nativeEvent.layout.height);
-            }}
-          >
-            <Text
-              style={[
-                styles.title,
-                isWebLessonLayout ? styles.webTitle : undefined,
-                isScaledWebLesson && { fontSize: scaleValue(22, webLessonScale), marginLeft: scaleValue(8, webLessonScale) },
-                { color: colors.text },
-              ]}
-            >
-              {lesson.title}
-            </Text>
-          </View>
-
-          {shouldShowMixedImageCarousel ? (
-            <View
-              style={[
-                styles.mixedImageCarouselWrap,
-                {
-                  width: lessonMediaWidth,
-                  maxWidth: webLessonMediaMaxWidth,
-                },
-              ]}
-            >
-              <ScrollView
-                horizontal
-                pagingEnabled
-                showsHorizontalScrollIndicator={false}
-                snapToInterval={lessonMediaWidth}
-                decelerationRate="fast"
-                directionalLockEnabled
-                disableIntervalMomentum
-                nestedScrollEnabled
-                style={[
-                  styles.mixedImageScroll,
-                  {
-                    width: lessonMediaWidth,
-                    height: lessonImageHeight,
-                  },
-                ]}
-                contentContainerStyle={styles.mixedImageScrollContent}
-              >
-                {mixedLessonImageCards.map((imageCard: MixedVocabularyImageCard, imageIndex: number) => {
-                  const slideSource = { uri: imageCard.imageUrl };
-
-                  return (
-                    <View
-                      key={`${imageCard.id}-${imageIndex}`}
-                      style={[
-                        styles.mixedImageSlide,
-                        {
-                          width: lessonMediaWidth,
-                          height: lessonImageHeight,
-                        },
-                      ]}
-                    >
-                      <ImageWithCredit
-                        source={slideSource}
-                        imageScale={lessonImageContentScale}
-                        style={[
-                          styles.mixedCarouselImage,
-                          {
-                            width: lessonMediaWidth,
-                            height: lessonImageHeight,
-                          },
-                        ] as any}
-                        accessibilityLabel={imageCard.title ? `${imageCard.title} lesson image` : 'Lesson image'}
-                      />
-                    </View>
-                  );
-                })}
-              </ScrollView>
-
-            </View>
-          ) : (
-            <ImageWithCredit
-              source={preferredImageSource as any}
-              imageScale={lessonImageContentScale}
-              style={
-                isWebLessonLayout
-                  ? [styles.lessonImage, styles.webLessonImage, { height: lessonImageHeight, maxWidth: webLessonMediaMaxWidth }]
-                  : [styles.lessonImage, { height: lessonImageHeight }]
-              }
-              onPress={() =>
-                navigation.navigate('FullImageModal', {
-                  source: preferredImageSource,
-                  uri: preferredImageUri,
-                })
-              }
-            />
-          )}
+        <View style={isDesktopWebLesson ? styles.dockLabelColDesktop : styles.dockLabelRowMobile}>
+          <Text style={[styles.dockLabel, isDesktopWebLesson ? styles.dockLabelDesktop : styles.dockLabelMobile, { color: isDarkMode ? colors.text : LESSON_CHROME_COLORS.ink }]}>
+            Practice
+          </Text>
         </View>
 
-        {useReservedModeShell ? (
-          <VocabularySecondViewShell
-            backgroundColor={colors.background}
-            bodyTopGuard={isSecondViewActive ? 0 : FIRST_VIEW_SECOND_VIEW_GUARD}
-            headerTopPadding={stickyHeaderPinnedTopPadding}
-            headerBottomPadding={isWebLessonLayout ? 18 : 14}
-            minHeight={secondViewShellMinHeight}
-            modeBar={renderModeButtons()}
-            onLayout={(event) => {
-              secondViewYRef.current = event.nativeEvent.layout.y;
-            }}
-            onHeaderLayout={(event) => {
-              setStickyHeaderHeight(event.nativeEvent.layout.height);
-            }}
-          >
-            {renderSecondViewContent('stage')}
-          </VocabularySecondViewShell>
-        ) : (
-          <View
-            style={[
-              styles.stickyHeader,
-              isWebLessonLayout ? styles.webStickyHeader : undefined,
-              !isSecondViewActive && styles.stickyHeaderFirstView,
-              isWebLessonLayout && !isSecondViewActive ? styles.webStickyHeaderFirstView : undefined,
-              {
-                backgroundColor: colors.background,
-                paddingTop: stickyHeaderPinnedTopPadding,
-              },
-            ]}
-            onLayout={(event) => {
-              secondViewYRef.current = event.nativeEvent.layout.y;
-              setStickyHeaderHeight(event.nativeEvent.layout.height);
-            }}
-          >
-            {renderModeButtons()}
-          </View>
-        )}
-
-        {!useReservedModeShell && (
-          <View
-            pointerEvents="none"
-            style={[
-              styles.firstViewSecondViewGuard,
-              {
-                backgroundColor: colors.background,
-                height: isSecondViewActive ? 0 : FIRST_VIEW_SECOND_VIEW_GUARD,
-              },
-            ]}
-          />
-        )}
-
-        {useReservedModeShell ? (
-          null
-        ) : (
-        <View
-          style={[
-            styles.lessonBody,
-            isAndroidLesson && styles.lessonBodyAndroid,
-            { minHeight: secondViewMinHeight, paddingTop: LESSON_BODY_TOP_BUFFER },
-          ]}
-        >
-
-
-        {isAndroidLesson ? (
-          <View style={[styles.gameToolbarAndroid, { height: ANDROID_GAME_TOOLBAR_HEIGHT }]}>
-            {mode === 'typing' ? null : renderCategoryControls()}
-          </View>
-        ) : (
-          renderCategoryControls()
-        )}
-
-        {/* CONTENT */}
-        {filteredWords.length === 0 && (
-          <View style={[styles.emptyLessonState, { backgroundColor: colors.card, borderColor: colors.border }]}>
-            <MaterialIcons name="book" size={32} color={colors.secondaryText} />
-            <Text style={[styles.emptyLessonStateTitle, { color: colors.text }]}>No words yet</Text>
-            <Text style={[styles.emptyLessonStateSubtitle, { color: colors.secondaryText }]}>
-              This lesson doesn't have any words in the current selection.
-            </Text>
-          </View>
-        )}
-        <View
-          style={[
-            styles.gameViewport,
-            isAndroidLesson && styles.gameViewportAndroid,
-            isWebLessonLayout && lessonLayoutWidth >= 768 && styles.gameViewportDesktopWeb,
-            isAndroidLesson && mode === 'matching' && styles.gameViewportAndroidMatching,
-            isWebLessonLayout && {
-              alignSelf: 'center',
-              maxWidth: mode === 'matching'
-                ? webMatchingGameMaxWidth
-                : mode === 'typing'
-                  ? webTypingGameMaxWidth
-                  : webLessonGameMaxWidth,
-              width: '100%',
-              paddingHorizontal: scaleValue(16, webLessonScale),
-            },
-            {
-              minHeight: mode === 'matching'
-                ? matchingViewportMinHeight
-                : mode === 'typing'
-                  ? typingViewportMinHeight
-                  : gameViewportMinHeight,
-            },
-          ]}
-        >
-          {mode === 'flashcards' && (
-            <View
+        <View style={[styles.dockChipsRow, isDesktopWebLesson ? styles.dockChipsRowDesktop : styles.dockChipsRowMobile]}>
+          {actions.map((action) => (
+            <TouchableOpacity
+              key={action.key}
+              activeOpacity={0.76}
+              onPress={() => openOrSwitchSheet(action.key)}
+              accessibilityRole="button"
+              accessibilityLabel={`Open ${action.label}`}
               style={[
-                styles.gameSection,
-                styles.flashcardsSection,
-                isAndroidLesson && styles.gameSectionAndroidUnified,
-                flashcardModuleTopDrop > 0 && { paddingTop: flashcardModuleTopDrop },
-              ]}
-            >
-            <VocabularyFlashcard
-              words={shuffledFlashcards}
-              currentIndex={currentWordIndex}
-              isShuffled={isFlashcardDeckShuffled}
-              isFlipped={isFlipped}
-              reverseDirection={reverseDirection}
-              onFlip={handleFlashcardFlip}
-              onNext={goToNextWord}
-              onPrevious={goToPrevWord}
-              onShuffle={shuffleFlashcards}
-              onStartLearnedReviewGame={startLearnedReviewGame}
-              progressModeEnabled={flashcardProgressModeEnabled}
-              sideLabels={lesson?.flashcardLabels}
-              onToggleDirection={() => {
-                triggerSelectionHaptic();
-                setReverseDirection((p) => !p);
-                setIsFlipped(false);
-              }}
-              onMarkKnown={handleMarkFlashcardKnown}
-              onMarkReview={handleMarkFlashcardForReview}
-              onToggleLearned={handleToggleCurrentFlashcardLearned}
-              isCurrentWordLearned={currentFlashcardLearned}
-              learnedCount={learnedFlashcardCount}
-              totalWordCount={filteredWords.length}
-              isCurrentWordKnown={!!shuffledFlashcards[currentWordIndex] && knownFlashcardKeys.has(vocabularyWordKey(shuffledFlashcards[currentWordIndex]))}
-              knownCount={knownFlashcardKeys.size}
-              currentWordReadyToMarkKnown={currentWordReadyToMarkKnown}
-              layoutHeight={flashcardLayoutHeight}
-              forceAndroidLayout={useApkPreviewLayout}
-              colors={colors}
-              isDarkMode={isDarkMode}
-            />
-            </View>
-          )}
-
-          {mode === 'matching' && (
-            <View
-              style={[
-                styles.gameSection,
-                styles.matchingGameSection,
-                isAndroidLesson && styles.gameSectionAndroidUnified,
-                isAndroidLesson && styles.matchingGameSectionAndroid,
+                styles.dockChip,
+                isDesktopWebLesson ? styles.dockChipDesktop : styles.dockChipMobile,
                 {
-                  minHeight: matchingViewportMinHeight,
-                  ...(isAndroidLesson ? { height: matchingViewportMinHeight } : null),
+                  backgroundColor: isDarkMode ? colors.surface : colors.card,
+                  borderColor: colors.border,
                 },
               ]}
             >
-            <VocabularyMatching
-              gameState={gameState}
-              matchingGamePairs={matchingGamePairs}
-              onCardPress={handleCardPress}
-              colors={colors}
-              isDarkMode={isDarkMode}
-              words={filteredWords}
-              timerMode={timerMode}
-              bestTimeForActiveCategory={bestTimeForActiveCategory}
-              matchingSessionXp={matchingSessionXp}
-              lastMatchingXpGain={lastMatchingXpGain}
-              refillOnMatch={useRefillMatching}
-              availableHeight={matchingViewportMinHeight}
-              forceAndroidLayout={useApkPreviewLayout}
-              audioMode={isVocabAudioMatchMode}
-            />
-
-            {completionModalReady && (
-              <VocabularyCompletionModal
-                visible={completionVisible}
-                gameState={gameState}
-                timerMode={timerMode}
-                wordsLength={filteredWords.length}
-                isDarkMode={isDarkMode}
-                onReplay={handleReplay}
-                isFirstCompletion={isFirstCompletion}
-                isPersonalBest={isPersonalBest}
-                colors={colors}
-                startedTimerMode={startedTimerMode}
-                bestTimeForActiveCategory={bestTimeForActiveCategory}
-                matchingSessionXp={matchingSessionXp}
-                statsItems={timerMode ? [
-                  { emoji: '✨', value: matchingSessionXp, label: 'XP' },
-                  { emoji: '⏱', value: fmtMs(gameState.timer), label: 'Time' },
-                  { emoji: '🏆', value: bestTimeForActiveCategory != null ? fmtMs(bestTimeForActiveCategory) : '--:--', label: 'Best' },
-                ] : [
-                  { emoji: '✨', value: matchingSessionXp, label: 'XP Earned' },
-                ]}
-                reviewWords={matchingReviewWords}
-                onReviewWords={() => reviewFlashcardWords(matchingReviewWords)}
-                secondaryActionLabel="Back to Vocabulary"
-                onSecondaryAction={handleBackPress}
+              <MaterialIcons
+                name={action.icon}
+                size={isDesktopWebLesson ? 18 : 17}
+                color={isDarkMode ? colors.primary : LESSON_CHROME_COLORS.accent}
               />
-            )}
-            </View>
-          )}
+              <Text
+                style={[
+                  styles.dockChipText,
+                  isDesktopWebLesson ? styles.dockChipTextDesktop : styles.dockChipTextMobile,
+                  { color: isDarkMode ? colors.text : LESSON_CHROME_COLORS.chipIdleText },
+                ]}
+                numberOfLines={1}
+              >
+                {action.label}
+              </Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+      </View>
+    );
+  };
 
-          {mode === 'typing' && (
-            <View
-              style={[
-                styles.gameSection,
-                styles.typingGameSection,
-                isAndroidLesson && styles.gameSectionAndroidUnified,
-                isWebLessonLayout && lessonLayoutWidth >= 768 && {
-                  minHeight: typingViewportMinHeight,
-                },
-              ]}
-            >
-            <VocabularyTyping
-              words={typingWords}
-              typingGame={typingGame}
-              colors={colors}
-              isDarkMode={isDarkMode}
-              allowSlashAlternatives={allowTypingSlashAlternatives}
-              promptLabel={lesson?.typingPromptLabel}
-              answerPlaceholder={lesson?.typingAnswerPlaceholder}
-              keyboardVisible={false}
-              layoutHeight={
-                isAndroidLesson
-                  ? typingViewportMinHeight
-                  : isWebLessonLayout && lessonLayoutWidth >= 768
-                    ? typingViewportMinHeight
-                    : lessonViewportHeight
-              }
-              forceAndroidLayout={useApkPreviewLayout}
-              onShuffle={handleShuffleTypingWords}
-              onSessionComplete={handleLessonTypingComplete}
-              onGoToAccount={handleGoToAccount}
-              onBack={handleBackPress}
-            />
-            </View>
-          )}
-        </View>
-        </View>
+  return (
+    <View style={[styles.screen, { backgroundColor: colors.background, paddingTop: layoutTopInset }]}>
+      <View style={[styles.header, isDesktopWebLesson ? styles.headerDesktop : styles.headerMobile]}>
+        <TouchableOpacity
+          onPress={handleBackPress}
+          accessibilityRole="button"
+          accessibilityLabel={backLabel}
+          style={[
+            styles.headerBackButton,
+            isDesktopWebLesson ? styles.headerBackButtonDesktop : styles.headerBackButtonMobile,
+            { backgroundColor: isDarkMode ? colors.card : '#FFFFFF' },
+          ]}
+        >
+          <MaterialIcons name="arrow-back" size={isDesktopWebLesson ? 19 : 17} color={isDarkMode ? colors.text : LESSON_CHROME_COLORS.ink} />
+        </TouchableOpacity>
+        <Text
+          style={[
+            styles.headerTitle,
+            isDesktopWebLesson ? styles.headerTitleDesktop : styles.headerTitleMobile,
+            { color: isDarkMode ? colors.text : LESSON_CHROME_COLORS.ink },
+          ]}
+          numberOfLines={1}
+          ellipsizeMode="tail"
+        >
+          {lesson.title}
+        </Text>
+      </View>
+
+      <View
+        style={[styles.imageStage, isDesktopWebLesson ? styles.imageStageDesktop : styles.imageStageMobile]}
+        onLayout={(event) => setStageSize({ width: event.nativeEvent.layout.width, height: event.nativeEvent.layout.height })}
+      >
+        {shouldShowMixedImageCarousel ? (
+          <ScrollView
+            horizontal
+            pagingEnabled
+            showsHorizontalScrollIndicator={false}
+            snapToInterval={stageSize.width}
+            decelerationRate="fast"
+            directionalLockEnabled
+            disableIntervalMomentum
+            nestedScrollEnabled
+            style={{ width: stageSize.width, height: stageSize.height }}
+          >
+            {mixedLessonImageCards.map((imageCard: MixedVocabularyImageCard, imageIndex: number) => (
+              <View
+                key={`${imageCard.id}-${imageIndex}`}
+                style={{ width: stageSize.width, height: stageSize.height, alignItems: 'center', justifyContent: 'center' }}
+              >
+                <ImageWithCredit
+                  source={{ uri: imageCard.imageUrl }}
+                  style={[{ width: stageSize.width, height: stageSize.height, borderRadius: isDesktopWebLesson ? 12 : 10 }]}
+                  accessibilityLabel={imageCard.title ? `${imageCard.title} lesson image` : 'Lesson image'}
+                />
+              </View>
+            ))}
+          </ScrollView>
+        ) : (
+          <ImageWithCredit
+            source={preferredImageSource as any}
+            onNaturalSize={handleImageNaturalSize}
+            style={[
+              {
+                width: fittedImageSize.width,
+                height: fittedImageSize.height,
+                borderRadius: isDesktopWebLesson ? 12 : 10,
+                boxShadow: isDesktopWebLesson
+                  ? '0px 8px 26px rgba(0,0,0,0.11)'
+                  : '0px 6px 20px rgba(0,0,0,0.11)',
+                elevation: 6,
+              },
+            ]}
+            onPress={() =>
+              navigation.navigate('FullImageModal', {
+                source: preferredImageSource,
+                uri: preferredImageUri,
+              })
+            }
+          />
         )}
-      </ScrollView>
+      </View>
+
+      {renderPracticeDock()}
+
+      <LessonPracticeSheet
+        visible={sheetMode !== null}
+        mode={mode}
+        isDarkMode={isDarkMode}
+        colors={colors}
+        onClose={closeSheet}
+        onSwitchMode={openOrSwitchSheet}
+      >
+        {renderSheetBody()}
+      </LessonPracticeSheet>
+
       <Modal visible={categoryPickerOpen} transparent animationType="fade">
         <TouchableOpacity
           activeOpacity={1}
@@ -2024,7 +1381,6 @@ const goToPrevWord = () => {
               {
                 backgroundColor: colors.card,
                 borderColor: colors.border,
-                shadowColor: '#000',
                 top: categoryPickerAnchor.y + categoryPickerAnchor.height + 8,
                 left: Math.max(16, categoryPickerAnchor.x),
               },
@@ -2081,293 +1437,145 @@ const goToPrevWord = () => {
           </TouchableOpacity>
         </TouchableOpacity>
       </Modal>
-    </KeyboardAvoidingView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
+  screen: {
     flex: 1,
-    backgroundColor: '#f5f5f5',
   },
   header: {
-    flexDirection: 'column',
-    alignItems: 'flex-start',
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 14,
+  },
+  headerDesktop: {
     padding: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: 'rgba(0,0,0,0.08)',
+    paddingHorizontal: 32,
+    paddingBottom: 8,
   },
-  webHeader: {
-    paddingVertical: 10,
+  headerMobile: {
+    padding: 8,
     paddingHorizontal: 16,
+    paddingBottom: 6,
   },
-  androidTopBackButton: {
-    marginTop: 0,
-  },
-  overviewSection: {
-    paddingBottom: 18,
-  },
-  stickyHeader: {
-    paddingTop: 10,
-    paddingBottom: 14,
-    position: 'relative',
-    zIndex: 20,
-  },
-  webStickyHeader: {
-    paddingBottom: 18,
-  },
-  stickyHeaderFirstView: {
-    paddingBottom: 14,
-    position: 'relative',
-    zIndex: 1,
-  },
-  webStickyHeaderFirstView: {
-    paddingBottom: 18,
-  },
-  firstViewSecondViewGuard: {
-    height: 44,
-  },
-  title: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: '#333',
-    marginTop: 8,
-    marginLeft: 8,
-  },
-  webTitle: {
-    fontSize: 22,
-    marginTop: 0,
-  },
-  lessonImage: {
-    width: '96%',
-    alignSelf: 'center',
-    marginTop: 10,
-    marginBottom: 8,
-    borderRadius: 18,
-    resizeMode: 'contain',
-  },
-  webLessonImage: {
-    marginTop: 6,
-    marginBottom: 4,
-  },
-  mixedImageCarouselWrap: {
-    alignSelf: 'center',
-    marginTop: 10,
-    marginBottom: 8,
-    position: 'relative',
-  },
-  mixedImageScroll: {
-    borderRadius: 18,
-    overflow: 'hidden',
-  },
-  mixedImageScrollContent: {
-    alignItems: 'center',
-  },
-  mixedImageSlide: {
+  headerBackButton: {
     alignItems: 'center',
     justifyContent: 'center',
+    boxShadow: '0px 3px 8px rgba(0,0,0,0.05)',
+    elevation: 2,
   },
-  mixedCarouselImage: {
-    alignSelf: 'center',
-    borderRadius: 18,
+  headerBackButtonDesktop: {
+    width: 38,
+    height: 38,
+    borderRadius: 12,
   },
-  mixedImageCarouselOverlay: {
-    alignItems: 'center',
-    bottom: 12,
-    flexDirection: 'row',
-    gap: 8,
-    left: 12,
-    pointerEvents: 'box-none',
-    position: 'absolute',
-    right: 12,
+  headerBackButtonMobile: {
+    width: 34,
+    height: 34,
+    borderRadius: 11,
   },
-  mixedImageNavButton: {
-    alignItems: 'center',
-    borderRadius: 18,
-    borderWidth: 1,
-    height: 36,
-    justifyContent: 'center',
-    width: 36,
-  },
-  mixedImageNavButtonDisabled: {
-    opacity: 0.42,
-  },
-  mixedImageStatusPill: {
-    alignItems: 'center',
-    borderRadius: 18,
-    borderWidth: 1,
-    flex: 1,
-    flexDirection: 'row',
-    gap: 8,
-    justifyContent: 'center',
-    minHeight: 36,
-    minWidth: 0,
-    paddingHorizontal: 12,
-  },
-  mixedImageStatusTitle: {
+  headerTitle: {
     flexShrink: 1,
-    fontSize: 12,
     fontWeight: '800',
-    lineHeight: 15,
   },
-  mixedImageStatusCount: {
-    fontSize: 11,
-    fontWeight: '900',
-    lineHeight: 14,
+  headerTitleDesktop: {
+    fontSize: 19,
   },
-  lessonBody: {
-    justifyContent: 'flex-start',
-    position: 'relative',
-    zIndex: 2,
+  headerTitleMobile: {
+    fontSize: 16,
   },
-  lessonBodyAndroid: {
-    zIndex: 0,
-    elevation: 0,
-  },
-  lessonBodyAndroidStage: {
+  imageStage: {
     flex: 1,
     minHeight: 0,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
-  modeButtonsWrap: {
-    paddingHorizontal: 16,
+  imageStageDesktop: {
+    paddingHorizontal: 32,
+    paddingTop: 6,
+    paddingBottom: 10,
   },
-  modeButtonsWrapAndroid: {
-    paddingHorizontal: 12,
+  imageStageMobile: {
+    paddingHorizontal: 14,
+    paddingTop: 4,
+    paddingBottom: 8,
   },
-  overviewModeButtonsWrap: {
-    marginTop: 8,
-    marginBottom: 8,
+  dock: {
+    flexShrink: 0,
   },
-  modeHeaderRow: {
-    width: '100%',
-    maxWidth: 560,
-    alignSelf: 'center',
+  dockDesktop: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 8,
     position: 'relative',
+    paddingTop: 10,
+    paddingBottom: 18,
+    paddingHorizontal: 32,
   },
-  modeHeaderRowFloatingActions: {
-    minHeight: 44,
-  },
-  modeButtons: {
-    flex: 1,
-    minWidth: 0,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    width: '100%',
-    maxWidth: 380,
-    alignSelf: 'center',
-    marginBottom: 0,
-    borderRadius: 999,
-    padding: 3,
-    gap: 2,
-  },
-  modeButtonsCompact: {
-    maxWidth: '100%',
-  },
-  imageShortcutButton: {
-    width: 42,
-    height: 42,
-    borderRadius: 12,
-    borderWidth: 1.5,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 0,
-  },
-  headerFloatingActionButton: {
-    elevation: 4,
-    position: 'absolute',
-    top: 2,
-    zIndex: 5,
-  },
-  headerFloatingBackButton: {
-    left: 0,
-  },
-  headerFloatingImageButton: {
-    right: 0,
-  },
-  stickyActionButtonHidden: {
-    opacity: 0,
-  },
-  modeButton: {
-    flex: 1,
-    minWidth: 0,
-    minHeight: 44,
-    paddingVertical: Platform.OS === 'web' ? 10 : 12,
-    paddingHorizontal: 5,
-    marginHorizontal: 8,
-    borderRadius: uiRadii.control,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 5,
-    borderWidth: 2,
-  },
-  modeButtonAndroid: {
-    paddingVertical: 12,
-  },
-  modeButtonCompact: {
-    minHeight: 42,
-    marginHorizontal: 3,
-    paddingHorizontal: 3,
-    paddingVertical: 9,
-    gap: 3,
-  },
-  activeMode: {
-    backgroundColor: '#0D7DD4',
-    borderColor: '#005EB3',
-  },
-  modeButtonLocked: {
-    opacity: 0.45,
-  },
-  modeText: {
-    flexShrink: 1,
-    fontWeight: '400',
-    fontSize: 16,
-    lineHeight: 19,
-  },
-  modeTextCompact: {
-    fontSize: 13,
-    lineHeight: 16,
-  },
-  modeTextAndroid: {
-    fontSize: 16,
-    lineHeight: 19,
-    fontWeight: '400',
-  },
-  modeTextCompactAndroid: {
-    fontSize: 14,
-    lineHeight: 17,
-  },
-  modeTextDesktopWeb: {
-    fontWeight: '600',
-  },
-  modeTextActive: {
-    color: '#ffffffff',
-  },
-  categoryRow: {
-    marginTop: 8,
-    marginBottom: 0,
-    flexGrow: 0,
-    minHeight: 44,
-  },
-  categorySlot: {
-    minHeight: 34,
-    justifyContent: 'center',
-    paddingTop: 0,
-  },
-  categoryRowWrap: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    minHeight: 34,
-    paddingLeft: 16,
-  },
-  categoryPickerWrap: {
+  dockMobile: {
     paddingHorizontal: 16,
-    justifyContent: 'center',
+    paddingTop: 8,
+    paddingBottom: 14,
+  },
+  dockLabelColDesktop: {
+    flexDirection: 'column',
+    left: 32,
+    position: 'absolute',
+  },
+  dockLabelRowMobile: {
+    flexDirection: 'row',
     alignItems: 'center',
+    marginBottom: 7,
+  },
+  dockLabel: {
+    fontWeight: '800',
+  },
+  dockLabelDesktop: {
+    fontSize: 15,
+  },
+  dockLabelMobile: {
+    fontSize: 14,
+  },
+  dockChipsRow: {
+    flexDirection: 'row',
+  },
+  dockChipsRowDesktop: {
+    gap: 10,
+  },
+  dockChipsRowMobile: {
+    gap: 8,
+  },
+  dockChip: {
+    minHeight: 44,
+    borderRadius: 13,
+    borderWidth: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 7,
+  },
+  dockChipDesktop: {
+    minWidth: 116,
+    paddingHorizontal: 20,
+  },
+  dockChipMobile: {
+    flex: 1,
+    paddingHorizontal: 8,
+  },
+  dockChipText: {
+    fontWeight: '700',
+  },
+  dockChipTextDesktop: {
+    fontSize: 15,
+  },
+  dockChipTextMobile: {
+    fontSize: 14,
+  },
+  sheetBody: {
+    flex: 1,
+    minHeight: 0,
   },
   categoryControlsRow: {
     position: 'relative',
@@ -2380,22 +1588,16 @@ const styles = StyleSheet.create({
     gap: 8,
     flexWrap: 'wrap',
     paddingHorizontal: 16,
-    marginTop: 0,
-    marginBottom: 18,
+    marginTop: 12,
+    marginBottom: 12,
   },
   categoryControlsRowDesktopWeb: {
-    marginTop: 0,
-    marginBottom: 11,
     paddingHorizontal: 12,
   },
   categoryControlsRowAndroid: {
     minHeight: 42,
-    marginBottom: 0,
     paddingHorizontal: 12,
     flexWrap: 'nowrap',
-  },
-  categoryControlsRowAndroidMatching: {
-    marginBottom: 0,
   },
   categoryPickerButton: {
     position: 'relative',
@@ -2479,29 +1681,17 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  categoryLabel: {
-    fontSize: 15,
-    fontWeight: '800',
-    color: '#5B6773',
-    marginRight: 10,
-  },
-  categoryRowContent: {
-    paddingRight: 0,
-    minHeight: 34,
-    alignItems: 'center',
-  },
-  categorySpacer: {
-    minHeight: 34,
-  },
-  gameToolbarAndroid: {
-    width: '100%',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
   gameViewport: {
+    flex: 1,
+    minHeight: 0,
     paddingHorizontal: 16,
-    paddingBottom: 0,
+    paddingBottom: 14,
     justifyContent: 'flex-start',
+  },
+  gameViewportDesktopWeb: {
+    alignSelf: 'center',
+    width: '100%',
+    maxWidth: 720,
   },
   emptyLessonState: {
     alignItems: 'center',
@@ -2523,73 +1713,20 @@ const styles = StyleSheet.create({
     fontSize: 14,
     textAlign: 'center',
   },
-  gameViewportAndroid: {
-    paddingTop: 6,
-  },
-  gameViewportAndroidStage: {
-    flex: 1,
-    minHeight: 0,
-  },
-  gameViewportAndroidMatching: {
-    paddingHorizontal: 8,
-    alignItems: 'stretch',
-  },
-  gameViewportDesktopWeb: {
-    paddingTop: 4,
-  },
   gameSection: {
     marginTop: 2,
-  },
-  gameSectionAndroidUnified: {
-    width: '100%',
-    marginTop: 0,
-    paddingTop: 0,
-    justifyContent: 'flex-start',
   },
   flashcardsSection: {
     justifyContent: 'flex-start',
     paddingTop: 6,
   },
-  secondaryGameSection: {
-    justifyContent: 'flex-start',
-    paddingTop: 8,
-  },
   matchingGameSection: {
     justifyContent: 'flex-start',
     paddingTop: 0,
   },
-  matchingGameSectionAndroid: {
-    width: '100%',
-  },
   typingGameSection: {
     justifyContent: 'flex-start',
     paddingTop: 0,
-  },
-  closeButton: {
-    position: 'absolute',
-    zIndex: 100,
-  },
-  categoryChip: {
-    paddingVertical: 10,
-    paddingHorizontal: 16,
-    height: 44,
-    borderRadius: 11,
-    backgroundColor: '#fff',
-    borderWidth: 2,
-    borderColor: '#ddd',
-    marginRight: 10,
-  },
-  categoryChipActive: {
-    backgroundColor: '#0D7DD4',
-    borderColor: '#005EB3',
-  },
-  categoryText: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: '#666',
-  },
-  categoryTextActive: {
-    color: '#ffffff',
   },
   categoryPopoverBackdrop: {
     flex: 1,

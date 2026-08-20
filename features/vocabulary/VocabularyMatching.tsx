@@ -241,19 +241,19 @@ export default function VocabularyMatching({
           toValue: 1,
           duration: REFILL_CARD_ENTER_MS,
           easing: Easing.out(Easing.cubic),
-          useNativeDriver: true,
+          useNativeDriver: Platform.OS !== 'web',
         }),
         Animated.timing(animation.scale, {
           toValue: 1,
           duration: REFILL_CARD_ENTER_MS,
           easing: Easing.out(Easing.cubic),
-          useNativeDriver: true,
+          useNativeDriver: Platform.OS !== 'web',
         }),
         Animated.timing(animation.translateY, {
           toValue: 0,
           duration: REFILL_CARD_ENTER_MS,
           easing: Easing.out(Easing.cubic),
-          useNativeDriver: true,
+          useNativeDriver: Platform.OS !== 'web',
         }),
       ]).start();
     });
@@ -278,19 +278,19 @@ export default function VocabularyMatching({
           toValue: 0,
           duration: REFILL_CARD_EXIT_MS,
           easing: Easing.in(Easing.cubic),
-          useNativeDriver: true,
+          useNativeDriver: Platform.OS !== 'web',
         }),
         Animated.timing(animation.scale, {
           toValue: 0.86,
           duration: REFILL_CARD_EXIT_MS,
           easing: Easing.in(Easing.cubic),
-          useNativeDriver: true,
+          useNativeDriver: Platform.OS !== 'web',
         }),
         Animated.timing(animation.translateY, {
           toValue: -REFILL_CARD_ENTER_OFFSET,
           duration: REFILL_CARD_EXIT_MS,
           easing: Easing.in(Easing.cubic),
-          useNativeDriver: true,
+          useNativeDriver: Platform.OS !== 'web',
         }),
       ]).start();
     });
@@ -306,11 +306,11 @@ export default function VocabularyMatching({
       const animation = getCardAnimation(cardId);
       animation.shakeX.setValue(0);
       Animated.sequence([
-        Animated.timing(animation.shakeX, { toValue: -8, duration: 45, useNativeDriver: true }),
-        Animated.timing(animation.shakeX, { toValue: 8, duration: 90, useNativeDriver: true }),
-        Animated.timing(animation.shakeX, { toValue: -6, duration: 80, useNativeDriver: true }),
-        Animated.timing(animation.shakeX, { toValue: 6, duration: 70, useNativeDriver: true }),
-        Animated.timing(animation.shakeX, { toValue: 0, duration: 60, useNativeDriver: true }),
+        Animated.timing(animation.shakeX, { toValue: -8, duration: 45, useNativeDriver: Platform.OS !== 'web' }),
+        Animated.timing(animation.shakeX, { toValue: 8, duration: 90, useNativeDriver: Platform.OS !== 'web' }),
+        Animated.timing(animation.shakeX, { toValue: -6, duration: 80, useNativeDriver: Platform.OS !== 'web' }),
+        Animated.timing(animation.shakeX, { toValue: 6, duration: 70, useNativeDriver: Platform.OS !== 'web' }),
+        Animated.timing(animation.shakeX, { toValue: 0, duration: 60, useNativeDriver: Platform.OS !== 'web' }),
       ]).start();
     });
 
@@ -335,13 +335,13 @@ export default function VocabularyMatching({
           toValue: 1.08,
           duration: 110,
           easing: Easing.out(Easing.cubic),
-          useNativeDriver: true,
+          useNativeDriver: Platform.OS !== 'web',
         }),
         Animated.timing(animation.scale, {
           toValue: 1,
           duration: 140,
           easing: Easing.out(Easing.cubic),
-          useNativeDriver: true,
+          useNativeDriver: Platform.OS !== 'web',
         }),
       ]).start();
     });
@@ -453,10 +453,9 @@ export default function VocabularyMatching({
             opacity: isMatched ? 0.4 : 1,
             height: cardHeight,
             maxWidth: '100%',
-            shadowColor: '#000',
-            shadowOffset: { width: 0, height: isSelectedState ? 2 : 1 },
-            shadowOpacity: isSelectedState ? 0.1 : 0.03,
-            shadowRadius: isSelectedState ? 6 : 2,
+            boxShadow: isSelectedState
+              ? '0px 2px 6px rgba(0,0,0,0.10)'
+              : '0px 1px 2px rgba(0,0,0,0.03)',
             elevation: isSelectedState ? 3 : 1,
             width: '100%',
           },
@@ -642,10 +641,7 @@ const styles = StyleSheet.create({
     borderRadius: 14,
     justifyContent: 'center',
     alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.03,
-    shadowRadius: 2,
+    boxShadow: '0px 1px 2px rgba(0,0,0,0.03)',
     elevation: 1,
     borderWidth: 1.5,
     borderColor: '#E7E3D8',

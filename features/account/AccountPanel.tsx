@@ -1096,10 +1096,7 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     borderWidth: 1.5,
     overflow: 'hidden',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 3 },
-    shadowOpacity: 0.12,
-    shadowRadius: 8,
+    boxShadow: '0px 3px 8px rgba(0,0,0,0.12)',
     elevation: 4,
   },
   dashboardCard: {

@@ -9,9 +9,9 @@ import BackButton from '../shared/BackButton';
 import ImageWithCredit from '../shared/ImageWithCredit';
 import GrammarFillExercise from './grammarExercises/GrammarFillExercise';
 import GrammarLessonTextContent from './GrammarLessonTextContent';
-import GrammarModeTabs from './grammarExercises/GrammarModeTabs';
 import GrammarReorderExercise from './grammarExercises/GrammarReorderExercise';
 import GrammarTranslateExercise from './grammarExercises/GrammarTranslateExercise';
+import LessonPracticeSheet from '../vocabulary/LessonPracticeSheet';
 import { clampNumber, scaleValue } from '../shared/responsiveLayout';
 import {
   CARD_HEIGHT,
@@ -82,7 +82,7 @@ const GrammarQuiz: React.FC<GrammarQuizProps> = ({ lesson, onBack, backLabel = '
     insets, windowWidth, rawWindowHeight,
     exerciseMode, setExerciseMode,
     setViewportHeight,
-    isSecondViewActive, setIsSecondViewActive,
+    setIsSecondViewActive,
     stableWindowHeight, setStableWindowHeight,
     keyboardHeight, setKeyboardHeight,
     keyboardHeightDrop, isKeyboardOpen, isFillKeyboardOpen, lessonViewportHeight,
@@ -91,10 +91,9 @@ const GrammarQuiz: React.FC<GrammarQuizProps> = ({ lesson, onBack, backLabel = '
     lessonMediaWidth, lessonImageContentScale, webExerciseMaxWidth,
     quizCardHeight, quizOptionGap, quizOptionHeight, exerciseCardBaseHeight,
     layoutTopInset, layoutBottomInset,
-    stickyHeaderPinnedTopPadding,
     STICKY_TOP_SNAP_OFFSET,
     QUIZ_VIEW_SNAP_EXTRA, FILL_VIEW_SNAP_EXTRA, REORDER_VIEW_SNAP_EXTRA, TRANSLATE_VIEW_SNAP_EXTRA,
-    FIRST_VIEW_BOTTOM_SPACE, FIRST_VIEW_PEEK, FIRST_VIEW_MODE_RAISE, FIRST_VIEW_SECOND_VIEW_GUARD,
+    FIRST_VIEW_BOTTOM_SPACE, FIRST_VIEW_PEEK, FIRST_VIEW_MODE_RAISE,
   } = useGrammarQuizLayout();
   const scrollViewRef = useRef<ScrollView>(null);
   const overviewHeightRef = useRef(0);
@@ -105,8 +104,9 @@ const GrammarQuiz: React.FC<GrammarQuizProps> = ({ lesson, onBack, backLabel = '
   const isManualLessonScrollRef = useRef(false);
   const initializedLessonKeyRef = useRef<string | null>(null);
   const [titleBlockHeight, setTitleBlockHeight] = useState(72);
-  const [stickyHeaderHeight, setStickyHeaderHeight] = useState(112);
+  const stickyHeaderHeight = 112;
   const [lessonContentMode, setLessonContentMode] = useState<'image' | 'text'>('image');
+  const [practiceSheetOpen, setPracticeSheetOpen] = useState(false);
   const hasLessonTextContent = !!lesson.textContent?.cards?.length;
   const overviewMinHeight = Math.max(
     isCompactScreen ? 420 : 500,
@@ -223,11 +223,11 @@ const GrammarQuiz: React.FC<GrammarQuizProps> = ({ lesson, onBack, backLabel = '
     const shakeAnim = getOptionShakeAnim(incorrectAnswer);
     shakeAnim.setValue(0);
     Animated.sequence([
-      Animated.timing(shakeAnim, { toValue: -8, duration: 45, useNativeDriver: true }),
-      Animated.timing(shakeAnim, { toValue: 8, duration: 90, useNativeDriver: true }),
-      Animated.timing(shakeAnim, { toValue: -6, duration: 80, useNativeDriver: true }),
-      Animated.timing(shakeAnim, { toValue: 6, duration: 70, useNativeDriver: true }),
-      Animated.timing(shakeAnim, { toValue: 0, duration: 60, useNativeDriver: true }),
+      Animated.timing(shakeAnim, { toValue: -8, duration: 45, useNativeDriver: Platform.OS !== 'web' }),
+      Animated.timing(shakeAnim, { toValue: 8, duration: 90, useNativeDriver: Platform.OS !== 'web' }),
+      Animated.timing(shakeAnim, { toValue: -6, duration: 80, useNativeDriver: Platform.OS !== 'web' }),
+      Animated.timing(shakeAnim, { toValue: 6, duration: 70, useNativeDriver: Platform.OS !== 'web' }),
+      Animated.timing(shakeAnim, { toValue: 0, duration: 60, useNativeDriver: Platform.OS !== 'web' }),
     ]).start();
   }, [incorrectAnswer, getOptionShakeAnim]);
 
@@ -247,8 +247,8 @@ const GrammarQuiz: React.FC<GrammarQuizProps> = ({ lesson, onBack, backLabel = '
     const pulseAnim = getOptionPulseAnim(userAnswer);
     pulseAnim.setValue(1);
     Animated.sequence([
-      Animated.timing(pulseAnim, { toValue: 1.06, duration: 110, easing: Easing.out(Easing.cubic), useNativeDriver: true }),
-      Animated.timing(pulseAnim, { toValue: 1, duration: 140, easing: Easing.out(Easing.cubic), useNativeDriver: true }),
+      Animated.timing(pulseAnim, { toValue: 1.06, duration: 110, easing: Easing.out(Easing.cubic), useNativeDriver: Platform.OS !== 'web' }),
+      Animated.timing(pulseAnim, { toValue: 1, duration: 140, easing: Easing.out(Easing.cubic), useNativeDriver: Platform.OS !== 'web' }),
     ]).start();
   }, [userAnswer, currentQuestionIndex, selectedQuestions, getOptionPulseAnim]);
   const [feedback, setFeedback] = useState<string>('');
@@ -432,12 +432,12 @@ const GrammarQuiz: React.FC<GrammarQuizProps> = ({ lesson, onBack, backLabel = '
           toValue: 1,
           duration: 520,
           easing: Easing.out(Easing.cubic),
-          useNativeDriver: true,
+          useNativeDriver: Platform.OS !== 'web',
         }),
         Animated.timing(lostLifeAnim, {
           toValue: 0,
           duration: 1,
-          useNativeDriver: true,
+          useNativeDriver: Platform.OS !== 'web',
         }),
       ]).start(() => setLostLifeIndex(null));
     }
@@ -446,6 +446,8 @@ const GrammarQuiz: React.FC<GrammarQuizProps> = ({ lesson, onBack, backLabel = '
   }, [lives, lostLifeAnim]);
 
   const scrollToExercise = useCallback((targetMode: ExerciseMode = exerciseMode, animated = true) => {
+    if (practiceSheetOpen) return;
+
     isManualLessonScrollRef.current = false;
     const snapExtra =
       targetMode === 'fill'
@@ -475,6 +477,7 @@ const GrammarQuiz: React.FC<GrammarQuizProps> = ({ lesson, onBack, backLabel = '
     TRANSLATE_VIEW_SNAP_EXTRA,
     exerciseMode,
     getSecondViewScrollY,
+    practiceSheetOpen,
     STICKY_TOP_SNAP_OFFSET,
   ]);
 
@@ -505,7 +508,7 @@ const GrammarQuiz: React.FC<GrammarQuizProps> = ({ lesson, onBack, backLabel = '
     };
   }, [exerciseMode, rawWindowHeight, scrollToExercise, stableWindowHeight]);
 
-  const switchExerciseMode = (mode: ExerciseMode) => {
+  const switchExerciseMode = (mode: ExerciseMode, shouldScroll = true) => {
     const safeMode = resolveSafeMode(mode);
     if (safeMode !== exerciseMode) {
       triggerSelectionHaptic();
@@ -518,7 +521,7 @@ const GrammarQuiz: React.FC<GrammarQuizProps> = ({ lesson, onBack, backLabel = '
     feedbackAnim.stopAnimation();
     feedbackAnim.setValue(CARD_HEIGHT);
 
-    const shouldScrollAfterKeyboardHides = exerciseMode === 'fill' && safeMode !== 'fill' && isKeyboardOpen;
+    const shouldScrollAfterKeyboardHides = shouldScroll && exerciseMode === 'fill' && safeMode !== 'fill' && isKeyboardOpen;
     pendingKeyboardHideScrollModeRef.current = shouldScrollAfterKeyboardHides ? safeMode : null;
 
     Keyboard.dismiss();
@@ -539,12 +542,26 @@ const GrammarQuiz: React.FC<GrammarQuizProps> = ({ lesson, onBack, backLabel = '
     setSessionMistakeCount(0);
     setSelectedQuestions(getQuestionsForMode(lesson.exercises, safeMode));
     setCurrentQuestionIndex(0);
-    scrollToExercise(safeMode);
+    if (shouldScroll) scrollToExercise(safeMode);
 
     if (shouldScrollAfterKeyboardHides) {
       setTimeout(() => scrollToExercise(safeMode, false), 360);
       setTimeout(() => scrollToExercise(safeMode, false), 560);
     }
+  };
+
+  const openPracticeMode = (mode: ExerciseMode) => {
+    setPracticeSheetOpen(true);
+    switchExerciseMode(mode, false);
+  };
+
+  const switchPracticeMode = (mode: ExerciseMode) => {
+    switchExerciseMode(mode, false);
+  };
+
+  const closePracticeSheet = () => {
+    Keyboard.dismiss();
+    setPracticeSheetOpen(false);
   };
 
   const handleAnswer = async (option: string) => {
@@ -783,72 +800,57 @@ const GrammarQuiz: React.FC<GrammarQuizProps> = ({ lesson, onBack, backLabel = '
   const gameModeButtonTextColor = getButtonTextColor(colors, isDarkMode, 'primary');
 
 
-  const renderModeTabs = (placement: 'overview' | 'sticky' = 'sticky') => {
-    const showSideActions = placement === 'sticky' && isSecondViewActive;
+  const renderPracticeDock = () => {
+    const modeIcons: Record<ExerciseMode, React.ComponentProps<typeof MaterialIcons>['name']> = {
+      quiz: 'quiz',
+      fill: 'edit-note',
+      reorder: 'swap-vert',
+      translate: 'translate',
+    };
 
     return (
       <View
         style={[
-          styles.modeTabsWrap,
-          placement === 'overview' && styles.overviewModeTabsWrap,
-          Platform.OS === 'android' && styles.modeTabsWrapAndroid,
-          isScaledWebLesson && { paddingHorizontal: scaleValue(16, webLessonScale) },
+          styles.practiceDock,
+          isDesktopWebLayout ? styles.practiceDockDesktop : styles.practiceDockMobile,
+          { backgroundColor: colors.background },
         ]}
       >
-        <View style={[styles.modeTabsRow, showSideActions && styles.modeTabsRowFloatingActions, isScaledWebLesson && { maxWidth: scaleValue(showSideActions ? 560 : 520, webLessonScale), gap: scaleValue(8, webLessonScale) }]}>
-          <View
-            style={[
-              styles.modeTabsContainer,
-              isScaledWebLesson && { maxWidth: scaleValue(520, webLessonScale) },
-            ]}
-          >
-          <GrammarModeTabs
-            modes={exerciseModeOptions}
-            activeMode={exerciseMode}
-            onChangeMode={switchExerciseMode}
-            layoutScale={webLessonScale}
-          />
+        <View style={isDesktopWebLayout ? styles.practiceDockLabelDesktop : styles.practiceDockLabelMobile}>
+          <Text style={[styles.practiceDockLabel, { color: colors.text }]}>Practice</Text>
         </View>
-          {showSideActions && (
-            <>
+
+        <View style={[styles.practiceActions, isDesktopWebLayout ? styles.practiceActionsDesktop : styles.practiceActionsMobile]}>
+          {exerciseModeOptions.map((option) => (
             <TouchableOpacity
-              accessibilityLabel={backLabel}
+              key={option.key}
+              activeOpacity={0.76}
+              onPress={() => openPracticeMode(option.key)}
               accessibilityRole="button"
-              onPress={onBack}
+              accessibilityLabel={`Open ${option.label}`}
               style={[
-                styles.imageShortcutButton,
-                styles.headerFloatingActionButton,
-                styles.headerFloatingBackButton,
-                {
-                  backgroundColor: colors.card,
-                  borderColor: colors.border,
-                  width: scaleValue(Platform.OS === 'android' ? 38 : 42, webLessonScale),
-                  height: scaleValue(Platform.OS === 'android' ? 38 : 42, webLessonScale),
-                },
+                styles.practiceAction,
+                isDesktopWebLayout ? styles.practiceActionDesktop : styles.practiceActionMobile,
+                { backgroundColor: isDarkMode ? colors.surface : colors.card, borderColor: colors.border },
               ]}
             >
-              <MaterialIcons name="arrow-back" size={scaleValue(21, webLessonScale)} color={colors.text} />
+              <MaterialIcons
+                name={modeIcons[option.key]}
+                size={isDesktopWebLayout ? 18 : 17}
+                color={colors.primary}
+              />
+              <Text
+                style={[
+                  styles.practiceActionText,
+                  isDesktopWebLayout ? styles.practiceActionTextDesktop : styles.practiceActionTextMobile,
+                  { color: colors.text },
+                ]}
+                numberOfLines={1}
+              >
+                {option.label}
+              </Text>
             </TouchableOpacity>
-            <TouchableOpacity
-              accessibilityLabel="Open lesson image"
-              accessibilityRole="button"
-              onPress={handleImagePress}
-              style={[
-                styles.imageShortcutButton,
-                styles.headerFloatingActionButton,
-                styles.headerFloatingImageButton,
-                {
-                  backgroundColor: colors.card,
-                  borderColor: colors.border,
-                  width: scaleValue(Platform.OS === 'android' ? 38 : 42, webLessonScale),
-                  height: scaleValue(Platform.OS === 'android' ? 38 : 42, webLessonScale),
-                },
-              ]}
-            >
-              <MaterialIcons name="image" size={scaleValue(21, webLessonScale)} color={colors.text} />
-            </TouchableOpacity>
-            </>
-          )}
+          ))}
         </View>
       </View>
     );
@@ -917,7 +919,6 @@ const GrammarQuiz: React.FC<GrammarQuizProps> = ({ lesson, onBack, backLabel = '
       <ScrollView
         ref={scrollViewRef}
         style={[styles.container, { backgroundColor: colors.background }]}
-        stickyHeaderIndices={[1]}
         contentContainerStyle={{
           paddingTop: layoutTopInset,
           paddingBottom: Math.max(insets.bottom, 8) + (isKeyboardOpen ? Math.min(Math.max(keyboardHeight || keyboardHeightDrop, 220), 420) : 0),
@@ -1099,33 +1100,25 @@ const GrammarQuiz: React.FC<GrammarQuizProps> = ({ lesson, onBack, backLabel = '
               }
             />
           )}
+          {renderPracticeDock()}
         </View>
-        <View
-          style={[
-            styles.stickyHeader,
-            Platform.OS === 'web' ? styles.webStickyHeader : undefined,
-            Platform.OS === 'android' && styles.stickyHeaderAndroid,
-            !isSecondViewActive && styles.stickyHeaderFirstView,
-            Platform.OS === 'web' && !isSecondViewActive ? styles.webStickyHeaderFirstView : undefined,
-            { backgroundColor: colors.background, paddingTop: stickyHeaderPinnedTopPadding },
-          ]}
-          onLayout={(event) => {
-            secondViewYRef.current = event.nativeEvent.layout.y;
-            setStickyHeaderHeight(event.nativeEvent.layout.height);
-          }}
+        <View style={[styles.practicePanelHost, { minHeight: secondViewMinHeight }]}>
+        <LessonPracticeSheet<ExerciseMode>
+          visible={practiceSheetOpen}
+          mode={exerciseMode}
+          segments={exerciseModeOptions}
+          isDarkMode={isDarkMode}
+          colors={colors}
+          onClose={closePracticeSheet}
+          onSwitchMode={switchPracticeMode}
         >
-          {renderModeTabs()}
-        </View>
-        <View
-          pointerEvents="none"
-          style={[
-            styles.firstViewSecondViewGuard,
-            {
-              backgroundColor: colors.background,
-              height: isSecondViewActive ? 0 : FIRST_VIEW_SECOND_VIEW_GUARD,
-            },
-          ]}
-        />
+        <ScrollView
+          style={styles.practiceSheetScroll}
+          contentContainerStyle={styles.practiceSheetScrollContent}
+          keyboardShouldPersistTaps="always"
+          bounces={false}
+          overScrollMode="never"
+        >
         <View
           ref={exerciseContainerRef}
           style={[
@@ -1164,7 +1157,7 @@ const GrammarQuiz: React.FC<GrammarQuizProps> = ({ lesson, onBack, backLabel = '
                   {
                     backgroundColor: grammarGame.panelSurface,
                     borderColor: grammarGame.panelBorder,
-                    shadowColor: grammarGame.panelShadow,
+                    boxShadow: `0px 6px 12px ${withColorAlpha(grammarGame.panelShadow, 0.16)}`,
                   },
                 ]}
               >
@@ -1230,10 +1223,10 @@ const GrammarQuiz: React.FC<GrammarQuizProps> = ({ lesson, onBack, backLabel = '
                                 />
                                 {isLost && (
                                   <Animated.View
-                                    pointerEvents="none"
                                     style={[
                                       styles.lostLifeOverlay,
                                       {
+                                        pointerEvents: 'none',
                                         opacity: lostLifeAnim.interpolate({
                                           inputRange: [0, 0.55, 1],
                                           outputRange: [1, 1, 0],
@@ -1294,7 +1287,7 @@ const GrammarQuiz: React.FC<GrammarQuizProps> = ({ lesson, onBack, backLabel = '
                         borderWidth: 0,
                         borderBottomWidth: 0,
                         borderRadius: 0,
-                        shadowOpacity: 0,
+                        boxShadow: 'none',
                         elevation: 0,
                       },
                       isScaledWebLesson && {
@@ -1558,7 +1551,7 @@ const GrammarQuiz: React.FC<GrammarQuizProps> = ({ lesson, onBack, backLabel = '
                   height: activeCardHeight,
                   backgroundColor: feedbackCardBackground,
                   borderColor: grammarGame.feedbackBorder,
-                  shadowColor: grammarGame.feedbackSurface,
+                  boxShadow: `0px 8px 14px ${withColorAlpha(grammarGame.feedbackSurface, 0.18)}`,
                   // Use translateY for smooth, hardware-accelerated animations where supported
                   transform: [{ translateY: feedbackAnim }]
                 }
@@ -1570,6 +1563,9 @@ const GrammarQuiz: React.FC<GrammarQuizProps> = ({ lesson, onBack, backLabel = '
             )}
           </>
         ) : null}
+        </View>
+        </ScrollView>
+        </LessonPracticeSheet>
         </View>
       </ScrollView>
     </KeyboardAvoidingView>
@@ -1640,6 +1636,84 @@ const styles = StyleSheet.create({
   },
   overviewSection: {
     paddingBottom: 18,
+  },
+  practiceDock: {
+    flexShrink: 0,
+  },
+  practiceDockDesktop: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    justifyContent: 'center',
+    paddingBottom: 18,
+    paddingHorizontal: 32,
+    paddingTop: 10,
+    position: 'relative',
+  },
+  practiceDockMobile: {
+    paddingBottom: 14,
+    paddingHorizontal: 12,
+    paddingTop: 8,
+  },
+  practiceDockLabelDesktop: {
+    left: 32,
+    position: 'absolute',
+  },
+  practiceDockLabelMobile: {
+    marginBottom: 7,
+  },
+  practiceDockLabel: {
+    fontSize: 14,
+    fontWeight: freshFontFamily.extrabold,
+  },
+  practiceActions: {
+    flexDirection: 'row',
+  },
+  practiceActionsDesktop: {
+    gap: 10,
+  },
+  practiceActionsMobile: {
+    gap: 6,
+  },
+  practiceAction: {
+    alignItems: 'center',
+    borderRadius: 13,
+    borderWidth: 1,
+    flexDirection: 'row',
+    justifyContent: 'center',
+    minHeight: 44,
+  },
+  practiceActionDesktop: {
+    gap: 7,
+    minWidth: 108,
+    paddingHorizontal: 17,
+  },
+  practiceActionMobile: {
+    flex: 1,
+    gap: 3,
+    minWidth: 0,
+    paddingHorizontal: 3,
+  },
+  practiceActionText: {
+    fontWeight: freshFontFamily.bold,
+  },
+  practiceActionTextDesktop: {
+    fontSize: 14,
+  },
+  practiceActionTextMobile: {
+    flexShrink: 1,
+    fontSize: 11.5,
+  },
+  practicePanelHost: {
+    position: 'relative',
+    overflow: 'hidden',
+  },
+  practiceSheetScroll: {
+    flex: 1,
+    minHeight: 0,
+  },
+  practiceSheetScrollContent: {
+    flexGrow: 1,
+    paddingBottom: 12,
   },
   stickyHeader: {
     paddingTop: 10,
@@ -1761,7 +1835,6 @@ const styles = StyleSheet.create({
     marginTop: 10,
     marginBottom: 8,
     borderRadius: 18,
-    resizeMode: 'contain',
   },
   webLessonImage: {
     marginTop: 6,
@@ -1917,10 +1990,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 24,
     marginBottom: 20,
     minHeight: 92,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.16,
-    shadowRadius: 20,
+    boxShadow: '0px 8px 20px rgba(0,0,0,0.16)',
     elevation: 4,
   },
   questionCardFillTight: {
@@ -2022,10 +2092,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 14,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 3 },
-    shadowOpacity: 0.05,
-    shadowRadius: 8,
+    boxShadow: '0px 3px 8px rgba(0,0,0,0.05)',
     elevation: 1,
   },
   optionLetterBadge: {
@@ -2055,9 +2122,7 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     marginVertical: 16,
     borderWidth: 1.5,
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.16,
-    shadowRadius: 12,
+    boxShadow: '0px 6px 12px rgba(0,0,0,0.16)',
     elevation: 5,
   },
   completionContainer: { alignItems: 'center', padding: 24, borderRadius: 16, marginVertical: 16 },
@@ -2078,7 +2143,7 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     textAlign: 'center',
   },
-  feedbackCard: { position: 'absolute', left: 16, right: 16, height: CARD_HEIGHT, padding: 16, borderRadius: 8, alignItems: 'center', justifyContent: 'center', zIndex: 10, borderWidth: 1.5, borderColor: 'rgba(223,255,238,0.5)', shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.18, shadowRadius: 14, elevation: 7 },
+  feedbackCard: { position: 'absolute', left: 16, right: 16, height: CARD_HEIGHT, padding: 16, borderRadius: 8, alignItems: 'center', justifyContent: 'center', zIndex: 10, borderWidth: 1.5, borderColor: 'rgba(223,255,238,0.5)', elevation: 7 },
   feedbackText: { color: '#fff', fontWeight: freshFontFamily.extrabold, fontSize: 32, textAlign: 'center' },
   congratsBox: {
     width: '100%',
@@ -2090,9 +2155,7 @@ const styles = StyleSheet.create({
     borderRadius: 18,
     marginVertical: 16,
     borderWidth: 1.5,
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.14,
-    shadowRadius: 12,
+    boxShadow: '0px 6px 12px rgba(0,0,0,0.14)',
     elevation: 4,
   },
   sessionMistakeStat: {
@@ -2131,10 +2194,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#FFF8D6',
     borderWidth: 1.5,
     borderColor: '#E7C566',
-    shadowColor: '#D4A72C',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.5,
-    shadowRadius: 10,
+    boxShadow: '0px 4px 10px rgba(212,167,44,0.50)',
     elevation: 10,
   },
   perfectCompletionText: {
@@ -2149,7 +2209,6 @@ const styles = StyleSheet.create({
     width: screenWidth * 0.25,
     height: screenWidth * 0.25,
     marginBottom: 20,
-    resizeMode: 'contain',
   },
   gameOverImage: {
     width: screenWidth * 0.25,

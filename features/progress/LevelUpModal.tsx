@@ -39,8 +39,8 @@ const Sparkle = ({ style, delay = 0, size = 12 }: { style: any; delay?: number; 
   useEffect(() => {
     const loop = Animated.loop(
       Animated.sequence([
-        Animated.timing(anim, { toValue: 1, duration: 900, delay, useNativeDriver: true }),
-        Animated.timing(anim, { toValue: 0, duration: 900, useNativeDriver: true }),
+        Animated.timing(anim, { toValue: 1, duration: 900, delay, useNativeDriver: Platform.OS !== 'web' }),
+        Animated.timing(anim, { toValue: 0, duration: 900, useNativeDriver: Platform.OS !== 'web' }),
       ])
     );
     loop.start();
@@ -133,14 +133,14 @@ export default function LevelUpModal({
     // Everything starts at t=0 — backdrop fade, container pop, and the
     // trophy pop all run together, then each row rises in on its own delay.
     Animated.parallel([
-      Animated.timing(backdropOpacity, { toValue: 1, duration: 260, useNativeDriver: true }),
-      Animated.spring(cardScale, { toValue: 1, friction: 8, tension: 140, useNativeDriver: true }),
-      Animated.spring(trophyScale, { toValue: 1, friction: 5, tension: 200, delay: 80, useNativeDriver: true }),
-      Animated.timing(titleAnim, { toValue: 1, duration: 400, delay: 500, useNativeDriver: true }),
-      Animated.timing(statsAnim, { toValue: 1, duration: 400, delay: 700, useNativeDriver: true }),
-      Animated.timing(barRowAnim, { toValue: 1, duration: 400, delay: 800, useNativeDriver: true }),
-      Animated.timing(unlockAnim, { toValue: 1, duration: 400, delay: 1300, useNativeDriver: true }),
-      Animated.timing(badgeAnim, { toValue: 1, duration: 300, delay: 1800, useNativeDriver: true }),
+      Animated.timing(backdropOpacity, { toValue: 1, duration: 260, useNativeDriver: Platform.OS !== 'web' }),
+      Animated.spring(cardScale, { toValue: 1, friction: 8, tension: 140, useNativeDriver: Platform.OS !== 'web' }),
+      Animated.spring(trophyScale, { toValue: 1, friction: 5, tension: 200, delay: 80, useNativeDriver: Platform.OS !== 'web' }),
+      Animated.timing(titleAnim, { toValue: 1, duration: 400, delay: 500, useNativeDriver: Platform.OS !== 'web' }),
+      Animated.timing(statsAnim, { toValue: 1, duration: 400, delay: 700, useNativeDriver: Platform.OS !== 'web' }),
+      Animated.timing(barRowAnim, { toValue: 1, duration: 400, delay: 800, useNativeDriver: Platform.OS !== 'web' }),
+      Animated.timing(unlockAnim, { toValue: 1, duration: 400, delay: 1300, useNativeDriver: Platform.OS !== 'web' }),
+      Animated.timing(badgeAnim, { toValue: 1, duration: 300, delay: 1800, useNativeDriver: Platform.OS !== 'web' }),
     ]).start();
 
     const xpListener = xpCountAnim.addListener(({ value }) => {
@@ -182,8 +182,7 @@ export default function LevelUpModal({
       hardwareAccelerated
     >
       <Animated.View
-        style={[StyleSheet.absoluteFill, styles.backdrop, { opacity: backdropOpacity }]}
-        pointerEvents={visible ? 'auto' : 'none'}
+        style={[StyleSheet.absoluteFill, styles.backdrop, { opacity: backdropOpacity, pointerEvents: visible ? 'auto' : 'none' }]}
       >
         <View style={[styles.shell, { paddingTop: topPad, paddingBottom: botPad }]}>
           <View style={[styles.banner, { backgroundColor: isDarkMode ? '#075A49' : '#1f9b82' }]}>
@@ -268,9 +267,8 @@ export default function LevelUpModal({
               <View
                 style={[
                   styles.unlockGlowRing,
-                  { backgroundColor: 'rgba(251,238,201,0.6)' },
+                  { backgroundColor: 'rgba(251,238,201,0.6)', pointerEvents: 'none' },
                 ]}
-                pointerEvents="none"
               />
               <Animated.View style={[styles.newBadge, riseIn(badgeAnim)]}>
                 <Text style={styles.newBadgeText}>NEW</Text>
@@ -344,10 +342,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 16,
     marginBottom: 14,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.15,
-    shadowRadius: 20,
+    boxShadow: '0px 8px 20px rgba(0,0,0,0.15)',
     elevation: 6,
   },
   bannerEmoji: {
@@ -448,10 +443,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     position: 'relative',
     overflow: 'hidden',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.1,
-    shadowRadius: 20,
+    boxShadow: '0px 8px 20px rgba(0,0,0,0.10)',
     elevation: 4,
   },
   unlockGlowRing: {
@@ -487,10 +479,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     overflow: 'hidden',
     backgroundColor: '#FFFFFF',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.15,
-    shadowRadius: 16,
+    boxShadow: '0px 6px 16px rgba(0,0,0,0.15)',
     elevation: 3,
   },
   unlockImage: {

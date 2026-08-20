@@ -1,5 +1,4 @@
-import React from 'react';
-import { render } from '@testing-library/react-native';
+import { act, fireEvent, render, waitFor } from '@testing-library/react-native';
 
 jest.mock('../features/grammar/grammarProgressStorage', () => ({
   getGrammarLessonProgressKey: jest.fn(() => 'test-key'),
@@ -25,6 +24,10 @@ jest.mock('../features/shared/soundEffects', () => ({
   replaySoundEffect: jest.fn(),
 }));
 
+jest.mock('../features/shared/useEnglishSpeech', () => ({
+  useEnglishSpeech: () => ({ speak: jest.fn(), stop: jest.fn() }),
+}));
+
 jest.mock('../features/progress/LevelProgressSummary', () => {
   const React = require('react');
   const { View } = require('react-native');
@@ -43,15 +46,33 @@ const mockLesson = {
       answer: 'an',
       options: ['a', 'an', 'the', 'none'],
     },
+    { type: 'fill' as const, question: 'He ___ tall.', answer: 'is' },
+    { type: 'reorder' as const, question: 'Put the words in order.', answer: 'I like cats', words: ['like', 'I', 'cats'] },
+    { type: 'translate' as const, question: 'Je suis heureux.', answer: 'I am happy', wordBank: ['I', 'am', 'happy'] },
   ],
   availableModes: {},
 };
 
 describe('GrammarQuiz', () => {
-  it('renders without crashing', async () => {
-    const { toJSON } = await render(
+  it('opens the selected practice mode directly from the lesson', async () => {
+    const screen = render(
       <GrammarQuiz lesson={mockLesson} onBack={jest.fn()} backLabel="Back" />
     );
-    expect(toJSON()).toBeTruthy();
+    await act(async () => {
+      await Promise.resolve();
+    });
+
+    expect(screen.toJSON()).toBeTruthy();
+    expect(screen.getByLabelText('Open Quiz')).toBeTruthy();
+    expect(screen.getByLabelText('Open Fill')).toBeTruthy();
+    expect(screen.getByLabelText('Open Reorder')).toBeTruthy();
+    expect(screen.getByLabelText('Open Translate')).toBeTruthy();
+
+    fireEvent.press(screen.getByLabelText('Open Translate'));
+
+    await waitFor(() => {
+      expect(screen.getByLabelText('Back to lesson')).toBeTruthy();
+      expect(screen.getByLabelText('Switch to Translate').props.accessibilityState).toEqual({ selected: true });
+    });
   });
 });

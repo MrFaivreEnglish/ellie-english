@@ -13,6 +13,7 @@ import {
 import { Svg, Circle } from 'react-native-svg';
 import Animated, { FadeInDown, useAnimatedProps, useSharedValue, withTiming, ZoomIn } from 'react-native-reanimated';
 import { useSpringPress } from '../shared/useSpringPress';
+import { getSerializableVocabularyLesson } from '../vocabulary/vocabularyUtils';
 
 const AnimatedCircle = Animated.createAnimatedComponent(Circle);
 
@@ -321,7 +322,7 @@ export default function HomeScreen() {
       params: {
         screen: 'VocabularyLesson',
         params: {
-          lesson: continueLessonTarget.lesson,
+          lesson: getSerializableVocabularyLesson(continueLessonTarget.lesson),
         },
       },
     });
@@ -398,7 +399,7 @@ export default function HomeScreen() {
             freshTileShadow(todayCardColors.shadow, true),
           ]}
         >
-          <View style={[styles.todayDecorCircle, { backgroundColor: todayCardColors.decoration }]} pointerEvents="none" />
+          <View style={[styles.todayDecorCircle, { backgroundColor: todayCardColors.decoration, pointerEvents: 'none' }]} />
           <View style={styles.todayHeaderRow}>
             <View style={styles.todayLeftBlock}>
               <View style={styles.todayTitleRow}>
@@ -427,7 +428,7 @@ export default function HomeScreen() {
                 trackColor={todayCardColors.ringTrack}
                 fillColor={todayCardColors.text}
               />
-              <View style={styles.todayRingCenter} pointerEvents="none">
+              <View style={[styles.todayRingCenter, { pointerEvents: 'none' }]}>
                 <Text style={[styles.todayRingValue, { color: todayCardColors.text, fontSize: 14, lineHeight: 17 }]}>{todaySavedProgressCount}</Text>
                 <Text style={[styles.todayRingGoal, { color: todayCardColors.faintText, fontSize: 9, lineHeight: 11 }]}>/{dailyPracticeGoal}</Text>
               </View>

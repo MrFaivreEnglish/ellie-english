@@ -1,5 +1,4 @@
-import React from 'react';
-import { render } from '@testing-library/react-native';
+import { act, fireEvent, render, waitFor } from '@testing-library/react-native';
 
 jest.mock('../features/vocabulary/useVocabularyGame', () => ({
   useVocabularyGame: () => ({
@@ -33,15 +32,41 @@ jest.mock('../features/vocabulary/useVocabularyGame', () => ({
 
 jest.mock('../features/vocabulary/useTypingGame', () => ({
   useTypingGame: () => ({
-    currentWord: null,
-    input: '',
-    setInput: jest.fn(),
-    isCorrect: null,
-    submit: jest.fn(),
-    skip: jest.fn(),
-    isComplete: false,
-    score: 0,
+    typedAnswer: '',
+    setTypedAnswer: jest.fn(),
+    typingIndex: 0,
+    typingFeedback: null,
+    firstTryCount: 0,
+    inlineMessage: '',
+    feedback: '',
+    feedbackEvent: null,
+    handleSubmit: jest.fn(),
+    xp: 0,
     sessionXp: 0,
+    streak: 0,
+    maxStreak: 0,
+    level: 1,
+    levelUpMessage: '',
+    attempts: 0,
+    totalAttempts: 0,
+    correctAnswers: 0,
+    reset: jest.fn(),
+    goToNextWord: jest.fn(),
+    goToPreviousWord: jest.fn(),
+    canGoPrevious: false,
+    canGoNext: true,
+    isAdvancing: false,
+    currentWord: { english: 'hello', french: 'bonjour' },
+    totalWords: 2,
+    isReviewMode: false,
+    isSessionComplete: false,
+    strictMode: false,
+    difficultyByWord: {},
+    reshuffleRemaining: jest.fn(),
+    comboBonus: 0,
+    requestHint: jest.fn(),
+    currentHintCount: 0,
+    currentHintText: '',
   }),
 }));
 
@@ -101,10 +126,24 @@ const mockRoute = {
 import VocabularyLessonScreen from '../features/vocabulary/VocabularyLessonScreen';
 
 describe('VocabularyLessonScreen', () => {
-  it('renders without crashing', async () => {
-    const { toJSON } = await render(
-      <VocabularyLessonScreen route={mockRoute} navigation={mockNavigation} />
-    );
+  it('keeps every practice mode directly accessible from the lesson', async () => {
+    const screen = render(<VocabularyLessonScreen route={mockRoute} navigation={mockNavigation} />);
+    await act(async () => {
+      await Promise.resolve();
+    });
+    const { getByLabelText, queryByText, toJSON } = screen;
+
     expect(toJSON()).toBeTruthy();
+    expect(getByLabelText('Open Cards')).toBeTruthy();
+    expect(getByLabelText('Open Match')).toBeTruthy();
+    expect(getByLabelText('Open Write')).toBeTruthy();
+    expect(queryByText(/opens over the lesson/i)).toBeNull();
+
+    fireEvent.press(getByLabelText('Open Write'));
+
+    await waitFor(() => {
+      expect(getByLabelText('Back to lesson')).toBeTruthy();
+      expect(getByLabelText('Switch to Write').props.accessibilityState).toEqual({ selected: true });
+    });
   });
 });

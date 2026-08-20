@@ -302,7 +302,7 @@ const PinchZoomImage: React.FC<Props> = ({
               </View>
             )}
             {showCredit && (
-              <View pointerEvents="none" style={styles.creditBadge}>
+              <View style={[styles.creditBadge, { pointerEvents: 'none' }]}>
                 <Text style={styles.creditText}>{creditLabel}</Text>
               </View>
             )}
