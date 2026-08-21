@@ -111,7 +111,7 @@ export default function VocabularyMatching({
   const titleHeight = 0;
   const footerBaseHeight = isVeryCompact ? 60 : isCompact ? 62 : 70;
   const footerHeight = isDesktop ? Math.round(footerBaseHeight * desktopBoardScale) : footerBaseHeight;
-  const boardTopSpacing = androidLikeLayout ? 10 : isCompact ? 14 : isDesktop ? Math.round(16 * desktopBoardScale) : 16;
+  const boardTopSpacing = androidLikeLayout ? 6 : isCompact ? 10 : isDesktop ? Math.round(12 * desktopBoardScale) : 12;
   const fullSetSize = matchingGamePairs?.english?.length || 0;
   // APK specifically gets a touch more row gap (on top of the shared Android-style
   // sizing that mobile web now also uses) so rows breathe a little more.
@@ -174,7 +174,7 @@ export default function VocabularyMatching({
         : rawCardHeight;
   const boardHeight = cardHeight * rowCount + cardGap * (rowCount - 1);
   const centeredBoardTopSpacing = androidLikeLayout
-    ? (isVeryCompact ? 14 : 16)
+    ? (isVeryCompact ? 10 : 12)
     : boardTopSpacing;
   const mobileCardTextSize = Math.round(clampNumber(cardHeight * 0.48, isVeryCompact ? 11 : 12, isCompact ? 16 : 20));
   const cardTextSize = isDesktop ? Math.round(clampNumber(22 * desktopBoardScale, 19, 32)) : mobileCardTextSize;

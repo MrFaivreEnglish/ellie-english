@@ -10,11 +10,9 @@ import {
 } from '@expo-google-fonts/libre-franklin';
 import { vocabRushColorsForTheme } from './vocabRushColors';
 import VocabRushGame from './VocabRushGame';
-import { getKnownVocabularyWords } from '../knownWords';
+import { getKnownVocabularyWords, MAX_VOCAB_RUSH_WORDS } from '../knownWords';
 import { useTheme } from '../../settings/ThemeContext';
 import type { Word } from '../../../types/VocabularyTypes';
-
-const KNOWN_WORDS_LIMIT = 30;
 
 export default function VocabRushScreen({ navigation }: any) {
   const { isDarkMode, colors: themeColors } = useTheme();
@@ -34,7 +32,7 @@ export default function VocabRushScreen({ navigation }: any) {
 
   useEffect(() => {
     let active = true;
-    getKnownVocabularyWords(KNOWN_WORDS_LIMIT).then((known) => {
+    getKnownVocabularyWords(MAX_VOCAB_RUSH_WORDS).then((known) => {
       if (active) setWords(known);
     });
     return () => {

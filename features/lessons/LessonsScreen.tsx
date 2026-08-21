@@ -440,11 +440,6 @@ export default function LessonsScreen() {
                         {
                           backgroundColor: isDarkMode ? colors.surface : '#FDFCFA',
                           borderColor: colors.border,
-                          // Rows otherwise all share the same flat card background —
-                          // this left-edge accent ties each chapter's lessons back to
-                          // its own category color so open chapters read as distinct.
-                          borderLeftWidth: 4,
-                          borderLeftColor: levelColor,
                         },
                       ]}
                     >

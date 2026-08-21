@@ -22,6 +22,13 @@ interface BackButtonProps {
    * Override text style if needed by a specific screen.
    */
   textStyle?: TextStyle;
+  /**
+   * Icon-only variant — drops the label text. The label is still used as the
+   * accessibility label. Only the vocabulary lesson screen uses this today,
+   * where the header title (lesson name + mode breadcrumb) needs the room
+   * the label would otherwise take.
+   */
+  hideLabel?: boolean;
 }
 
 /**
@@ -37,6 +44,7 @@ const BackButton: React.FC<BackButtonProps> = ({
   onPress,
   style,
   textStyle,
+  hideLabel = false,
 }) => {
   const navigation = useNavigation<any>();
   const { colors } = useTheme();
@@ -59,7 +67,9 @@ const BackButton: React.FC<BackButtonProps> = ({
       accessibilityLabel={resolvedLabel}
     >
       <MaterialIcons name="arrow-back" size={24} color={colors.text} />
-      <Text style={[styles.label, { color: colors.text }, textStyle]}>{resolvedLabel}</Text>
+      {!hideLabel && (
+        <Text style={[styles.label, { color: colors.text }, textStyle]}>{resolvedLabel}</Text>
+      )}
     </TouchableOpacity>
   );
 };

@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Image, ScrollView, Modal, Keyboard } from 'react-native';
+import BackButton from '../shared/BackButton';
 import ImageWithCredit from '../shared/ImageWithCredit';
 import VocabularyFlashcard from './VocabularyFlashcard';
 import VocabularyMatching from './VocabularyMatching';
@@ -73,6 +74,13 @@ export default function VocabularyLessonScreen({ route, navigation }: Props) {
     : resolveVocabularyMode(route.params.initialMode);
   const [sheetMode, setSheetMode] = useState<VocabularyMode | null>(null);
   const mode = sheetMode ?? 'flashcards';
+  const [dockHeight, setDockHeight] = useState(0);
+  const MODE_TITLE_LABELS: Record<VocabularyMode, string> = {
+    flashcards: 'Flashcards',
+    matching: 'Matching',
+    typing: 'Writing',
+  };
+  const activeModeLabel = sheetMode ? MODE_TITLE_LABELS[sheetMode] : null;
 
   const { lesson, backLabel = 'Back to Vocabulary', backTarget } = route.params;
   const useRefillMatching = !!lesson?.useRefillMatching;
@@ -838,8 +846,8 @@ const goToPrevWord = () => {
 
   const openOrSwitchSheet = useCallback((nextMode: VocabularyMode) => {
     setSheetMode((current) => {
-      if (nextMode !== current) triggerSelectionHaptic();
-      return nextMode;
+      triggerSelectionHaptic();
+      return nextMode === current ? null : nextMode;
     });
     Keyboard.dismiss();
   }, []);
@@ -1093,6 +1101,7 @@ const goToPrevWord = () => {
           style={[
             styles.gameViewport,
             isDesktopWebLesson && styles.gameViewportDesktopWeb,
+            sheetMode === 'typing' && isDesktopWebLesson && styles.gameViewportTypingDesktop,
             { minHeight: practiceViewportHeight },
           ]}
         >
@@ -1194,7 +1203,7 @@ const goToPrevWord = () => {
           )}
 
           {sheetMode === 'typing' && (
-            <View style={[styles.gameSection, styles.typingGameSection]}>
+            <View style={[styles.gameSection, styles.typingGameSection, !isDesktopWebLesson && styles.typingGameSectionMobile]}>
               <VocabularyTyping
                 words={typingWords}
                 typingGame={typingGame}
@@ -1229,54 +1238,62 @@ const goToPrevWord = () => {
       { key: 'typing', label: 'Write', icon: 'edit' },
     ];
 
+    const dockAttached = sheetMode !== null;
+
     return (
       <View
+        onLayout={(event) => setDockHeight(event.nativeEvent.layout.height)}
         style={[
           styles.dock,
           isDesktopWebLesson ? styles.dockDesktop : styles.dockMobile,
-          { backgroundColor: colors.background },
+          dockAttached && styles.dockAttached,
+          {
+            backgroundColor: dockAttached ? colors.card : colors.background,
+            borderTopColor: colors.border,
+          },
         ]}
       >
-        <View style={isDesktopWebLesson ? styles.dockLabelColDesktop : styles.dockLabelRowMobile}>
-          <Text style={[styles.dockLabel, isDesktopWebLesson ? styles.dockLabelDesktop : styles.dockLabelMobile, { color: isDarkMode ? colors.text : LESSON_CHROME_COLORS.ink }]}>
-            Practice
-          </Text>
-        </View>
-
         <View style={[styles.dockChipsRow, isDesktopWebLesson ? styles.dockChipsRowDesktop : styles.dockChipsRowMobile]}>
-          {actions.map((action) => (
-            <TouchableOpacity
-              key={action.key}
-              activeOpacity={0.76}
-              onPress={() => openOrSwitchSheet(action.key)}
-              accessibilityRole="button"
-              accessibilityLabel={`Open ${action.label}`}
-              style={[
-                styles.dockChip,
-                isDesktopWebLesson ? styles.dockChipDesktop : styles.dockChipMobile,
-                {
-                  backgroundColor: isDarkMode ? colors.surface : colors.card,
-                  borderColor: colors.border,
-                },
-              ]}
-            >
-              <MaterialIcons
-                name={action.icon}
-                size={isDesktopWebLesson ? 18 : 17}
-                color={isDarkMode ? colors.primary : LESSON_CHROME_COLORS.accent}
-              />
-              <Text
+          {actions.map((action) => {
+            const isActive = sheetMode === action.key;
+
+            return (
+              <TouchableOpacity
+                key={action.key}
+                activeOpacity={0.76}
+                onPress={() => openOrSwitchSheet(action.key)}
+                accessibilityRole="button"
+                accessibilityLabel={isActive ? `Close ${action.label}` : `Open ${action.label}`}
+                accessibilityState={{ selected: isActive }}
                 style={[
-                  styles.dockChipText,
-                  isDesktopWebLesson ? styles.dockChipTextDesktop : styles.dockChipTextMobile,
-                  { color: isDarkMode ? colors.text : LESSON_CHROME_COLORS.chipIdleText },
+                  styles.dockChip,
+                  isDesktopWebLesson ? styles.dockChipDesktop : styles.dockChipMobile,
+                  {
+                    backgroundColor: isActive
+                      ? (isDarkMode ? colors.primarySoft : LESSON_CHROME_COLORS.accent)
+                      : (isDarkMode ? colors.surface : colors.card),
+                    borderColor: isActive ? LESSON_CHROME_COLORS.accent : colors.border,
+                  },
                 ]}
-                numberOfLines={1}
               >
-                {action.label}
-              </Text>
-            </TouchableOpacity>
-          ))}
+                <MaterialIcons
+                  name={action.icon}
+                  size={isDesktopWebLesson ? 18 : 17}
+                  color={isActive ? '#FFFFFF' : (isDarkMode ? colors.primary : LESSON_CHROME_COLORS.accent)}
+                />
+                <Text
+                  style={[
+                    styles.dockChipText,
+                    isDesktopWebLesson ? styles.dockChipTextDesktop : styles.dockChipTextMobile,
+                    { color: isActive ? '#FFFFFF' : (isDarkMode ? colors.text : LESSON_CHROME_COLORS.chipIdleText) },
+                  ]}
+                  numberOfLines={1}
+                >
+                  {action.label}
+                </Text>
+              </TouchableOpacity>
+            );
+          })}
         </View>
       </View>
     );
@@ -1285,29 +1302,47 @@ const goToPrevWord = () => {
   return (
     <View style={[styles.screen, { backgroundColor: colors.background, paddingTop: layoutTopInset }]}>
       <View style={[styles.header, isDesktopWebLesson ? styles.headerDesktop : styles.headerMobile]}>
-        <TouchableOpacity
+        <BackButton
+          label={backLabel}
           onPress={handleBackPress}
-          accessibilityRole="button"
-          accessibilityLabel={backLabel}
-          style={[
-            styles.headerBackButton,
-            isDesktopWebLesson ? styles.headerBackButtonDesktop : styles.headerBackButtonMobile,
-            { backgroundColor: isDarkMode ? colors.card : '#FFFFFF' },
-          ]}
-        >
-          <MaterialIcons name="arrow-back" size={isDesktopWebLesson ? 19 : 17} color={isDarkMode ? colors.text : LESSON_CHROME_COLORS.ink} />
-        </TouchableOpacity>
-        <Text
-          style={[
-            styles.headerTitle,
-            isDesktopWebLesson ? styles.headerTitleDesktop : styles.headerTitleMobile,
-            { color: isDarkMode ? colors.text : LESSON_CHROME_COLORS.ink },
-          ]}
-          numberOfLines={1}
-          ellipsizeMode="tail"
-        >
-          {lesson.title}
-        </Text>
+          style={styles.headerBackButton}
+          hideLabel
+        />
+        <View style={styles.headerTitleRow}>
+          <Text
+            style={[
+              styles.headerTitle,
+              isDesktopWebLesson ? styles.headerTitleDesktop : styles.headerTitleMobile,
+              { color: isDarkMode ? colors.text : LESSON_CHROME_COLORS.ink },
+              activeModeLabel ? styles.headerTitleShrunk : styles.headerTitleFlex,
+            ]}
+            numberOfLines={1}
+            ellipsizeMode="tail"
+          >
+            {lesson.title}
+          </Text>
+          {activeModeLabel && (
+            <>
+              <MaterialIcons
+                name="chevron-right"
+                size={isDesktopWebLesson ? 20 : 18}
+                color={isDarkMode ? colors.secondaryText : LESSON_CHROME_COLORS.chipIdleText}
+              />
+              <Text
+                style={[
+                  styles.headerTitle,
+                  isDesktopWebLesson ? styles.headerTitleDesktop : styles.headerTitleMobile,
+                  styles.headerModeLabel,
+                  { color: isDarkMode ? colors.secondaryText : LESSON_CHROME_COLORS.chipIdleText },
+                ]}
+                numberOfLines={1}
+                ellipsizeMode="tail"
+              >
+                {activeModeLabel}
+              </Text>
+            </>
+          )}
+        </View>
       </View>
 
       <View
@@ -1380,6 +1415,11 @@ const goToPrevWord = () => {
         colors={colors}
         onClose={closeSheet}
         onSwitchMode={openOrSwitchSheet}
+        edgeToEdge
+        bottomInset={dockHeight}
+        showModeControl={false}
+        lessonTitle={lesson.title}
+        showTitleRow={false}
       >
         {renderSheetBody()}
       </LessonPracticeSheet>
@@ -1478,30 +1518,40 @@ const styles = StyleSheet.create({
     paddingBottom: 6,
   },
   headerBackButton: {
+    flexShrink: 0,
+    marginTop: 0,
+    marginLeft: 0,
+    paddingVertical: 0,
+    alignSelf: 'center',
+  },
+  headerTitleRow: {
+    flex: 1,
+    minWidth: 0,
+    flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
-    boxShadow: '0px 3px 8px rgba(0,0,0,0.05)',
-    elevation: 2,
-  },
-  headerBackButtonDesktop: {
-    width: 38,
-    height: 38,
-    borderRadius: 12,
-  },
-  headerBackButtonMobile: {
-    width: 34,
-    height: 34,
-    borderRadius: 11,
+    gap: 4,
   },
   headerTitle: {
-    flexShrink: 1,
     fontWeight: '800',
   },
+  headerTitleFlex: {
+    flex: 1,
+    minWidth: 0,
+  },
+  headerTitleShrunk: {
+    flexShrink: 1,
+    flexGrow: 0,
+  },
+  headerModeLabel: {
+    flexShrink: 2,
+    minWidth: 0,
+    fontWeight: '700',
+  },
   headerTitleDesktop: {
-    fontSize: 19,
+    fontSize: 24,
   },
   headerTitleMobile: {
-    fontSize: 16,
+    fontSize: 21,
   },
   imageStage: {
     flex: 1,
@@ -1511,39 +1561,27 @@ const styles = StyleSheet.create({
   },
   dock: {
     flexShrink: 0,
+    zIndex: 2,
+  },
+  dockAttached: {
+    borderTopWidth: 1,
+    borderTopLeftRadius: 18,
+    borderTopRightRadius: 18,
+    boxShadow: '0px -6px 14px rgba(0,0,0,0.08)',
   },
   dockDesktop: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     position: 'relative',
-    paddingTop: 10,
-    paddingBottom: 18,
+    paddingTop: 6,
+    paddingBottom: 10,
     paddingHorizontal: 32,
   },
   dockMobile: {
     paddingHorizontal: 16,
-    paddingTop: 8,
-    paddingBottom: 14,
-  },
-  dockLabelColDesktop: {
-    flexDirection: 'column',
-    left: 32,
-    position: 'absolute',
-  },
-  dockLabelRowMobile: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 7,
-  },
-  dockLabel: {
-    fontWeight: '800',
-  },
-  dockLabelDesktop: {
-    fontSize: 15,
-  },
-  dockLabelMobile: {
-    fontSize: 14,
+    paddingTop: 5,
+    paddingBottom: 8,
   },
   dockChipsRow: {
     flexDirection: 'row',
@@ -1595,8 +1633,8 @@ const styles = StyleSheet.create({
     gap: 8,
     flexWrap: 'wrap',
     paddingHorizontal: 16,
-    marginTop: 12,
-    marginBottom: 12,
+    marginTop: 2,
+    marginBottom: 6,
   },
   categoryControlsRowDesktopWeb: {
     paddingHorizontal: 12,
@@ -1700,6 +1738,9 @@ const styles = StyleSheet.create({
     width: '100%',
     maxWidth: 720,
   },
+  gameViewportTypingDesktop: {
+    justifyContent: 'center',
+  },
   emptyLessonState: {
     alignItems: 'center',
     justifyContent: 'center',
@@ -1734,6 +1775,9 @@ const styles = StyleSheet.create({
   typingGameSection: {
     justifyContent: 'flex-start',
     paddingTop: 0,
+  },
+  typingGameSectionMobile: {
+    marginTop: 28,
   },
   categoryPopoverBackdrop: {
     flex: 1,

@@ -76,6 +76,26 @@ type Props<TMode extends string> = {
   segments?: readonly LessonPracticeSheetModeOption<TMode>[];
   modeTitles?: Partial<Record<TMode, string>>;
   children: React.ReactNode;
+  // Renders as a plain in-tree overlay (no RN Modal) confined to the parent
+  // screen container, instead of a full-window Modal — so a sibling bottom
+  // tab bar rendered outside that container stays visible while the sheet
+  // is open. GrammarQuiz's practice panel isn't laid out for that (it's
+  // nested mid-scrollview), so it keeps the Modal path via the default.
+  edgeToEdge?: boolean;
+  // Space to leave clear at the bottom of an edgeToEdge sheet, e.g. for a
+  // mode dock that stays visible/interactive below the sheet.
+  bottomInset?: number;
+  // Whether to render the built-in segmented mode control. Off when the
+  // caller already shows a persistent mode dock outside the sheet.
+  showModeControl?: boolean;
+  // When set, the sheet's own title row echoes the lesson header's
+  // "Lesson › Mode" breadcrumb instead of showing just the mode name.
+  lessonTitle?: string;
+  // Experimental: hides the title row (breadcrumb + back circle) entirely,
+  // so the practice module starts right under the drag handle. The handle
+  // itself and the dock's toggle-to-close still close the sheet, so this is
+  // safe to try — flip back to true (or drop the prop) to restore it.
+  showTitleRow?: boolean;
 };
 
 export default function LessonPracticeSheet<TMode extends string = VocabularyMode>({
@@ -88,6 +108,11 @@ export default function LessonPracticeSheet<TMode extends string = VocabularyMod
   segments = DEFAULT_SEGMENTS as unknown as readonly LessonPracticeSheetModeOption<TMode>[],
   modeTitles,
   children,
+  edgeToEdge = false,
+  bottomInset = 0,
+  showModeControl = true,
+  lessonTitle,
+  showTitleRow = true,
 }: Props<TMode>) {
   const insets = useSafeAreaInsets();
   const { width, height } = useWindowDimensions();
@@ -106,7 +131,7 @@ export default function LessonPracticeSheet<TMode extends string = VocabularyMod
   const [mounted, setMounted] = useState(visible);
   const translateY = useRef(new Animated.Value(height)).current;
   const scrimOpacity = useRef(new Animated.Value(0)).current;
-  const sheetTop = isDesktop ? 24 : 38;
+  const sheetTop = edgeToEdge ? Math.max(insets.top, 4) : (isDesktop ? 24 : 38);
   const sheetHeight = Math.max(1, height - sheetTop);
   // Read via a ref inside the animation effect (not as a dependency) — the
   // on-screen keyboard opening for Write mode can change the reported window
@@ -198,72 +223,99 @@ export default function LessonPracticeSheet<TMode extends string = VocabularyMod
 
   if (!mounted) return null;
 
-  return (
-    <Modal visible transparent animationType="none" statusBarTranslucent onRequestClose={onClose}>
-      <View style={StyleSheet.absoluteFill}>
-        <Animated.View style={[StyleSheet.absoluteFill, styles.scrim, { opacity: scrimOpacity }]}>
-          <TouchableOpacity style={StyleSheet.absoluteFill} activeOpacity={1} onPress={onClose} accessibilityLabel="Close practice" accessibilityRole="button" />
-        </Animated.View>
+  const sheetInner = (
+    <View style={StyleSheet.absoluteFill} pointerEvents="box-none">
+      <Animated.View
+        style={[
+          StyleSheet.absoluteFill,
+          styles.scrim,
+          { opacity: scrimOpacity, bottom: edgeToEdge ? bottomInset : 0 },
+        ]}
+        pointerEvents={visible ? 'auto' : 'none'}
+      >
+        <TouchableOpacity style={StyleSheet.absoluteFill} activeOpacity={1} onPress={onClose} accessibilityLabel="Close practice" accessibilityRole="button" />
+      </Animated.View>
 
-        <Animated.View
-          style={[
-            styles.sheet,
-            isDesktop ? styles.sheetDesktop : styles.sheetMobile,
-            {
-              top: sheetTop,
-              backgroundColor: theme.sheetBg,
-              paddingBottom: Math.max(insets.bottom, isDesktop ? 0 : 8),
-              transform: [{ translateY }],
-            },
-          ]}
-        >
-          <View {...panResponder.panHandlers}>
+      <Animated.View
+        style={[
+          styles.sheet,
+          isDesktop ? styles.sheetDesktop : styles.sheetMobile,
+          {
+            top: sheetTop,
+            bottom: edgeToEdge ? bottomInset : 0,
+            backgroundColor: theme.sheetBg,
+            paddingBottom: Math.max(insets.bottom, isDesktop ? 0 : 8),
+            transform: [{ translateY }],
+          },
+        ]}
+      >
+        <View {...panResponder.panHandlers}>
+          <TouchableOpacity
+            style={styles.handleWrap}
+            onPress={onClose}
+            accessibilityRole="button"
+            accessibilityLabel="Close practice"
+          >
+            <View style={[styles.handle, isDesktop ? styles.handleDesktop : styles.handleMobile, { backgroundColor: theme.handle }]} />
+          </TouchableOpacity>
+        </View>
+
+        {showTitleRow && (
+          <View style={[styles.titleRow, mode === 'matching' && styles.titleRowMatching]}>
             <TouchableOpacity
-              style={styles.handleWrap}
+              style={[styles.backCircle, mode === 'matching' && styles.backCircleCompact, { backgroundColor: theme.chipIdleBg }]}
               onPress={onClose}
               accessibilityRole="button"
-              accessibilityLabel="Close practice"
+              accessibilityLabel="Back to lesson"
             >
-              <View style={[styles.handle, isDesktop ? styles.handleDesktop : styles.handleMobile, { backgroundColor: theme.handle }]} />
+              <MaterialIcons name="arrow-back" size={mode === 'matching' ? 15 : 18} color={theme.ink} />
             </TouchableOpacity>
+
+            <View style={styles.titleBreadcrumb}>
+              {lessonTitle ? (
+                <>
+                  <Text
+                    style={[styles.titleText, styles.titleTextShrunk, { color: theme.ink }]}
+                    numberOfLines={1}
+                  >
+                    {lessonTitle}
+                  </Text>
+                  <MaterialIcons name="chevron-right" size={16} color={theme.inkSecondary} />
+                  <Text
+                    style={[styles.titleText, styles.titleModeText, { color: theme.inkSecondary }]}
+                    numberOfLines={1}
+                  >
+                    {activeTitle}
+                  </Text>
+                </>
+              ) : (
+                <Text style={[styles.titleText, { color: theme.ink }]} numberOfLines={1}>
+                  {activeTitle}
+                </Text>
+              )}
+            </View>
           </View>
+        )}
 
-          <View style={[styles.titleRow, mode === 'matching' && styles.titleRowMatching]}>
-            <Text style={[styles.titleText, { color: theme.ink }]} numberOfLines={1}>
-              {activeTitle}
-            </Text>
-            {isDesktop ? (
-              <TouchableOpacity
-                style={[styles.backPill, { backgroundColor: theme.chipIdleBg }]}
-                onPress={onClose}
-                accessibilityRole="button"
-                accessibilityLabel="Back to lesson"
-              >
-                <MaterialIcons name="arrow-downward" size={15} color={theme.ink} />
-                <Text style={[styles.backPillText, { color: theme.ink }]}>Back to lesson</Text>
-              </TouchableOpacity>
-            ) : (
-              <TouchableOpacity
-                style={[styles.backCircle, { backgroundColor: theme.chipIdleBg }]}
-                onPress={onClose}
-                accessibilityRole="button"
-                accessibilityLabel="Back to lesson"
-              >
-                <MaterialIcons name="arrow-downward" size={18} color={theme.ink} />
-              </TouchableOpacity>
-            )}
-          </View>
+        <KeyboardAvoidingView
+          style={styles.contentSlot}
+          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        >
+          {children}
+        </KeyboardAvoidingView>
 
-          <KeyboardAvoidingView
-            style={styles.contentSlot}
-            behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-          >
-            {children}
-          </KeyboardAvoidingView>
-
+        {showModeControl && (
           <ModeSegmentedControl mode={mode} segments={segments} isDesktop={isDesktop} theme={theme} onChange={onSwitchMode} />
-        </Animated.View>
-      </View>
+        )}
+      </Animated.View>
+    </View>
+  );
+
+  if (edgeToEdge) return sheetInner;
+
+  return (
+    <Modal visible transparent animationType="none" statusBarTranslucent onRequestClose={onClose}>
+      {sheetInner}
     </Modal>
   );
 }
@@ -347,7 +399,6 @@ const styles = StyleSheet.create({
     bottom: 0,
     backgroundColor: '#FFFFFF',
     boxShadow: '0px -14px 44px rgba(0,0,0,0.22)',
-    elevation: 24,
   },
   sheetDesktop: {
     borderTopLeftRadius: 26,
@@ -360,7 +411,7 @@ const styles = StyleSheet.create({
   handleWrap: {
     alignItems: 'center',
     paddingTop: 6,
-    paddingBottom: 3,
+    paddingBottom: 12,
   },
   handle: {
     width: 44,
@@ -377,31 +428,31 @@ const styles = StyleSheet.create({
   titleRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
+    gap: 10,
     paddingHorizontal: 20,
-    paddingBottom: 10,
+    paddingBottom: 2,
   },
   titleRowMatching: {
-    paddingBottom: 2,
+    paddingBottom: 0,
+  },
+  titleBreadcrumb: {
+    flex: 1,
+    minWidth: 0,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
   },
   titleText: {
     fontSize: 18,
     fontWeight: '800',
     color: SHEET_COLORS.ink,
   },
-  backPill: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    backgroundColor: SHEET_COLORS.chipIdleBg,
-    borderRadius: 999,
-    paddingHorizontal: 14,
-    paddingVertical: 8,
+  titleTextShrunk: {
+    flexShrink: 1,
   },
-  backPillText: {
-    fontSize: 13.5,
-    fontWeight: '700',
-    color: SHEET_COLORS.ink,
+  titleModeText: {
+    flexShrink: 2,
+    minWidth: 0,
   },
   backCircle: {
     width: 34,
@@ -410,6 +461,11 @@ const styles = StyleSheet.create({
     backgroundColor: SHEET_COLORS.chipIdleBg,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  backCircleCompact: {
+    width: 26,
+    height: 26,
+    borderRadius: 13,
   },
   contentSlot: {
     flex: 1,
@@ -442,7 +498,6 @@ const styles = StyleSheet.create({
     backgroundColor: '#FFFFFF',
     borderRadius: 999,
     boxShadow: '0px 2px 7px rgba(0,0,0,0.09)',
-    elevation: 2,
   },
   segmentedItem: {
     flex: 1,

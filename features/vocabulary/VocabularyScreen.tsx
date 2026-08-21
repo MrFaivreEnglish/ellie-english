@@ -23,6 +23,7 @@ import { vocabularyCategories } from '../../content/lessons/vocabularyRegistry';
 import { getCustomVocabularyLessons } from '../lessons/customLessonStorage';
 import { getMenuCopy } from '../shared/menuCopy';
 import { MAX_XP_PER_PAIR } from './vocabRush/VocabRushGame';
+import { MAX_VOCAB_RUSH_WORDS } from './knownWords';
 import type { Word } from '../../types/VocabularyTypes';
 import type { VocabularyLesson } from '../../types/lessonTypes';
 import {
@@ -1048,13 +1049,13 @@ export default function VocabularyScreen() {
             },
           ]}
           accessibilityRole="button"
-          accessibilityLabel={`Start Vocab Rush — up to ${learnedMixWords.length * MAX_XP_PER_PAIR} XP possible`}
+          accessibilityLabel={`Start Vocab Rush — up to ${Math.min(learnedMixWords.length, MAX_VOCAB_RUSH_WORDS) * MAX_XP_PER_PAIR} XP possible`}
         >
           <MaterialIcons name="bolt" size={28} color="#ffffff" />
           <View style={[styles.vocabRushFabBadge, { backgroundColor: '#ffffff', borderColor: isDarkMode ? '#b3282c' : '#d73337' }]}>
             <Text style={[styles.vocabRushFabBadgeText, { color: isDarkMode ? '#b3282c' : '#d73337' }]} numberOfLines={1}>
               {(() => {
-                const maxXp = learnedMixWords.length * MAX_XP_PER_PAIR;
+                const maxXp = Math.min(learnedMixWords.length, MAX_VOCAB_RUSH_WORDS) * MAX_XP_PER_PAIR;
                 return `${maxXp > 999 ? '999+' : maxXp} XP`;
               })()}
             </Text>

@@ -26,8 +26,13 @@ const getLessonWords = (lesson: any): Word[] => {
     .filter((word: Word) => word.english && word.french);
 };
 
+// Vocab Rush's own session cap — a round only ever plays this many words
+// regardless of how many the player has actually learnt, so any XP estimate
+// shown before starting a round must be capped the same way.
+export const MAX_VOCAB_RUSH_WORDS = 30;
+
 /** Words the user has marked "learnt" across all lessons, shuffled and capped at `limit`. */
-export const getKnownVocabularyWords = async (limit = 30): Promise<Word[]> => {
+export const getKnownVocabularyWords = async (limit = MAX_VOCAB_RUSH_WORDS): Promise<Word[]> => {
   const customLessons = await getCustomVocabularyLessons().catch(() => []);
   const allLessons = [
     ...bundledCustomVocabularyLessons,

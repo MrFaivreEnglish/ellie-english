@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState, type ComponentProps } from 'react';
 import { Animated, Easing, Platform, Pressable, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useIsFocused } from '@react-navigation/native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { vocabRushColors, vocabRushColorsForTheme } from './vocabRushColors';
 import { shuffleArray } from '../vocabularyUtils';
@@ -223,7 +224,24 @@ export default function VocabRushGame({
     setGameOver(true);
   };
 
-  const paused = pickerVisible || gameOver;
+  // Leaving this screen mid-round (tab switch, back button) used to leave the
+  // interval running or resume the stale countdown on return — the round would
+  // silently burn through the clock while the player wasn't even looking at it.
+  // Losing focus now pauses the timer; regaining focus mid-round resets it to a
+  // fresh full duration for the current mode instead of resuming where it left off.
+  const isFocused = useIsFocused();
+  const wasFocusedRef = useRef(isFocused);
+
+  useEffect(() => {
+    const wasFocused = wasFocusedRef.current;
+    wasFocusedRef.current = isFocused;
+
+    if (isFocused && !wasFocused && mode && !pickerVisible && !gameOver) {
+      setTimeLeft(getModeSeconds(MODES.find((m) => m.key === mode)!.secondsPerWord, totalWords));
+    }
+  }, [isFocused, mode, pickerVisible, gameOver, totalWords]);
+
+  const paused = pickerVisible || gameOver || !isFocused;
 
   useEffect(() => {
     if (paused) return;

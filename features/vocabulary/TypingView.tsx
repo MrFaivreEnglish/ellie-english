@@ -12,12 +12,6 @@ import {
 } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useAudioPlayer } from 'expo-audio';
-import { useFonts } from 'expo-font';
-import {
-  LibreFranklin_600SemiBold,
-  LibreFranklin_700Bold,
-  LibreFranklin_800ExtraBold,
-} from '@expo-google-fonts/libre-franklin';
 
 import { useTypingGame } from './useTypingGame';
 import type { Word } from '../../types/VocabularyTypes';
@@ -25,7 +19,6 @@ import { SOUND_EFFECT_OPTIONS, SUCCESS_SOUND, replaySoundEffect } from '../share
 import { clampNumber, getWebLessonScale, scaleValue } from '../shared/responsiveLayout';
 import VocabularyCompletionModal from './VocabularyCompletionModal';
 import Assets from '../../assets/index';
-import { fontFamilyForWeight } from './vocabRush/vocabRushFonts';
 import { triggerSelectionHaptic, triggerSuccessHaptic, triggerWarningHaptic } from '../shared/haptics';
 import { usePersistentExerciseKeyboard } from '../shared/usePersistentExerciseKeyboard';
 import { FRESH_COLORS, freshGlowShadow } from '../shared/freshDirection';
@@ -196,13 +189,6 @@ export default function TypingView({
   const [feedbackType, setFeedbackType] = useState<FeedbackType>(null);
   const [feedbackStreak, setFeedbackStreak] = useState(0);
   const [feedbackAnswer, setFeedbackAnswer] = useState('');
-  const [feedbackFontsLoaded] = useFonts({
-    LibreFranklin_600SemiBold,
-    LibreFranklin_700Bold,
-    LibreFranklin_800ExtraBold,
-  });
-  const feedbackFont = (weight: '600' | '700' | '800') =>
-    feedbackFontsLoaded ? fontFamilyForWeight(weight) : undefined;
 
   const feedbackOpacity = useRef(new Animated.Value(0)).current;
   const feedbackTranslateY = useRef(new Animated.Value(16)).current;
@@ -312,22 +298,22 @@ export default function TypingView({
         : 94;
   const promptFontSize = isAndroid
     ? keyboardMode
-      ? 34
-      : 40
+      ? 32
+      : 38
     : keyboardMode
-      ? 30
+      ? 28
       : isDesktopWeb
-        ? scaleValue(54, typingWebScale)
-        : 40;
+        ? scaleValue(52, typingWebScale)
+        : 38;
   const promptLineHeight = isAndroid
     ? keyboardMode
-      ? 41
-      : 48
+      ? 39
+      : 46
     : keyboardMode
-      ? 36
+      ? 34
       : isDesktopWeb
-        ? scaleValue(63, typingWebScale)
-        : 48;
+        ? scaleValue(61, typingWebScale)
+        : 46;
   const contentHorizontalPadding = isAndroid
     ? isCompact ? 8 : 10
     : isCompact ? 12 : 18;
@@ -774,12 +760,13 @@ export default function TypingView({
             <Animated.View
               style={[
                 styles.correctFeedbackCard,
+                styles.feedbackOverlay,
                 isDesktopWeb && { maxWidth: scaleValue(700, typingWebScale) },
                 { pointerEvents: 'none' },
                 {
                   backgroundColor: theme.isDark
-                    ? 'rgba(34, 197, 94, 0.90)'
-                    : 'rgba(34, 197, 94, 0.92)',
+                    ? 'rgba(34, 197, 94, 0.98)'
+                    : 'rgba(34, 197, 94, 0.99)',
                   borderColor: theme.isDark ? '#4ADE80' : '#16A34A',
                   boxShadow: '0px 8px 14px rgba(34, 197, 94, 0.18)',
                   opacity: feedbackOpacity,
@@ -788,11 +775,11 @@ export default function TypingView({
               ]}
             >
               <Text style={styles.correctFeedbackEmoji}>🎉</Text>
-              <Text style={[styles.correctFeedbackTitle, { fontFamily: feedbackFont('800') }]}>
+              <Text style={styles.correctFeedbackTitle}>
                 Great job!
               </Text>
               <View style={styles.correctFeedbackComboPill}>
-                <Text style={[styles.correctFeedbackComboText, { fontFamily: feedbackFont('800') }]}>
+                <Text style={styles.correctFeedbackComboText}>
                   Combo ×{feedbackStreak}
                 </Text>
               </View>
@@ -802,6 +789,7 @@ export default function TypingView({
             <Animated.View
               style={[
                 styles.mascotFeedbackRow,
+                styles.feedbackOverlay,
                 isDesktopWeb && { maxWidth: scaleValue(700, typingWebScale) },
                 { pointerEvents: 'none' },
                 {
@@ -839,22 +827,23 @@ export default function TypingView({
                 />
                 {feedbackType === 'wrong' ? (
                   <>
-                    <Text style={[styles.mascotHeadline, { color: FEEDBACK_WRONG_TEXT, fontFamily: feedbackFont('700') }]}>
+                    <Text style={[styles.mascotHeadline, { color: FEEDBACK_WRONG_TEXT }]}>
                       Not this time.
                     </Text>
-                    <Text style={[styles.mascotSubtext, { color: FEEDBACK_WRONG_TEXT, fontFamily: feedbackFont('600') }]}>
-                      Correct answer: <Text style={{ fontFamily: feedbackFont('800') }}>{feedbackAnswer}</Text>
+                    <Text style={[styles.mascotSubtext, { color: FEEDBACK_WRONG_TEXT }]}>
+                      Correct answer: <Text style={{ fontWeight: '800' }}>{feedbackAnswer}</Text>
                     </Text>
                   </>
                 ) : (
-                  <Text style={[styles.mascotHeadline, { color: FEEDBACK_ALMOST_TEXT, fontFamily: feedbackFont('700') }]}>
+                  <Text style={[styles.mascotHeadline, { color: FEEDBACK_ALMOST_TEXT }]}>
                     So close — one more try before you lose your combo!
                   </Text>
                 )}
               </View>
             </Animated.View>
           )}
-          <View style={[styles.promptCenterWrap, showFeedbackCard && styles.promptCenterWrapAfterFeedback]}>
+          <View style={styles.promptAnswerGroup}>
+          <View style={styles.promptCenterWrap}>
           <View
             style={[
               styles.promptOverlayWrap,
@@ -1053,6 +1042,7 @@ export default function TypingView({
                 <MaterialIcons name="chevron-right" size={20} color={theme.text} />
               </TouchableOpacity>
             </View>
+          </View>
           </View>
           </View>
         </View>
@@ -1427,10 +1417,16 @@ const styles = StyleSheet.create({
   progressFill: {
     height: '100%',
   },
+  feedbackOverlay: {
+    position: 'absolute',
+    top: 26,
+    left: 0,
+    right: 0,
+    zIndex: 5,
+  },
   correctFeedbackCard: {
     width: '100%',
     alignSelf: 'center',
-    marginTop: 12,
     borderRadius: 8,
     borderWidth: 1.5,
     paddingVertical: 16,
@@ -1462,7 +1458,6 @@ const styles = StyleSheet.create({
   mascotFeedbackRow: {
     width: '100%',
     alignSelf: 'center',
-    marginTop: 12,
     flexDirection: 'row',
     alignItems: 'flex-start',
     gap: 14,
@@ -1746,15 +1741,17 @@ const styles = StyleSheet.create({
     maxWidth: 460,
     alignSelf: 'center',
   },
-  // Sits right under the stats block instead of centering across the full
-  // leftover card height — any true excess space now falls below the answer
-  // panel instead of stretching the gap between stats/word/input apart.
+  // The prompt and answer panel are centered together as one fixed-gap block
+  // (see promptAnswerGroup) — promptCenterWrap itself must stay unflexed, or
+  // it soaks up the whole leftover height and blows out the gap to the answer
+  // panel below it.
+  promptAnswerGroup: {
+    flex: 1,
+    width: '100%',
+    justifyContent: 'center',
+  },
   promptCenterWrap: {
     width: '100%',
-    marginTop: 26,
-  },
-  promptCenterWrapAfterFeedback: {
-    marginTop: 12,
   },
   promptOverlayWrap: {
     alignSelf: 'center',
