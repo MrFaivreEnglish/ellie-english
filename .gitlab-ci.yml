@@ -1,0 +1,36 @@
+image: node:22-bookworm
+
+stages:
+  - test
+  - deploy
+
+variables:
+  NPM_CONFIG_CACHE: "$CI_PROJECT_DIR/.npm"
+  EXPO_NO_TELEMETRY: "1"
+
+cache:
+  key:
+    files:
+      - package-lock.json
+  paths:
+    - .npm/
+
+before_script:
+  - npm ci --prefer-offline --no-audit
+
+check:
+  stage: test
+  script:
+    - npm run check
+
+pages:
+  stage: deploy
+  script:
+    - npx expo export --platform web
+    - rm -rf public
+    - cp -r dist public
+  artifacts:
+    paths:
+      - public
+  rules:
+    - if: '$CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH'
