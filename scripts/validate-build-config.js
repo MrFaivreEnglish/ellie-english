@@ -57,11 +57,42 @@ if (productionBuildType !== 'app-bundle') {
   problems.push(`eas.json: production.android.buildType should be "app-bundle", got ${JSON.stringify(productionBuildType)}`);
 }
 
-if (appJson?.expo?.updates?.enabled !== false) {
-  problems.push('app.json: expo.updates.enabled should stay false unless OTA updates are intentionally restored');
+// OTA updates are intentionally enabled: students install the APK by hand, so an
+// over-the-air update is the only way a fix reaches them without a reinstall.
+// Guard the pieces that silently break delivery rather than the feature itself.
+const updates = appJson?.expo?.updates;
+if (updates?.enabled !== true) {
+  problems.push('app.json: expo.updates.enabled should be true so OTA updates reach sideloaded APKs');
+} else {
+  const easProjectId = appJson?.expo?.extra?.eas?.projectId;
+  const expectedUrl = `https://u.expo.dev/${easProjectId}`;
+  if (updates.url !== expectedUrl) {
+    problems.push(`app.json: expo.updates.url should be ${expectedUrl}, got ${JSON.stringify(updates.url)}`);
+  }
+  if (!appJson?.expo?.runtimeVersion) {
+    problems.push('app.json: expo.runtimeVersion is required when updates are enabled');
+  }
+  for (const profile of ['preview', 'production']) {
+    if (!easJson?.build?.[profile]?.channel) {
+      problems.push(`eas.json: build.${profile} needs a "channel" or that build can never receive updates`);
+    }
+  }
 }
 
-if (packageJson?.scripts?.predeploy && !packageJson.scripts.predeploy.includes('scripts/fix-web-base-path.js')) {
+// Follows `npm run <script>` indirection so the check is on what predeploy effectively
+// runs, not on the literal string — predeploy delegates to build:web, and the guarantee
+// that matters is that the fix script runs somewhere in that chain.
+const expandNpmScript = (name, scripts, seen = new Set()) => {
+  if (!scripts?.[name] || seen.has(name)) return '';
+  seen.add(name);
+
+  return scripts[name].replace(/npm run ([\w:-]+)/g, (match, referenced) =>
+    `${match} ${expandNpmScript(referenced, scripts, seen)}`
+  );
+};
+
+const effectivePredeploy = expandNpmScript('predeploy', packageJson?.scripts);
+if (packageJson?.scripts?.predeploy && !effectivePredeploy.includes('scripts/fix-web-base-path.js')) {
   problems.push('package.json: predeploy must run scripts/fix-web-base-path.js after expo export so GitHub Pages subpaths work');
 }
 

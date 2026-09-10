@@ -2,10 +2,16 @@
   "expo": {
     "name": "Ellie by MrFaivre",
     "slug": "ellie",
-    "version": "2.4.0",
+    "version": "2.8.0",
     "icon": "./assets/icony.png",
     "updates": {
-      "enabled": false
+      "enabled": true,
+      "url": "https://u.expo.dev/52c68ae6-5457-4bf8-897a-e9e76d521e63",
+      "fallbackToCacheTimeout": 0,
+      "checkAutomatically": "ON_LOAD"
+    },
+    "runtimeVersion": {
+      "policy": "fingerprint"
     },
     "web": {
       "name": "Ellie by MrFaivre",
@@ -31,7 +37,17 @@
       "expo-asset",
       "expo-audio",
       "expo-font",
-      "expo-status-bar"
+      "expo-status-bar",
+      "expo-image",
+      [
+        "expo-build-properties",
+        {
+          "android": {
+            "enableProguardInReleaseBuilds": true,
+            "enableShrinkResourcesInReleaseBuilds": true
+          }
+        }
+      ]
     ],
     "android": {
       "package": "com.mrfaivreenglish.ellie",

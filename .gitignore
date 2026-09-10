@@ -50,6 +50,9 @@ Thumbs.db
 
 # Browser profiles (accidentally created in project dir)
 .edge-rating-profile/
+.edge-pixel-diagnostic/
+.edge-pixel-diagnostic-2/
+.edge-shiny-preview/
 .chrome-profile/
 edge-grammar-accessibility/
 
@@ -58,3 +61,6 @@ edge-grammar-accessibility/
 ui-screenshots/
 android/
 ios/
+
+# Local backup of lesson sheets pulled from imgbb (not tracked)
+lesson-images/
