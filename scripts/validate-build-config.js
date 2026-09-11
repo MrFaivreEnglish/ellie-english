@@ -69,8 +69,21 @@ if (updates?.enabled !== true) {
   if (updates.url !== expectedUrl) {
     problems.push(`app.json: expo.updates.url should be ${expectedUrl}, got ${JSON.stringify(updates.url)}`);
   }
-  if (!appJson?.expo?.runtimeVersion) {
+  // runtimeVersion must be a fixed string, not the fingerprint policy. Under
+  // fingerprint, an unrelated `npm install` can shift a native dependency, the
+  // hash changes, and updates silently stop reaching APKs already in students'
+  // hands -- which happened once and cost a rebuild. A fixed string keeps
+  // updates flowing; bump it by hand (and rebuild the APK) only when native
+  // code actually changes: a new native module, or an Expo SDK upgrade.
+  const runtimeVersion = appJson?.expo?.runtimeVersion;
+  if (!runtimeVersion) {
     problems.push('app.json: expo.runtimeVersion is required when updates are enabled');
+  } else if (typeof runtimeVersion !== 'string') {
+    problems.push(
+      'app.json: expo.runtimeVersion must be a fixed string, got ' +
+        JSON.stringify(runtimeVersion) +
+        ' - a policy lets the runtime drift and orphan installed APKs'
+    );
   }
   for (const profile of ['preview', 'production']) {
     if (!easJson?.build?.[profile]?.channel) {
