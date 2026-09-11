@@ -9,13 +9,13 @@ try {
   NavigationBar = null;
 }
 
-/**
- * Set navigation bar appearance on Android
- * @param options.color Hex color for background (default transparent)
- * @param options.buttonStyle 'light' | 'dark' (default 'light')
- * @param options.visibility 'visible' | 'hidden' (default 'visible')
- * @param options.behavior 'inset' | 'overlay-swipe' | 'overlay-fixed' (default 'overlay-swipe')
- */
+
+
+
+
+
+
+
 export async function setNavigationBar({
   color = 'transparent',
   buttonStyle = 'light',
@@ -39,9 +39,9 @@ export async function setNavigationBar({
   }
 }
 
-/**
- * Hide navigation bar completely (immersive style)
- */
+
+
+
 export async function hideNavigationBar() {
   await setNavigationBar({
     visibility: 'hidden',
@@ -51,9 +51,9 @@ export async function hideNavigationBar() {
   });
 }
 
-/**
- * Show navigation bar with inset style (default)
- */
+
+
+
 export async function showNavigationBar(
   color = '#000000',
   buttonStyle: 'dark' | 'light' = 'light'

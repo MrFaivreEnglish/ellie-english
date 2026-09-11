@@ -2,7 +2,7 @@ const PhysicalDescriptionVocab = {
   id: '311',
   title: 'Physical Description',
   description: "Words to describe people's appearance",
-  imageUrl: 'https://i.ibb.co/4Cy7ggw/physical-description.webp',
+  imageUrl: 'https://wretggbpaejzjdilemit.supabase.co/storage/v1/object/public/lesson-images/15274719ab/physical-description.webp',
   thumbnail: require('../../assets/thumbnails/physical-description-thumbnail.png'),
   flashcards: [
     {

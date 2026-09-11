@@ -1,17 +1,23 @@
-import React, { useMemo, useState } from 'react';
-import { Alert, View, Text, StyleSheet, Platform, ScrollView, Pressable, Modal, TextInput, TouchableOpacity, Linking, useWindowDimensions } from 'react-native';
+import React, { useState } from 'react';
+import { Alert, View, StyleSheet, Platform, ScrollView, Pressable, Modal, TouchableOpacity, Linking, useWindowDimensions } from 'react-native';
 import BackButton from '../shared/BackButton';
 import PillToggle from '../shared/PillToggle';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import type { RootStackParamList } from '../../types/navigationTypes';
-import { FontAwesome, MaterialIcons } from '@expo/vector-icons';
+import { FontAwesome } from '@expo/vector-icons';
+import Text from '../shared/ThemedText';
+import MaterialIcons from '../shared/ThemedMaterialIcon';
 import { useTheme } from './ThemeContext';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { getMenuCopy } from '../shared/menuCopy';
 import { ENABLE_SHINY_ELLIE_COLOR_MODE } from '../../lib/featureFlags';
 import { hapticsAreSupported } from '../shared/haptics';
-import { getButtonStyle, getButtonTextColor } from '../shared/uiPrimitives';
+import { getButtonStyle, getButtonTextColor, getPixelSurfaceStyle, withColorAlpha } from '../shared/uiPrimitives';
+import { getDesktopContentMaxWidth, getDesktopTypographyScale, getTopSafeAreaInset, isDesktopWebWidth, NARROW_TRAY_WIDTH } from '../shared/responsiveLayout';
+import { DesktopTypographyProvider } from '../shared/DesktopTypography';
+import { useAccount } from '../account/AccountContext';
+import { getAdminContentAccess } from '../lessons/adminContentSync';
 
 const SETTINGS_FONT_FAMILY = Platform.select({
   ios: 'System',
@@ -23,8 +29,7 @@ const SETTINGS_FONT_FAMILY = Platform.select({
 const ANDROID_APK_DOWNLOAD_URL = 'https://github.com/MrFaivreEnglish/ellie-english/releases/latest/download/ellie-latest.apk';
 
 export default function SettingsScreen() {
-  const ADMIN_PIN = '241711';
-  const { 
+  const {
     isDarkMode,
     toggleTheme,
     colors,
@@ -50,25 +55,41 @@ export default function SettingsScreen() {
     toggleAndroidStatusBar,
     isShinyEllieUnlocked,
     isShinyEllieMode,
-    toggleShinyEllieMode,
+    updateShinyEllieMode,
+    isShinyElliePresentationMode,
+    updateShinyElliePresentationMode,
+    shinyEllieColorVariant,
+    updateShinyEllieColorVariant,
   } = useTheme();
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
+  const { session } = useAccount();
   const insets = useSafeAreaInsets();
-  const { width: windowWidth } = useWindowDimensions();
-  const isDesktopWeb = Platform.OS === 'web' && windowWidth >= 768;
-  const topContentInset = Platform.OS === 'ios'
-    ? (insets.top > 0 ? insets.top : 0)
-    : Platform.OS === 'android' && isAndroidStatusBarEnabled
-      ? insets.top
-      : 0;
+  const { width: windowWidth, height: windowHeight } = useWindowDimensions();
+  const isDesktopWeb = isDesktopWebWidth(windowWidth, undefined, windowHeight);
+  const desktopContentMaxWidth = getDesktopContentMaxWidth(windowWidth, 'scroll', windowHeight);
+
+
+
+
+
+  const desktopScale = getDesktopTypographyScale(windowWidth, windowHeight, 'scroll');
+  // Tablet keeps the mobile structural layout (isDesktopWeb stays false)
+  // but still gets a real desktopScale > 1 — numeric-only scale call sites
+  // gate on this instead of isDesktopWeb alone, which used to leave tablet
+  // at the flat phone size even though its own scale was already correct.
+  const isScaledLayout = isDesktopWeb || desktopScale > 1;
+  const isHeaderTitleCompact = windowWidth < NARROW_TRAY_WIDTH;
+  const topContentInset = getTopSafeAreaInset(Platform.OS, insets.top, isAndroidStatusBarEnabled);
   const [, setAdminTapCount] = useState(0);
-  const [adminModalVisible, setAdminModalVisible] = useState(false);
+  const [isCheckingAdminAccess, setIsCheckingAdminAccess] = useState(false);
   const [installGuideVisible, setInstallGuideVisible] = useState(false);
-  const [adminPinInput, setAdminPinInput] = useState('');
-  const [adminPinError, setAdminPinError] = useState('');
   const adminAccessEnabled = Platform.OS === 'web';
-  const showInstallBadge = Platform.OS === 'web' && windowWidth < 768;
-  const isPinValid = useMemo(() => adminPinInput.trim() === ADMIN_PIN, [adminPinInput]);
+
+
+  // Shown at every web width: the pill and its icons already scale with desktopScale, and a
+  // desktop visitor is just as likely to want the iPhone guide or the Android download.
+  // Native is the only place with no install to offer — it is the installed app.
+  const showInstallBadge = Platform.OS === 'web';
   const appCopy = getMenuCopy();
   const copy = appCopy.settings;
   const commonCopy = appCopy.common;
@@ -76,14 +97,16 @@ export default function SettingsScreen() {
   const settingsCardBorder = colors.border;
   const settingsRowBorder = colors.border;
   const settingsIconBackground = colors.surfaceAlt;
-  const settingsIconColor = isDarkMode ? colors.secondaryText : '#56616D';
+  const settingsIconColor = colors.secondaryText;
   const settingsControlBackground = colors.surface;
   const settingsSubsectionBackground = colors.surface;
-  const settingsSubsectionText = isDarkMode ? colors.text : '#4B5563';
+  const settingsSubsectionText = colors.secondaryText;
+  const settingsCardShadow = isDarkMode
+    ? '0px 4px 10px rgba(0,0,0,0.22)'
+    : `0px 4px 10px ${withColorAlpha(colors.shadow, 0.72)}`;
   const primaryButtonStyle = getButtonStyle(colors, isDarkMode, 'primary');
   const primaryButtonTextColor = getButtonTextColor(colors, isDarkMode, 'primary');
-  const secondaryButtonStyle = getButtonStyle(colors, isDarkMode, 'secondary');
-  const secondaryButtonTextColor = getButtonTextColor(colors, isDarkMode, 'secondary');
+  const pixelSurfaceStyle = getPixelSurfaceStyle(colors, isDarkMode, 'soft');
 
   const openAndroidDownload = () => {
     if (!ANDROID_APK_DOWNLOAD_URL) {
@@ -96,40 +119,50 @@ export default function SettingsScreen() {
     });
   };
 
+  const openAdminStudio = async () => {
+    if (!session) {
+      Alert.alert(
+        'Admin sign-in required',
+        'Sign in with your administrator account before opening Content Studio.',
+        [
+          { text: 'Cancel', style: 'cancel' },
+          { text: 'Sign in', onPress: () => navigation.navigate('Account', undefined) },
+        ]
+      );
+      return;
+    }
+
+    setIsCheckingAdminAccess(true);
+    try {
+      const access = await getAdminContentAccess();
+      if (!access.isAdmin) {
+        Alert.alert('Not an administrator', 'This account does not have permission to publish app content.');
+        return;
+      }
+      navigation.navigate('AdminLessonPreview');
+    } catch (error) {
+      Alert.alert(
+        'Could not verify admin access',
+        error instanceof Error ? error.message : 'Check your connection and try again.'
+      );
+    } finally {
+      setIsCheckingAdminAccess(false);
+    }
+  };
+
   const handleAdminVersionPress = () => {
-    if (!adminAccessEnabled) {
+    if (!adminAccessEnabled || isCheckingAdminAccess) {
       return;
     }
 
     setAdminTapCount((current) => {
       const next = current + 1;
       if (next >= 7) {
-        setAdminModalVisible(true);
+        void openAdminStudio();
         return 0;
       }
       return next;
     });
-  };
-
-  const closeAdminModal = () => {
-    setAdminModalVisible(false);
-    setAdminPinInput('');
-    setAdminPinError('');
-  };
-
-  const submitAdminPin = () => {
-    if (!adminAccessEnabled) {
-      closeAdminModal();
-      return;
-    }
-
-    if (!isPinValid) {
-      setAdminPinError(copy.wrongPin);
-      return;
-    }
-
-    closeAdminModal();
-    navigation.navigate('AdminLessonPreview');
   };
 
   const renderSetting = ({
@@ -147,12 +180,28 @@ export default function SettingsScreen() {
     onValueChange: () => void;
     activeColor: string;
   }) => (
-    <View style={[styles.settingItem, { borderBottomColor: settingsRowBorder }]}>
-      <View style={styles.settingTextContainer}>
-        <View style={[styles.settingIconBox, { backgroundColor: settingsIconBackground }]}>
-          <MaterialIcons name={icon} size={20} color={settingsIconColor} />
+    <View
+      style={[
+        styles.settingItem,
+        isScaledLayout && {
+          minHeight: Math.round(62 * desktopScale),
+          paddingHorizontal: Math.round(12 * desktopScale),
+          paddingVertical: Math.round(10 * desktopScale),
+        },
+        { borderBottomColor: settingsRowBorder },
+      ]}
+    >
+      <View style={[styles.settingTextContainer, isScaledLayout && { paddingRight: Math.round(10 * desktopScale) }]}>
+        <View
+          style={[
+            styles.settingIconBox,
+            isScaledLayout && { width: Math.round(36 * desktopScale), height: Math.round(36 * desktopScale), borderRadius: Math.round(10 * desktopScale) },
+            { backgroundColor: settingsIconBackground },
+          ]}
+        >
+          <MaterialIcons name={icon} size={Math.round(20 * desktopScale)} color={settingsIconColor} />
         </View>
-        <View style={styles.settingCopy}>
+        <View style={[styles.settingCopy, isScaledLayout && { marginLeft: Math.round(10 * desktopScale) }]}>
           <Text style={[styles.settingText, { color: colors.text }]}>{title}</Text>
           <Text style={[styles.settingDescription, { color: colors.secondaryText }]}>
             {description}
@@ -164,12 +213,82 @@ export default function SettingsScreen() {
         onValueChange={onValueChange}
         activeColor={activeColor}
         trackOffColor={colors.border}
+        scale={isScaledLayout ? desktopScale : 1}
         accessibilityLabel={title}
       />
     </View>
   );
 
+  const renderChoiceSetting = <T extends string>({
+    icon,
+    title,
+    description,
+    value,
+    options,
+    onValueChange,
+  }: {
+    icon: React.ComponentProps<typeof MaterialIcons>['name'];
+    title: string;
+    description: string;
+    value: T;
+    options: ReadonlyArray<{ value: T; label: string }>;
+    onValueChange: (value: T) => void;
+  }) => (
+    <View
+      style={[
+        styles.settingItem,
+        isScaledLayout && {
+          minHeight: Math.round(62 * desktopScale),
+          paddingHorizontal: Math.round(12 * desktopScale),
+          paddingVertical: Math.round(10 * desktopScale),
+        },
+        { borderBottomColor: settingsRowBorder },
+      ]}
+    >
+      <View style={[styles.settingTextContainer, isScaledLayout && { paddingRight: Math.round(10 * desktopScale) }]}>
+        <View
+          style={[
+            styles.settingIconBox,
+            isScaledLayout && { width: Math.round(36 * desktopScale), height: Math.round(36 * desktopScale), borderRadius: Math.round(10 * desktopScale) },
+            { backgroundColor: settingsIconBackground },
+          ]}
+        >
+          <MaterialIcons name={icon} size={Math.round(20 * desktopScale)} color={settingsIconColor} />
+        </View>
+        <View style={[styles.settingCopy, isScaledLayout && { marginLeft: Math.round(10 * desktopScale) }]}>
+          <Text style={[styles.settingText, { color: colors.text }]}>{title}</Text>
+          <Text style={[styles.settingDescription, { color: colors.secondaryText }]}>
+            {description}
+          </Text>
+        </View>
+      </View>
+      <View style={[styles.segmentedControl, { backgroundColor: settingsControlBackground, borderColor: settingsCardBorder }]}>
+        {options.map((option) => {
+          const isActive = value === option.value;
+          return (
+            <Pressable
+              key={option.value}
+              onPress={() => onValueChange(option.value)}
+              style={[
+                styles.segmentedButton,
+                isActive && { backgroundColor: colors.buttonBackground },
+              ]}
+              accessibilityRole="button"
+              accessibilityState={{ selected: isActive }}
+              accessibilityLabel={`${title}: ${option.label}`}
+            >
+              <Text style={[styles.segmentedText, { color: isActive ? colors.buttonText : colors.secondaryText }]}>
+                {option.label}
+              </Text>
+            </Pressable>
+          );
+        })}
+      </View>
+    </View>
+  );
+
   return (
+    <DesktopTypographyProvider mode="scroll">
     <ScrollView
       style={[styles.container, { backgroundColor: colors.background }]}
       contentContainerStyle={{
@@ -177,11 +296,20 @@ export default function SettingsScreen() {
         paddingBottom: insets.bottom + 32,
       }}
     >
-      <View style={isDesktopWeb && styles.desktopContentWrap}>
+      <View style={isDesktopWeb && [styles.desktopContentWrap, { maxWidth: desktopContentMaxWidth }]}>
       <BackButton label={commonCopy.backToHome} onPress={() => navigation.navigate('Home')} />
 
       <View style={styles.headerTitleRow}>
-        <Text style={[styles.headerTitle, { color: colors.text }]} numberOfLines={1}>
+        <Text
+          style={[
+            styles.headerTitle,
+            isHeaderTitleCompact && styles.headerTitleCompact,
+            { color: colors.text },
+          ]}
+          numberOfLines={1}
+          adjustsFontSizeToFit
+          minimumFontScale={0.7}
+        >
           {copy.header}
         </Text>
         {showInstallBadge && (
@@ -195,7 +323,7 @@ export default function SettingsScreen() {
                 accessibilityLabel="Installer Ellie sur iPhone"
                 style={[styles.headerInstallButton, { backgroundColor: colors.surface, borderColor: colors.border }]}
               >
-                <FontAwesome name="apple" size={18} color={colors.secondaryText} />
+                <FontAwesome name="apple" size={Math.round(18 * desktopScale)} color={colors.secondaryText} />
               </TouchableOpacity>
               <TouchableOpacity
                 onPress={openAndroidDownload}
@@ -204,7 +332,7 @@ export default function SettingsScreen() {
                 accessibilityLabel="Installer Ellie sur Android"
                 style={[styles.headerInstallButton, styles.headerInstallButtonAndroid]}
               >
-                <MaterialIcons name="android" size={19} color="#258B62" />
+                <MaterialIcons name="android" size={Math.round(19 * desktopScale)} color="#258B62" />
               </TouchableOpacity>
             </View>
           </View>
@@ -213,7 +341,13 @@ export default function SettingsScreen() {
 
       <View style={styles.section}>
         <Text style={[styles.sectionTitle, { color: colors.secondaryText }]}>Display</Text>
-        <View style={[styles.sectionCard, { backgroundColor: settingsCardBackground, borderColor: settingsCardBorder }]}>
+        <View
+          style={[
+            styles.sectionCard,
+            { backgroundColor: settingsCardBackground, borderColor: settingsCardBorder, boxShadow: settingsCardShadow, shadowColor: colors.shadow },
+            pixelSurfaceStyle,
+          ]}
+        >
           {renderSetting({
             icon: 'brightness-6',
             title: copy.darkModeTitle,
@@ -261,11 +395,17 @@ export default function SettingsScreen() {
 
       <View style={styles.section}>
         <Text style={[styles.sectionTitle, { color: colors.secondaryText }]}>{copy.vocabulary}</Text>
-        <View style={[styles.sectionCard, { backgroundColor: settingsCardBackground, borderColor: settingsCardBorder }]}>
+        <View
+          style={[
+            styles.sectionCard,
+            { backgroundColor: settingsCardBackground, borderColor: settingsCardBorder, boxShadow: settingsCardShadow, shadowColor: colors.shadow },
+            pixelSurfaceStyle,
+          ]}
+        >
           <View style={[styles.settingItem, { borderBottomColor: settingsRowBorder }]}>
             <View style={styles.settingTextContainer}>
               <View style={[styles.settingIconBox, { backgroundColor: settingsIconBackground }]}>
-                <MaterialIcons name="view-agenda" size={20} color={settingsIconColor} />
+                <MaterialIcons name="view-agenda" size={Math.round(20 * desktopScale)} color={settingsIconColor} />
               </View>
               <View style={styles.settingCopy}>
                 <Text style={[styles.settingText, { color: colors.text }]}>{copy.vocabularyLayoutTitle}</Text>
@@ -356,7 +496,13 @@ export default function SettingsScreen() {
 
       <View style={styles.section}>
         <Text style={[styles.sectionTitle, { color: colors.secondaryText }]}>{copy.grammar}</Text>
-        <View style={[styles.sectionCard, { backgroundColor: settingsCardBackground, borderColor: settingsCardBorder }]}>
+        <View
+          style={[
+            styles.sectionCard,
+            { backgroundColor: settingsCardBackground, borderColor: settingsCardBorder, boxShadow: settingsCardShadow, shadowColor: colors.shadow },
+            pixelSurfaceStyle,
+          ]}
+        >
           {renderSetting({
             icon: 'sports-esports',
             title: copy.grammarGameModeTitle,
@@ -379,21 +525,63 @@ export default function SettingsScreen() {
       {ENABLE_SHINY_ELLIE_COLOR_MODE && isShinyEllieUnlocked && (
         <View style={styles.section}>
           <Text style={[styles.sectionTitle, { color: colors.secondaryText }]}>{copy.extras}</Text>
-          <View style={[styles.sectionCard, { backgroundColor: settingsCardBackground, borderColor: settingsCardBorder }]}>
-            {renderSetting({
+          <View
+            style={[
+              styles.sectionCard,
+              { backgroundColor: settingsCardBackground, borderColor: settingsCardBorder, boxShadow: settingsCardShadow, shadowColor: colors.shadow },
+              pixelSurfaceStyle,
+            ]}
+          >
+            <Text
+              style={[
+                styles.subsectionTitle,
+                {
+                  backgroundColor: settingsSubsectionBackground,
+                  borderBottomColor: settingsRowBorder,
+                  color: settingsSubsectionText,
+                },
+              ]}
+            >
+              {copy.shinyEllieTitle} · {copy.shinyEllieDescription}
+            </Text>
+            {renderChoiceSetting({
               icon: 'auto-awesome',
-              title: copy.shinyEllieTitle,
-              description: copy.shinyEllieDescription,
-              value: isShinyEllieMode,
-              onValueChange: toggleShinyEllieMode,
-              activeColor: colors.primary,
+              title: copy.shinyElliePresentationTitle,
+              description: copy.shinyElliePresentationDescription,
+              value: isShinyElliePresentationMode ? 'shiny' : 'normal',
+              options: [
+                { value: 'normal', label: 'Normal' },
+                { value: 'shiny', label: 'Shiny' },
+              ] as const,
+              onValueChange: (value) => updateShinyElliePresentationMode(value === 'shiny'),
+            })}
+            {renderChoiceSetting({
+              icon: 'style',
+              title: copy.shinyEllieLookTitle,
+              description: copy.shinyEllieLookDescription,
+              value: isShinyEllieMode ? 'pixel' : 'normal',
+              options: [
+                { value: 'normal', label: 'Normal' },
+                { value: 'pixel', label: 'Pixel' },
+              ] as const,
+              onValueChange: (value) => updateShinyEllieMode(value === 'pixel'),
+            })}
+            {renderChoiceSetting({
+              icon: 'palette',
+              title: copy.shinyElliePaletteTitle,
+              description: copy.shinyElliePaletteDescription,
+              value: shinyEllieColorVariant,
+              options: [
+                { value: 'cool', label: 'Cool' },
+                { value: 'warm', label: 'Warm' },
+              ] as const,
+              onValueChange: updateShinyEllieColorVariant,
             })}
           </View>
         </View>
       )}
 
-      {/* Credits Section */}
-      <View style={[styles.creditsContainer, { backgroundColor: settingsCardBackground, borderColor: settingsCardBorder }]}>
+      <View style={[styles.creditsContainer, { backgroundColor: settingsCardBackground, borderColor: settingsCardBorder }, pixelSurfaceStyle]}>
         <Text style={[styles.creditsTitle, { color: colors.text }]}>{copy.credits}</Text>
         <Text style={[styles.creditsText, { color: colors.secondaryText }]}>
           - {copy.creditsConcept}{"\n"}
@@ -412,60 +600,11 @@ export default function SettingsScreen() {
       </View>
       </View>
 
-      <Modal visible={adminAccessEnabled && adminModalVisible} transparent animationType="fade" onRequestClose={closeAdminModal}>
-        <View style={styles.adminModalBackdrop}>
-          <View style={[styles.adminModalCard, { backgroundColor: colors.card }]}>
-            <Text style={[styles.adminModalTitle, { color: colors.text }]}>{copy.adminAccessTitle}</Text>
-            <Text style={[styles.adminModalText, { color: colors.secondaryText }]}>
-              {copy.adminAccessDescription}
-            </Text>
-            <TextInput
-              value={adminPinInput}
-              onChangeText={(value) => {
-                setAdminPinInput(value);
-                if (adminPinError) setAdminPinError('');
-              }}
-              placeholder={copy.pinPlaceholder}
-              placeholderTextColor={colors.secondaryText}
-              keyboardType="number-pad"
-              secureTextEntry
-              style={[
-                styles.adminModalInput,
-                {
-                  color: colors.text,
-                  borderColor: adminPinError ? colors.danger : colors.border,
-                  backgroundColor: colors.surface,
-                },
-              ]}
-            />
-            {!!adminPinError && <Text style={styles.adminModalError}>{adminPinError}</Text>}
-            <View style={styles.adminModalActions}>
-              <TouchableOpacity
-                onPress={closeAdminModal}
-                style={[styles.adminSecondaryButton, secondaryButtonStyle]}
-                accessibilityRole="button"
-                accessibilityLabel={copy.cancel}
-              >
-                <Text style={[styles.adminSecondaryButtonText, { color: secondaryButtonTextColor }]}>{copy.cancel}</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                onPress={submitAdminPin}
-                style={[styles.adminPrimaryButton, primaryButtonStyle]}
-                accessibilityRole="button"
-                accessibilityLabel={copy.openAdmin}
-              >
-                <Text style={[styles.adminPrimaryButtonText, { color: primaryButtonTextColor }]}>{copy.openAdmin}</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-        </View>
-      </Modal>
-
       <Modal visible={installGuideVisible} transparent animationType="fade" onRequestClose={() => setInstallGuideVisible(false)}>
         <View style={styles.adminModalBackdrop}>
-          <View style={[styles.installModalCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
+          <View style={[styles.installModalCard, { backgroundColor: colors.card, borderColor: colors.border }, pixelSurfaceStyle]}>
             <View style={[styles.installModalIcon, { backgroundColor: colors.primarySoft }]}>
-              <MaterialIcons name="add-to-home-screen" size={30} color={colors.primary} />
+              <MaterialIcons name="add-to-home-screen" size={Math.round(30 * desktopScale)} color={colors.primary} />
             </View>
             <Text style={[styles.adminModalTitle, { color: colors.text }]}>Installer Ellie</Text>
             <View style={styles.installSteps}>
@@ -503,6 +642,7 @@ export default function SettingsScreen() {
         </View>
       </Modal>
     </ScrollView>
+    </DesktopTypographyProvider>
   );
 }
 
@@ -511,17 +651,19 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   desktopContentWrap: {
+
+
     width: '100%',
-    maxWidth: 700,
     alignSelf: 'center',
   },
   headerTitle: {
-    fontFamily: SETTINGS_FONT_FAMILY,
-    fontSize: 30,
-    lineHeight: 34,
-    fontWeight: '800',
     flex: 1,
+    fontSize: 32,
+    fontWeight: 'bold',
     minWidth: 0,
+  },
+  headerTitleCompact: {
+    fontSize: 26,
   },
   headerTitleRow: {
     paddingHorizontal: 20,
@@ -582,7 +724,6 @@ const styles = StyleSheet.create({
     borderRadius: 18,
     borderWidth: 1,
     boxShadow: '0px 4px 10px rgba(0,0,0,0.06)',
-    elevation: 2,
   },
   subsectionTitle: {
     fontFamily: SETTINGS_FONT_FAMILY,
@@ -652,7 +793,7 @@ const styles = StyleSheet.create({
   },
   inlineChoiceButton: {
     borderWidth: 1.5,
-    borderColor: '#D6E2EE',
+    borderColor: '#E6DED3',
     borderRadius: 10,
     paddingHorizontal: 10,
     paddingVertical: 7,
@@ -701,7 +842,7 @@ const styles = StyleSheet.create({
     minWidth: 72,
     paddingHorizontal: 12,
     borderRadius: 10,
-    backgroundColor: '#EAF1FF',
+    backgroundColor: '#FAF3EA',
     borderWidth: 1.5,
     borderColor: '#0D7DD4',
     alignItems: 'center',
@@ -759,7 +900,7 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     padding: 20,
     borderWidth: 1.5,
-    borderColor: '#DDE5EE',
+    borderColor: '#E6DED3',
   },
   installModalCard: {
     width: '100%',

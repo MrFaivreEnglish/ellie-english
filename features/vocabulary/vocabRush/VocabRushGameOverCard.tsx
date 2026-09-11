@@ -1,18 +1,26 @@
 import { useEffect, useRef, useState } from 'react';
-import { Image, Platform, Pressable, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
+import { ScrollView, StyleSheet, View, useWindowDimensions } from 'react-native';
+import Text from '../../shared/ThemedText';
 import { vocabRushColorsForTheme } from './vocabRushColors';
-import { fontFamilyForWeight } from './vocabRushFonts';
 import { getXP } from '../../progress/xpStorage';
 import { getXPLevel } from '../../progress/xpLevels';
 import LevelUpModal from '../../progress/LevelUpModal';
+import SessionResultCard, {
+  SessionResultActions,
+  SessionResultStats,
+} from '../../progress/SessionResultCard';
 import type { ThemeColors } from '../../settings/ThemeContext';
+import { DesktopTypographyProvider } from '../../shared/DesktopTypography';
+import { getDesktopTypographyScale, NARROW_CARD_WIDTH } from '../../shared/responsiveLayout';
 
-// Shown only when the round ends because the timer ran out — the "all matched before
-// time ran out" case uses the app's normal exercise-complete screen instead.
+
+
 type Props = {
   visible: boolean;
   score: number;
   sessionXp: number;
+  // Claiming is what actually banks the run's XP — nothing is written before it.
+  onClaimXP?: () => Promise<unknown> | void;
   bestCombo: number;
   matchedCount: number;
   totalWords: number;
@@ -27,6 +35,7 @@ export default function VocabRushGameOverCard({
   visible,
   score,
   sessionXp,
+  onClaimXP,
   bestCombo,
   matchedCount,
   totalWords,
@@ -36,18 +45,25 @@ export default function VocabRushGameOverCard({
   onBack,
   onGoToAccount,
 }: Props) {
-  const { width: windowWidth } = useWindowDimensions();
+  const { width: windowWidth, height: windowHeight } = useWindowDimensions();
+  const desktopScale = getDesktopTypographyScale(windowWidth, windowHeight, 'fit');
   const colors = vocabRushColorsForTheme(isDarkMode, themeColors);
   const [currentXP, setCurrentXP] = useState(0);
   const [xpReady, setXpReady] = useState(false);
   const [showLevelUp, setShowLevelUp] = useState(false);
+  const [flowFinished, setFlowFinished] = useState(false);
   const hasShownLevelUpRef = useRef(false);
+  const claimStartedRef = useRef(false);
+  const pendingActionRef = useRef<(() => void) | null>(null);
 
   useEffect(() => {
     if (!visible) {
       setXpReady(false);
       setShowLevelUp(false);
+      setFlowFinished(false);
       hasShownLevelUpRef.current = false;
+      claimStartedRef.current = false;
+      pendingActionRef.current = null;
       return;
     }
 
@@ -55,13 +71,7 @@ export default function VocabRushGameOverCard({
     getXP()
       .then((xp) => {
         if (!active) return;
-        const before = Math.max(0, xp - sessionXp);
-        const leveledUp = sessionXp > 0 && getXPLevel(before) < getXPLevel(xp);
         setCurrentXP(xp);
-        if (leveledUp && !hasShownLevelUpRef.current) {
-          hasShownLevelUpRef.current = true;
-          setShowLevelUp(true);
-        }
         setXpReady(true);
       })
       .catch(() => {
@@ -75,74 +85,119 @@ export default function VocabRushGameOverCard({
 
   if (!visible || !xpReady) return null;
 
-  const containerPadding = windowWidth < 480 ? 16 : 24;
+  const containerPadding = windowWidth < NARROW_CARD_WIDTH ? 16 : 24;
+  const matchedPercent = totalWords > 0 ? Math.min(100, Math.max(0, (matchedCount / totalWords) * 100)) : 0;
+  // XP is banked on claim, so the stored total read on open is the pre-run one.
+  const previousXP = currentXP;
+  const totalAfterRunXP = currentXP + sessionXp;
+  const didLevelUp = sessionXp > 0 && getXPLevel(previousXP) < getXPLevel(totalAfterRunXP);
+  const continueAfterClaim = (action: () => void) => {
+    if (claimStartedRef.current) return;
+    claimStartedRef.current = true;
+    void Promise.resolve(onClaimXP?.()).catch(() => {});
+    if (didLevelUp && !hasShownLevelUpRef.current) {
+      hasShownLevelUpRef.current = true;
+      pendingActionRef.current = action;
+      setShowLevelUp(true);
+      return;
+    }
+    setFlowFinished(true);
+    action();
+  };
+  const closeResult = () => {
+    if (claimStartedRef.current) return;
+    claimStartedRef.current = true;
+    setFlowFinished(true);
+    onBack();
+  };
 
   return (
-    <>
-      {!showLevelUp && (
-        <View style={styles.pageBackground}>
-          <View style={[styles.stack, { padding: containerPadding }]}>
-            <View style={[styles.heroCard, { backgroundColor: colors.cardBg }]}>
-              <View style={[styles.iconCircle, { backgroundColor: colors.gameOverIconBg }]}>
-                <Image
-                  source={require('../../../assets/embarrassed.png')}
-                  style={styles.iconImage}
-                  resizeMode="contain"
+    <DesktopTypographyProvider mode="fit">
+      <>
+      {!showLevelUp && !flowFinished && (
+        <View style={[styles.pageBackground, { backgroundColor: isDarkMode ? 'rgba(7,15,28,0.62)' : 'rgba(20,20,25,0.55)' }]}>
+          <ScrollView
+            style={styles.scroll}
+            contentContainerStyle={[styles.scrollContent, { padding: containerPadding }]}
+            showsVerticalScrollIndicator={false}
+            bounces={false}
+          >
+            <View style={[styles.stack, { maxWidth: Math.round(430 * desktopScale) }]}>
+              <SessionResultCard
+                colors={themeColors}
+                isDarkMode={isDarkMode}
+                tone="warning"
+                eyebrow="Nice try!"
+                title="Time's up!"
+                subtitle={`You matched ${matchedCount} of ${totalWords} words. Ready to beat that score?`}
+                image={require('../../../assets/embarrassed.png')}
+                sectionLabel="Vocabulary"
+                onBack={closeResult}
+              >
+                <View style={styles.roundProgress}>
+                  <View style={styles.roundProgressHeader}>
+                    <Text style={[styles.roundProgressTitle, { color: themeColors.text }]}>Words matched</Text>
+                    <Text style={[styles.roundProgressValue, { color: colors.timerRed }]}>{Math.round(matchedPercent)}%</Text>
+                  </View>
+                  <View style={[styles.roundProgressTrack, { backgroundColor: themeColors.progressTrack }]}>
+                    <View style={[styles.roundProgressFill, { width: `${matchedPercent}%`, backgroundColor: colors.timerRed }]} />
+                  </View>
+                </View>
+
+                <SessionResultStats
+                  colors={themeColors}
+                  isDarkMode={isDarkMode}
+                  items={[
+                    { emoji: '✨', label: 'XP earned', value: `+${sessionXp}` },
+                    { emoji: '🔥', label: 'Best combo', value: `×${bestCombo}` },
+                    { emoji: '⭐', label: 'Score', value: score },
+                  ]}
                 />
-              </View>
-              <Text style={[styles.title, { color: colors.title }]}>Time's up, game over!</Text>
-              <Text style={[styles.body, { color: colors.gameOverSecondaryText }]}>
-                You matched {matchedCount} of {totalWords} words. Don't worry, give it another go!
-              </Text>
-            </View>
 
-            <View style={styles.statsRow}>
-              <View style={[styles.statCard, { backgroundColor: colors.cardBg }]}>
-                <Text style={[styles.statLabel, { color: colors.comboLabel }]}>XP</Text>
-                <Text style={[styles.statValue, { color: colors.comboValue }]}>+{sessionXp}</Text>
-              </View>
-              <View style={[styles.statCard, { backgroundColor: colors.cardBg }]}>
-                <Text style={[styles.statLabel, { color: colors.comboLabel }]}>Best Combo</Text>
-                <Text style={[styles.statValue, { color: colors.timerRed }]}>×{bestCombo}</Text>
-              </View>
-              <View style={[styles.statCard, { backgroundColor: colors.cardBg }]}>
-                <Text style={[styles.statLabel, { color: colors.comboLabel }]}>Score</Text>
-                <Text style={[styles.statValue, { color: colors.title }]}>{score}</Text>
-              </View>
+                <SessionResultActions
+                  colors={themeColors}
+                  isDarkMode={isDarkMode}
+                  primaryLabel={`Claim ${sessionXp} XP`}
+                  onPrimary={() => continueAfterClaim(onPlayAgain)}
+                />
+              </SessionResultCard>
             </View>
-
-            <View style={styles.actions}>
-              <Pressable
-                onPress={onPlayAgain}
-                style={[styles.primaryButton, { backgroundColor: colors.comboValue }, Platform.OS === 'web' && ({ cursor: 'pointer' } as any)]}
-              >
-                <Text style={styles.primaryButtonText}>Play again</Text>
-              </Pressable>
-              <Pressable
-                onPress={onBack}
-                style={[styles.secondaryButton, { backgroundColor: colors.cardBg, borderColor: colors.progressTrack }, Platform.OS === 'web' && ({ cursor: 'pointer' } as any)]}
-              >
-                <Text style={[styles.secondaryButtonText, { color: colors.gameOverSecondaryText }]}>Back to Vocabulary</Text>
-              </Pressable>
-            </View>
-          </View>
+          </ScrollView>
         </View>
       )}
 
       <LevelUpModal
-        visible={showLevelUp}
-        totalXP={currentXP}
+        visible={visible && showLevelUp && !flowFinished}
+        totalXP={totalAfterRunXP}
         sessionXP={sessionXp}
         colors={themeColors}
         isDarkMode={isDarkMode}
         onDismiss={() => {
+          setFlowFinished(true);
           setShowLevelUp(false);
-          onPlayAgain();
+          const action = pendingActionRef.current;
+          pendingActionRef.current = null;
+          action?.();
         }}
-        dismissLabel="Play again"
-        onGoToAccount={onGoToAccount}
+        dismissLabel="Continue"
+        onGoToAccount={onGoToAccount ? () => {
+
+          pendingActionRef.current = null;
+          setFlowFinished(true);
+          setShowLevelUp(false);
+
+
+
+
+
+
+
+          // Let the nested native modal dismiss before navigation presents another screen.
+          setTimeout(onGoToAccount, 220);
+        } : undefined}
       />
-    </>
+      </>
+    </DesktopTypographyProvider>
   );
 }
 
@@ -153,125 +208,58 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     bottom: 0,
-    backgroundColor: 'rgba(30,26,16,0.45)',
+    zIndex: 24,
+    // Unlike the Modal-wrapped completion screens, this overlay isn't inside a native
+    // <Modal> — it shares the normal view tree with the game screen underneath, so it
+    // still needs real elevation to draw/stack above that content on Android. But this
+    // background is intentionally translucent, and an elevation as extreme as the old
+    // 1000 made Android render it as an opaque white plate with a thick grey shadow ring
+    // instead of a see-through scrim — 24 is already well clear of anything else on this
+    // screen (the game UI tops out at elevation 2), and shadowColor suppresses the ring.
+    elevation: 24,
+    shadowColor: 'transparent',
+  },
+  scroll: {
+    flex: 1,
+    width: '100%',
+  },
+  scrollContent: {
+    flexGrow: 1,
+    width: '100%',
     alignItems: 'center',
     justifyContent: 'center',
   },
   stack: {
     width: '100%',
-    maxWidth: 320,
-    flexDirection: 'column',
-    alignItems: 'center',
-    gap: 18,
+    maxWidth: 430,
   },
-  heroCard: {
+  roundProgress: {
     width: '100%',
-    borderRadius: 20,
-    paddingTop: 24,
-    paddingHorizontal: 22,
-    paddingBottom: 22,
-    alignItems: 'center',
-    ...Platform.select({
-      web: { boxShadow: '0 8px 24px rgba(0,0,0,0.08)' } as any,
-      default: {
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 8 },
-        shadowOpacity: 0.08,
-        shadowRadius: 24,
-        elevation: 4,
-      },
-    }),
   },
-  iconCircle: {
-    width: 64,
-    height: 64,
-    borderRadius: 32,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  iconImage: {
-    width: 46,
-    height: 46,
-  },
-  title: {
-    marginTop: 14,
-    fontSize: 19,
-    fontWeight: '800',
-    fontFamily: fontFamilyForWeight('800'),
-    textAlign: 'center',
-  },
-  body: {
-    marginTop: 6,
-    fontSize: 13,
-    fontWeight: '600',
-    fontFamily: fontFamilyForWeight('600'),
-    textAlign: 'center',
-    lineHeight: 18,
-  },
-  statsRow: {
+  roundProgressHeader: {
     flexDirection: 'row',
-    gap: 8,
-    width: '100%',
-  },
-  statCard: {
-    flex: 1,
-    borderRadius: 12,
-    paddingVertical: 12,
-    paddingHorizontal: 8,
+    justifyContent: 'space-between',
     alignItems: 'center',
-    ...Platform.select({
-      web: { boxShadow: '0 4px 12px rgba(0,0,0,0.05)' } as any,
-      default: {
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.05,
-        shadowRadius: 12,
-        elevation: 2,
-      },
-    }),
   },
-  statLabel: {
-    fontSize: 10,
-    fontWeight: '700',
-    fontFamily: fontFamilyForWeight('700'),
-    textTransform: 'uppercase',
-    letterSpacing: 0.4,
-    textAlign: 'center',
-  },
-  statValue: {
-    marginTop: 4,
-    fontSize: 18,
+  roundProgressTitle: {
+    fontSize: 12,
+    lineHeight: 16,
     fontWeight: '800',
-    fontFamily: fontFamilyForWeight('800'),
-    textAlign: 'center',
   },
-  actions: {
+  roundProgressValue: {
+    fontSize: 12,
+    lineHeight: 16,
+    fontWeight: '800',
+  },
+  roundProgressTrack: {
     width: '100%',
-    flexDirection: 'column',
-    gap: 10,
+    height: 10,
+    marginTop: 8,
+    borderRadius: 999,
+    overflow: 'hidden',
   },
-  primaryButton: {
-    borderRadius: 14,
-    padding: 14,
-    alignItems: 'center',
-  },
-  primaryButtonText: {
-    fontSize: 15,
-    fontWeight: '700',
-    fontFamily: fontFamilyForWeight('700'),
-    color: '#ffffff',
-    textAlign: 'center',
-  },
-  secondaryButton: {
-    borderRadius: 14,
-    borderWidth: 1.5,
-    padding: 12,
-    alignItems: 'center',
-  },
-  secondaryButtonText: {
-    fontSize: 14,
-    fontWeight: '600',
-    fontFamily: fontFamilyForWeight('600'),
-    textAlign: 'center',
+  roundProgressFill: {
+    height: '100%',
+    borderRadius: 999,
   },
 });

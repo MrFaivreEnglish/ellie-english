@@ -1,7 +1,7 @@
 const SpaceVocab = {
   id: '41',
   title: 'Space',
-  description: 'Learn vocabulary related to astronomy and space exploration',  imageUrl: 'https://i.ibb.co/7dhkKvv0/Space.webp',
+  description: 'Learn vocabulary related to astronomy and space exploration',  imageUrl: 'https://wretggbpaejzjdilemit.supabase.co/storage/v1/object/public/lesson-images/15274719ab/space.webp',
   thumbnail: require('../../assets/thumbnails/space-thumbnail.png'),
   flashcards: [
     {

@@ -2,7 +2,7 @@ const EmotionsLevel2Vocab = {
   id: '207',
   title: 'Emotions Plus',
   description: 'Advanced emotions vocabulary with nuanced feelings and expressions',
-  imageUrl: 'https://i.ibb.co/6c2cc9ZB/emotions-Level-2.webp',
+  imageUrl: 'https://wretggbpaejzjdilemit.supabase.co/storage/v1/object/public/lesson-images/15274719ab/emotions-plus.webp',
   thumbnail: require('../../assets/thumbnails/emotions-level-2-thumbnail.png'),
   flashcards:[
     {
@@ -40,7 +40,7 @@ const EmotionsLevel2Vocab = {
         { english: 'Jealous', french: 'Jaloux' },
         { english: 'Scared', french: 'Effrayé' },
         { english: 'Fearful', french: 'Craintif' },
-        { english: 'Frightened', french: 'Effrayé' },
+        { english: 'Frightened', french: 'Apeuré' },
         { english: 'Nervous', french: 'Nerveux' },
         { english: 'Anxious', french: 'Anxieux' },
         { english: 'Stressed', french: 'Stressé' },

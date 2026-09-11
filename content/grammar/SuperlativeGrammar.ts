@@ -2,7 +2,7 @@ const SuperlativeGrammar = {
   id: '8',
   title: 'Superlatif',
   description: 'Learn how to use superlatives in English',
-  imageUrl: 'https://i.ibb.co/1fSC9tpR/Superlatif-sup-riorit.png',
+  imageUrl: 'https://wretggbpaejzjdilemit.supabase.co/storage/v1/object/public/lesson-images/15274719ab/superlatif.webp',
   textContent: {
     cards: [
       {

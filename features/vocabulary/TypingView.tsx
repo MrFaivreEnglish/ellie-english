@@ -2,26 +2,30 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Animated,
   Easing,
+  Keyboard,
   Platform,
+  Pressable,
   StyleSheet,
-  Text,
-  TextInput,
   TouchableOpacity,
   useWindowDimensions,
   View,
 } from 'react-native';
-import { MaterialIcons } from '@expo/vector-icons';
+import Text, { ThemedTextInput as TextInput } from '../shared/ThemedText';
+import MaterialIcons from '../shared/ThemedMaterialIcon';
 import { useAudioPlayer } from 'expo-audio';
 
 import { useTypingGame } from './useTypingGame';
 import type { Word } from '../../types/VocabularyTypes';
-import { SOUND_EFFECT_OPTIONS, SUCCESS_SOUND, replaySoundEffect } from '../shared/soundEffects';
-import { clampNumber, getWebLessonScale, scaleValue } from '../shared/responsiveLayout';
+import { SOUND_EFFECT_OPTIONS, SUCCESS_SOUND, replayPooledSoundEffect } from '../shared/soundEffects';
+import { clampNumber, getMatchWriteCardScale, getWebLessonScale, isDesktopWebWidth, scaleValue } from '../shared/responsiveLayout';
+import { EXERCISE_MOBILE_HORIZONTAL_PADDING, EXERCISE_PANEL_RADIUS, getExercisePanelShadow } from '../shared/exerciseLayoutTokens';
 import VocabularyCompletionModal from './VocabularyCompletionModal';
 import Assets from '../../assets/index';
 import { triggerSelectionHaptic, triggerSuccessHaptic, triggerWarningHaptic } from '../shared/haptics';
 import { usePersistentExerciseKeyboard } from '../shared/usePersistentExerciseKeyboard';
-import { FRESH_COLORS, freshGlowShadow } from '../shared/freshDirection';
+import { reservesSoftKeyboardSpace, useStableViewportHeight } from '../shared/softKeyboardLayout';
+import { FRESH_COLORS } from '../shared/freshDirection';
+import { PERFECT_RUN_XP_MULTIPLIER } from '../progress/xpRewards';
 
 type ThemeColors = {
   isDark?: boolean;
@@ -32,6 +36,7 @@ type ThemeColors = {
   text?: string;
   border?: string;
   borderStrong?: string;
+  progressTrack?: string;
   secondaryText?: string;
   primary?: string;
   success?: string;
@@ -59,6 +64,13 @@ interface TypingViewProps {
   promptLabel?: string;
   answerPlaceholder?: string;
   keyboardVisible?: boolean;
+  isDesktopWeb?: boolean;
+
+
+
+
+
+  practiceSheetReady?: boolean;
   layoutHeight?: number;
   forceAndroidLayout?: boolean;
   onShuffle?: () => void;
@@ -86,10 +98,12 @@ interface TypingViewProps {
     reset: () => void;
     reshuffleRemaining: () => void;
     comboBonus: number;
+    commitPendingTypingXp?: () => Promise<number>;
     requestHint: () => void;
     currentHintCount: number;
     currentHintText: string;
     sessionXp: number;
+    resolvedSessionXp?: number | null;
     setTypedAnswer: (value: string) => void;
     strictMode: boolean;
     streak: number;
@@ -97,6 +111,7 @@ interface TypingViewProps {
     typingFeedback?: 'correct' | 'close' | 'wrong' | null;
     typingIndex: number;
     firstTryCount?: number;
+    wasPerfectRun?: boolean;
     totalAttempts: number;
     totalWords: number;
     xp: number;
@@ -115,11 +130,11 @@ const buildTheme = (colors?: ThemeColors) => {
 
   return {
     isDark,
-    background: colors?.background ?? (isDark ? '#071A2D' : '#F8FAFC'),
-    card: colors?.card ?? (isDark ? '#0D2742' : '#FFFFFF'),
-    text: colors?.text ?? (isDark ? '#F7FAFF' : '#0F172A'),
-    subText: colors?.secondaryText ?? (isDark ? '#C9DDF0' : '#64748B'),
-    border: colors?.border ?? (isDark ? '#2A5C84' : '#E2E8F0'),
+    background: colors?.background ?? (isDark ? '#071A2D' : FRESH_COLORS.pageBackground),
+    card: colors?.card ?? (isDark ? '#0D2742' : FRESH_COLORS.cardSurface),
+    text: colors?.text ?? (isDark ? '#F7FAFF' : FRESH_COLORS.inkPrimary),
+    subText: colors?.secondaryText ?? (isDark ? '#C9DDF0' : FRESH_COLORS.inkSecondary),
+    border: colors?.border ?? (isDark ? '#2A5C84' : FRESH_COLORS.hairline),
     primary: colors?.primary ?? colors?.buttonBackground ?? '#0D7DD4',
     success: colors?.success ?? (isDark ? '#4FD9C4' : '#17B8A6'),
     successSoft: colors?.successSoft ?? (isDark ? '#0F332F' : '#CCFBF1'),
@@ -127,18 +142,20 @@ const buildTheme = (colors?: ThemeColors) => {
     warningSoft: colors?.warningSoft ?? (isDark ? '#493912' : '#FFF4D8'),
     error: colors?.danger ?? (isDark ? '#FF9478' : '#FF7A59'),
     errorSoft: colors?.dangerSoft ?? (isDark ? '#3D1E14' : '#FFE4DA'),
-    progressBg: colors?.border ?? (isDark ? '#2A5C84' : '#E2E8F0'),
-    inputBackground: colors?.surfaceAlt ?? (isDark ? '#1B527F' : '#FFFFFF'),
+    progressBg: colors?.progressTrack ?? colors?.border ?? (isDark ? '#2A5C84' : FRESH_COLORS.progressTodo),
+    inputBackground: isDark
+      ? (colors?.surface ?? '#162436')
+      : (colors?.surfaceAlt ?? '#FFFFFF'),
     statsBackground: colors?.surface ?? (isDark ? '#123B61' : '#EEF2F7'),
     statsBorder: colors?.border ?? (isDark ? '#2A5C84' : '#E5E7EB'),
   };
 };
 
-// Feedback card palette — converted from the design spec's OKLCH values to
-// sRGB hex (RN has no oklch() support), L/C/H preserved exactly:
-//   correct card:  oklch(0.60 0.15 150)
-//   almost avatar: oklch(0.92 0.07  90)   almost bubble: oklch(0.95 0.04  90)   almost text: oklch(0.48 0.11  90)
-//   wrong avatar:  oklch(0.92 0.06  25)   wrong bubble:  oklch(0.95 0.03  25)   wrong text:  oklch(0.48 0.13  25)
+
+
+
+
+
 const FEEDBACK_ALMOST_AVATAR_BG = '#F7E3B0';
 const FEEDBACK_ALMOST_BUBBLE_BG = '#F9EED1';
 const FEEDBACK_ALMOST_TEXT = '#765900';
@@ -154,6 +171,8 @@ export default function TypingView({
   promptLabel = 'French',
   answerPlaceholder = 'Type the English translation',
   keyboardVisible = false,
+  isDesktopWeb: isDesktopWebProp,
+  practiceSheetReady = true,
   layoutHeight,
   forceAndroidLayout = false,
   onSessionComplete,
@@ -165,24 +184,37 @@ export default function TypingView({
   const safeWords = words ?? [];
   const { width, height } = useWindowDimensions();
   const responsiveHeight = layoutHeight ?? height;
-  const isAndroid = Platform.OS === 'android' || forceAndroidLayout;
-  const isDesktopWeb = Platform.OS === 'web' && !forceAndroidLayout && width >= 768;
-  const webScale = getWebLessonScale(width, responsiveHeight);
-  const typingWebScale = isDesktopWeb ? Math.min(webScale * 1.06, 1.16) : webScale;
-  // Width-only version of the same scale, used just for the card's own
-  // max-width — Match derives its progress-bar cap the same width-only way,
-  // so the two modes never disagree on this one measurement just because
-  // they get a different available height from the layout hook.
-  const widthOnlyWebScale = clampNumber(width / 1180, 1, 1.1);
-  const cardWidthWebScale = isDesktopWeb ? Math.min(widthOnlyWebScale * 1.06, 1.16) : widthOnlyWebScale;
-  const isCompact = false;
-  // Only the real keyboard-visible signal shrinks the layout — a merely
-  // short/narrow viewport (very common on phones even with the keyboard
-  // closed) must NOT trigger this, or Write's card renders noticeably
-  // shorter than Cards/Match at the exact same screen size.
-  const keyboardMode = keyboardVisible;
-  const inputRef = useRef<TextInput | null>(null);
+  const isDesktopWeb = isDesktopWebProp ?? (!forceAndroidLayout && isDesktopWebWidth(width));
+
+
+
+
+
+  // Design scaling must not react to the keyboard-shrunk viewport.
+  const stableViewportHeight = useStableViewportHeight();
+  const webScale = getWebLessonScale(width, stableViewportHeight);
+
+
+
+
+  const typingWebScale = isDesktopWeb ? Math.min(webScale * 1.06, 1.7) : webScale;
+
+
+
+
+  const cardWidthWebScale = getMatchWriteCardScale(width, isDesktopWeb);
+
+
+
+
+
+
+  const keyboardMode = keyboardVisible && !isDesktopWeb;
+  const inputRef = useRef<React.ElementRef<typeof TextInput> | null>(null);
+  // Two voices, alternated, so a correct answer never waits on the previous one rewinding.
   const successPlayer = useAudioPlayer(SUCCESS_SOUND, SOUND_EFFECT_OPTIONS);
+  const successPlayerAlt = useAudioPlayer(SUCCESS_SOUND, SOUND_EFFECT_OPTIONS);
+  const successVoiceCursor = useRef(0);
   const hasNotifiedCompletionRef = useRef(false);
 
   const [showFeedbackCard, setShowFeedbackCard] = useState(false);
@@ -212,11 +244,10 @@ export default function TypingView({
     return {
       ...baseTheme,
       subText: colors?.secondaryText ?? baseTheme.subText,
-      // Vocabulary lesson modes (Cards/Match/Write) share one accent — the
-      // "exercise blue" family, distinct from the app-wide primary blue.
+
+
       primary: isDark ? '#3FA0DB' : FRESH_COLORS.exerciseBlue,
       buttonText: colors?.buttonText ?? '#FFFFFF',
-      inputBackground: colors?.surfaceAlt ?? baseTheme.inputBackground,
       statsBackground: colors?.surface ?? baseTheme.statsBackground,
       statsBorder: colors?.border ?? baseTheme.statsBorder,
     };
@@ -238,6 +269,7 @@ export default function TypingView({
     requestHint,
     currentHintCount = 0,
     sessionXp,
+    resolvedSessionXp,
     setTypedAnswer,
     strictMode,
     streak,
@@ -245,6 +277,7 @@ export default function TypingView({
     typingFeedback = null,
     typingIndex,
     firstTryCount = 0,
+    wasPerfectRun = false,
     correctAnswers,
     difficultyByWord = {},
     totalAttempts,
@@ -253,88 +286,29 @@ export default function TypingView({
 
   const prevStreakRef = useRef(streak);
 
-  const isFinished = safeWords.length > 0 && isSessionComplete;
+  // "Go to account" dismisses the completion modal without resetting the session, so
+  // isSessionComplete stays true underneath — track that dismissal separately so the
+  // modal doesn't pop back up when the user returns from Account to this still-open screen.
+  const [completionDismissedForAccount, setCompletionDismissedForAccount] = useState(false);
+  useEffect(() => {
+    if (!isSessionComplete) setCompletionDismissedForAccount(false);
+  }, [isSessionComplete]);
+  const handleGoToAccountFromCompletion = useCallback(() => {
+    setCompletionDismissedForAccount(true);
+    onGoToAccount?.();
+  }, [onGoToAccount]);
+
+  const isFinished = safeWords.length > 0 && isSessionComplete && !completionDismissedForAccount;
   const currentSourceLessonTitle =
     typeof currentWord?.sourceLesson?.title === 'string'
       ? currentWord.sourceLesson.title.trim()
       : '';
-  const shouldReserveKeyboardSpace = forceAndroidLayout || Platform.OS !== 'web' || width < 768;
-  const androidInteractiveCardMinHeight = Math.round(clampNumber(
-    responsiveHeight * (keyboardMode ? 0.50 : isCompact ? 0.66 : 0.58),
-    keyboardMode ? (isCompact ? 370 : 400) : isCompact ? 490 : 460,
-    keyboardMode ? (isCompact ? 460 : 510) : isCompact ? 630 : 620
-  ));
-  // Web (non-Android) card height: fit the actual available height like
-  // Android already does above, instead of demanding a flat 420/490/550px
-  // regardless of the real budget — a fixed floor here is what made Write's
-  // card overflow its section and sit taller than Cards/Match at the same
-  // screen size, since Cards adapts its card size to the space it's given.
-  const interactiveCardMinHeight = isAndroid
-    ? androidInteractiveCardMinHeight
-    : keyboardMode
-      ? Math.round(clampNumber(responsiveHeight * 0.5, 260, 306))
-      : isDesktopWeb
-        ? Math.round(clampNumber(responsiveHeight * 0.80, scaleValue(420, typingWebScale), scaleValue(550, typingWebScale)))
-        : Math.round(clampNumber(
-            responsiveHeight * (isCompact ? 0.62 : 0.56),
-            isCompact ? 300 : 300,
-            isCompact ? 420 : 420
-          ));
-  // Reserves just enough room for the word (1-2 lines) plus the optional
-  // source badge below it — not a generous multi-line buffer — since this
-  // box doesn't vertically center its own content, any extra minHeight here
-  // shows up as dead space directly under the word rather than around it.
-  const androidPromptMinHeight = Math.round(clampNumber(
-    responsiveHeight * (keyboardMode ? 0.20 : 0.16),
-    keyboardMode ? 136 : 110,
-    keyboardMode ? 172 : 150
-  ));
-  const promptMinHeight = isAndroid
-    ? androidPromptMinHeight
-    : keyboardMode
-      ? 96
-      : isDesktopWeb
-        ? scaleValue(146, typingWebScale)
-        : 94;
-  const promptFontSize = isAndroid
-    ? keyboardMode
-      ? 32
-      : 38
-    : keyboardMode
-      ? 28
-      : isDesktopWeb
-        ? scaleValue(52, typingWebScale)
-        : 38;
-  const promptLineHeight = isAndroid
-    ? keyboardMode
-      ? 39
-      : 46
-    : keyboardMode
-      ? 34
-      : isDesktopWeb
-        ? scaleValue(61, typingWebScale)
-        : 46;
-  const contentHorizontalPadding = isAndroid
-    ? isCompact ? 8 : 10
-    : isCompact ? 12 : 18;
-  const contentBottomPadding = isAndroid
-    ? keyboardMode ? 34 : shouldReserveKeyboardSpace ? (isCompact ? 18 : 26) : 16
-    : keyboardMode ? 44 : shouldReserveKeyboardSpace ? (isCompact ? 16 : 24) : 16;
-  const androidAnswerMarginTop = keyboardMode ? 8 : isCompact ? 12 : 18;
-  const inputVerticalPadding = isAndroid
-    ? keyboardMode ? 12 : 15
-    : keyboardMode ? 9 : isDesktopWeb ? scaleValue(16, typingWebScale) : 13;
-  const inputFontSize = isAndroid
-    ? keyboardMode ? 18 : 22
-    : keyboardMode ? 16 : isDesktopWeb ? scaleValue(23, typingWebScale) : 20;
-  const checkButtonAndroidStyle = isAndroid
-    ? {
-        minHeight: keyboardMode ? 44 : 52,
-        paddingVertical: keyboardMode ? 9 : 12,
-        paddingHorizontal: 24,
-      }
-    : undefined;
 
+
+
+
+
+  const shouldReserveKeyboardSpace = reservesSoftKeyboardSpace(width);
 
   const accuracy = useMemo(() => {
     if (totalAttempts === 0) {
@@ -365,8 +339,8 @@ export default function TypingView({
     ? 'Clean round. You got every word.'
     : 'You finished the round. Nice work!';
   const playSuccessSound = useCallback(() => {
-    replaySoundEffect(successPlayer);
-  }, [successPlayer]);
+    replayPooledSoundEffect([successPlayer, successPlayerAlt], successVoiceCursor);
+  }, [successPlayer, successPlayerAlt]);
 
   const triggerFeedbackCard = useCallback(
     (type: FeedbackType, streak: number, answer: string) => {
@@ -376,7 +350,7 @@ export default function TypingView({
       setShowFeedbackCard(true);
 
       const canUseNativeDriver = Platform.OS !== 'web';
-      const easeCurve = Easing.bezier(0.25, 0.1, 0.25, 1); // CSS "ease"
+      const easeCurve = Easing.bezier(0.25, 0.1, 0.25, 1);
       feedbackOpacity.setValue(0);
       feedbackTranslateY.setValue(16);
 
@@ -415,7 +389,7 @@ export default function TypingView({
     [feedbackOpacity, feedbackTranslateY]
   );
 
-  // Almost/Wrong mascot avatar bob loop — Correct never uses this.
+
   useEffect(() => {
     if (!showFeedbackCard || feedbackType === 'correct' || feedbackType === null) {
       feedbackAvatarFloat.setValue(0);
@@ -447,34 +421,58 @@ export default function TypingView({
     };
   }, [showFeedbackCard, feedbackType, feedbackAvatarFloat]);
 
+  // Set when the student taps empty space to put the keyboard away; cleared when they tap
+  // back into the input or move to the next word.
+  const [keyboardDismissed, setKeyboardDismissed] = useState(false);
+
   const {
     isScreenFocused,
     shouldKeepKeyboardOpen,
     focusInputSequence,
     focusOnExerciseChange,
+    clearFocusTimeouts,
   } = usePersistentExerciseKeyboard({
     inputRef,
-    enabled: !isFinished,
+    // Tapping empty space dismisses the keyboard (same as Fill). That has to switch this
+    // hook off, not just call Keyboard.dismiss() — its Android focus retries would
+    // otherwise refocus the input a few hundred ms later and reopen the keyboard.
+    enabled: !isFinished && !keyboardDismissed,
     androidFocusRetries: Platform.OS === 'android' || forceAndroidLayout,
   });
   const shouldAutoFocusInput = isScreenFocused;
 
-  const handleInputBlur = useCallback(() => {
-    if (!shouldKeepKeyboardOpen || isDesktopWeb) {
-      return;
-    }
 
-    focusInputSequence([80, 260]);
-  }, [focusInputSequence, isDesktopWeb, shouldKeepKeyboardOpen]);
+
+
+
+  const isSubmitRefocusPendingRef = useRef(false);
+
+
+
+
+
+
+
+  const handleInputFocus = useCallback(() => {
+    // Tapping back into the field opts back into the keyboard staying open.
+    setKeyboardDismissed(false);
+  }, []);
 
   const onSubmit = useCallback(() => {
     if (isAdvancing || !typedAnswer.trim()) {
       return;
     }
 
+    isSubmitRefocusPendingRef.current = true;
     void Promise.resolve(handleSubmit()).finally(() => {
-      if (isFinished) return;
+      if (isFinished) {
+        isSubmitRefocusPendingRef.current = false;
+        return;
+      }
       focusInputSequence([90, 760]);
+      setTimeout(() => {
+        isSubmitRefocusPendingRef.current = false;
+      }, 800);
     });
   }, [focusInputSequence, handleSubmit, isAdvancing, isFinished, typedAnswer]);
 
@@ -520,21 +518,45 @@ export default function TypingView({
     triggerFeedbackCard(feedbackEvent.type, feedbackEvent.streak ?? 0, feedbackEvent.answer ?? '');
   }, [feedbackEvent, playSuccessSound, triggerFeedbackCard]);
 
+  // Early focus can resize Android's stage during the sheet entrance animation.
   useEffect(() => {
-    if (!shouldKeepKeyboardOpen) {
+    if (!shouldKeepKeyboardOpen || !practiceSheetReady) {
       return;
     }
 
+
+
     focusOnExerciseChange();
-  }, [focusOnExerciseChange, shouldKeepKeyboardOpen, typingIndex]);
+  }, [focusOnExerciseChange, practiceSheetReady, shouldKeepKeyboardOpen, typingIndex]);
+
+  // Moving to the next word starts fresh: the effect above can't do this, since it bails
+  // out while the keyboard is dismissed (shouldKeepKeyboardOpen is false by then).
+  useEffect(() => {
+    setKeyboardDismissed(false);
+  }, [typingIndex]);
+
+  // Mirrors Fill: disabling the hook should already stop it refocusing, but Fill also kills
+  // any in-flight focus timer and blurs the field outright, and that's the version that
+  // actually holds on Android — a retry queued a moment before the tap would otherwise
+  // still land and pull the keyboard straight back up.
+  useEffect(() => {
+    if (!keyboardDismissed) return;
+    clearFocusTimeouts();
+    inputRef.current?.blur();
+  }, [clearFocusTimeouts, keyboardDismissed]);
+
+
+
+
+
 
   useEffect(() => {
-    if (!shouldKeepKeyboardOpen || keyboardVisible) {
+    if (!shouldKeepKeyboardOpen || !practiceSheetReady) {
       return;
     }
 
     focusInputSequence([120, 360]);
-  }, [focusInputSequence, keyboardVisible, shouldKeepKeyboardOpen]);
+  }, [focusInputSequence, practiceSheetReady, shouldKeepKeyboardOpen]);
 
   useEffect(() => {
     if (!isFinished) {
@@ -595,7 +617,9 @@ export default function TypingView({
     if (typingIndex === 0) {
       progressBarAnim.setValue(target);
     } else {
-      Animated.timing(progressBarAnim, { toValue: target, duration: 300, useNativeDriver: false }).start();
+      // Native-drivable because the fill scales rather than animating its width — a width
+      // percentage would force a JS-thread layout pass on every frame.
+      Animated.timing(progressBarAnim, { toValue: target, duration: 300, useNativeDriver: true }).start();
     }
   }, [typingIndex, safeWords.length, progressBarAnim]);
 
@@ -624,14 +648,66 @@ export default function TypingView({
 
   const translateTargetLabel = promptLabel === 'English' ? 'French' : 'English';
 
-  return (
-    <View style={styles.interactiveShell}>
-      <View
+
+
+
+  const renderMobileContent = () => {
+    // responsiveHeight is the real *measured* stage height (via layoutHeight), so it already
+    // reflects however much browser chrome or a category button actually ate into the
+    // viewport on this device — mobile web doesn't need a lower ceiling than native here, and
+    // capping it low was leaving real headroom (e.g. on a phone browser with a shrunk-but-tall
+    // viewport) unused. The floor must also stay low enough to shrink when a category button
+    // eats space above, or the card renders at the floor regardless of how much room is left.
+    const interactiveCardMinHeight = Math.round(clampNumber(
+      responsiveHeight * (keyboardMode ? 0.50 : 0.58),
+      keyboardMode ? 260 : 300,
+      keyboardMode ? 510 : 620
+    ));
+
+    const promptMinHeight = Math.round(clampNumber(
+      responsiveHeight * (keyboardMode ? 0.20 : 0.16),
+      keyboardMode ? 100 : 94,
+      keyboardMode ? 172 : 150
+    ));
+    // Native and mobile-web differ only by how much room is actually measured
+    // (responsiveHeight/keyboardMode), not by a separate per-OS number — the phone-size
+    // curve (webScale) covers "this device has more room" instead of an isAndroid fork.
+    const promptFontSize = scaleValue(keyboardMode ? 28 : 38, webScale);
+    const promptLineHeight = scaleValue(keyboardMode ? 34 : 46, webScale);
+    const contentHorizontalPadding = scaleValue(EXERCISE_MOBILE_HORIZONTAL_PADDING, webScale);
+    const contentBottomPadding = scaleValue(keyboardMode ? 44 : shouldReserveKeyboardSpace ? 24 : 16, webScale);
+    const answerMarginTop = scaleValue(keyboardMode ? 4 : 12, webScale);
+    const inputVerticalPadding = scaleValue(keyboardMode ? 12 : 13, webScale);
+    const inputFontSize = scaleValue(keyboardMode ? 17 : 20, webScale);
+    const checkButtonMobileStyle = {
+      minHeight: scaleValue(keyboardMode ? 44 : 52, webScale),
+      paddingVertical: scaleValue(keyboardMode ? 9 : 12, webScale),
+      paddingHorizontal: scaleValue(24, webScale),
+    };
+    const checkButtonRowMarginTop = scaleValue(keyboardMode ? 8 : 10, webScale);
+
+    return (
+      <Pressable
+        onPress={() => {
+          // Same as Fill: flip the flag first so the persistent-keyboard hook's Android
+          // focus retries are cleared, then dismiss on the next tick — a same-tick dismiss
+          // races those timers and gets silently reopened.
+          setKeyboardDismissed(true);
+          inputRef.current?.blur();
+          setTimeout(() => Keyboard.dismiss(), 0);
+        }}
         style={[
           styles.contentContainer,
           {
-            backgroundColor: theme.card,
-            paddingTop: isAndroid ? 6 : 0,
+            // Matches the practice sheet's own surface (theme.background) — this is a
+            // passive wrapper, not a card, so it should blend into the sheet rather than
+            // stand out as a distinctly-colored block. The actual interactive pieces inside
+            // (input, buttons) keep theme.card so they still read as tappable surfaces.
+            backgroundColor: theme.background,
+            // Stretches into the space between the exercise and the keyboard so tapping
+            // there dismisses too. Content still sits at the top (justifyContent above).
+            flex: 1,
+            paddingTop: 0,
             paddingBottom: contentBottomPadding,
             paddingHorizontal: contentHorizontalPadding,
             minHeight: keyboardMode ? undefined : interactiveCardMinHeight + (shouldReserveKeyboardSpace ? 20 : 32),
@@ -642,10 +718,8 @@ export default function TypingView({
           style={[
             styles.card,
             styles.interactiveCard,
-            isDesktopWeb && styles.interactiveCardDesktopWeb,
-            isDesktopWeb && { maxWidth: scaleValue(1237, cardWidthWebScale) },
             {
-              backgroundColor: theme.card,
+              backgroundColor: theme.background,
               borderColor: 'transparent',
               borderWidth: 0,
               padding: 0,
@@ -653,12 +727,26 @@ export default function TypingView({
             },
           ]}
         >
-          <View style={styles.writeMetaBlock}>
+          {/* Was 20: that padding existed to push the exercise down, but the prompt/answer
+              group is bottom-anchored now, so it only added dead space above the bar. */}
+          <View
+            style={[
+              styles.writeMetaBlock,
+              {
+                paddingTop: scaleValue(8, webScale),
+                // Opens up the gap under the progress bar (and above the metrics row).
+                gap: scaleValue(12, webScale),
+              },
+            ]}
+          >
             <View
               style={[
                 styles.writeProgressTrack,
-                { backgroundColor: theme.isDark ? '#2a2e38' : '#e0dacc' },
-                isDesktopWeb && styles.writeProgressTrackDesktopWeb,
+
+
+
+                { height: Math.round(6 * typingWebScale) },
+                { backgroundColor: theme.progressBg },
               ]}
             >
               <Animated.View
@@ -666,29 +754,31 @@ export default function TypingView({
                   styles.writeProgressFill,
                   {
                     backgroundColor: theme.primary,
-                    width: progressBarAnim.interpolate({ inputRange: [0, 100], outputRange: ['0%', '100%'] }),
+                    // Full width scaled from the left edge, rather than an animated width
+                    // percentage — this form can run on the native driver.
+                    width: '100%',
+                    transformOrigin: 'left',
+                    transform: [{
+                      scaleX: progressBarAnim.interpolate({ inputRange: [0, 100], outputRange: [0, 1] }),
+                    }],
                   },
                 ]}
               />
             </View>
 
-            <View style={styles.writeMetricsRow}>
-              <Text style={[styles.writeTaskLabel, { color: theme.primary }]} numberOfLines={1}>
-                Translate to {translateTargetLabel}
-              </Text>
-
+            <View style={[styles.writeMetricsRow, styles.writeMetricsRowMobile]}>
               <View style={styles.writeMetricsGroup}>
                 <View style={styles.writeMetricCol}>
-                  <Text style={[styles.writeMetricLabel, { color: theme.isDark ? '#8A8F98' : '#918c7f' }]}>Word</Text>
+                  <Text style={[styles.writeMetricLabel, { color: theme.subText }]}>Word</Text>
                   <Text style={[styles.writeMetricValue, { color: theme.primary }]}>
                     {typingIndex + 1} / {safeWords.length}
                   </Text>
                 </View>
-                <View style={[styles.writeMetricDivider, { backgroundColor: theme.isDark ? '#3A3E48' : '#e3decf' }]} />
+                <View style={[styles.writeMetricDivider, { backgroundColor: theme.border }]} />
                 <Animated.View style={[styles.writeMetricCol, { transform: [{ translateX: comboShakeAnim }] }]}>
-                  <Text style={[styles.writeMetricLabel, { color: theme.isDark ? '#8A8F98' : '#918c7f' }]}>Combo</Text>
+                  <Text style={[styles.writeMetricLabel, { color: theme.subText }]}>Combo</Text>
                   <View style={styles.comboValueRow}>
-                    <Text style={[styles.writeMetricValue, { color: theme.isDark ? '#E4E1D8' : '#3e3a2f' }]}>
+                    <Text style={[styles.writeMetricValue, { color: theme.text }]}>
                       {streak}
                     </Text>
                     {streak >= 3 && (
@@ -698,13 +788,13 @@ export default function TypingView({
                     )}
                   </View>
                 </Animated.View>
-                <View style={[styles.writeMetricDivider, { backgroundColor: theme.isDark ? '#3A3E48' : '#e3decf' }]} />
+                <View style={[styles.writeMetricDivider, { backgroundColor: theme.border }]} />
                 <View style={styles.writeMetricCol}>
-                  <Text style={[styles.writeMetricLabel, { color: theme.isDark ? '#8A8F98' : '#918c7f' }]}>XP</Text>
+                  <Text style={[styles.writeMetricLabel, { color: theme.subText }]}>XP</Text>
                   <Animated.Text
                     style={[
                       styles.writeMetricValue,
-                      { color: theme.isDark ? '#E4E1D8' : '#3e3a2f', transform: [{ scale: xpPulseAnim }] },
+                      { color: theme.text, transform: [{ scale: xpPulseAnim }] },
                     ]}
                   >
                     {sessionXp}
@@ -712,6 +802,10 @@ export default function TypingView({
                 </View>
               </View>
             </View>
+
+            <Text style={[styles.writeTaskLabel, styles.writeTaskLabelMobile, { color: theme.primary }]}>
+              Translate to {translateTargetLabel}
+            </Text>
           </View>
 
           {(isReviewMode || strictMode) && (
@@ -749,109 +843,20 @@ export default function TypingView({
             </View>
           )}
 
-          <View
-            style={[
-              styles.gameAreaWrap,
-              isDesktopWeb && { maxWidth: scaleValue(700, typingWebScale) },
-              { flex: 1 },
-            ]}
-          >
-          {showFeedbackCard && feedbackType === 'correct' && (
-            <Animated.View
-              style={[
-                styles.correctFeedbackCard,
-                styles.feedbackOverlay,
-                isDesktopWeb && { maxWidth: scaleValue(700, typingWebScale) },
-                { pointerEvents: 'none' },
-                {
-                  backgroundColor: theme.isDark
-                    ? 'rgba(34, 197, 94, 0.98)'
-                    : 'rgba(34, 197, 94, 0.99)',
-                  borderColor: theme.isDark ? '#4ADE80' : '#16A34A',
-                  boxShadow: '0px 8px 14px rgba(34, 197, 94, 0.18)',
-                  opacity: feedbackOpacity,
-                  transform: [{ translateY: feedbackTranslateY }],
-                },
-              ]}
-            >
-              <Text style={styles.correctFeedbackEmoji}>🎉</Text>
-              <Text style={styles.correctFeedbackTitle}>
-                Great job!
-              </Text>
-              <View style={styles.correctFeedbackComboPill}>
-                <Text style={styles.correctFeedbackComboText}>
-                  Combo ×{feedbackStreak}
-                </Text>
-              </View>
-            </Animated.View>
-          )}
-          {showFeedbackCard && (feedbackType === 'close' || feedbackType === 'wrong') && (
-            <Animated.View
-              style={[
-                styles.mascotFeedbackRow,
-                styles.feedbackOverlay,
-                isDesktopWeb && { maxWidth: scaleValue(700, typingWebScale) },
-                { pointerEvents: 'none' },
-                {
-                  opacity: feedbackOpacity,
-                  transform: [{ translateY: feedbackTranslateY }],
-                },
-              ]}
-            >
-              <Animated.View
-                style={[
-                  styles.mascotAvatar,
-                  {
-                    backgroundColor: feedbackType === 'wrong' ? FEEDBACK_WRONG_AVATAR_BG : FEEDBACK_ALMOST_AVATAR_BG,
-                    transform: [{ translateY: feedbackAvatarFloat }],
-                  },
-                ]}
-              >
-                {feedbackType === 'wrong' ? (
-                  <MaterialIcons name="sentiment-dissatisfied" size={30} color={FEEDBACK_WRONG_TEXT} />
-                ) : (
-                  <Text style={styles.mascotAvatarEmoji}>🤏</Text>
-                )}
-              </Animated.View>
-              <View
-                style={[
-                  styles.mascotBubble,
-                  { backgroundColor: feedbackType === 'wrong' ? FEEDBACK_WRONG_BUBBLE_BG : FEEDBACK_ALMOST_BUBBLE_BG },
-                ]}
-              >
-                <View
-                  style={[
-                    styles.mascotBubbleTail,
-                    { backgroundColor: feedbackType === 'wrong' ? FEEDBACK_WRONG_BUBBLE_BG : FEEDBACK_ALMOST_BUBBLE_BG },
-                  ]}
-                />
-                {feedbackType === 'wrong' ? (
-                  <>
-                    <Text style={[styles.mascotHeadline, { color: FEEDBACK_WRONG_TEXT }]}>
-                      Not this time.
-                    </Text>
-                    <Text style={[styles.mascotSubtext, { color: FEEDBACK_WRONG_TEXT }]}>
-                      Correct answer: <Text style={{ fontWeight: '800' }}>{feedbackAnswer}</Text>
-                    </Text>
-                  </>
-                ) : (
-                  <Text style={[styles.mascotHeadline, { color: FEEDBACK_ALMOST_TEXT }]}>
-                    So close — one more try before you lose your combo!
-                  </Text>
-                )}
-              </View>
-            </Animated.View>
-          )}
-          <View style={styles.promptAnswerGroup}>
+          <View style={[styles.gameAreaWrap, { flex: 1 }]}>
+          {/* Bottom-anchored at rest so the prompt/answer block sits lower rather than
+              floating mid-card with dead space above and below; centered once a real
+              keyboard is up, since that's the state the keyboard-safety fixes were tuned for. */}
+          <View style={[styles.promptAnswerGroup, { justifyContent: keyboardMode ? 'center' : 'flex-end' }]}>
           <View style={styles.promptCenterWrap}>
           <View
             style={[
               styles.promptOverlayWrap,
-              isDesktopWeb && {
-                maxWidth: scaleValue(700, typingWebScale),
-              },
               {
                 minHeight: promptMinHeight,
+                justifyContent: 'center',
+                // Sits the word lower in its box, opening up space above it.
+                paddingTop: scaleValue(18, webScale),
               },
             ]}
           >
@@ -893,18 +898,8 @@ export default function TypingView({
           </View>
           </View>
 
-          <View
-            style={[
-              styles.answerPanel,
-              isDesktopWeb && styles.answerPanelDesktopWeb,
-              isDesktopWeb && {
-                maxWidth: scaleValue(700, typingWebScale),
-              },
-              {
-                marginTop: isAndroid ? androidAnswerMarginTop : keyboardMode ? 4 : isDesktopWeb ? 0 : isCompact ? 6 : 12,
-              },
-            ]}
-          >
+          <View style={{ position: 'relative' }}>
+          <View style={[styles.answerPanel, { marginTop: answerMarginTop }]}>
             <View style={styles.inputWrap}>
               <TextInput
                 ref={inputRef}
@@ -916,7 +911,7 @@ export default function TypingView({
                 autoCorrect={false}
                 showSoftInputOnFocus
                 returnKeyType="send"
-                onBlur={handleInputBlur}
+                onFocus={handleInputFocus}
                 style={[
                   styles.input,
                   keyboardMode && styles.inputTight,
@@ -932,10 +927,11 @@ export default function TypingView({
                           ? theme.error
                           : typedAnswer.trim()
                             ? theme.primary
-                            : (theme.isDark ? '#153f55' : '#bcd1df'),
+                            : theme.border,
                     paddingVertical: inputVerticalPadding,
                     fontSize: inputFontSize,
                   },
+                  Platform.OS === 'web' ? ({ outlineStyle: 'none' } as any) : null,
                 ]}
               />
               {!typedAnswer && (
@@ -958,40 +954,44 @@ export default function TypingView({
                 </View>
               )}
               {!strictMode && (
-                <TouchableOpacity
-                  onPress={requestHint}
-                  disabled={isAdvancing}
+              <TouchableOpacity
+                onPress={requestHint}
+                disabled={isAdvancing}
+                accessibilityRole="button"
+                accessibilityLabel="Show hint"
                   style={[
                     styles.hintIconButton,
                     {
-                      backgroundColor: theme.isDark ? '#162436' : theme.warningSoft,
-                      borderColor: theme.isDark ? '#5AA8F5' : theme.warning,
+                      backgroundColor: theme.warningSoft,
+                      borderColor: theme.warning,
                       opacity: isAdvancing ? 0.5 : 1,
                     },
                   ]}
                 >
                   <MaterialIcons
                     name="lightbulb-outline"
-                    size={keyboardMode || isCompact ? 16 : 18}
-                    color={theme.isDark ? '#7BAAFB' : '#8a5a00'}
+                    size={keyboardMode ? 16 : 18}
+                    color={theme.isDark ? theme.warning : '#8a5a00'}
                   />
                   {currentHintCount > 0 && (
-                    <Text style={[styles.hintIconCount, { color: theme.isDark ? '#7BAAFB' : '#8a5a00' }]}>{currentHintCount}</Text>
+                    <Text style={[styles.hintIconCount, { color: theme.isDark ? theme.warning : '#8a5a00' }]}>{currentHintCount}</Text>
                   )}
                 </TouchableOpacity>
               )}
             </View>
 
-            <View style={[styles.checkButtonRow, { marginTop: isAndroid ? (keyboardMode ? 10 : 15) : keyboardMode ? 8 : 10 }]}>
+            <View style={[styles.checkButtonRow, { marginTop: checkButtonRowMarginTop }]}>
               <TouchableOpacity
                 onPress={handlePreviousWordPress}
                 disabled={!canGoPrevious || isAdvancing}
+                accessibilityRole="button"
+                accessibilityLabel="Previous word"
                 style={[
                   styles.navArrowInline,
                   keyboardMode && styles.navArrowInlineTight,
                   {
                     backgroundColor: theme.card,
-                    borderColor: theme.isDark ? '#3A3E48' : '#e3decf',
+                    borderColor: theme.border,
                     opacity: !canGoPrevious || isAdvancing ? 0.4 : 1,
                   },
                 ]}
@@ -1005,36 +1005,41 @@ export default function TypingView({
                 style={[
                   styles.button,
                   styles.primaryCheckButton,
-                  isCompact && styles.primaryCheckButtonCompact,
                   keyboardMode && styles.primaryCheckButtonTight,
-                  checkButtonAndroidStyle,
-                  isDesktopWeb && {
-                    minHeight: scaleValue(47, typingWebScale),
-                    paddingVertical: scaleValue(11, typingWebScale),
-                    paddingHorizontal: scaleValue(27, typingWebScale),
-                  },
+                  checkButtonMobileStyle,
                   {
                     flex: 1,
                     marginTop: 0,
-                    backgroundColor: theme.primary,
+
+
+
+
+                    backgroundColor: typingFeedback === 'correct'
+                      ? theme.success
+                      : typingFeedback === 'close'
+                        ? theme.warning
+                        : typingFeedback === 'wrong'
+                          ? theme.error
+                          : theme.primary,
                     opacity: isAdvancing || !typedAnswer.trim() ? 0.55 : 1,
                   },
-                  freshGlowShadow(theme.primary),
                 ]}
               >
-                <MaterialIcons name="check" size={isDesktopWeb ? scaleValue(17, typingWebScale) : 17} color={theme.buttonText} />
-                <Text style={[styles.buttonText, isDesktopWeb && { fontSize: scaleValue(15, typingWebScale) }, { color: theme.buttonText }]}>Check</Text>
+                <MaterialIcons name="check" size={17} color={theme.buttonText} />
+                <Text style={[styles.buttonText, { color: theme.buttonText }]}>Check</Text>
               </TouchableOpacity>
 
               <TouchableOpacity
                 onPress={handleNextWordPress}
                 disabled={!canGoNext || isAdvancing}
+                accessibilityRole="button"
+                accessibilityLabel="Next word"
                 style={[
                   styles.navArrowInline,
                   keyboardMode && styles.navArrowInlineTight,
                   {
                     backgroundColor: theme.card,
-                    borderColor: '#71add0',
+                    borderColor: theme.border,
                     opacity: !canGoNext || isAdvancing ? 0.4 : 1,
                   },
                 ]}
@@ -1043,19 +1048,616 @@ export default function TypingView({
               </TouchableOpacity>
             </View>
           </View>
+          {showFeedbackCard && feedbackType === 'correct' && (
+            <Animated.View
+              style={[
+                styles.correctFeedbackCard,
+                styles.feedbackOverlay,
+                { pointerEvents: 'none' },
+                {
+                  backgroundColor: theme.isDark
+                    ? 'rgba(34, 197, 94, 0.98)'
+                    : 'rgba(34, 197, 94, 0.99)',
+                  borderColor: theme.isDark ? '#4ADE80' : '#16A34A',
+                  boxShadow: '0px 8px 14px rgba(34, 197, 94, 0.18)',
+                  opacity: feedbackOpacity,
+                  transform: [{ translateY: feedbackTranslateY }],
+                },
+              ]}
+            >
+              <Text style={styles.correctFeedbackEmoji}>🎉</Text>
+              <Text style={styles.correctFeedbackTitle}>
+                Great job!
+              </Text>
+              <View style={styles.correctFeedbackComboPill}>
+                <Text style={styles.correctFeedbackComboText}>
+                  Combo ×{feedbackStreak}
+                </Text>
+              </View>
+            </Animated.View>
+          )}
+          {showFeedbackCard && (feedbackType === 'close' || feedbackType === 'wrong') && (
+            <Animated.View
+              style={[
+                styles.mascotFeedbackRow,
+                styles.feedbackOverlay,
+                {
+                  alignItems: 'stretch',
+                  backgroundColor: feedbackType === 'wrong' ? FEEDBACK_WRONG_BUBBLE_BG : FEEDBACK_ALMOST_BUBBLE_BG,
+                  borderRadius: EXERCISE_PANEL_RADIUS,
+                },
+                { pointerEvents: 'none' },
+                {
+                  opacity: feedbackOpacity,
+                  transform: [{ translateY: feedbackTranslateY }],
+                },
+              ]}
+            >
+              <Animated.View
+                style={[
+                  styles.mascotAvatar,
+                  { alignSelf: 'center' },
+                  // These were fixed px while everything around them scales with the phone
+                  // size curve, so the avatar crowded the message on a small screen and
+                  // looked undersized on a large one.
+                  {
+                    width: scaleValue(76, webScale),
+                    height: scaleValue(76, webScale),
+                    borderRadius: scaleValue(38, webScale),
+                  },
+                  {
+                    backgroundColor: feedbackType === 'wrong' ? FEEDBACK_WRONG_AVATAR_BG : FEEDBACK_ALMOST_AVATAR_BG,
+                    transform: [{ translateY: feedbackAvatarFloat }],
+                  },
+                ]}
+              >
+                {feedbackType === 'wrong' ? (
+                  <MaterialIcons name="sentiment-dissatisfied" size={scaleValue(38, webScale)} color={FEEDBACK_WRONG_TEXT} />
+                ) : (
+                  <Text style={[styles.mascotAvatarEmoji, { fontSize: scaleValue(40, webScale) }]}>🤏</Text>
+                )}
+              </Animated.View>
+              <View
+                style={[
+                  styles.mascotBubble,
+                  { justifyContent: 'center' },
+                  {
+                    paddingVertical: scaleValue(18, webScale),
+                    paddingHorizontal: scaleValue(20, webScale),
+                  },
+                  { backgroundColor: feedbackType === 'wrong' ? FEEDBACK_WRONG_BUBBLE_BG : FEEDBACK_ALMOST_BUBBLE_BG },
+                ]}
+              >
+                <View
+                  style={[
+                    styles.mascotBubbleTail,
+                    { backgroundColor: feedbackType === 'wrong' ? FEEDBACK_WRONG_BUBBLE_BG : FEEDBACK_ALMOST_BUBBLE_BG },
+                  ]}
+                />
+                {feedbackType === 'wrong' ? (
+                  <>
+                    <Text style={[styles.mascotHeadline, { fontSize: scaleValue(24, webScale), color: FEEDBACK_WRONG_TEXT }]}>
+                      Not this time.
+                    </Text>
+                    <Text style={[styles.mascotSubtext, { fontSize: scaleValue(18, webScale), color: FEEDBACK_WRONG_TEXT }]}>
+                      Correct answer: <Text style={{ fontWeight: '800' }}>{feedbackAnswer}</Text>
+                    </Text>
+                  </>
+                ) : (
+                  <Text style={[styles.mascotHeadline, { fontSize: scaleValue(24, webScale), color: FEEDBACK_ALMOST_TEXT }]}>
+                    So close — one more try before you lose your combo!
+                  </Text>
+                )}
+              </View>
+            </Animated.View>
+          )}
+          </View>
+          </View>
+          </View>
+        </View>
+      </Pressable>
+    );
+  };
+
+
+
+
+  const renderDesktopContent = () => {
+    const interactiveCardMinHeight = Math.round(clampNumber(
+      responsiveHeight * 0.80,
+      scaleValue(420, typingWebScale),
+      scaleValue(550, typingWebScale)
+    ));
+    const promptMinHeight = scaleValue(146, typingWebScale);
+    const promptFontSize = scaleValue(52, typingWebScale);
+    const promptLineHeight = scaleValue(61, typingWebScale);
+    const contentBottomPadding = shouldReserveKeyboardSpace ? 24 : 16;
+    const inputVerticalPadding = scaleValue(18, typingWebScale);
+    const inputFontSize = scaleValue(23, typingWebScale);
+
+    return (
+      <View
+        style={[
+          styles.contentContainer,
+          {
+            // Matches the practice sheet's own surface (theme.background) — see the same
+            // fix in renderMobileContent; this passive wrapper should blend into the sheet.
+            backgroundColor: theme.background,
+            paddingTop: 0,
+            paddingBottom: contentBottomPadding,
+            paddingHorizontal: 18,
+            minHeight: interactiveCardMinHeight + (shouldReserveKeyboardSpace ? 20 : 32),
+          },
+        ]}
+      >
+        <View
+          style={[
+            styles.card,
+            styles.interactiveCard,
+            styles.interactiveCardDesktopWeb,
+            { maxWidth: scaleValue(1237, cardWidthWebScale) },
+            {
+              backgroundColor: theme.background,
+              borderColor: 'transparent',
+              borderWidth: 0,
+              padding: 0,
+              minHeight: interactiveCardMinHeight,
+            },
+          ]}
+        >
+          <View style={[styles.writeMetaBlock, styles.writeMetaBlockDesktopTopGap]}>
+            <View
+              style={[
+                styles.writeProgressTrack,
+                { backgroundColor: theme.progressBg },
+                styles.writeProgressTrackDesktopWeb,
+              ]}
+            >
+              <Animated.View
+                style={[
+                  styles.writeProgressFill,
+                  {
+                    backgroundColor: theme.primary,
+                    // Full width scaled from the left edge, rather than an animated width
+                    // percentage — this form can run on the native driver.
+                    width: '100%',
+                    transformOrigin: 'left',
+                    transform: [{
+                      scaleX: progressBarAnim.interpolate({ inputRange: [0, 100], outputRange: [0, 1] }),
+                    }],
+                  },
+                ]}
+              />
+            </View>
+
+            <View style={styles.writeMetricsRow}>
+              <Text
+                style={[
+                  styles.writeTaskLabel,
+                  { fontSize: Math.round(10 * cardWidthWebScale) },
+                  { color: theme.primary },
+                ]}
+                numberOfLines={1}
+              >
+                Translate to {translateTargetLabel}
+              </Text>
+
+              <View style={styles.writeMetricsGroup}>
+                <View style={styles.writeMetricCol}>
+                  <Text style={[styles.writeMetricLabel, { fontSize: Math.round(9 * cardWidthWebScale) }, { color: theme.subText }]}>Word</Text>
+                  <Text style={[styles.writeMetricValue, { fontSize: Math.round(18 * cardWidthWebScale), lineHeight: Math.round(20 * cardWidthWebScale) }, { color: theme.primary }]}>
+                    {typingIndex + 1} / {safeWords.length}
+                  </Text>
+                </View>
+                <View style={[styles.writeMetricDivider, { backgroundColor: theme.border }]} />
+                <Animated.View style={[styles.writeMetricCol, { transform: [{ translateX: comboShakeAnim }] }]}>
+                  <Text style={[styles.writeMetricLabel, { fontSize: Math.round(9 * cardWidthWebScale) }, { color: theme.subText }]}>Combo</Text>
+                  <View style={styles.comboValueRow}>
+                    <Text style={[styles.writeMetricValue, { fontSize: Math.round(18 * cardWidthWebScale), lineHeight: Math.round(20 * cardWidthWebScale) }, { color: theme.text }]}>
+                      {streak}
+                    </Text>
+                    {streak >= 3 && (
+                      <Animated.Text style={[styles.comboFireEmoji, { transform: [{ scale: comboFireScale }] }]}>
+                        {COMBO_EMOJI}
+                      </Animated.Text>
+                    )}
+                  </View>
+                </Animated.View>
+                <View style={[styles.writeMetricDivider, { backgroundColor: theme.border }]} />
+                <View style={styles.writeMetricCol}>
+                  <Text style={[styles.writeMetricLabel, { fontSize: Math.round(9 * cardWidthWebScale) }, { color: theme.subText }]}>XP</Text>
+                  <Animated.Text
+                    style={[
+                      styles.writeMetricValue,
+                      { fontSize: Math.round(18 * cardWidthWebScale), lineHeight: Math.round(20 * cardWidthWebScale) },
+                      { color: theme.text, transform: [{ scale: xpPulseAnim }] },
+                    ]}
+                  >
+                    {sessionXp}
+                  </Animated.Text>
+                </View>
+              </View>
+            </View>
+          </View>
+
+          {(isReviewMode || strictMode) && (
+            <View style={styles.modeStatusRow}>
+              {isReviewMode && (
+                <View
+                  style={[
+                    styles.modeStatusBadge,
+                    styles.reviewModeBadge,
+                    {
+                      backgroundColor: theme.warningSoft,
+                      borderColor: theme.warning,
+                    },
+                  ]}
+                >
+                  <MaterialIcons name="workspace-premium" size={scaleValue(14, typingWebScale)} color={theme.warning} />
+                  <Text style={[styles.modeStatusText, { color: theme.text }]}>Final Review</Text>
+                </View>
+              )}
+
+              {strictMode && (
+                <View
+                  style={[
+                    styles.modeStatusBadge,
+                    {
+                      backgroundColor: theme.statsBackground,
+                      borderColor: theme.statsBorder,
+                    },
+                  ]}
+                >
+                  <MaterialIcons name="rule" size={scaleValue(14, typingWebScale)} color={theme.subText} />
+                  <Text style={[styles.modeStatusText, { color: theme.subText }]}>Strict</Text>
+                </View>
+              )}
+            </View>
+          )}
+
+          <View style={[styles.gameAreaWrap, { maxWidth: scaleValue(700, typingWebScale) }, { flex: 1 }]}>
+          <View style={styles.promptAnswerGroup}>
+          <View style={styles.promptCenterWrap}>
+          <View
+            style={[
+              styles.promptOverlayWrap,
+              { maxWidth: scaleValue(700, typingWebScale) },
+              { minHeight: promptMinHeight, justifyContent: 'center' },
+            ]}
+          >
+            <View style={styles.writeWordRow}>
+              <Animated.Text
+                style={[
+                  styles.writeWordText,
+                  {
+                    color: theme.isDark ? theme.text : '#1e1a10',
+                    fontSize: promptFontSize,
+                    lineHeight: promptLineHeight,
+                    opacity: wordFadeAnim,
+                  },
+                ]}
+              >
+                {currentWord?.french}
+              </Animated.Text>
+            </View>
+            {currentSourceLessonTitle ? (
+              <View
+                style={[
+                  styles.promptSourceBadge,
+                  styles.promptSourceBadgeInline,
+                  {
+                    backgroundColor: theme.statsBackground,
+                    borderColor: theme.statsBorder,
+                  },
+                ]}
+              >
+                <MaterialIcons name="auto-stories" size={scaleValue(13, typingWebScale)} color={theme.primary} />
+                <Text
+                  style={[styles.promptSourceBadgeText, { color: theme.subText }]}
+                  numberOfLines={1}
+                >
+                  {currentSourceLessonTitle}
+                </Text>
+              </View>
+            ) : null}
+          </View>
+          </View>
+
+          <View style={{ position: 'relative', width: '100%', maxWidth: scaleValue(700, typingWebScale), alignSelf: 'center' }}>
+          <View
+            style={[
+              styles.answerPanel,
+              styles.answerPanelDesktopWeb,
+              { maxWidth: scaleValue(700, typingWebScale) },
+              {
+                marginTop: scaleValue(18, typingWebScale),
+                backgroundColor: theme.card,
+                borderRadius: scaleValue(EXERCISE_PANEL_RADIUS, typingWebScale),
+                paddingHorizontal: scaleValue(28, typingWebScale),
+                paddingVertical: scaleValue(24, typingWebScale),
+              },
+              getExercisePanelShadow(theme.isDark, 'soft'),
+            ]}
+          >
+            <View style={styles.inputWrap}>
+              <TextInput
+                ref={inputRef}
+                value={typedAnswer}
+                onChangeText={setTypedAnswer}
+                onSubmitEditing={onSubmit}
+                submitBehavior="submit"
+                autoCapitalize="none"
+                autoCorrect={false}
+                showSoftInputOnFocus
+                returnKeyType="send"
+                onFocus={handleInputFocus}
+                style={[
+                  styles.input,
+                  !strictMode && styles.inputWithHint,
+                  {
+                    color: theme.text,
+                    // Matches the surrounding card (theme.card), same as the mobile input —
+                    // theme.inputBackground (colors.surfaceAlt) painted a mismatched tint here.
+                    backgroundColor: theme.card,
+                    borderColor: typingFeedback === 'correct'
+                      ? theme.success
+                      : typingFeedback === 'close'
+                        ? theme.warning
+                        : typingFeedback === 'wrong'
+                          ? theme.error
+                          : typedAnswer.trim()
+                            ? theme.primary
+                            : theme.border,
+                    paddingVertical: inputVerticalPadding,
+                    fontSize: inputFontSize,
+                  },
+                  Platform.OS === 'web' ? ({ outlineStyle: 'none' } as any) : null,
+                ]}
+              />
+              {!typedAnswer && (
+                <View
+                  style={[
+                    styles.inputPlaceholderOverlay,
+                    !strictMode && styles.inputPlaceholderOverlayWithHint,
+                    { pointerEvents: 'none' },
+                  ]}
+                >
+                  <Text
+                    numberOfLines={1}
+                    style={[
+                      styles.inputPlaceholderText,
+                      { color: theme.subText, fontSize: inputFontSize },
+                    ]}
+                  >
+                    {answerPlaceholder}
+                  </Text>
+                </View>
+              )}
+              {!strictMode && (
+              <TouchableOpacity
+                onPress={requestHint}
+                disabled={isAdvancing}
+                accessibilityRole="button"
+                accessibilityLabel="Show hint"
+                  style={[
+                    styles.hintIconButton,
+                    {
+                      backgroundColor: theme.warningSoft,
+                      borderColor: theme.warning,
+                      opacity: isAdvancing ? 0.5 : 1,
+                    },
+                  ]}
+                >
+                  <MaterialIcons
+                    name="lightbulb-outline"
+                    size={scaleValue(18, typingWebScale)}
+                    color={theme.isDark ? theme.warning : '#8a5a00'}
+                  />
+                  {currentHintCount > 0 && (
+                    <Text style={[styles.hintIconCount, { color: theme.isDark ? theme.warning : '#8a5a00' }]}>{currentHintCount}</Text>
+                  )}
+                </TouchableOpacity>
+              )}
+            </View>
+
+            <View style={[styles.checkButtonRow, { marginTop: scaleValue(18, typingWebScale), justifyContent: 'space-between' }]}>
+              <TouchableOpacity
+                onPress={handlePreviousWordPress}
+                disabled={!canGoPrevious || isAdvancing}
+                accessibilityRole="button"
+                accessibilityLabel="Previous word"
+                style={[
+                  styles.navArrowInline,
+                  {
+                    width: scaleValue(40, typingWebScale),
+                    height: scaleValue(40, typingWebScale),
+                    borderRadius: scaleValue(12, typingWebScale),
+                    backgroundColor: theme.card,
+                    borderColor: theme.border,
+                    opacity: !canGoPrevious || isAdvancing ? 0.4 : 1,
+                  },
+                ]}
+              >
+                <MaterialIcons name="chevron-left" size={scaleValue(20, typingWebScale)} color={theme.text} />
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                onPress={onSubmit}
+                disabled={isAdvancing || !typedAnswer.trim()}
+                style={[
+                  styles.button,
+                  styles.primaryCheckButton,
+                  {
+                    minHeight: scaleValue(47, typingWebScale),
+                    paddingVertical: scaleValue(11, typingWebScale),
+                    paddingHorizontal: scaleValue(27, typingWebScale),
+                  },
+                  {
+                    flex: 0,
+                    minWidth: scaleValue(170, typingWebScale),
+                    marginTop: 0,
+
+
+
+
+                    backgroundColor: typingFeedback === 'correct'
+                      ? theme.success
+                      : typingFeedback === 'close'
+                        ? theme.warning
+                        : typingFeedback === 'wrong'
+                          ? theme.error
+                          : theme.primary,
+                    opacity: isAdvancing || !typedAnswer.trim() ? 0.55 : 1,
+                  },
+                ]}
+              >
+                <MaterialIcons name="check" size={scaleValue(17, typingWebScale)} color={theme.buttonText} />
+                <Text style={[styles.buttonText, { fontSize: scaleValue(15, typingWebScale) }, { color: theme.buttonText }]}>Check</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                onPress={handleNextWordPress}
+                disabled={!canGoNext || isAdvancing}
+                accessibilityRole="button"
+                accessibilityLabel="Next word"
+                style={[
+                  styles.navArrowInline,
+                  {
+                    width: scaleValue(40, typingWebScale),
+                    height: scaleValue(40, typingWebScale),
+                    borderRadius: scaleValue(12, typingWebScale),
+                    backgroundColor: theme.card,
+                    borderColor: theme.border,
+                    opacity: !canGoNext || isAdvancing ? 0.4 : 1,
+                  },
+                ]}
+              >
+                <MaterialIcons name="chevron-right" size={scaleValue(20, typingWebScale)} color={theme.text} />
+              </TouchableOpacity>
+            </View>
+          </View>
+          {showFeedbackCard && feedbackType === 'correct' && (
+            <Animated.View
+              style={[
+                styles.correctFeedbackCard,
+                styles.feedbackOverlay,
+                { pointerEvents: 'none' },
+                {
+                  backgroundColor: theme.isDark
+                    ? 'rgba(34, 197, 94, 0.98)'
+                    : 'rgba(34, 197, 94, 0.99)',
+                  borderColor: theme.isDark ? '#4ADE80' : '#16A34A',
+                  boxShadow: '0px 8px 14px rgba(34, 197, 94, 0.18)',
+                  opacity: feedbackOpacity,
+                  transform: [{ translateY: feedbackTranslateY }],
+                },
+              ]}
+            >
+              <Text style={styles.correctFeedbackEmoji}>🎉</Text>
+              <Text style={styles.correctFeedbackTitle}>
+                Great job!
+              </Text>
+              <View style={styles.correctFeedbackComboPill}>
+                <Text style={styles.correctFeedbackComboText}>
+                  Combo ×{feedbackStreak}
+                </Text>
+              </View>
+            </Animated.View>
+          )}
+          {showFeedbackCard && (feedbackType === 'close' || feedbackType === 'wrong') && (
+            <Animated.View
+              style={[
+                styles.mascotFeedbackRow,
+                styles.feedbackOverlay,
+                {
+                  alignItems: 'stretch',
+                  backgroundColor: feedbackType === 'wrong' ? FEEDBACK_WRONG_BUBBLE_BG : FEEDBACK_ALMOST_BUBBLE_BG,
+                  borderRadius: scaleValue(EXERCISE_PANEL_RADIUS, typingWebScale),
+                },
+                { pointerEvents: 'none' },
+                {
+                  opacity: feedbackOpacity,
+                  transform: [{ translateY: feedbackTranslateY }],
+                },
+              ]}
+            >
+              <Animated.View
+                style={[
+                  styles.mascotAvatar,
+                  { alignSelf: 'center' },
+                  {
+                    backgroundColor: feedbackType === 'wrong' ? FEEDBACK_WRONG_AVATAR_BG : FEEDBACK_ALMOST_AVATAR_BG,
+                    transform: [{ translateY: feedbackAvatarFloat }],
+                  },
+                ]}
+              >
+                {feedbackType === 'wrong' ? (
+                  <MaterialIcons name="sentiment-dissatisfied" size={scaleValue(30, typingWebScale)} color={FEEDBACK_WRONG_TEXT} />
+                ) : (
+                  <Text style={styles.mascotAvatarEmoji}>🤏</Text>
+                )}
+              </Animated.View>
+              <View
+                style={[
+                  styles.mascotBubble,
+                  { justifyContent: 'center' },
+                  { backgroundColor: feedbackType === 'wrong' ? FEEDBACK_WRONG_BUBBLE_BG : FEEDBACK_ALMOST_BUBBLE_BG },
+                ]}
+              >
+                <View
+                  style={[
+                    styles.mascotBubbleTail,
+                    { backgroundColor: feedbackType === 'wrong' ? FEEDBACK_WRONG_BUBBLE_BG : FEEDBACK_ALMOST_BUBBLE_BG },
+                  ]}
+                />
+                {feedbackType === 'wrong' ? (
+                  <>
+                    <Text style={[styles.mascotHeadline, { color: FEEDBACK_WRONG_TEXT }]}>
+                      Not this time.
+                    </Text>
+                    <Text style={[styles.mascotSubtext, { color: FEEDBACK_WRONG_TEXT }]}>
+                      Correct answer: <Text style={{ fontWeight: '800' }}>{feedbackAnswer}</Text>
+                    </Text>
+                  </>
+                ) : (
+                  <Text style={[styles.mascotHeadline, { color: FEEDBACK_ALMOST_TEXT }]}>
+                    So close — one more try before you lose your combo!
+                  </Text>
+                )}
+              </View>
+            </Animated.View>
+          )}
+          </View>
           </View>
           </View>
         </View>
       </View>
+    );
+  };
+
+  // Prefer the figure resolved at session end — it applies the bonus and the replay
+  // discount exactly as the claim will, where this fallback only approximates the bonus by
+  // rounding the sum rather than each word.
+  const displayedTypingSessionXp = resolvedSessionXp
+    ?? (wasPerfectRun ? Math.round(sessionXp * PERFECT_RUN_XP_MULTIPLIER) : sessionXp);
+  const typingBonusXp = displayedTypingSessionXp - sessionXp;
+
+  return (
+    // flex on mobile so the tap-to-dismiss area reaches the keyboard: this shell otherwise
+    // sizes to its content, and the Pressable inside can only ever fill the shell.
+    <View style={[styles.interactiveShell, !isDesktopWeb && { flex: 1 }]}>
+      {isDesktopWeb ? renderDesktopContent() : renderMobileContent()}
 
       <VocabularyCompletionModal
-        visible={isFinished}
+        visible={isFinished && resolvedSessionXp !== null}
         timerMode={false}
         startedTimerMode={false}
         isFirstCompletion={false}
         isPersonalBest={false}
         wordsLength={safeWords.length}
-        matchingSessionXp={sessionXp}
+        matchingSessionXp={displayedTypingSessionXp}
+        onClaimXP={typingGame?.commitPendingTypingXp}
+        bonusXp={typingBonusXp}
         onReplay={handlePlayAgain}
         onPrimaryAction={handlePlayAgain}
         primaryActionLabel="Play Again"
@@ -1066,15 +1668,16 @@ export default function TypingView({
         isPerfect={accuracy === 100}
         image={accuracy === 100 ? Assets.comic : Assets.shootingStar}
         statsItems={[
-          { emoji: XP_EMOJI, value: sessionXp, label: 'XP' },
-          { emoji: STAR_EMOJI, value: firstTryCount, label: '1st Try' },
+          { emoji: COMBO_EMOJI, value: maxStreak, label: 'Best Combo' },
           { emoji: ACCURACY_EMOJI, value: `${accuracy}%`, label: 'Accuracy' },
-          { emoji: COMBO_EMOJI, value: maxStreak, label: 'Max Combo' },
+          { emoji: STAR_EMOJI, value: firstTryCount, label: '1st Try' },
+          { emoji: XP_EMOJI, value: displayedTypingSessionXp, label: 'XP' },
+          ...(typingBonusXp > 0 ? [{ emoji: '⭐', value: `+${typingBonusXp}`, label: 'Perfect bonus' }] : []),
         ]}
         reviewWords={weakWords}
         colors={colors as any}
         isDarkMode={isDarkMode ?? false}
-        onGoToAccount={onGoToAccount}
+        onGoToAccount={onGoToAccount ? handleGoToAccountFromCompletion : undefined}
       />
     </View>
   );
@@ -1418,28 +2021,34 @@ const styles = StyleSheet.create({
     height: '100%',
   },
   feedbackOverlay: {
+    // Fills whatever it's nested in exactly — the answer-panel wrapper, not the prompt —
+    // so feedback covers the input/Check button while the prompt stays visible above it.
+    // The card itself stretches to fill this (flex: 1 below) rather than sitting centered
+    // at its own intrinsic size, so it actually covers the panel instead of leaving gaps
+    // that show the input/nav arrows peeking out underneath.
     position: 'absolute',
-    top: 26,
+    top: 0,
     left: 0,
     right: 0,
+    bottom: 0,
     zIndex: 5,
   },
   correctFeedbackCard: {
+    flex: 1,
     width: '100%',
-    alignSelf: 'center',
     borderRadius: 8,
     borderWidth: 1.5,
-    paddingVertical: 16,
-    paddingHorizontal: 22,
+    paddingVertical: 12,
+    paddingHorizontal: 18,
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 12,
+    gap: 10,
   },
   correctFeedbackEmoji: {
-    fontSize: 26,
+    fontSize: 44,
   },
   correctFeedbackTitle: {
-    fontSize: 18,
+    fontSize: 30,
     fontWeight: '800',
     color: '#FFFFFF',
   },
@@ -1447,30 +2056,30 @@ const styles = StyleSheet.create({
     marginLeft: 'auto',
     backgroundColor: 'rgba(255,255,255,0.25)',
     borderRadius: 100,
-    paddingVertical: 6,
-    paddingHorizontal: 12,
+    paddingVertical: 8,
+    paddingHorizontal: 14,
   },
   correctFeedbackComboText: {
-    fontSize: 14,
+    fontSize: 18,
     fontWeight: '800',
     color: '#FFFFFF',
   },
   mascotFeedbackRow: {
+    flex: 1,
     width: '100%',
-    alignSelf: 'center',
     flexDirection: 'row',
     alignItems: 'flex-start',
     gap: 14,
   },
   mascotAvatar: {
-    width: 56,
-    height: 56,
-    borderRadius: 28,
+    width: 64,
+    height: 64,
+    borderRadius: 32,
     alignItems: 'center',
     justifyContent: 'center',
   },
   mascotAvatarEmoji: {
-    fontSize: 30,
+    fontSize: 36,
   },
   mascotBubble: {
     flex: 1,
@@ -1489,18 +2098,24 @@ const styles = StyleSheet.create({
     transform: [{ rotate: '45deg' }],
   },
   mascotHeadline: {
-    fontSize: 16,
+    fontSize: 22,
     fontWeight: '700',
   },
   mascotSubtext: {
     marginTop: 2,
-    fontSize: 14,
+    fontSize: 16,
     fontWeight: '600',
     opacity: 0.8,
   },
   writeMetaBlock: {
     gap: 4,
     marginBottom: 0,
+  },
+
+
+
+  writeMetaBlockDesktopTopGap: {
+    paddingTop: 36,
   },
   writeProgressTrack: {
     width: '100%',
@@ -1510,6 +2125,7 @@ const styles = StyleSheet.create({
   },
   writeProgressTrackDesktopWeb: {
     width: '100%',
+    height: 5,
     alignSelf: 'center',
   },
   writeProgressFill: {
@@ -1522,12 +2138,25 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     gap: 14,
   },
+
+
+
+  writeMetricsRowMobile: {
+    justifyContent: 'flex-end',
+  },
   writeTaskLabel: {
     fontSize: 11,
     fontWeight: '800',
     textTransform: 'uppercase',
     letterSpacing: 0.7,
     flexShrink: 1,
+  },
+
+
+  writeTaskLabelMobile: {
+    fontSize: 12.5,
+    // On top of the block's own gap, so "Translate to ..." sits clear of the metrics row.
+    marginTop: 12,
   },
   writeMetricsGroup: {
     flexDirection: 'row',
@@ -1741,14 +2370,21 @@ const styles = StyleSheet.create({
     maxWidth: 460,
     alignSelf: 'center',
   },
-  // The prompt and answer panel are centered together as one fixed-gap block
-  // (see promptAnswerGroup) — promptCenterWrap itself must stay unflexed, or
-  // it soaks up the whole leftover height and blows out the gap to the answer
-  // panel below it.
+
+
+
+
+
   promptAnswerGroup: {
     flex: 1,
+    minHeight: 0,
     width: '100%',
-    justifyContent: 'center',
+
+
+
+
+
+    justifyContent: 'flex-start',
   },
   promptCenterWrap: {
     width: '100%',
@@ -1758,6 +2394,9 @@ const styles = StyleSheet.create({
     width: '100%',
     maxWidth: 460,
     position: 'relative',
+
+
+
   },
   promptPanel: {
     alignSelf: 'center',
@@ -1771,7 +2410,6 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     position: 'relative',
     boxShadow: '0px 2px 5px rgba(0,0,0,0.08)',
-    elevation: 2,
   },
   promptPanelDesktopWeb: {
     maxWidth: 600,
@@ -1834,6 +2472,7 @@ const styles = StyleSheet.create({
     fontSize: 16,
   },
   inputWithHint: {
+    paddingLeft: 50,
     paddingRight: 50,
   },
   inputWrap: {
@@ -1849,8 +2488,13 @@ const styles = StyleSheet.create({
     right: 18,
     justifyContent: 'center',
   },
+
+
   inputPlaceholderOverlayWithHint: {
-    right: 50,
+
+
+    left: 52,
+    right: 52,
   },
   inputPlaceholderText: {
     fontWeight: '500',
@@ -1892,16 +2536,10 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     gap: 8,
   },
-  primaryCheckButtonCompact: {
-    minHeight: 42,
-    marginTop: 14,
-    paddingVertical: 9,
-    paddingHorizontal: 22,
-  },
   primaryCheckButtonTight: {
-    minHeight: 38,
+    minHeight: 44,
     marginTop: 8,
-    paddingVertical: 7,
+    paddingVertical: 9,
     paddingHorizontal: 18,
   },
   navArrowInline: {
@@ -1913,7 +2551,8 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   navArrowInlineTight: {
-    width: 36,
-    height: 36,
+    width: 44,
+    height: 44,
+    borderRadius: 14,
   },
 });

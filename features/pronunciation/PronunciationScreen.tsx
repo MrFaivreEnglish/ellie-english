@@ -1,30 +1,37 @@
-import React, { useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import {
   Platform,
   ScrollView,
   StyleSheet,
-  Text,
-  TextInput,
   TouchableOpacity,
+  useWindowDimensions,
   View,
 } from 'react-native';
-import { MaterialIcons } from '@expo/vector-icons';
+import Text, { ThemedTextInput as TextInput } from '../shared/ThemedText';
+import MaterialIcons from '../shared/ThemedMaterialIcon';
 import { useNavigation } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import BackButton from '../shared/BackButton';
 import { useTheme } from '../settings/ThemeContext';
 import { pronunciationCategories } from '../../content/pronunciationLessons';
+import { DesktopTypographyProvider } from '../shared/DesktopTypography';
+import { getDesktopContentMaxWidth, getDesktopTypographyScale, getTopSafeAreaInset, isDesktopWebWidth } from '../shared/responsiveLayout';
 
 export default function PronunciationScreen() {
   const navigation = useNavigation();
   const insets = useSafeAreaInsets();
   const { colors, isDarkMode, isAndroidStatusBarEnabled } = useTheme();
+  const { width: windowWidth, height: windowHeight } = useWindowDimensions();
+  const isDesktopWeb = isDesktopWebWidth(windowWidth, undefined, windowHeight);
+  const desktopContentMaxWidth = getDesktopContentMaxWidth(windowWidth, 'scroll', windowHeight);
+
+
+
+
+
+  const desktopScale = getDesktopTypographyScale(windowWidth, windowHeight, 'scroll');
   const [searchText, setSearchText] = useState('');
-  const topContentInset = Platform.OS === 'ios'
-    ? insets.top
-    : Platform.OS === 'android' && isAndroidStatusBarEnabled
-      ? insets.top
-      : 0;
+  const topContentInset = getTopSafeAreaInset(Platform.OS, insets.top, isAndroidStatusBarEnabled);
 
   const filteredCategories = useMemo(() => {
     const query = searchText.trim().toLowerCase();
@@ -58,12 +65,17 @@ export default function PronunciationScreen() {
   }, [searchText]);
 
   return (
+    <DesktopTypographyProvider mode="scroll">
     <ScrollView
       style={[styles.container, { backgroundColor: colors.background }]}
-      contentContainerStyle={{
-        paddingTop: topContentInset,
-        paddingBottom: insets.bottom + 24,
-      }}
+      contentContainerStyle={[
+        {
+          paddingTop: topContentInset,
+          paddingBottom: insets.bottom + 24,
+        },
+        isDesktopWeb && styles.desktopContentWrap,
+        isDesktopWeb && { maxWidth: desktopContentMaxWidth },
+      ]}
     >
       <BackButton
         label="Back to Home"
@@ -104,7 +116,7 @@ export default function PronunciationScreen() {
           <TouchableOpacity style={styles.clearButton} onPress={() => setSearchText('')}>
             <MaterialIcons
               name="close"
-              size={20}
+              size={Math.round(20 * desktopScale)}
               color={isDarkMode ? colors.primary : '#134975'}
             />
           </TouchableOpacity>
@@ -145,7 +157,7 @@ export default function PronunciationScreen() {
                 activeOpacity={0.86}
               >
                 <View style={[styles.lessonIcon, { backgroundColor: category.color }]}>
-                  <MaterialIcons name="record-voice-over" size={23} color="#ffffff" />
+                  <MaterialIcons name="record-voice-over" size={Math.round(23 * desktopScale)} color="#ffffff" />
                 </View>
                 <Text style={[styles.lessonTitle, { color: colors.text }]}>
                   {lesson.title}
@@ -154,7 +166,7 @@ export default function PronunciationScreen() {
                   {lesson.goal}
                 </Text>
                 <View style={styles.lessonFooter}>
-                  <MaterialIcons name="volume-up" size={18} color={category.color} />
+                  <MaterialIcons name="volume-up" size={Math.round(18 * desktopScale)} color={category.color} />
                   <Text style={[styles.lessonMeta, { color: category.color }]}>
                     Phrases + sounds
                   </Text>
@@ -165,11 +177,13 @@ export default function PronunciationScreen() {
         </View>
       ))}
     </ScrollView>
+    </DesktopTypographyProvider>
   );
 }
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
+  desktopContentWrap: { width: '100%', alignSelf: 'center' },
   header: { paddingHorizontal: 16, paddingBottom: 8 },
   headerTitle: { fontSize: 32, fontWeight: 'bold' },
   headerSubtitle: { fontSize: 16, lineHeight: 22, marginTop: 6 },

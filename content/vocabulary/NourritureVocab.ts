@@ -2,15 +2,15 @@ const NourritureVocab = {
   id: '45',
   title: 'Food Basics',
   description: 'Learn basic food vocabulary: vegetables, fruits, desserts, drinks, meat, and other food',
-  imageUrl: 'https://i.ibb.co/997QBBww/food-1.webp',
+  imageUrl: 'https://wretggbpaejzjdilemit.supabase.co/storage/v1/object/public/lesson-images/15274719ab/food-basics.webp',
   thumbnail: require('../../assets/thumbnails/food-basics-thumbnail.png'),
   categoryPickerTitle: 'Choose a food basics category',
   categoryPickerLabel: 'Food category',
   categoryPickerAllLabel: 'All food basics',
   flashcards: [
     {
-      category: 'Vegetables',
-      imageUrl: 'https://i.ibb.co/997QBBww/food-1.webp',
+      category: 'Vegetables 🥦',
+      imageUrl: 'https://wretggbpaejzjdilemit.supabase.co/storage/v1/object/public/lesson-images/15274719ab/food-basics.webp',
       words: [
         { english: 'Cucumber', french: 'Concombre' },
         { english: 'Corn', french: 'Maïs' },
@@ -25,8 +25,8 @@ const NourritureVocab = {
       ],
     },
     {
-      category: 'Fruits',
-      imageUrl: 'https://i.ibb.co/997QBBww/food-1.webp',
+      category: 'Fruits 🍎',
+      imageUrl: 'https://wretggbpaejzjdilemit.supabase.co/storage/v1/object/public/lesson-images/15274719ab/food-basics.webp',
       words: [
         { english: 'Apple', french: 'Pomme' },
         { english: 'Pear', french: 'Poire' },
@@ -43,8 +43,8 @@ const NourritureVocab = {
       ],
     },
     {
-      category: 'Desserts',
-      imageUrl: 'https://i.ibb.co/997QBBww/food-1.webp',
+      category: 'Desserts 🍰',
+      imageUrl: 'https://wretggbpaejzjdilemit.supabase.co/storage/v1/object/public/lesson-images/15274719ab/food-basics.webp',
       words: [
         { english: 'Yogurt', french: 'Yaourt' },
         { english: 'Cake', french: 'Gâteau' },
@@ -55,8 +55,8 @@ const NourritureVocab = {
       ],
     },
     {
-      category: 'Drinks',
-      imageUrl: 'https://i.ibb.co/997QBBww/food-1.webp',
+      category: 'Drinks 🥤',
+      imageUrl: 'https://wretggbpaejzjdilemit.supabase.co/storage/v1/object/public/lesson-images/15274719ab/food-basics.webp',
       words: [
         { english: 'Water', french: 'Eau' },
         { english: 'Fruit juice', french: 'Jus de fruit' },
@@ -67,8 +67,8 @@ const NourritureVocab = {
       ],
     },
     {
-      category: 'Other',
-      imageUrl: 'https://i.ibb.co/997QBBww/food-1.webp',
+      category: 'Other 🍽️',
+      imageUrl: 'https://wretggbpaejzjdilemit.supabase.co/storage/v1/object/public/lesson-images/15274719ab/food-basics.webp',
       words: [
         { english: 'Bread', french: 'Pain' },
         { english: 'Cheese', french: 'Fromage' },

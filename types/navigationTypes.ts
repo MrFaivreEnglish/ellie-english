@@ -2,18 +2,18 @@ import type { NavigatorScreenParams } from '@react-navigation/native';
 import type { ImageSourcePropType } from 'react-native';
 import type { GrammarLesson, VocabularyLesson } from './lessonTypes';
 
-// ─── Root Stack ───────────────────────────────────────────────────────────────
+
 
 export type RootStackParamList = {
   Splash: undefined;
   Home: undefined;
-  Account: undefined;
+  Account: { openAvatarPicker?: boolean } | undefined;
   FullImageModal: { source?: ImageSourcePropType; uri?: string };
   MainTabs: NavigatorScreenParams<TabParamList> | undefined;
   AdminLessonPreview: undefined;
 };
 
-// ─── Main Tabs ────────────────────────────────────────────────────────────────
+
 
 export type TabParamList = {
   Grammar: { lesson?: GrammarLesson; backLabel?: string; backTarget?: string; openKey?: number } | undefined;
@@ -22,7 +22,7 @@ export type TabParamList = {
   Settings: undefined;
 };
 
-// ─── Vocabulary Stack ─────────────────────────────────────────────────────────
+
 
 export type VocabularyStackParamList = {
   VocabularyList: undefined;
@@ -35,7 +35,7 @@ export type VocabularyStackParamList = {
   VocabRush: undefined;
 };
 
-// ─── Global merge — gives useNavigation() a typed root ───────────────────────
+
 
 declare global {
   namespace ReactNavigation {

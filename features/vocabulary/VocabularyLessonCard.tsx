@@ -1,14 +1,17 @@
 import React, { useCallback, useMemo } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Image } from 'react-native';
+import { Platform, View, StyleSheet, TouchableOpacity } from 'react-native';
 import type { ImageSourcePropType } from 'react-native';
+import { Image } from 'expo-image';
 import Animated, { FadeInDown } from 'react-native-reanimated';
-import { MaterialIcons } from '@expo/vector-icons';
+import Text from '../shared/ThemedText';
+import MaterialIcons from '../shared/ThemedMaterialIcon';
 import type { ThemeColors } from '../settings/ThemeContext';
 import { getPanelStyle } from '../shared/uiPrimitives';
 import { useSpringPress } from '../shared/useSpringPress';
-import { useSelectPop } from '../shared/useSelectPop';
 import type { VocabularyLesson, VocabGroup } from '../../types/lessonTypes';
 import type { getMenuCopy } from '../shared/menuCopy';
+import { getVocabularySelectionCardHeight } from './vocabularySelectionCardLayout';
+import { useDesktopTypographyScale } from '../shared/DesktopTypography';
 
 const STAR = '★';
 
@@ -69,6 +72,7 @@ const VocabularyLessonCard = React.memo(({
   const wordCount = getLessonWordCount(lesson);
   const isTile = cardView === 'tile';
   const isCompactTile = isTile && compactTile;
+  const desktopScale = useDesktopTypographyScale();
 
   const handlePress = useCallback(() => {
     if (selectionMode) {
@@ -82,14 +86,13 @@ const VocabularyLessonCard = React.memo(({
     onImageError(lessonImageKey);
   }, [lessonImageKey, onImageError]);
   const cardPress = useSpringPress();
-  const selectPopStyle = useSelectPop(selected);
 
   return (
     <Animated.View
       entering={FadeInDown.delay(Math.min(rowIndex, 10) * 40).duration(300)}
       style={isTile ? [styles.lessonTileWrap, isCompactTile && styles.lessonTileWrapCompact] : undefined}
     >
-      <Animated.View style={[cardPress.animatedStyle, selectPopStyle]}>
+      <Animated.View style={cardPress.animatedStyle}>
         <TouchableOpacity
           style={[
             styles.lessonCard,
@@ -98,6 +101,18 @@ const VocabularyLessonCard = React.memo(({
             isTile ? styles.lessonCardTile : styles.lessonCardList,
             isCompactTile && styles.lessonCardTileCompact,
             selectionMode && (isTile ? styles.lessonCardTileSelectionMode : styles.lessonCardSelectionMode),
+            selectionMode && {
+              height: Math.round(getVocabularySelectionCardHeight(cardView, compactTile, colors.visualStyle) * desktopScale),
+            },
+            desktopScale > 1 && {
+              borderRadius: Math.round(16 * desktopScale),
+              marginBottom: Math.round(10 * desktopScale),
+              padding: Math.round(10 * desktopScale),
+              paddingRight: Math.round((selectionMode && !isTile ? 46 : 10) * desktopScale),
+              minHeight: Math.round((isTile ? (isCompactTile ? 136 : 148) : 82) * desktopScale),
+              paddingTop: Math.round((selectionMode && isTile ? 20 : isTile ? (isCompactTile ? 8 : 10) : 10) * desktopScale),
+              paddingBottom: Math.round((isTile ? (isCompactTile ? 9 : 10) : 10) * desktopScale),
+            },
             {
               backgroundColor: selected ? colors.primarySoft : colors.card,
               borderColor: selected ? colors.primary : colors.border,
@@ -119,6 +134,12 @@ const VocabularyLessonCard = React.memo(({
           style={[
             styles.lessonSelectBadge,
             isTile && styles.lessonSelectBadgeTile,
+            desktopScale > 1 && {
+              height: Math.round(28 * desktopScale),
+              width: Math.round(28 * desktopScale),
+              right: Math.round(10 * desktopScale),
+              top: Math.round(10 * desktopScale),
+            },
             {
               backgroundColor: selected ? colors.buttonBackground : colors.card,
               borderColor: selected ? colors.buttonBackground : colors.borderStrong,
@@ -127,7 +148,7 @@ const VocabularyLessonCard = React.memo(({
         >
           <MaterialIcons
             name={selected ? 'check' : 'add'}
-            size={15}
+            size={Math.round(15 * desktopScale)}
             color={selected ? colors.buttonText : colors.primary}
           />
         </View>
@@ -150,20 +171,32 @@ const VocabularyLessonCard = React.memo(({
           styles.lessonImageFrame,
           isTile && styles.lessonImageFrameTile,
           isCompactTile && styles.lessonImageFrameTileCompact,
+          desktopScale > 1 && {
+            width: Math.round((isTile ? (isCompactTile ? 76 : 90) : 68) * desktopScale),
+            height: Math.round((isTile ? (isCompactTile ? 76 : 90) : 68) * desktopScale),
+            marginRight: isTile ? 0 : Math.round(9 * desktopScale),
+            marginBottom: isTile ? Math.round((isCompactTile ? 9 : 12) * desktopScale) : 0,
+            borderRadius: Math.round((isTile ? (isCompactTile ? 9 : 10) : 8) * desktopScale),
+          },
           { backgroundColor: 'transparent', borderColor: 'transparent' },
           imageFailed && [styles.lessonImageFallback, { borderColor: colors.border }],
         ]}
       >
         {imageFailed ? (
-          <View style={[styles.lessonImagePlaceholder, { backgroundColor: isDarkMode ? colors.surfaceAlt : '#EEF4FB' }]}>
+          <View style={[styles.lessonImagePlaceholder, { backgroundColor: colors.surfaceAlt }]}>
             <Text style={styles.lessonImagePlaceholderEmoji}>{categoryEmoji}</Text>
           </View>
         ) : (
           <Image
             source={imageSource}
             style={styles.lessonImage}
-            resizeMode="cover"
-            fadeDuration={0}
+            contentFit="cover"
+
+
+
+            recyclingKey={lessonImageKey}
+            transition={Platform.OS === 'android' ? 0 : 200}
+            cachePolicy="memory-disk"
             onError={handleImageError}
             accessibilityIgnoresInvertColors
           />
@@ -223,7 +256,7 @@ const styles = StyleSheet.create({
   lessonTileWrapCompact: { width: '46%' },
   lessonCardList: { flexDirection: 'row', alignItems: 'center', minHeight: 82 },
   lessonCardTile: { width: '48%', minHeight: 148, alignItems: 'center', paddingTop: 10, paddingBottom: 10 },
-  lessonCardTileCompact: { minHeight: 136, marginBottom: 16, padding: 8, paddingTop: 8, paddingBottom: 9 },
+  lessonCardTileCompact: { minHeight: 136, marginBottom: 11, padding: 8, paddingTop: 8, paddingBottom: 9 },
   lessonCardSelectionMode: { paddingRight: 46 },
   lessonCardTileSelectionMode: { paddingTop: 20 },
   lessonImageFrame: {

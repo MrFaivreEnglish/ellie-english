@@ -1,9 +1,8 @@
-// New grammar lesson file for "can"
 const CanGrammar = {
   id: '21',
   title: 'Can',
   description: 'Learn how to use the modal verb can.',
-  imageUrl: 'https://i.ibb.co/1fBG5Rhj/Can.png',
+  imageUrl: 'https://wretggbpaejzjdilemit.supabase.co/storage/v1/object/public/lesson-images/15274719ab/can.webp',
   textContent: {
     cards: [
       {

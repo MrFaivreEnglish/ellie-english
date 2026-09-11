@@ -2,7 +2,7 @@ const PresentIngInterrogativeGrammar = {
   id: '24',
   title: 'Présent ING Interrogatif',
   description: 'Learn how to form questions in the present continuous tense',
-  imageUrl: 'https://i.ibb.co/DPPrM4Z3/Pr-sent-ING-Interrogatif.png',
+  imageUrl: 'https://wretggbpaejzjdilemit.supabase.co/storage/v1/object/public/lesson-images/15274719ab/present-ing-interrogatif.webp',
   textContent: {
     cards: [
       {
@@ -149,9 +149,9 @@ const PresentIngInterrogativeGrammar = {
   {
     type: 'translate',
     question: 'Translate into English.',
-    prompt: "Est-ce qu'il fait de plus en plus froid dehors ?",
-    answer: "Is it getting colder outside?",
-    wordBank: ["Is", "it", "getting", "colder", "outside?"]
+    prompt: "Fait-il sombre dehors ?",
+    answer: "Is it getting dark outside?",
+    wordBank: ["Is", "it", "getting", "dark", "outside?"]
   },
   {
     type: 'translate',
@@ -184,9 +184,9 @@ const PresentIngInterrogativeGrammar = {
   {
     type: 'translate',
     question: 'Translate into English.',
-    prompt: "Est-ce que j'utilise le bon modèle ?",
-    answer: "Am I using the right template?",
-    wordBank: ["Am", "I", "using", "the right", "template?"]
+    prompt: "Est-ce que j'utilise le bon livre ?",
+    answer: "Am I using the right book?",
+    wordBank: ["Am", "I", "using", "the right", "book?"]
   },
   {
     type: 'translate',
@@ -211,12 +211,12 @@ const PresentIngInterrogativeGrammar = {
     { question: "___ he ___ late tonight? (work)", answer: "Is he working late tonight?", options: ["Do he working late tonight?", "Is he working late tonight?", "Are he working late tonight?", "Is he work late tonight?"] },
     { question: "___ they ___ a new house? (build)", answer: "Are they building a new house?", options: ["Are they build a new house?", "Do they building a new house?", "Are they building a new house?", "Is they building a new house?"] },
     { question: "___ you ___ the concert? (enjoy)", answer: "Are you enjoying the concert?", options: ["Is you enjoying the concert?", "Are you enjoy the concert?", "Are you enjoying the concert?", "Do you enjoying the concert?"] },
-    { question: "___ it ___ colder outside? (get)", answer: "Is it getting colder outside?", options: ["Is it get colder outside?", "Does it getting colder outside?", "Is it getting colder outside?", "Are it getting colder outside?"] },
+    { question: "___ it ___ dark outside? (get)", answer: "Is it getting dark outside?", options: ["Is it get dark outside?", "Does it getting dark outside?", "Is it getting dark outside?", "Are it getting dark outside?"] },
     { question: "___ she ___ the piano? (practice)", answer: "Is she practicing the piano?", options: ["Is she practice the piano?", "Does she practicing the piano?", "Is she practicing the piano?", "Are she practicing the piano?"] },
     { question: "___ they ___ the meeting? (attend)", answer: "Are they attending the meeting?", options: ["Are they attend the meeting?", "Are they attending the meeting?", "Do they attending the meeting?", "Is they attending the meeting?"] },
     { question: "___ we ___ dinner now? (have)", answer: "Are we having dinner now?", options: ["Are we have dinner now?", "Is we having dinner now?", "Are we having dinner now?", "Do we having dinner now?"] },
     { question: "___ the kids ___ cartoons? (watch)", answer: "Are the kids watching cartoons?", options: ["Do the kids watching cartoons?", "Are the kids watch cartoons?", "Are the kids watching cartoons?", "Is the kids watching cartoons?"] },
-    { question: "___ I ___ the right template? (use)", answer: "Am I using the right template?", options: ["Do I using the right template?", "Am I using the right template?", "Is I using the right template?", "Are I using the right template?"] },
+    { question: "___ I ___ the right book? (use)", answer: "Am I using the right book?", options: ["Do I using the right book?", "Am I using the right book?", "Is I using the right book?", "Are I using the right book?"] },
     { question: "___ your team ___ the match? (win)", answer: "Is your team winning the match?", options: ["Is your team win the match?", "Are your team winning the match?", "Is your team winning the match?", "Does your team winning the match?"] },
     { question: "___ she ___ the bus? (take)", answer: "Is she taking the bus?", options: ["Is she take the bus?", "Does she taking the bus?", "Is she taking the bus?", "Are she taking the bus?"] },
     { question: "___ they ___ a trip? (plan)", answer: "Are they planning a trip?", options: ["Are they plan a trip?", "Do they planning a trip?", "Are they planning a trip?", "Is they planning a trip?"] },
@@ -224,7 +224,7 @@ const PresentIngInterrogativeGrammar = {
     { question: "___ it ___ like rain? (look)", answer: "Is it looking like rain?", options: ["Is it look like rain?", "Does it looking like rain?", "Is it looking like rain?", "Are it looking like rain?"] },
     { question: "___ he ___ already? (sleep)", answer: "Is he sleeping already?", options: ["Is he sleep already?", "Is he sleeping already?", "Does he sleeping already?", "Are he sleeping already?"] },
     { question: "___ they ___ next month? (move)", answer: "Are they moving next month?", options: ["Are they move next month?", "Do they moving next month?", "Are they moving next month?", "Is they moving next month?"] },
-    { question: "___ you ___ better today? (feel)", answer: "Are you feeling better today?", options: ["Do you feeling better today?", "Are you feeling better today?", "Is you feeling better today?", "Are you feel better today?"] }
+    { question: "___ you ___ well today? (feel)", answer: "Are you feeling well today?", options: ["Do you feeling well today?", "Are you feeling well today?", "Is you feeling well today?", "Are you feel well today?"] }
   ]
 };
 

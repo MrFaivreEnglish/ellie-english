@@ -2,7 +2,7 @@ const PresentPerfectGrammar = {
   id: '6',
   title: 'Present Perfect',
   description: 'Learn how to use the present perfect tense',
-  imageUrl: 'https://i.ibb.co/HDSX4Gn7/Present-perfect.png',
+  imageUrl: 'https://wretggbpaejzjdilemit.supabase.co/storage/v1/object/public/lesson-images/15274719ab/present-perfect.webp',
   textContent: {
     cards: [
       {

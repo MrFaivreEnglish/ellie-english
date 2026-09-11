@@ -143,7 +143,13 @@ describe('VocabularyLessonScreen', () => {
 
     await waitFor(() => {
       expect(getByLabelText('Back to lesson')).toBeTruthy();
-      expect(getByLabelText('Switch to Write').props.accessibilityState).toEqual({ selected: true });
+      expect(getByLabelText('Close Write').props.accessibilityState).toEqual({ selected: true });
+    });
+
+    // Let the sheet's open spring finish settling (its onEntered callback
+    // fires on a real timer) before the test tears the component down.
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 300));
     });
   });
 
@@ -159,7 +165,13 @@ describe('VocabularyLessonScreen', () => {
 
     await waitFor(() => {
       expect(getByLabelText('Back to lesson')).toBeTruthy();
-      expect(getByLabelText('Switch to Cards').props.accessibilityState).toEqual({ selected: true });
+      expect(getByLabelText('Close Cards').props.accessibilityState).toEqual({ selected: true });
+    });
+
+    // Let the sheet's open spring finish settling (its onEntered callback
+    // fires on a real timer) before the test tears the component down.
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 300));
     });
   });
 });

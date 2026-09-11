@@ -5,11 +5,15 @@ import { hapticsAreSupported, setHapticsEnabled } from '../shared/haptics';
 import { setSoundEffectsEnabled } from '../shared/soundEffects';
 import {
   saveShinyEllieProgress,
+  SHINY_ELLIE_COLOR_VARIANT_KEY,
   SHINY_ELLIE_MODE_KEY,
+  SHINY_ELLIE_PRESENTATION_MODE_KEY,
   SHINY_ELLIE_UNLOCKED_KEY,
+  type ShinyEllieColorVariant,
 } from '../progress/shinyEllieStorage';
 import { ENABLE_SHINY_ELLIE_COLOR_MODE } from '../../lib/featureFlags';
 import { DESIGN_ACCENTS } from '../shared/uiPrimitives';
+import { APP_LIGHT_COLORWAYS, FRESH_COLORS } from '../shared/freshDirection';
 import {
   ANDROID_STATUS_BAR_ENABLED_KEY,
   GRAMMAR_GAME_MODE_KEY,
@@ -33,11 +37,11 @@ const TEXT_SIZE_LEVEL_KEY = '@text_size_level';
 
 export type TextSizeLevel = 'normal' | 'large' | 'xlarge';
 
-// Multiplier applied to lesson/exercise reading text (grammar text mode,
-// vocabulary word prompts, quiz options) — the one true accessibility lever
-// this app can offer in-app, since RN's OS-level `allowFontScaling` scale is
-// no longer JS-overridable and a full-codebase font-size refactor is out of
-// scope. Consumers do `Math.round(baseFontSize * textScale)`.
+
+
+
+
+
 export const TEXT_SCALE_BY_LEVEL: Record<TextSizeLevel, number> = {
   normal: 1,
   large: 1.15,
@@ -45,14 +49,18 @@ export const TEXT_SCALE_BY_LEVEL: Record<TextSizeLevel, number> = {
 };
 
 export type ThemeColors = {
+  visualStyle: 'normal' | 'pixel';
   background: string;
   card: string;
   surface: string;
   surfaceAlt: string;
+  exerciseSurface: string;
   text: string;
   secondaryText: string;
   border: string;
   borderStrong: string;
+  shadow: string;
+  progressTrack: string;
   primary: string;
   primarySoft: string;
   success: string;
@@ -108,22 +116,36 @@ isTypingStrictMode: boolean;
   updateAndroidStatusBar: (value: boolean) => void;
   isShinyEllieUnlocked: boolean;
   isShinyEllieMode: boolean;
+  isShinyElliePresentationMode: boolean;
+  shinyEllieColorVariant: ShinyEllieColorVariant;
+  isWarmColorVariant: boolean;
   unlockShinyEllie: () => void;
   toggleShinyEllieMode: () => void;
   updateShinyEllieMode: (value: boolean) => void;
-  updateShinyEllieProgress: (unlocked: boolean, mode: boolean) => void;
+  updateShinyElliePresentationMode: (value: boolean) => void;
+  updateShinyEllieColorVariant: (value: ShinyEllieColorVariant) => void;
+  updateShinyEllieProgress: (
+    unlocked: boolean,
+    mode: boolean,
+    colorVariant?: ShinyEllieColorVariant,
+    presentationMode?: boolean
+  ) => void;
   applyAccountPreferences: (snapshot: AccountPreferenceSnapshot) => void;
 };
 
 const lightColors: ThemeColors = {
-  background: '#F7F4EE',
-  card: '#FDFCFA',
-  surface: '#F4F1EA',
-  surfaceAlt: '#EFF6FF',
-  text: '#243041',
-  secondaryText: '#607089',
-  border: '#E7E1D6',
+  visualStyle: 'normal',
+  background: FRESH_COLORS.pageBackground,
+  card: FRESH_COLORS.cardSurface,
+  surface: APP_LIGHT_COLORWAYS.standard.surface,
+  surfaceAlt: FRESH_COLORS.surfaceAlt,
+  exerciseSurface: APP_LIGHT_COLORWAYS.standard.exerciseSurface,
+  text: FRESH_COLORS.inkPrimary,
+  secondaryText: FRESH_COLORS.inkSecondary,
+  border: FRESH_COLORS.hairline,
   borderStrong: DESIGN_ACCENTS.blue.shadow,
+  shadow: FRESH_COLORS.whiteCardShadow,
+  progressTrack: FRESH_COLORS.progressTodo,
   primary: DESIGN_ACCENTS.blue.solid,
   primarySoft: DESIGN_ACCENTS.blue.soft,
   success: DESIGN_ACCENTS.teal.solid,
@@ -138,15 +160,32 @@ const lightColors: ThemeColors = {
   buttonText: '#ffffff',
 };
 
+const shinyEllieLightColors: ThemeColors = {
+  ...lightColors,
+  background: APP_LIGHT_COLORWAYS.shinyEllie.background,
+  surface: APP_LIGHT_COLORWAYS.shinyEllie.surface,
+  surfaceAlt: APP_LIGHT_COLORWAYS.shinyEllie.surfaceAlt,
+  exerciseSurface: APP_LIGHT_COLORWAYS.shinyEllie.exerciseSurface,
+  text: APP_LIGHT_COLORWAYS.shinyEllie.text,
+  secondaryText: APP_LIGHT_COLORWAYS.shinyEllie.secondaryText,
+  border: APP_LIGHT_COLORWAYS.shinyEllie.border,
+  shadow: APP_LIGHT_COLORWAYS.shinyEllie.cardShadow,
+  progressTrack: APP_LIGHT_COLORWAYS.shinyEllie.progressTrack,
+};
+
 const darkColors: ThemeColors = {
+  visualStyle: 'normal',
   background: '#070F1C',
   card: '#0D1A28',
   surface: '#162436',
   surfaceAlt: '#1E3450',
+  exerciseSurface: '#0A1526',
   text: '#F7FAFF',
   secondaryText: '#C8D5EA',
   border: '#334D68',
   borderStrong: '#7BAAFB',
+  shadow: '#08131F',
+  progressTrack: '#16233A',
   primary: '#7BAAFB',
   primarySoft: DESIGN_ACCENTS.blue.softDark,
   success: '#4FD9C4',
@@ -159,6 +198,21 @@ const darkColors: ThemeColors = {
   warningSoft: DESIGN_ACCENTS.amber.softDark,
   buttonBackground: '#5AA8F5',
   buttonText: '#FFFFFF',
+};
+
+const warmDarkColors: ThemeColors = {
+  ...darkColors,
+  background: '#1A130D',
+  card: '#241A12',
+  surface: '#302318',
+  surfaceAlt: '#3B2B1E',
+  exerciseSurface: '#17100B',
+  text: '#FFF7EC',
+  secondaryText: '#D9C8B2',
+  border: '#5A4633',
+  borderStrong: '#E3A94E',
+  shadow: '#080503',
+  progressTrack: '#3B2C20',
 };
 
 export const ThemeContext = createContext<ThemeContextType>({
@@ -197,14 +251,19 @@ isTypingStrictMode: false,
   isTodayCardEnabled: false,
   toggleTodayCard: () => {},
   updateTodayCard: () => {},
-  isAndroidStatusBarEnabled: false,
+  isAndroidStatusBarEnabled: true,
   toggleAndroidStatusBar: () => {},
   updateAndroidStatusBar: () => {},
   isShinyEllieUnlocked: false,
   isShinyEllieMode: false,
+  isShinyElliePresentationMode: false,
+  shinyEllieColorVariant: 'cool',
+  isWarmColorVariant: false,
   unlockShinyEllie: () => {},
   toggleShinyEllieMode: () => {},
   updateShinyEllieMode: () => {},
+  updateShinyElliePresentationMode: () => {},
+  updateShinyEllieColorVariant: () => {},
   updateShinyEllieProgress: () => {},
   applyAccountPreferences: () => {},
 });
@@ -212,9 +271,9 @@ isTypingStrictMode: false,
 export const ThemeProvider = ({ children }: { children: React.ReactNode }) => {
   const systemColorScheme = useColorScheme();
   const [isDarkMode, setIsDarkMode] = useState(() => Appearance.getColorScheme() === 'dark');
-  // Whether the user (or a synced account) has ever made an explicit choice.
-  // Until then, `isDarkMode` tracks the OS setting live; once set, the
-  // explicit choice always wins over the OS value (§2b).
+
+
+
   const [hasExplicitThemeChoice, setHasExplicitThemeChoice] = useState(false);
   const [isThemeLoaded, setIsThemeLoaded] = useState(false);
   const [textSizeLevel, setTextSizeLevel] = useState<TextSizeLevel>('normal');
@@ -228,11 +287,13 @@ const [isTypingStrictMode, setIsTypingStrictMode] = useState(false);
   const [isHapticsEnabled, setIsHapticsEnabled] = useState(hapticsAreSupported);
   const [isSoundEffectsEnabled, setIsSoundEffectsEnabled] = useState(true);
   const [isTodayCardEnabled, setIsTodayCardEnabled] = useState(false);
-  const [isAndroidStatusBarEnabled, setIsAndroidStatusBarEnabled] = useState(false);
+  const [isAndroidStatusBarEnabled, setIsAndroidStatusBarEnabled] = useState(true);
   const [isShinyEllieUnlocked, setIsShinyEllieUnlocked] = useState(false);
   const [isShinyEllieMode, setIsShinyEllieMode] = useState(false);
+  const [isShinyElliePresentationMode, setIsShinyElliePresentationMode] = useState(false);
+  const [shinyEllieColorVariant, setShinyEllieColorVariant] = useState<ShinyEllieColorVariant>('cool');
 
-  // Load saved preferences
+
   useEffect(() => {
     const loadPreferences = async () => {
       try {
@@ -252,6 +313,8 @@ const [isTypingStrictMode, setIsTypingStrictMode] = useState(false);
           savedAndroidStatusBarEnabled,
           savedShinyEllieUnlocked,
           savedShinyEllieMode,
+          savedShinyEllieColorVariant,
+          savedShinyElliePresentationMode,
           savedGrammarSpeech,
           savedTextSizeLevel,
         ] = await Promise.all([
@@ -270,10 +333,12 @@ const [isTypingStrictMode, setIsTypingStrictMode] = useState(false);
           AsyncStorage.getItem(ANDROID_STATUS_BAR_ENABLED_KEY),
           AsyncStorage.getItem(SHINY_ELLIE_UNLOCKED_KEY),
           AsyncStorage.getItem(SHINY_ELLIE_MODE_KEY),
+          AsyncStorage.getItem(SHINY_ELLIE_COLOR_VARIANT_KEY),
+          AsyncStorage.getItem(SHINY_ELLIE_PRESENTATION_MODE_KEY),
           AsyncStorage.getItem(GRAMMAR_SPEECH_ENABLED_KEY),
           AsyncStorage.getItem(TEXT_SIZE_LEVEL_KEY),
         ]);
-        
+
         if (savedTheme !== null) {
           setIsDarkMode(savedTheme === 'dark');
           setHasExplicitThemeChoice(true);
@@ -290,7 +355,7 @@ const [isTypingStrictMode, setIsTypingStrictMode] = useState(false);
         if (savedGrammarSpeech !== null) {
           setIsGrammarSpeechEnabled(savedGrammarSpeech === 'true');
         }
-        
+
         if (savedVocabMode !== null) {
           setIsVocabTimerMode(savedVocabMode === 'true');
         }
@@ -348,41 +413,57 @@ const [isTypingStrictMode, setIsTypingStrictMode] = useState(false);
           setIsAndroidStatusBarEnabled(savedAndroidStatusBarEnabled === 'true');
         }
 
-        if (savedShinyEllieUnlocked !== null) {
-          setIsShinyEllieUnlocked(savedShinyEllieUnlocked === 'true');
+        const shinyEllieUnlocked = savedShinyEllieUnlocked === 'true';
+        const shinyEllieMode = ENABLE_SHINY_ELLIE_COLOR_MODE
+          && shinyEllieUnlocked
+          && (savedShinyEllieMode === null || savedShinyEllieMode === 'true');
+        const nextShinyEllieColorVariant: ShinyEllieColorVariant =
+          shinyEllieUnlocked && savedShinyEllieColorVariant !== 'cool' ? 'warm' : 'cool';
+        const shinyElliePresentationMode = shinyEllieUnlocked
+          && (savedShinyElliePresentationMode === null || savedShinyElliePresentationMode === 'true');
+        setIsShinyEllieUnlocked(shinyEllieUnlocked);
+        setIsShinyEllieMode(shinyEllieMode);
+        setIsShinyElliePresentationMode(shinyElliePresentationMode);
+        setShinyEllieColorVariant(nextShinyEllieColorVariant);
+
+        const serializedShinyEllieMode = shinyEllieMode ? 'true' : 'false';
+        if (savedShinyEllieMode !== serializedShinyEllieMode) {
+          AsyncStorage.setItem(SHINY_ELLIE_MODE_KEY, serializedShinyEllieMode).catch((error) => {
+            console.error('Failed to save the default Shiny Ellie mode preference:', error);
+          });
+        }
+        if (savedShinyEllieColorVariant !== nextShinyEllieColorVariant) {
+          AsyncStorage.setItem(SHINY_ELLIE_COLOR_VARIANT_KEY, nextShinyEllieColorVariant).catch((error) => {
+            console.error('Failed to save the default Shiny Ellie color preference:', error);
+          });
+        }
+        const serializedShinyElliePresentationMode = shinyElliePresentationMode ? 'true' : 'false';
+        if (savedShinyElliePresentationMode !== serializedShinyElliePresentationMode) {
+          AsyncStorage.setItem(SHINY_ELLIE_PRESENTATION_MODE_KEY, serializedShinyElliePresentationMode).catch((error) => {
+            console.error('Failed to save the default Shiny Ellie presentation preference:', error);
+          });
         }
 
-        if (ENABLE_SHINY_ELLIE_COLOR_MODE && savedShinyEllieMode !== null) {
-          setIsShinyEllieMode(savedShinyEllieMode === 'true');
-        } else {
-          setIsShinyEllieMode(false);
-          if (savedShinyEllieMode !== 'false') {
-            AsyncStorage.setItem(SHINY_ELLIE_MODE_KEY, 'false').catch((error) => {
-              console.error('Failed to reset Shiny Ellie mode preference:', error);
-            });
-          }
-        }
-        
         setIsThemeLoaded(true);
       } catch (error) {
         console.error('Failed to load preferences:', error);
         setIsThemeLoaded(true);
       }
     };
-    
+
     loadPreferences();
   }, []);
 
-  // Follow the OS theme live as long as the user hasn't made an explicit
-  // in-app choice — an explicit choice (toggle, or a synced account
-  // preference) always wins over the OS value from then on (§2b).
+
+
+
   useEffect(() => {
     if (hasExplicitThemeChoice) return;
     if (systemColorScheme == null) return;
     setIsDarkMode(systemColorScheme === 'dark');
   }, [systemColorScheme, hasExplicitThemeChoice]);
 
-  // === Helpers ===
+
   const syncAccountPreferences = () => {
     void syncAccountPreferencesToCloudIfSignedIn();
   };
@@ -417,7 +498,7 @@ const [isTypingStrictMode, setIsTypingStrictMode] = useState(false);
     }
   };
 
-  // === Memoised toggle handlers ===
+
   const updateTextSizeLevel = useCallback((level: TextSizeLevel) => {
     setTextSizeLevel(level);
     persistStringPreference(TEXT_SIZE_LEVEL_KEY, level);
@@ -427,7 +508,7 @@ const [isTypingStrictMode, setIsTypingStrictMode] = useState(false);
     setHasExplicitThemeChoice(true);
     setIsDarkMode(prev => {
       const next = !prev;
-      // Persist asynchronously; no need to await for UI updates.
+
       persistStringPreference(THEME_STORAGE_KEY, next ? 'dark' : 'light');
       return next;
     });
@@ -576,13 +657,15 @@ const [isTypingStrictMode, setIsTypingStrictMode] = useState(false);
     const nextMode = ENABLE_SHINY_ELLIE_COLOR_MODE;
     setIsShinyEllieUnlocked(true);
     setIsShinyEllieMode(nextMode);
-    saveShinyEllieProgress({ unlocked: true, mode: nextMode }).catch((error) => {
+    setIsShinyElliePresentationMode(true);
+    setShinyEllieColorVariant('warm');
+    saveShinyEllieProgress({ unlocked: true, mode: nextMode, colorVariant: 'warm', presentationMode: true }).catch((error) => {
       console.error('Failed to save Shiny Ellie progress:', error);
     }).then(syncAccountPreferences);
   }, []);
 
   const toggleShinyEllieMode = useCallback(() => {
-    if (!ENABLE_SHINY_ELLIE_COLOR_MODE) {
+    if (!ENABLE_SHINY_ELLIE_COLOR_MODE || !isShinyEllieUnlocked) {
       setIsShinyEllieMode(false);
       persistBoolean(SHINY_ELLIE_MODE_KEY, false);
       return;
@@ -590,26 +673,76 @@ const [isTypingStrictMode, setIsTypingStrictMode] = useState(false);
 
     setIsShinyEllieMode(prev => {
       const next = !prev;
-      saveShinyEllieProgress({ unlocked: isShinyEllieUnlocked, mode: next }).catch((error) => {
+      saveShinyEllieProgress({
+        unlocked: isShinyEllieUnlocked,
+        mode: next,
+        colorVariant: shinyEllieColorVariant,
+        presentationMode: isShinyElliePresentationMode,
+      }).catch((error) => {
         console.error('Failed to save Shiny Ellie mode:', error);
       }).then(syncAccountPreferences);
       return next;
     });
-  }, [isShinyEllieUnlocked]);
+  }, [isShinyElliePresentationMode, isShinyEllieUnlocked, shinyEllieColorVariant]);
 
   const updateShinyEllieMode = useCallback((value: boolean) => {
-    const next = ENABLE_SHINY_ELLIE_COLOR_MODE ? value : false;
+    const next = ENABLE_SHINY_ELLIE_COLOR_MODE && isShinyEllieUnlocked ? value : false;
     setIsShinyEllieMode(next);
-    saveShinyEllieProgress({ unlocked: isShinyEllieUnlocked, mode: next }).catch((error) => {
+    saveShinyEllieProgress({
+      unlocked: isShinyEllieUnlocked,
+      mode: next,
+      colorVariant: shinyEllieColorVariant,
+      presentationMode: isShinyElliePresentationMode,
+    }).catch((error) => {
       console.error('Failed to save Shiny Ellie mode:', error);
     }).then(syncAccountPreferences);
-  }, [isShinyEllieUnlocked]);
+  }, [isShinyElliePresentationMode, isShinyEllieUnlocked, shinyEllieColorVariant]);
 
-  const updateShinyEllieProgress = useCallback((unlocked: boolean, mode: boolean) => {
+  const updateShinyElliePresentationMode = useCallback((value: boolean) => {
+    const next = isShinyEllieUnlocked ? value : false;
+    setIsShinyElliePresentationMode(next);
+    saveShinyEllieProgress({
+      unlocked: isShinyEllieUnlocked,
+      mode: isShinyEllieMode,
+      colorVariant: shinyEllieColorVariant,
+      presentationMode: next,
+    }).catch((error) => {
+      console.error('Failed to save Shiny Ellie presentation mode:', error);
+    }).then(syncAccountPreferences);
+  }, [isShinyEllieMode, isShinyEllieUnlocked, shinyEllieColorVariant]);
+
+  const updateShinyEllieColorVariant = useCallback((value: ShinyEllieColorVariant) => {
+    const next = isShinyEllieUnlocked ? value : 'cool';
+    setShinyEllieColorVariant(next);
+    saveShinyEllieProgress({
+      unlocked: isShinyEllieUnlocked,
+      mode: isShinyEllieMode,
+      colorVariant: next,
+      presentationMode: isShinyElliePresentationMode,
+    }).catch((error) => {
+      console.error('Failed to save Shiny Ellie color variant:', error);
+    }).then(syncAccountPreferences);
+  }, [isShinyEllieMode, isShinyElliePresentationMode, isShinyEllieUnlocked]);
+
+  const updateShinyEllieProgress = useCallback((
+    unlocked: boolean,
+    mode: boolean,
+    colorVariant: ShinyEllieColorVariant = 'warm',
+    presentationMode: boolean = true
+  ) => {
     const nextMode = unlocked && ENABLE_SHINY_ELLIE_COLOR_MODE ? mode : false;
+    const nextColorVariant = unlocked ? colorVariant : 'cool';
+    const nextPresentationMode = unlocked ? presentationMode : false;
     setIsShinyEllieUnlocked(unlocked);
     setIsShinyEllieMode(nextMode);
-    saveShinyEllieProgress({ unlocked, mode: nextMode }, { syncCloud: false }).catch((error) => {
+    setIsShinyElliePresentationMode(nextPresentationMode);
+    setShinyEllieColorVariant(nextColorVariant);
+    saveShinyEllieProgress({
+      unlocked,
+      mode: nextMode,
+      colorVariant: nextColorVariant,
+      presentationMode: nextPresentationMode,
+    }, { syncCloud: false }).catch((error) => {
       console.error('Failed to apply Shiny Ellie progress:', error);
     });
   }, []);
@@ -640,33 +773,44 @@ const [isTypingStrictMode, setIsTypingStrictMode] = useState(false);
     setSoundEffectsEnabled(snapshot.soundEffectsEnabled);
     setIsTodayCardEnabled(snapshot.todayCardOptIn && snapshot.todayCardEnabled);
     setIsAndroidStatusBarEnabled(snapshot.androidStatusBarEnabled);
-    setIsShinyEllieMode(ENABLE_SHINY_ELLIE_COLOR_MODE && snapshot.shinyEllieMode);
+
+
   }, []);
 
-  const colors = useMemo(() => isDarkMode ? darkColors : lightColors, [isDarkMode]);
+  const isWarmColorVariant = isShinyEllieUnlocked && shinyEllieColorVariant === 'warm';
+  const colors = useMemo(() => {
+    const palette = isDarkMode
+      ? (isWarmColorVariant ? warmDarkColors : darkColors)
+      : (isWarmColorVariant ? shinyEllieLightColors : lightColors);
+
+    return {
+      ...palette,
+      visualStyle: isShinyEllieMode ? 'pixel' as const : 'normal' as const,
+    };
+  }, [isDarkMode, isShinyEllieMode, isWarmColorVariant]);
   const textScale = useMemo(() => TEXT_SCALE_BY_LEVEL[textSizeLevel], [textSizeLevel]);
 
-  // Elegantly sync the browser page background colour on web
+
   const usePageBackgroundColor = (bgColor: string) => {
     useEffect(() => {
       if (Platform.OS !== 'web') return;
       const doc = (globalThis as any).document as Document | undefined;
       if (!doc) return;
-      
+
       doc.documentElement.style.backgroundColor = bgColor;
       doc.body.style.backgroundColor = bgColor;
     }, [bgColor]);
   };
 
-  // Apply the hook
+
   usePageBackgroundColor(colors.background);
 
-  // Show nothing until theme is loaded to prevent flash
+
   if (!isThemeLoaded) {
     return null;
   }
 
-  return (    <ThemeContext.Provider value={{ 
+  return (    <ThemeContext.Provider value={{
       isDarkMode,
       colors,
       toggleTheme,
@@ -707,9 +851,14 @@ const [isTypingStrictMode, setIsTypingStrictMode] = useState(false);
       updateAndroidStatusBar,
       isShinyEllieUnlocked,
       isShinyEllieMode,
+      isShinyElliePresentationMode,
+      shinyEllieColorVariant,
+      isWarmColorVariant,
       unlockShinyEllie,
       toggleShinyEllieMode,
       updateShinyEllieMode,
+      updateShinyElliePresentationMode,
+      updateShinyEllieColorVariant,
       updateShinyEllieProgress,
       applyAccountPreferences
     }}>

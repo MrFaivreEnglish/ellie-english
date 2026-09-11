@@ -2,7 +2,7 @@ const ColoursVocab = {
   id: '47',
   title: 'Colours',
   description: 'Key colour words in English with French translations',
-  imageUrl: 'https://i.ibb.co/spNCbRvC/Colours.webp',
+  imageUrl: 'https://wretggbpaejzjdilemit.supabase.co/storage/v1/object/public/lesson-images/15274719ab/colours.webp',
   thumbnail: require('../../assets/thumbnails/colours-thumbnail.png'),
   flashcards: [
     {

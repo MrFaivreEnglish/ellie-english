@@ -2,16 +2,20 @@ import React from 'react';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import Animated, { useAnimatedStyle, useSharedValue, withSequence, withSpring } from 'react-native-reanimated';
 import { NavigationContainer, DefaultTheme as NavDefaultTheme, DarkTheme as NavDarkTheme } from '@react-navigation/native';
-import { BackHandler, View, Image, Platform, Text, useWindowDimensions } from 'react-native';
+import { BackHandler, View, Image, Platform, useWindowDimensions, type ImageSourcePropType } from 'react-native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import 'react-native-gesture-handler';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import SplashScreen from './features/system/SplashScreen';
+import UpdateBanner from './features/system/UpdateBanner';
 import { StyleSheet } from 'react-native';
 import { SafeAreaProvider, useSafeAreaInsets } from "react-native-safe-area-context";
 import { Toaster } from 'sonner-native';
-import { MaterialIcons } from '@expo/vector-icons';
+import { useFonts } from 'expo-font';
+import { PressStart2P_400Regular } from '@expo-google-fonts/press-start-2p';
 import { ThemeProvider, useTheme } from './features/settings/ThemeContext';
+import Text from './features/shared/ThemedText';
+import MaterialIcons from './features/shared/ThemedMaterialIcon';
 import { AccountProvider } from './features/account/AccountContext';
 import HomeScreen from "./features/home/HomeScreen";
 import GrammarScreen from "./features/grammar/GrammarScreen";
@@ -24,25 +28,25 @@ import AccountScreen from "./features/account/AccountScreen";
 import AdminLessonPreviewScreen from "./features/lessons/AdminLessonPreviewScreen";
 import { Asset } from 'expo-asset';
 import { applyAppChrome, applyImmersiveMode, bindImmersiveOnForeground } from './lib/immersive';
+import { primeSoundEffects } from './features/shared/soundEffects';
 import FullImageScreen from './features/shared/FullImageScreen';
 import ErrorBoundary from './features/shared/ErrorBoundary';
 import { StatusBar } from 'expo-status-bar';
-import { getWebAppContentMaxWidth } from './features/shared/responsiveLayout';
+import { DESKTOP_WEB_MIN_WIDTH, getDesktopTypographyScale, getWebAppContentMaxWidth, LARGE_WIDTH, NARROW_TRAY_WIDTH } from './features/shared/responsiveLayout';
 import { getMenuCopy } from './features/shared/menuCopy';
 import {
-  DEFAULT_SPLASH_BACKGROUND,
+  getSplashBackground,
   HOME_MENU_ROUTE_COLORS,
   SHINY_HOME_MENU_ROUTE_COLORS,
-  SHINY_SPLASH_BACKGROUND,
 } from './features/shared/homeMenuColors';
 import { getAndroidBottomBarButtonStyle, getAndroidBottomBarColor } from './features/shared/appChromeColors';
 import { getApkPreviewContentMaxWidth, isApkLayoutPreviewEnabled } from './features/shared/apkPreview';
 import type { RootStackParamList, TabParamList, VocabularyStackParamList } from './types/navigationTypes';
 
-// Android is edge-to-edge by default now (expo-status-bar no longer exposes
-// `translucent`/`backgroundColor` — the OS always draws app content full-bleed
-// behind the status bar icons). When the user wants an opaque-looking status
-// bar, we paint that area ourselves so scrolled content can't show through it.
+
+
+
+
 function AndroidStatusBarBackdrop({ visible, color }: { visible: boolean; color: string }) {
   const insets = useSafeAreaInsets();
 
@@ -55,7 +59,23 @@ function AndroidStatusBarBackdrop({ visible, color }: { visible: boolean; color:
   );
 }
 
-function TabIcon({ iconName, size, color, focused }: { iconName: React.ComponentProps<typeof MaterialIcons>['name']; size: number; color: string; focused: boolean }) {
+function TabIcon({
+  iconName,
+  imageSource,
+  tintImage = true,
+  imageOpacity = 1,
+  size,
+  color,
+  focused,
+}: {
+  iconName: React.ComponentProps<typeof MaterialIcons>['name'];
+  imageSource?: ImageSourcePropType;
+  tintImage?: boolean;
+  imageOpacity?: number;
+  size: number;
+  color: string;
+  focused: boolean;
+}) {
   const scale = useSharedValue(1);
   const wasFocused = React.useRef(focused);
 
@@ -75,7 +95,20 @@ function TabIcon({ iconName, size, color, focused }: { iconName: React.Component
 
   return (
     <Animated.View style={animatedStyle}>
-      <MaterialIcons name={iconName} size={size} color={color} />
+      {imageSource ? (
+        <Image
+          source={imageSource}
+          style={[
+            { width: size, height: size, opacity: imageOpacity },
+            tintImage && { tintColor: color },
+          ]}
+          resizeMode="contain"
+          fadeDuration={0}
+          accessibilityIgnoresInvertColors
+        />
+      ) : (
+        <MaterialIcons name={iconName} size={size} color={color} />
+      )}
     </Animated.View>
   );
 }
@@ -91,6 +124,10 @@ const tabIcons: Record<string, MaterialIconName> = {
   Lessons: 'menu-book',
   Settings: 'settings',
 };
+const grammarIconSource = require('./assets/navigation/grammar.png');
+const vocabularyIconSource = require('./assets/navigation/vocabulary.png');
+const chaptersIconSource = require('./assets/navigation/chapters.png');
+const settingsIconSource = require('./assets/navigation/settings.png');
 
 function VocabularyLessonBoundaryScreen(props: any) {
   const goBack = React.useCallback(() => {
@@ -143,38 +180,56 @@ function VocabularyStack(): React.JSX.Element {
 }
 
 function MainTabNavigator() {
-  const { isDarkMode, colors, isShinyEllieMode } = useTheme();
+  const { isDarkMode, colors, isShinyElliePresentationMode } = useTheme();
   const copy = getMenuCopy();
   const insets = useSafeAreaInsets();
-  const { width } = useWindowDimensions();
+  const { width, height } = useWindowDimensions();
   const [tabState, setTabState] = React.useState<{ routes: any[]; index: number } | null>(null);
-  const isCompactTabBar = width < 430;
-  const isLargeTabBar = width >= 900;
+  const isCompactTabBar = width < NARROW_TRAY_WIDTH;
+  const isLargeTabBar = width >= LARGE_WIDTH;
   const useApkPreviewLayout = isApkLayoutPreviewEnabled();
   const isAndroidTabBarLayout = Platform.OS === 'android' || useApkPreviewLayout;
   const isWebTabBar = Platform.OS === 'web' && !useApkPreviewLayout;
+  const isMobileWebTabBar = isWebTabBar && width < DESKTOP_WEB_MIN_WIDTH;
+  const isDesktopWebTabBar = isWebTabBar && !isMobileWebTabBar;
+  const desktopChromeScale = isWebTabBar ? getDesktopTypographyScale(width, height, 'fit') : 1;
   const androidSystemNavInset = isAndroidTabBarLayout ? Math.max(insets.bottom, 24) : 0;
-  const tabBarBaseHeight = isWebTabBar ? (isCompactTabBar ? 58 : isLargeTabBar ? 60 : 58) : (isCompactTabBar ? 48 : isLargeTabBar ? 50 : 48);
+  const tabBarBaseHeight = isWebTabBar
+    ? Math.round((isCompactTabBar ? 58 : isLargeTabBar ? 60 : 58) * desktopChromeScale)
+    : (isCompactTabBar ? 48 : isLargeTabBar ? 50 : 48);
   const tabBarHeight = tabBarBaseHeight + androidSystemNavInset;
-  const tabBarIconSize = isCompactTabBar ? 22 : isLargeTabBar ? 23 : 22;
-  const tabBarLabelFontSize = isCompactTabBar ? 11 : isLargeTabBar ? 12 : 11;
-  const tabBarLabelLineHeight = isCompactTabBar ? 13 : isLargeTabBar ? 14 : 13;
+  const tabBarIconSize = isMobileWebTabBar
+    ? 26
+    : Math.round((isCompactTabBar ? 22 : isLargeTabBar ? 23 : 22) * desktopChromeScale);
+  const tabBarLabelFontSize = Math.round((isCompactTabBar ? 11 : isLargeTabBar ? 12 : 11) * desktopChromeScale);
+  const tabBarLabelLineHeight = Math.round((isCompactTabBar ? 13 : isLargeTabBar ? 14 : 13) * desktopChromeScale);
+  const desktopTabIconContainerHeight = Math.round(28 * desktopChromeScale);
+  const desktopTabContentTopOffset = Math.max(
+    0,
+    Math.round((tabBarBaseHeight - desktopTabIconContainerHeight - tabBarLabelLineHeight - 10) / 2)
+  );
   const tabBarStylePaddingBottom = androidSystemNavInset;
-  const tabBarTopBorderWidth = isAndroidTabBarLayout ? 0 : StyleSheet.hairlineWidth;
+  const tabBarTopBorderWidth = isAndroidTabBarLayout
+    ? 0
+    : colors.visualStyle === 'pixel'
+      ? 2
+      : StyleSheet.hairlineWidth;
   const tabBarBackgroundColor = isDarkMode
     ? colors.card
     : isAndroidTabBarLayout
       ? getAndroidBottomBarColor(isDarkMode, colors)
-      : 'rgba(255, 255, 255, 0.82)';
-  const tabRouteColors: Record<string, string> = isShinyEllieMode ? SHINY_HOME_MENU_ROUTE_COLORS : HOME_MENU_ROUTE_COLORS;
+      : 'rgba(255, 255, 255, 0.9)';
+  const tabRouteColors: Record<string, string> = isShinyElliePresentationMode ? SHINY_HOME_MENU_ROUTE_COLORS : HOME_MENU_ROUTE_COLORS;
   const tabLabels = React.useMemo(
     () => ({
       Grammar: copy.home.grammarTitle,
       Vocabulary: isCompactTabBar ? 'Vocab' : copy.home.vocabularyTitle,
-      Lessons: isCompactTabBar ? copy.lessons.chapters : copy.lessons.header,
+      // Full name on desktop; the short form everywhere narrower, where "Chapters & Links"
+      // wraps to two lines (which is what knocked the home card's icon off-centre).
+      Lessons: isDesktopWebTabBar ? copy.lessons.header : copy.lessons.chapters,
       Settings: copy.home.settingsTitle,
     }),
-    [copy.home.grammarTitle, copy.home.vocabularyTitle, copy.home.settingsTitle, copy.lessons.chapters, copy.lessons.header, isCompactTabBar]
+    [copy.home.grammarTitle, copy.home.vocabularyTitle, copy.home.settingsTitle, copy.lessons.chapters, copy.lessons.header, isCompactTabBar, isDesktopWebTabBar]
   );
   const borrowedGrammarVocabularyActive = React.useMemo(() => {
     const activeTabRoute = tabState?.routes?.[tabState.index ?? 0];
@@ -186,9 +241,9 @@ function MainTabNavigator() {
     return activeVocabularyRoute?.name === 'VocabularyLesson'
       && activeVocabularyRoute?.params?.backTarget === 'Grammar';
   }, [tabState]);
-  // Vocab Rush renders its own bottom nav (styled to match this one) — hide the
-  // real tab bar for it here, centrally, instead of a per-screen setOptions hack that
-  // can clobber this computed style for every other screen when it tries to restore it.
+
+
+
   const isVocabRushFocused = React.useMemo(() => {
     const activeTabRoute = tabState?.routes?.[tabState.index ?? 0];
     if (activeTabRoute?.name !== 'Vocabulary') return false;
@@ -213,16 +268,21 @@ function MainTabNavigator() {
       tabRouteColors[routeName] ?? colors.primary,
     [colors.primary, tabRouteColors]
   );
-  
+
   return (
     <Tab.Navigator
-      backBehavior="none" // Let hardware back press bubble up to RootStack (we handle it globally)
+      backBehavior="none"
       screenListeners={{
         state: (event) => setTabState(event.data.state),
       }}
       screenOptions={({ route }) => ({
         headerShown: false,
-        animation: 'fade',
+        // Not 'fade': a crossfade keeps the outgoing and incoming screens composited at the
+        // same time, and on Android react-native-screens could end up leaving the incoming
+        // one invisible while the outgoing one stayed drawn underneath — a blank content
+        // area (with the previous tab's content showing through) that only ever reproduced
+        // when switching via the tab bar.
+        animation: 'none',
         safeAreaInsets: { bottom: 0 },
         tabBarShowLabel: true,
         tabBarLabelPosition: 'below-icon',
@@ -248,12 +308,46 @@ function MainTabNavigator() {
           const visuallyFocused = getVisualTabFocus(route.name, focused);
           const identityColor = getTabIdentityColor(route.name);
           const iconColor = visuallyFocused ? identityColor : colors.secondaryText;
+          const customIconSource = route.name === 'Grammar'
+            ? grammarIconSource
+            : route.name === 'Vocabulary'
+              ? vocabularyIconSource
+              : route.name === 'Lessons'
+                ? chaptersIconSource
+                : route.name === 'Settings'
+                  ? settingsIconSource
+                  : undefined;
+          const isFullColorIcon = route.name === 'Grammar'
+            || route.name === 'Vocabulary'
+            || route.name === 'Lessons'
+            || route.name === 'Settings';
           return (
-            <View style={styles.tabIconPill}>
-              <TabIcon iconName={iconName} size={tabBarIconSize} color={iconColor} focused={visuallyFocused} />
+            <View
+              style={[
+                styles.tabIconPill,
+                isMobileWebTabBar && styles.tabIconPillMobileWeb,
+
+
+
+
+                isWebTabBar && !isMobileWebTabBar && {
+                  width: Math.round(44 * desktopChromeScale),
+                  height: Math.round(28 * desktopChromeScale),
+                },
+              ]}
+            >
+              <TabIcon
+                iconName={iconName}
+                imageSource={customIconSource}
+                tintImage={!isFullColorIcon}
+                imageOpacity={isFullColorIcon && !visuallyFocused ? 0.58 : 1}
+                size={isFullColorIcon ? tabBarIconSize + 2 : tabBarIconSize}
+                color={iconColor}
+                focused={visuallyFocused}
+              />
             </View>
           );
-        },        
+        },
         tabBarActiveTintColor: getTabIdentityColor(route.name),
         tabBarInactiveTintColor: colors.secondaryText,
         tabBarLabelStyle: {
@@ -271,16 +365,35 @@ function MainTabNavigator() {
           transform: [{ translateY: isWebTabBar ? 0 : -2 }],
         },
         tabBarIconStyle: {
-          marginTop: 0,
+          marginTop: isDesktopWebTabBar ? desktopTabContentTopOffset : 0,
           marginBottom: 0,
+          ...(isDesktopWebTabBar
+            ? {
+                width: Math.round(44 * desktopChromeScale),
+                height: desktopTabIconContainerHeight,
+                alignItems: 'center' as const,
+                justifyContent: 'center' as const,
+              }
+            : isMobileWebTabBar
+            ? {
+                flex: 1,
+                alignItems: 'center' as const,
+                justifyContent: 'center' as const,
+              }
+            : null),
         },
         tabBarStyle: {
           height: tabBarHeight,
-          paddingTop: 3,
+          paddingTop: isWebTabBar ? 0 : Math.round(3 * desktopChromeScale),
           paddingBottom: tabBarStylePaddingBottom,
           backgroundColor: tabBarBackgroundColor,
-          borderTopColor: isAndroidTabBarLayout ? 'transparent' : isDarkMode ? colors.border : 'rgba(0,0,0,0.08)',
+          borderTopColor: isAndroidTabBarLayout ? 'transparent' : colors.border,
           borderTopWidth: tabBarTopBorderWidth,
+          // On Android, elevation (not zIndex) decides native draw/touch order, and
+          // in-screen overlays carry their own elevation. This has to sit above the
+          // practice sheet (10) so an open sheet can't swallow tab taps, but stay below
+          // the lesson lists' selection tray (20), which is meant to cover the tab bar.
+          ...(Platform.OS === 'android' ? { elevation: 12, zIndex: 12 } : null),
           ...(isVocabRushFocused ? { display: 'none' as const } : null),
         },
       })}
@@ -331,7 +444,6 @@ function RootStack() {
         component={AccountScreen}
         options={{ headerShown: false }}
       />
-      {/* Root-level full image modal so it overlays headers */}
       <RootStackNav.Screen
         name="FullImageModal"
         component={FullImageScreen}
@@ -355,10 +467,10 @@ function RootStack() {
 
 function AppInner() {
   const navigationRef = React.useRef<any>(null);
-  const { isDarkMode, colors, isAndroidStatusBarEnabled, isShinyEllieMode } = useTheme();
+  const { isDarkMode, colors, isAndroidStatusBarEnabled, isShinyEllieMode, isShinyElliePresentationMode } = useTheme();
   const { width: windowWidth } = useWindowDimensions();
   const [currentRoute, setCurrentRoute] = React.useState<string>('Splash');
-  const splashBG = isShinyEllieMode ? SHINY_SPLASH_BACKGROUND : DEFAULT_SPLASH_BACKGROUND;
+  const splashBG = getSplashBackground(isShinyElliePresentationMode);
   const isSplashRoute = currentRoute === 'Splash';
   const sideBackground =
     isSplashRoute
@@ -410,7 +522,13 @@ function AppInner() {
     applyAppChrome(appChromeNavColor, appChromeButtonStyle, showAppStatusBar);
   }, [appChromeButtonStyle, appChromeNavColor, showAppStatusBar, splashBG]);
 
-  // Preload lesson thumbnails (handles both bundled require() assets and http URIs)
+
+  // Configures and activates the audio session at startup so the first success sound of
+  // the session does not have to wait on that work before it can be heard.
+  React.useEffect(() => {
+    primeSoundEffects();
+  }, []);
+
   React.useEffect(() => {
     const preloadThumbnails = async () => {
       try {
@@ -420,11 +538,11 @@ function AppInner() {
 
         Object.values(thumbs).forEach((entry: any) => {
           if (!entry) return;
-          // Metro returns numeric module ids for require('./image.png') -> typeof entry === 'number'
+
           if (typeof entry === 'number') {
             tasks.push(Asset.loadAsync(entry));
           } else if (entry.uri && typeof entry.uri === 'string') {
-            // Skip data URIs (already embedded). Prefetch http(s) URIs to warm cache.
+
             if (entry.uri.startsWith('http')) {
               tasks.push(Image.prefetch(entry.uri));
             }
@@ -439,9 +557,9 @@ function AppInner() {
     preloadThumbnails();
   }, []);
 
-  // Ensure immersive mode is applied on mount and whenever app returns to foreground
+
   React.useEffect(() => {
-    // Do not force immersive on mount; route-specific screens (like Splash) manage their own immersive state.
+    // Android resets system-bar styling after resume, so reapply the configured chrome.
     const unbind = bindImmersiveOnForeground(appChromeNavColor, appChromeButtonStyle);
     return () => {
       unbind();
@@ -452,7 +570,7 @@ function AppInner() {
     applyRouteChrome(currentRoute);
   }, [applyRouteChrome, currentRoute]);
 
-  // Central back navigation logic for native hardware back and web popstate.
+
   const onBackRequested = React.useCallback(() => {
     const nav = navigationRef.current;
     if (!nav) return false;
@@ -460,11 +578,11 @@ function AppInner() {
     const route = nav?.getCurrentRoute()?.name;
 
     if (Platform.OS === 'web') {
-      // Only allow the browser to exit from Home or Splash.
+
       if (route === 'Home' || route === 'Splash') return false;
-      // During navigation transitions, route may be undefined — stay in app.
+
       if (!route) return true;
-      // Navigate back within the app stack, falling back to Home.
+
       if (nav.canGoBack()) {
         nav.goBack();
       } else {
@@ -473,7 +591,7 @@ function AppInner() {
       return true;
     }
 
-    // Native: from any top-level tab, go back to Home
+
     if (route && ['MainTabs', 'Grammar', 'Vocabulary', 'VocabularyList', 'Lessons', 'Settings'].includes(route)) {
       nav.navigate('Home');
       return true;
@@ -492,7 +610,7 @@ function AppInner() {
     return false;
   }, []);
 
-  // Global hardware back press handler (native)
+
   React.useEffect(() => {
     if (Platform.OS === 'web') return;
 
@@ -500,11 +618,12 @@ function AppInner() {
     return () => sub.remove();
   }, [onBackRequested]);
 
-  // Web mobile: Android's system back button triggers browser history, not React Native BackHandler.
+
   React.useEffect(() => {
     if (Platform.OS !== 'web') return;
     if (typeof window === 'undefined') return;
 
+    // A synthetic entry lets browser Back follow the in-app navigation stack first.
     window.history.pushState({ ...(window.history.state ?? {}), ellieBackGuard: true }, '', window.location.href);
 
     const onPopState = () => {
@@ -520,7 +639,7 @@ function AppInner() {
     };
   }, [onBackRequested]);
 
-  // Web-only: block right-click/long-press save menus on images (local and remote).
+
   React.useEffect(() => {
     if (Platform.OS !== 'web') return;
     if (typeof document === 'undefined') return;
@@ -571,18 +690,19 @@ function AppInner() {
 
     markImagesUndraggable();
 
+    // Lesson images mount asynchronously, so protect additions as well as existing nodes.
     const observer = typeof MutationObserver !== 'undefined'
       ? new MutationObserver(markImagesUndraggable)
       : null;
     observer?.observe(document.body, { childList: true, subtree: true });
 
-    // Add listeners in capture phase so browser save affordances do not win first.
+
     document.addEventListener('contextmenu', preventImageSaveMenu, true);
     document.addEventListener('dragstart', onDragStart, true);
     document.addEventListener('selectstart', preventImageSaveMenu, true);
     document.addEventListener('copy', preventImageSaveMenu, true);
 
-    // Inject CSS to further suppress iOS/Android callouts and dragging on web-rendered images.
+
     const style = document.createElement('style');
     style.id = 'a0-image-protect';
     style.textContent = `
@@ -619,7 +739,41 @@ function AppInner() {
     document.body.style.backgroundColor = sideBackground;
   }, [sideBackground]);
 
-  // Web-only (desktop): hide the scrollbar while keeping scrolling functional
+  React.useEffect(() => {
+    if (Platform.OS !== 'web') return;
+    if (typeof document === 'undefined') return;
+
+    document.documentElement.dataset.ellieVisualStyle = isShinyEllieMode ? 'pixel' : 'normal';
+
+    const styleId = 'ellie-pixel-art-runtime';
+    let style = document.getElementById(styleId) as HTMLStyleElement | null;
+    if (!style) {
+      style = document.createElement('style');
+      style.id = styleId;
+      style.textContent = `
+        html[data-ellie-visual-style="pixel"] [role="button"],
+        html[data-ellie-visual-style="pixel"] input,
+        html[data-ellie-visual-style="pixel"] textarea {
+          border-radius: 2px !important;
+        }
+        html[data-ellie-visual-style="pixel"] #root div,
+        html[data-ellie-visual-style="pixel"] #root img {
+          border-radius: 2px !important;
+        }
+        html[data-ellie-visual-style="pixel"] img,
+        html[data-ellie-visual-style="pixel"] canvas {
+          image-rendering: pixelated;
+        }
+      `;
+      document.head.appendChild(style);
+    }
+
+    return () => {
+      delete document.documentElement.dataset.ellieVisualStyle;
+    };
+  }, [isShinyEllieMode]);
+
+
   React.useEffect(() => {
     if (Platform.OS !== 'web') return;
     if (typeof document === 'undefined') return;
@@ -660,7 +814,7 @@ function AppInner() {
     };
   }, []);
 
-  // Web-only: neutralise the browser's yellow autofill highlight on text inputs.
+
   React.useEffect(() => {
     if (Platform.OS !== 'web') return;
     if (typeof document === 'undefined') return;
@@ -691,16 +845,15 @@ function AppInner() {
 
   return (
     <>
-      {/* Full-width to capture scroll even when cursor is in the margins */}
       <SafeAreaProvider style={{ flex: 1, backgroundColor: sideBackground }}>
         <Toaster />
+        <UpdateBanner />
         <StatusBar
           hidden={shouldHideStatusBar}
           style={statusBarStyle}
           animated
         />
         <View style={[styles.appShell, { backgroundColor: sideBackground }]}>
-          {/* Width-constrained content wrapper */}
           <View style={[styles.contentWrapper, { backgroundColor: contentBackground, maxWidth: contentMaxWidth }]}>
             <NavigationContainer
               ref={navigationRef}
@@ -734,6 +887,10 @@ function AppInner() {
 }
 
 export default function App() {
+  const [pixelFontLoaded] = useFonts({ PressStart2P_400Regular });
+
+  if (!pixelFontLoaded) return null;
+
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
       <ThemeProvider>
@@ -763,6 +920,10 @@ const styles = StyleSheet.create({
     height: 28,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  tabIconPillMobileWeb: {
+    width: 52,
+    height: 44,
   },
   statusBarBackdrop: {
     position: 'absolute',

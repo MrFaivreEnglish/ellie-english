@@ -2,7 +2,7 @@ const GettingAJobVocab = {
   id: '210',
   title: 'Getting a job',
   description: 'Vocabulary and expressions for job applications and interviews',
-  imageUrl: 'https://i.ibb.co/p6XxpJNp/Getting-a-job.webp',
+  imageUrl: 'https://wretggbpaejzjdilemit.supabase.co/storage/v1/object/public/lesson-images/15274719ab/getting-a-job.webp',
   thumbnail: require('../../assets/thumbnails/getting-a-job-thumbnail.png'),
   flashcards: [
     {

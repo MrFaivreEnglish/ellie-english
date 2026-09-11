@@ -1,11 +1,11 @@
 const DetectiveVocab = {
   id: '39',
   title: 'Detective',
-  description: 'Learn vocabulary related to detective work and investigations',  imageUrl: 'https://i.ibb.co/mVCCkWGS/Detective-stories.webp',
+  description: 'Learn vocabulary related to detective work and investigations',  imageUrl: 'https://wretggbpaejzjdilemit.supabase.co/storage/v1/object/public/lesson-images/15274719ab/detective.webp',
   thumbnail: require('../../assets/thumbnails/detective-stories-thumbnail.png'),
   flashcards: [
     {
-      category: 'People',
+      category: 'People 🕵️',
       words: [
         { english: 'A detective', french: 'Un détective' },
         { english: 'A culprit', french: 'Un coupable' },
@@ -16,7 +16,7 @@ const DetectiveVocab = {
       ],
     },
     {
-      category: 'Elements',
+      category: 'Elements 🔍',
       words: [
         { english: 'A murder', french: 'Un meurtre' },
         { english: 'A crime scene', french: 'Une scène de crime' },
@@ -32,7 +32,7 @@ const DetectiveVocab = {
       ],
     },
     {
-      category: 'Actions',
+      category: 'Actions 👣',
       words: [
         { english: '(to) be guilty', french: 'Être coupable' },
         { english: '(to) steal', french: 'Voler' },

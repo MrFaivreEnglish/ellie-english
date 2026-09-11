@@ -2,7 +2,7 @@ const PreteritNIGrammar = {
   id: '36',
   title: 'Prétérit Négatif et Interrogatif',
   description: 'Learn negative and interrogative forms in past simple',
-  imageUrl: 'https://i.ibb.co/Dg7h1Bx5/Pr-t-rit-N-gatif-et-interrogatif.png',
+  imageUrl: 'https://wretggbpaejzjdilemit.supabase.co/storage/v1/object/public/lesson-images/15274719ab/preterit-negatif-et-interrogatif.webp',
   textContent: {
     cards: [
       {

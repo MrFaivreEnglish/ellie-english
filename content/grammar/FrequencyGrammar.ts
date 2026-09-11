@@ -3,7 +3,7 @@ const FrequencyGrammar = {
   title: 'Adverbes de fréquence',
   description: 'Learn how to use frequency adverbs',
   category: 'Adverbes',
-  imageUrl: 'https://i.ibb.co/gZ9sKLZ0/Fr-quence.png',
+  imageUrl: 'https://wretggbpaejzjdilemit.supabase.co/storage/v1/object/public/lesson-images/15274719ab/adverbes-de-frequence.webp',
   textContent: {
     cards: [
       {
@@ -18,7 +18,7 @@ const FrequencyGrammar = {
           },
         ],
         examples: [
-          { en: 'She **always knew** the answer.', fr: 'Elle connaissait toujours la réponse.' },
+          { en: 'She **always knows** the answer.', fr: 'Elle connaît toujours la réponse.' },
           { en: 'I **never talk** with her.', fr: 'Je ne lui parle jamais.' },
         ],
       },
@@ -28,7 +28,7 @@ const FrequencyGrammar = {
         tip: 'Formule : sujet + be conjugué + adverbe.',
         examples: [
           { en: 'I **am never** late.', fr: 'Je ne suis jamais en retard.' },
-          { en: 'We **were always** nice.', fr: 'Nous étions toujours gentils.' },
+          { en: 'We **are always** nice.', fr: 'Nous sommes toujours gentils.' },
         ],
       },
     ],
@@ -142,9 +142,9 @@ translateExercises: [
   {
     type: 'translate',
     question: 'Translate into English.',
-    prompt: "Je ne suis jamais heureux quand il pleut.",
-    answer: "I am never happy when it rains.",
-    wordBank: ["I", "am", "never", "happy", "when", "it", "rains."]
+    prompt: "Je ne suis jamais triste.",
+    answer: "I am never sad.",
+    wordBank: ["I", "am", "never", "sad."]
   },
   {
     type: 'translate',
@@ -191,18 +191,18 @@ translateExercises: [
   { "question": "I am always happy.", "answer": true, "explanation": "With 'to be', adverb comes after the verb. Correct." },
   { "question": "They are sometimes late for class.", "answer": true, "explanation": "With 'to be', adverb goes after the verb." },
   { "question": "She is never tired in the morning.", "answer": true, "explanation": "'Never' correctly placed after 'is'." },
-  { "question": "We are usually enjoying our lunch at noon.", "answer": true, "explanation": "Adverb is correctly placed after 'are' for continuous action." },
+  { "question": "We usually eat lunch at noon.", "answer": true, "explanation": "'Usually' is correctly placed before the main verb." },
   { "question": "I am often go to the gym.", "answer": false, "explanation": "Incorrect: after 'am' use '-ing' form. Correct: 'I am often going to the gym'." },
-  { "question": "He has always finished his homework on time.", "answer": true, "explanation": "Adverb goes between 'has' and past participle." },
-  { "question": "She has finished always her work before class.", "answer": false, "explanation": "Incorrect: 'always' should go between 'has' and past participle. Correct: 'She has always finished her work'." },
-  { "question": "They have never visited that museum.", "answer": true, "explanation": "Adverb 'never' goes between 'have' and past participle." },
-  { "question": "We have visited often that museum.", "answer": false, "explanation": "Incorrect: adverb should go between 'have' and past participle. Correct: 'We have often visited that museum'." },
+  { "question": "He always finishes his homework on time.", "answer": true, "explanation": "'Always' is correctly placed before the main verb." },
+  { "question": "She finishes always her work before class.", "answer": false, "explanation": "Incorrect: 'always' should come before the main verb. Correct: 'She always finishes her work'." },
+  { "question": "They never visit that museum.", "answer": true, "explanation": "Adverb 'never' is correctly placed before the main verb." },
+  { "question": "We visit often that museum.", "answer": false, "explanation": "Incorrect: adverb should come before the main verb. Correct: 'We often visit that museum'." },
   { "question": "I sometimes read books in the evening.", "answer": true, "explanation": "'Sometimes' correctly before the main verb." },
   { "question": "You plays often football on weekends.", "answer": false, "explanation": "Incorrect: adverb placement and verb form. Correct: 'You often play football'." },
   { "question": "He is always polite to strangers.", "answer": true, "explanation": "With 'to be', adverb after the verb is correct." },
   { "question": "They rarely are late to meetings.", "answer": false, "explanation": "Incorrect: with 'to be', adverb comes after the verb. Correct: 'They are rarely late'." },
   { "question": "We always eat breakfast together.", "answer": true, "explanation": "Adverb correctly placed before the main verb." },
-  { "question": "I am never happy when it rains.", "answer": true, "explanation": "Adverb after 'am' is correct." },
+  { "question": "I am never sad.", "answer": true, "explanation": "Adverb after 'am' is correct." },
   { "question": "She often is tired after work.", "answer": false, "explanation": "Incorrect: with 'to be', adverb should follow the verb. Correct: 'She is often tired'." },
   { "question": "They sometimes go to the park on Sundays.", "answer": true, "explanation": "'Sometimes' correctly before the main verb." },
   { "question": "We are always excited for holidays.", "answer": true, "explanation": "Adverb after 'are' is correct for state verbs." },

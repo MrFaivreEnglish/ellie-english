@@ -76,7 +76,7 @@ Major work catalogued through May 27, 2026. Current app version: 2.2.0.
 
 ## Progress, XP, and Levels
 
-- Added a shared `LevelProgressSummary` component.
+- Added shared level-progress presentation, now handled directly by completion and account surfaces.
 - Added XP reward tuning for grammar, typing, matching, timer, and review flows.
 - Added one-time grammar answer XP tracking.
 - Added daily vocabulary typing XP limits.

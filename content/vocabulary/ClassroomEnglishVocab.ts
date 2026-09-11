@@ -2,7 +2,7 @@ const ClassroomEnglishVocab = {
   id: '32',
   title: 'Classroom English',
   description: 'Learn essential classroom vocabulary and phrases',
-  imageUrl: 'https://i.ibb.co/W4CkT6TW/Classroom-English.webp',
+  imageUrl: 'https://wretggbpaejzjdilemit.supabase.co/storage/v1/object/public/lesson-images/15274719ab/classroom-english.webp',
   thumbnail: require('../../assets/thumbnails/classroom-english-thumbnail.png'),
   flashcards: [
     { english: 'Read', french: 'Lire' },

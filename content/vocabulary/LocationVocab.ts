@@ -2,7 +2,7 @@ const LocationVocab = {
   id: '308',
   title: 'Location',
   description: 'Prepositions and location phrases',
-  imageUrl: 'https://i.ibb.co/0RDVnn5Y/Location.webp',
+  imageUrl: 'https://wretggbpaejzjdilemit.supabase.co/storage/v1/object/public/lesson-images/15274719ab/location.webp',
   thumbnail: require('../../assets/thumbnails/location-thumbnail.png'),
   flashcards: [
     { "english": "On the left", "french": "À gauche" },

@@ -45,10 +45,12 @@ import {
   isFillExercise,
   isReorderExercise,
   isTranslateExercise,
+  groupNounPhraseTokens,
   tokenizeTranslateAnswer,
 } from '../../features/grammar/grammarExercises/GrammarExerciseUtils';
 
 type LessonModeConfig = {
+  quiz?: boolean;
   fill: boolean;
   reorder: boolean;
   translate: boolean;
@@ -106,32 +108,36 @@ const defaultLessonModeConfig: LessonModeConfig = {
 };
 
 const applyTranslateLessonOverrides = (lesson: any, exercise: any) => {
+  const normalizedExercise = lesson.id === '40' || !Array.isArray(exercise.wordBank)
+    ? exercise
+    : { ...exercise, wordBank: groupNounPhraseTokens(exercise.wordBank) };
+
   switch (lesson.id) {
     case '34':
       return {
-        ...exercise,
+        ...normalizedExercise,
         distractorMode: 'modal-past' as const,
-        distractors: [...(exercise.distractors ?? []), 'was', 'were'],
+        distractors: [...(normalizedExercise.distractors ?? []), 'was', 'were'],
       };
     case '27':
       return {
-        ...exercise,
+        ...normalizedExercise,
         distractorMode: 'modal-ing' as const,
       };
     case '38':
       return {
-        ...exercise,
+        ...normalizedExercise,
         distractorMode: 'passive-past' as const,
-        distractors: [...(exercise.distractors ?? []), 'was', 'were'],
+        distractors: [...(normalizedExercise.distractors ?? []), 'was', 'were'],
       };
     case '2':
       return {
-        ...exercise,
+        ...normalizedExercise,
         distractorMode: 'present-negative' as const,
-        distractors: [...(exercise.distractors ?? []), "don't", "doesn't"],
+        distractors: [...(normalizedExercise.distractors ?? []), "don't", "doesn't"],
       };
     default:
-      return exercise;
+      return normalizedExercise;
   }
 };
 
@@ -196,7 +202,7 @@ const buildReorderExerciseFromTranslateAnswer = (lesson: any, exercise: any) => 
 const buildAvailableModes = (
   modeConfig: LessonModeConfig
 ): Partial<Record<ExerciseMode, boolean>> => ({
-  quiz: true,
+  quiz: modeConfig.quiz ?? true,
   fill: modeConfig.fill,
   reorder: modeConfig.reorder,
   translate: modeConfig.translate,
@@ -234,7 +240,7 @@ const slugifyGrammarLessonId = (value: string) =>
     .replace(/[^a-z0-9]+/g, '-')
     .replace(/^-+|-+$/g, '') || 'mixed';
 
-const MIXED_GRAMMAR_FALLBACK_IMAGE_URL = 'https://i.ibb.co/wNYxhH6t/Groupes-de-mots.png';
+const MIXED_GRAMMAR_FALLBACK_IMAGE_URL = 'https://wretggbpaejzjdilemit.supabase.co/storage/v1/object/public/lesson-images/15274719ab/les-groupes-de-mots.webp';
 const MIXED_GRAMMAR_IMAGE_URL_FIELD = 'imageUrl';
 
 const getLessonImageUrl = (lesson: any) =>
@@ -361,7 +367,7 @@ const IrregularVerbsSpecialOnes = {
   id: 'irregular-verbs-special-ones-1',
   title: 'Irregular Verbs 1 : Irréguliers spéciaux',
   practiceType: 'vocabulary',
-  imageUrl: 'https://i.ibb.co/3yvDCN98/page-1.webp',
+  imageUrl: 'https://wretggbpaejzjdilemit.supabase.co/storage/v1/object/public/lesson-images/15274719ab/irregular-verbs-1-irreguliers-speciaux.webp',
   categoryLabel: '1 - Irréguliers spéciaux / uniques',
   ...irregularVerbPracticeOptions,
   flashcards: [
@@ -382,7 +388,7 @@ const IrregularVerbsDEndings = {
   id: 'irregular-verbs-d-endings-2',
   title: 'Irregular Verbs 2 : Terminaisons en -D',
   practiceType: 'vocabulary',
-  imageUrl: 'https://i.ibb.co/1fLpXKFR/page-2.webp',
+  imageUrl: 'https://wretggbpaejzjdilemit.supabase.co/storage/v1/object/public/lesson-images/15274719ab/irregular-verbs-2-terminaisons-en-d.webp',
   categoryLabel: '2 - Terminaisons en -D',
   ...irregularVerbPracticeOptions,
   flashcards: [
@@ -400,7 +406,7 @@ const IrregularVerbsNoChange = {
   id: 'irregular-verbs-no-change-3',
   title: 'Irregular Verbs 3 : Pas de changement',
   practiceType: 'vocabulary',
-  imageUrl: 'https://i.ibb.co/FqKkTP9m/page-3.webp',
+  imageUrl: 'https://wretggbpaejzjdilemit.supabase.co/storage/v1/object/public/lesson-images/15274719ab/irregular-verbs-3-pas-de-changement.webp',
   categoryLabel: '3 - Facile, pas de changement',
   ...irregularVerbPracticeOptions,
   flashcards: [
@@ -416,7 +422,7 @@ const IrregularVerbsGht = {
   id: 'irregular-verbs-ght-4',
   title: 'Irregular Verbs 4 : GHT',
   practiceType: 'vocabulary',
-  imageUrl: 'https://i.ibb.co/W4Mv6pGt/page-4.webp',
+  imageUrl: 'https://wretggbpaejzjdilemit.supabase.co/storage/v1/object/public/lesson-images/15274719ab/irregular-verbs-4-ght.webp',
   categoryLabel: "4 - J'ai acheté, GHT",
   ...irregularVerbPracticeOptions,
   flashcards: [
@@ -433,7 +439,7 @@ const IrregularVerbsEnParticiple = {
   id: 'irregular-verbs-en-participle-5',
   title: 'Irregular Verbs 5 : Participe en -EN',
   practiceType: 'vocabulary',
-  imageUrl: 'https://i.ibb.co/rf2gbgbw/page-5.webp',
+  imageUrl: 'https://wretggbpaejzjdilemit.supabase.co/storage/v1/object/public/lesson-images/15274719ab/irregular-verbs-5-participe-en-en.webp',
   categoryLabel: '5 - Participe en -EN',
   ...irregularVerbPracticeOptions,
   flashcards: [
@@ -458,7 +464,7 @@ const IrregularVerbsEwOwn = {
   id: 'irregular-verbs-ew-own-6',
   title: 'Irregular Verbs 6 : EW / OWN',
   practiceType: 'vocabulary',
-  imageUrl: 'https://i.ibb.co/HT3Z9xHz/page-6.webp',
+  imageUrl: 'https://wretggbpaejzjdilemit.supabase.co/storage/v1/object/public/lesson-images/15274719ab/irregular-verbs-6-ew-own.webp',
   categoryLabel: '6 - EW / OWN',
   ...irregularVerbPracticeOptions,
   flashcards: [
@@ -473,7 +479,7 @@ const IrregularVerbsTEndings = {
   id: 'irregular-verbs-t-endings-7',
   title: 'Irregular Verbs 7 : Terminaisons en -T',
   practiceType: 'vocabulary',
-  imageUrl: 'https://i.ibb.co/BHqBFsct/page-7.webp',
+  imageUrl: 'https://wretggbpaejzjdilemit.supabase.co/storage/v1/object/public/lesson-images/15274719ab/irregular-verbs-7-terminaisons-en-t.webp',
   categoryLabel: '7 - Terminaisons en -T',
   ...irregularVerbPracticeOptions,
   flashcards: [
@@ -496,7 +502,7 @@ const IrregularVerbsIAU = {
   id: 'irregular-verbs-i-a-u-8',
   title: 'Irregular Verbs 8 : i -> a -> u',
   practiceType: 'vocabulary',
-  imageUrl: 'https://i.ibb.co/p6jypHgK/page-8.webp',
+  imageUrl: 'https://wretggbpaejzjdilemit.supabase.co/storage/v1/object/public/lesson-images/15274719ab/irregular-verbs-8-i-a-u.webp',
   categoryLabel: '8 - i -> a -> u',
   ...irregularVerbPracticeOptions,
   flashcards: [
@@ -523,7 +529,7 @@ const IrregularVerbsPractice = {
   title: 'All Irregular Verbs',
   description: 'Choose one or more irregular verb lessons to study together.',
   practiceType: 'vocabulary',
-  imageUrl: 'https://i.ibb.co/Wp4jY2Xw/Irregular-verbs-59-4-x-42-cm.webp',
+  imageUrl: 'https://wretggbpaejzjdilemit.supabase.co/storage/v1/object/public/lesson-images/15274719ab/all-irregular-verbs.webp',
   ...irregularVerbPracticeOptions,
   flashcards: irregularVerbLessons.map((lesson) => ({
     category: lesson.categoryLabel,

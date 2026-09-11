@@ -64,3 +64,6 @@ ios/
 
 # Local backup of lesson sheets pulled from imgbb (not tracked)
 lesson-images/
+
+# Supabase CLI scratch
+supabase/.temp/

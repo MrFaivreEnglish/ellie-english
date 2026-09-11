@@ -1,7 +1,7 @@
 const EcologyVocab = {
   id: '27',
   title: 'Ecology',
-  description: 'Learn vocabulary related to environment and conservation',  imageUrl: 'https://i.ibb.co/LdHkDWTs/Ecology.webp',
+  description: 'Learn vocabulary related to environment and conservation',  imageUrl: 'https://wretggbpaejzjdilemit.supabase.co/storage/v1/object/public/lesson-images/15274719ab/ecology.webp',
   thumbnail: require('../../assets/thumbnails/ecology-thumbnail.png'),
   flashcards: [
     {
@@ -9,7 +9,7 @@ const EcologyVocab = {
       words: [
         { english: 'Nature', french: 'La nature' },
         { english: 'Climate', french: 'Le climat' },
-        { english: 'The environment', french: 'L’environnement' },
+        { english: 'The environment', french: 'L\'environnement' },
         { english: 'Global warming', french: 'Le réchauffement climatique' },
         { english: 'Climate change', french: 'Le changement climatique' },
         { english: 'The Earth', french: 'La Terre' }
@@ -26,7 +26,7 @@ const EcologyVocab = {
       category: 'Waste & Pollution 🗑️',
       words: [
         { english: 'Garbage', french: 'Les ordures' },
-        { english: 'Litter', french: 'Les déchets' },
+        { english: 'Litter', french: 'Les détritus' },
         { english: 'Pollution', french: 'La pollution' }
       ]
     },
@@ -35,7 +35,7 @@ const EcologyVocab = {
       words: [
         { english: 'Ecofriendly', french: 'Écologique' },
         { english: 'Endangered', french: 'En danger' },
-        { english: 'Extinct', french: 'Éteint' },
+        { english: 'Extinct', french: 'Disparu' },
         { english: 'Organic', french: 'Biologique' }
       ]
     },

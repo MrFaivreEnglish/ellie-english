@@ -3,7 +3,7 @@ const PassivePastGrammar = {
   title: 'Voix passive passée',
   description: 'Learn how to use the passive voice in past tense',
   category: 'Voix passive',
-  imageUrl: 'https://i.ibb.co/zHt9fbBY/Voix-passive-pass-e.png',
+  imageUrl: 'https://wretggbpaejzjdilemit.supabase.co/storage/v1/object/public/lesson-images/15274719ab/voix-passive-passee.webp',
   textContent: {
     cards: [
       {

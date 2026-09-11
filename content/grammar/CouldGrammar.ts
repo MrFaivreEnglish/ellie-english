@@ -2,7 +2,7 @@ const CouldGrammar = {
   id: '33',
   title: 'Could / Was able to',
   description: 'Practice past ability with could and was able to',
-  imageUrl: 'https://i.ibb.co/PsDv5rG6/Could-Was-able-to.png',
+  imageUrl: 'https://wretggbpaejzjdilemit.supabase.co/storage/v1/object/public/lesson-images/15274719ab/could-was-able-to.webp',
   textContent: {
     cards: [
       {

@@ -2,7 +2,7 @@ const SchoolSubjectsVocab = {
   id: '403',
   title: 'School Subjects',
   description: 'Name the subjects you study at school',
-  imageUrl: 'https://i.ibb.co/Z6hzCR3L/School-subjects.webp',
+  imageUrl: 'https://wretggbpaejzjdilemit.supabase.co/storage/v1/object/public/lesson-images/15274719ab/school-subjects.webp',
   flashcards: [
     { english: 'English', french: "L'anglais" },
     { english: 'French', french: 'Le français' },
@@ -18,7 +18,7 @@ const SchoolSubjectsVocab = {
     { english: 'Chemistry', french: 'La chimie' },
     { english: 'Design and Technology', french: 'La technologie' },
     { english: 'Computing', french: "L'informatique" },
-    { english: 'Physical Education (PE)', french: "L'EPS (Éducation Physique et Sportive)" },
+    { english: 'Physical Education (PE)', alternatives: ['PE'], french: "L'EPS (Éducation physique et sportive)" },
     { english: 'Music', french: 'La musique' },
     { english: 'Art', french: 'Les arts plastiques' },
     { english: 'Drama', french: 'Le théâtre' },

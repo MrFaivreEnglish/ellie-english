@@ -1,26 +1,29 @@
 import type { Word } from './VocabularyTypes';
 import type { Exercise, ExerciseMode } from '../features/grammar/grammarExercises/GrammarExerciseUtils';
 
-// ─── Grammar ─────────────────────────────────────────────────────────────────
 
-// A text-mode alternative to a grammar lesson's poster image — transcribed
-// from the teacher's original image so students can read it without relying
-// on an image loading. `**bold**` segments are the only supported inline
-// markup, kept deliberately simple to match what the poster images actually
-// emphasize (conjugated verb forms).
-export type GrammarTextAccent = 'blue' | 'coral' | 'amber' | 'teal';
+
+
+
+
+
+
+export type GrammarTextAccent = 'blue' | 'coral' | 'amber' | 'teal' | 'green';
 
 export interface GrammarTextColumn {
   label: string;
   accent: GrammarTextAccent;
-  // A row is either a single value ("I") or a set of values shown side by
-  // side on the same row ([\"Like\", \"Do\"]).
+
+
   rows: Array<string | string[]>;
 }
 
 export interface GrammarTextExample {
   en: string;
   fr: string;
+
+
+  correct?: boolean;
 }
 
 export interface GrammarTextSubsection {
@@ -59,7 +62,7 @@ export interface GrammarLesson {
   flashcardLabels?: { english: string; french: string };
 }
 
-// ─── Vocabulary ───────────────────────────────────────────────────────────────
+
 
 export type VocabGroup = {
   category: string;

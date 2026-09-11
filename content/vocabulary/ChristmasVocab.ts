@@ -2,13 +2,13 @@ const ChristmasVocab = {
   id: '401',
   title: 'Christmas',
   description: 'Vocabulary for Christmas traditions and celebrations',
-  imageUrl: 'https://i.ibb.co/wNspjYjy/Christmas-1.webp',
+  imageUrl: 'https://wretggbpaejzjdilemit.supabase.co/storage/v1/object/public/lesson-images/15274719ab/christmas.webp',
   categoryPickerTitle: 'Choose a category',
   categoryPickerLabel: 'Category',
   categoryPickerAllLabel: 'All Christmas words',
   flashcards: [
     {
-      category: 'Characters',
+      category: 'Characters 🎅',
       words: [
         { english: 'Santa Claus', french: 'Le Père Noël' },
         { english: 'An elf', french: 'Un lutin' },
@@ -17,12 +17,12 @@ const ChristmasVocab = {
       ],
     },
     {
-      category: 'Objects',
+      category: 'Objects 🎁',
       words: [
         { english: 'A Christmas tree', french: 'Un sapin de Noël' },
         { english: 'Holly', french: 'Le houx' },
         { english: 'Mistletoe', french: 'Le gui' },
-        { english: 'A Christmas cracker', french: 'Un cracker de Noël' },
+        { english: 'A Christmas cracker', french: 'Une papillote surprise' },
         { english: 'A present / A gift', french: 'Un cadeau' },
         { english: 'A chimney', french: 'Une cheminée' },
         { english: 'A fireplace', french: 'Une cheminée (foyer)' },
@@ -35,7 +35,7 @@ const ChristmasVocab = {
       ],
     },
     {
-      category: 'Food',
+      category: 'Food 🍪',
       words: [
         { english: 'A candy cane', french: "Une canne en sucre d'orge" },
         { english: 'Christmas pudding', french: 'Le pudding de Noël' },
@@ -44,7 +44,7 @@ const ChristmasVocab = {
       ],
     },
     {
-      category: 'Actions',
+      category: 'Actions 🎄',
       words: [
         { english: 'Decorate the tree', french: 'Décorer le sapin' },
         { english: 'Wrap presents', french: 'Emballer des cadeaux' },

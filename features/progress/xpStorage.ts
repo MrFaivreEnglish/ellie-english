@@ -1,10 +1,12 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { syncXPToCloudIfSignedIn } from '../account/accountStorage';
+import { applyDailyXpTaper, REPLAY_XP_FRACTION } from './xpRewards';
 
 const XP_KEY = 'TOTAL_XP';
 const DAILY_WORD_XP_PREFIX = 'TYPING_WORD_XP_AWARDED';
 const DAILY_ACTIVITY_XP_PREFIX = 'PRACTICE_XP_AWARDED';
 const DAILY_PRACTICE_PREFIX = 'DAILY_PRACTICE_ACTIVITY';
+const DAILY_GRANTED_XP_PREFIX = 'DAILY_GRANTED_XP';
 const stringSetWriteQueues = new Map<string, Promise<void>>();
 const pendingStringSetAdds = new Map<string, Set<string>>();
 
@@ -91,7 +93,7 @@ const getPracticeActivityKeysToday = async () => {
   return activityKeys;
 };
 
-// 🔄 Get XP
+
 export const getXP = async (): Promise<number> => {
   try {
     const value = await AsyncStorage.getItem(XP_KEY);
@@ -101,7 +103,7 @@ export const getXP = async (): Promise<number> => {
   }
 };
 
-// 💾 Save XP
+
 export const setLocalXP = async (xp: number) => {
   try {
     const nextXP = normalizeXP(xp);
@@ -125,7 +127,8 @@ export const clearLocalXPProgress = async () => {
         key === XP_KEY ||
         key.startsWith(`${DAILY_WORD_XP_PREFIX}_`) ||
         key.startsWith(`${DAILY_ACTIVITY_XP_PREFIX}_`) ||
-        key.startsWith(`${DAILY_PRACTICE_PREFIX}_`)
+        key.startsWith(`${DAILY_PRACTICE_PREFIX}_`) ||
+        key.startsWith(`${DAILY_GRANTED_XP_PREFIX}_`)
     );
 
     pendingStringSetAdds.clear();
@@ -137,13 +140,88 @@ export const clearLocalXPProgress = async () => {
   } catch {}
 };
 
-// ➕ Add XP
+
+/**
+ * Adds XP verbatim. Earning paths should use `grantXP` instead so the day's soft cap
+ * applies — this stays for corrections and restores, where a figure is already final.
+ */
 export const addXP = async (amount: number): Promise<number> => {
   if (!Number.isFinite(amount)) return getXP();
   const currentXP = await getXP();
   const newXP = normalizeXP(currentXP + amount);
   await setXP(newXP);
   return newXP;
+};
+
+export const getGrantedXPToday = async (): Promise<number> => {
+  try {
+    const value = await AsyncStorage.getItem(todayKey(DAILY_GRANTED_XP_PREFIX));
+    return value ? normalizeXP(parseInt(value, 10)) : 0;
+  } catch {
+    return 0;
+  }
+};
+
+/**
+ * The single choke point for earned XP: tapers `amount` against what has already been
+ * banked today (see DAILY_XP_BANDS), banks the result and returns it. Callers must show
+ * the returned figure rather than what they asked for, or the "+N XP" they promised won't
+ * match what the student's total actually moved by.
+ */
+export const grantXP = async (amount: number): Promise<number> => {
+  const requested = normalizeXP(amount);
+  if (requested <= 0) return 0;
+
+  try {
+    const grantedToday = await getGrantedXPToday();
+    const granted = applyDailyXpTaper(requested, grantedToday);
+    if (granted <= 0) return 0;
+
+    await AsyncStorage.setItem(
+      todayKey(DAILY_GRANTED_XP_PREFIX),
+      `${grantedToday + granted}`
+    );
+    await addXP(granted);
+    return granted;
+  } catch {
+    return 0;
+  }
+};
+
+/**
+ * What `grantXP` would give, without banking anything. `pendingAmount` is XP a caller has
+ * already previewed but not yet banked this session, so previewing a batch item by item
+ * tapers the batch as a whole instead of restarting from the stored total each time.
+ */
+export const previewGrantXP = async (amount: number, pendingAmount = 0): Promise<number> => {
+  const requested = normalizeXP(amount);
+  if (requested <= 0) return 0;
+
+  try {
+    const grantedToday = await getGrantedXPToday();
+    return applyDailyXpTaper(requested, grantedToday + normalizeXP(pendingAmount));
+  } catch {
+    return 0;
+  }
+};
+
+/**
+ * Everything needed to price an award without touching storage again: which activities
+ * have already paid out today, and how much has been banked toward the day's soft cap.
+ * Lets a running in-session total be shown honestly — recomputing per item would mean a
+ * storage read on every answer, and showing the undiscounted figure means the number the
+ * student watched climbing isn't the number they're given at the end.
+ */
+export const getDailyXPSnapshot = async (): Promise<{
+  awardedActivityKeys: Set<string>;
+  grantedToday: number;
+}> => {
+  const [awardedActivityKeys, grantedToday] = await Promise.all([
+    getAwardedActivityXPKeysToday(),
+    getGrantedXPToday(),
+  ]);
+
+  return { awardedActivityKeys, grantedToday };
 };
 
 export const hasWordXpAwardedToday = async (wordKey: string): Promise<boolean> => {
@@ -171,7 +249,11 @@ export const markPracticeActivityToday = async (activityKey: string) => {
   } catch {}
 };
 
-export const awardActivityXPOnceToday = async (activityKey: string, amount: number): Promise<number> => {
+export const awardActivityXPOnceToday = async (
+  activityKey: string,
+  amount: number,
+  replayFraction: number = REPLAY_XP_FRACTION
+): Promise<number> => {
   const normalizedKey = activityKey.trim();
   const normalizedAmount = normalizeXP(amount);
   if (!normalizedKey) return 0;
@@ -183,11 +265,44 @@ export const awardActivityXPOnceToday = async (activityKey: string, amount: numb
     const storageKey = todayKey(DAILY_ACTIVITY_XP_PREFIX);
     const awardedKeys = await getAwardedActivityXPKeysToday();
 
-    if (awardedKeys.has(normalizedKey)) return 0;
+    // Already earned full XP for this today — give a smaller replay reward instead of
+    // nothing, so redoing an exercise still feels worthwhile.
+    if (awardedKeys.has(normalizedKey)) {
+      return grantXP(Math.round(normalizedAmount * replayFraction));
+    }
 
     await addStringSetValue(storageKey, normalizedKey);
-    await addXP(normalizedAmount);
-    return normalizedAmount;
+    return grantXP(normalizedAmount);
+  } catch {
+    return 0;
+  }
+};
+
+/**
+ * What awardActivityXPOnceToday would return, without awarding anything or marking the
+ * activity as practised. Lets a session total be shown accurately before the student
+ * claims it — the amount is reduced for activities already done today and by the day's
+ * soft cap, neither of which is knowable from the session alone. `pendingAmount` carries
+ * the running total of everything already previewed for this session, so previewing a
+ * batch item by item tapers the batch as a whole.
+ */
+export const previewActivityXPOnceToday = async (
+  activityKey: string,
+  amount: number,
+  replayFraction: number = REPLAY_XP_FRACTION,
+  pendingAmount = 0
+): Promise<number> => {
+  const normalizedKey = activityKey.trim();
+  const normalizedAmount = normalizeXP(amount);
+  if (!normalizedKey || normalizedAmount <= 0) return 0;
+
+  try {
+    const awardedKeys = await getAwardedActivityXPKeysToday();
+    const beforeTaper = awardedKeys.has(normalizedKey)
+      ? Math.round(normalizedAmount * replayFraction)
+      : normalizedAmount;
+
+    return previewGrantXP(beforeTaper, pendingAmount);
   } catch {
     return 0;
   }

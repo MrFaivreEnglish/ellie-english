@@ -2,38 +2,45 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   SectionList,
   View,
-  Text,
   TouchableOpacity,
   Image,
   StyleSheet,
   Platform,
-  TextInput,
   UIManager,
   LayoutAnimation,
   useWindowDimensions
 } from 'react-native';
+import { Image as ExpoImage } from 'expo-image';
 import Animated, { FadeIn, FadeInDown, FadeOut } from 'react-native-reanimated';
+import {
+  getBottomSafeAreaInset,
+  getDesktopContentMaxWidth,
+  getTopSafeAreaInset,
+  isDesktopWebWidth,
+  NARROW_TRAY_WIDTH,
+} from '../shared/responsiveLayout';
 import { useSpringPress } from '../shared/useSpringPress';
-import { useSelectPop } from '../shared/useSelectPop';
 import { useSearchFocusAnimation } from '../shared/useSearchFocusAnimation';
 import FloatingIcon from '../shared/FloatingIcon';
 import { useTheme, type ThemeColors } from '../settings/ThemeContext';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
-import { MaterialIcons } from '@expo/vector-icons';
+import Text, { ThemedTextInput as TextInput } from '../shared/ThemedText';
+import MaterialIcons from '../shared/ThemedMaterialIcon';
 import BackButton from '../shared/BackButton';
 import { createMixedGrammarLesson, grammarCategories } from '../../content/lessons/grammarRegistry';
 import { getGrammarLessonProgressCounts, getGrammarLessonProgressKey, getGrammarLessonKeysPracticedToday } from './grammarProgressStorage';
 import { getMenuCopy } from '../shared/menuCopy';
 import {
   getInsetSurfaceStyle,
-  getPanelStyle,
   getSelectionTrayColors,
   getSoftShadow,
   getStudySurfaceColors,
   uiRadii,
+  withColorAlpha,
 } from '../shared/uiPrimitives';
 import type { GrammarLesson } from '../../types/lessonTypes';
+import { useDesktopTypographyScale } from '../shared/DesktopTypography';
 
 const isRemoteLessonImage = (imageUrl: any) =>
   typeof imageUrl === 'string' && /^https?:\/\//i.test(imageUrl);
@@ -85,6 +92,7 @@ const GrammarLessonRow = React.memo(({
   selectable = true,
   onToggleLesson,
 }: GrammarLessonRowProps) => {
+  const desktopScale = useDesktopTypographyScale();
   const handlePress = useCallback(() => {
     if (selectionMode && selectable && onToggleLesson) {
       onToggleLesson(lesson);
@@ -94,7 +102,6 @@ const GrammarLessonRow = React.memo(({
     onSelectLesson(lesson);
   }, [lesson, onSelectLesson, onToggleLesson, selectable, selectionMode]);
   const rowPress = useSpringPress();
-  const selectPopStyle = useSelectPop(selected);
   const isMixedGrammarLesson = !!lesson.isMixedGrammarLesson;
   const mixedLessonImageUrls: string[] = Array.isArray(lesson.sourceLessonImages)
     ? lesson.sourceLessonImages.filter((imageUrl: unknown): imageUrl is string => typeof imageUrl === 'string' && imageUrl.trim().length > 0)
@@ -106,7 +113,7 @@ const GrammarLessonRow = React.memo(({
   const [imageLoadFailed, setImageLoadFailed] = useState(false);
   const shouldRenderThumbnail = !isMixedGrammarLesson && imageSource && (!isRemoteImage || canLoadRemoteImage);
   const studySurface = getStudySurfaceColors(colors, isDarkMode);
-  const mixedLessonSurface = isDarkMode ? colors.surface : '#FDFCFA';
+  const mixedLessonSurface = colors.card;
   const mixedLessonBorder = isDarkMode ? '#FFFFFF' : colors.border;
   const mixedLessonIconSurface = studySurface.control;
   const mixedLessonMetaSurface = studySurface.control;
@@ -135,10 +142,15 @@ const GrammarLessonRow = React.memo(({
     <Animated.View
       entering={FadeInDown.delay(Math.min(rowIndex, 10) * 40).duration(300)}
     >
-      <Animated.View style={[rowPress.animatedStyle, selectPopStyle]}>
+      <Animated.View style={rowPress.animatedStyle}>
       <TouchableOpacity
       style={[
         styles.lessonItem,
+        desktopScale > 1 && {
+          paddingVertical: Math.round(12 * desktopScale),
+          paddingHorizontal: Math.round(12 * desktopScale),
+          borderRadius: Math.round(uiRadii.panel * desktopScale),
+        },
         getInsetSurfaceStyle(colors, isDarkMode),
         isMixedGrammarLesson && styles.mixedLessonItem,
         selected && styles.selectedLessonItem,
@@ -146,13 +158,14 @@ const GrammarLessonRow = React.memo(({
           backgroundColor: isMixedGrammarLesson
             ? selected ? colors.primarySoft : mixedLessonSurface
             : selected ? colors.primarySoft
-            : isDarkMode ? colors.surface : '#FDFCFA',
+            : colors.card,
           borderColor: isMixedGrammarLesson
             ? selected ? colors.primary : mixedLessonBorder
             : selected ? colors.primary
             : colors.border,
+          borderWidth: isMixedGrammarLesson ? undefined : 2,
           borderBottomColor: selected ? colors.primary : colors.border,
-          borderBottomWidth: selected ? 3 : 1.5,
+          borderBottomWidth: selected ? 3 : 2.5,
         },
       ]}
       activeOpacity={0.82}
@@ -167,6 +180,12 @@ const GrammarLessonRow = React.memo(({
         style={[
           styles.lessonThumbnail,
           isMixedGrammarLesson && styles.mixedLessonThumbnail,
+          desktopScale > 1 && {
+            width: Math.round(70 * desktopScale),
+            height: Math.round(70 * desktopScale),
+            borderRadius: Math.round(uiRadii.thumbnail * desktopScale),
+            marginRight: Math.round(6 * desktopScale),
+          },
           {
             backgroundColor: isMixedGrammarLesson ? 'transparent' : studySurface.photoFrame,
             borderColor: isMixedGrammarLesson ? 'transparent' : studySurface.photoFrameBorder,
@@ -175,7 +194,7 @@ const GrammarLessonRow = React.memo(({
               ? 'none'
               : isDarkMode
                 ? '0px 2px 5px rgba(0,0,0,0.25)'
-                : '0px 2px 5px rgba(108,142,170,0.14)',
+                : `0px 2px 5px ${withColorAlpha(colors.shadow, 0.72)}`,
           },
         ]}
       >
@@ -184,23 +203,26 @@ const GrammarLessonRow = React.memo(({
             {mixedLessonImageUrls.length > 0 ? (
               <View style={styles.mixedLessonImageStack}>
                 {mixedLessonImageUrls.slice(0, 3).map((imageUrl, index) => (
-                  <Image
+                  <ExpoImage
                     key={`${imageUrl}-${index}`}
                     source={{ uri: imageUrl }}
                     style={[
                       styles.mixedLessonStackImage,
                       {
+                        backgroundColor: colors.surfaceAlt,
                         left: index * 13,
                         transform: [{ rotate: index === 0 ? '-6deg' : index === 1 ? '3deg' : '9deg' }],
                       },
                     ]}
-                    resizeMode="cover"
+                    contentFit="cover"
+                    transition={200}
+                    cachePolicy="memory-disk"
                   />
                 ))}
               </View>
             ) : null}
             <View style={[styles.mixedLessonShuffleBadge, { backgroundColor: colors.buttonBackground, borderColor: '#FFFFFF' }]}>
-              <MaterialIcons name="shuffle" size={17} color={colors.buttonText} />
+              <MaterialIcons name="shuffle" size={Math.round(17 * desktopScale)} color={colors.buttonText} />
             </View>
           </View>
         ) : (
@@ -210,7 +232,7 @@ const GrammarLessonRow = React.memo(({
                 <View
                   style={[
                     styles.thumbnailSkeletonPanel,
-                    { backgroundColor: isDarkMode ? colors.card : '#FDFCFA' },
+                    { backgroundColor: colors.card },
                   ]}
                 />
                 <View
@@ -230,22 +252,19 @@ const GrammarLessonRow = React.memo(({
             )}
 
             {shouldRenderThumbnail && !imageLoadFailed && (
-              <Image
+              <ExpoImage
                 source={imageSource}
-                style={[
-                  styles.lessonThumbnailImage,
-                  !imageLoaded && styles.lessonThumbnailImageLoading,
-                ]}
-                resizeMode="cover"
-                fadeDuration={0}
-                progressiveRenderingEnabled
+                style={styles.lessonThumbnailImage}
+                contentFit="cover"
+                transition={200}
+                cachePolicy="memory-disk"
                 onLoad={() => setImageLoaded(true)}
                 onError={() => setImageLoadFailed(true)}
               />
             )}
 
             {imageLoadFailed && (
-              <MaterialIcons name="image-not-supported" size={22} color={colors.secondaryText} />
+              <MaterialIcons name="image-not-supported" size={Math.round(22 * desktopScale)} color={colors.secondaryText} />
             )}
           </>
         )}
@@ -266,7 +285,7 @@ const GrammarLessonRow = React.memo(({
         {isMixedGrammarLesson && (
           <View style={styles.mixedMetaRow}>
             <View style={[styles.mixedMetaPill, { backgroundColor: mixedLessonMetaSurface, borderColor: colors.primary }]}>
-              <MaterialIcons name="auto-awesome" size={13} color={colors.primary} />
+              <MaterialIcons name="auto-awesome" size={Math.round(13 * desktopScale)} color={colors.primary} />
               <Text style={[styles.mixedMetaText, { color: colors.primary }]}>
                 {lesson.sourceLessonCount ?? mixedLessonImageUrls.length} {lesson.sourceLessonCount === 1 ? copy.lessonSingular : copy.lessonPlural}
               </Text>
@@ -276,13 +295,13 @@ const GrammarLessonRow = React.memo(({
         <View style={styles.lessonPillRow}>
           {practicedToday && (
             <View style={[styles.todayPill, { backgroundColor: colors.primarySoft, borderColor: colors.primary }]}>
-              <MaterialIcons name="today" size={12} color={colors.primary} />
+              <MaterialIcons name="today" size={Math.round(12 * desktopScale)} color={colors.primary} />
               <Text style={[styles.todayPillText, { color: colors.primary }]}>Today</Text>
             </View>
           )}
           {savedAnswerCount > 0 && (
             <View style={[styles.savedAnswersPill, { backgroundColor: colors.successSoft, borderColor: colors.success }]}>
-              <MaterialIcons name="check-circle" size={14} color={colors.success} />
+              <MaterialIcons name="check-circle" size={Math.round(14 * desktopScale)} color={colors.success} />
               <Text style={[styles.savedAnswersText, { color: colors.successText ?? colors.success }]}>
                 {savedAnswerCount} {savedAnswerCount === 1 ? copy.savedAnswerSingular : copy.savedAnswerPlural}
               </Text>
@@ -294,13 +313,13 @@ const GrammarLessonRow = React.memo(({
       {selectionMode && selectable ? (
         <MaterialIcons
           name={selected ? 'check-box' : 'check-box-outline-blank'}
-          size={24}
+          size={Math.round(24 * desktopScale)}
           color={selected ? colors.primary : colors.secondaryText}
         />
       ) : (
         <MaterialIcons
           name="arrow-forward-ios"
-          size={16}
+          size={Math.round(16 * desktopScale)}
           color={colors.secondaryText}
         />
       )}
@@ -342,18 +361,24 @@ const GrammarCategoryList: React.FC<{ onSelectLesson: (lesson: GrammarLesson) =>
 ({ onSelectLesson }) => {
   const insets = useSafeAreaInsets();
   const navigation = useNavigation();
-  const { width: windowWidth } = useWindowDimensions();
-  const isDesktopWeb = Platform.OS === 'web' && windowWidth >= 768;
+  const { width: windowWidth, height: windowHeight } = useWindowDimensions();
+  const isDesktopWeb = isDesktopWebWidth(windowWidth, undefined, windowHeight);
+  const desktopContentMaxWidth = getDesktopContentMaxWidth(windowWidth, 'scroll', windowHeight);
+  const desktopScale = useDesktopTypographyScale();
+  // Tablet keeps the mobile structural layout (isDesktopWeb stays false)
+  // but still gets a real desktopScale > 1 — numeric-only scale call sites
+  // gate on this instead of isDesktopWeb alone, which used to leave tablet
+  // at the flat phone size even though its own scale was already correct.
+  const isScaledLayout = isDesktopWeb || desktopScale > 1;
+  // Growing 1:1 with desktopScale makes the "Select lessons" button dominate the header on
+  // wide screens, so its whole box (and the text inside it) scales at a gentler rate instead.
+  const selectButtonScale = 1 + (desktopScale - 1) * 0.5;
   const { colors, isDarkMode, isAndroidStatusBarEnabled } = useTheme();
   const appCopy = getMenuCopy();
   const copy = appCopy.grammar;
   const commonCopy = appCopy.common;
-  const isSelectionTrayCompact = windowWidth < 430;
-  const topContentInset = Platform.OS === 'ios'
-    ? (insets.top ?? 0)
-    : Platform.OS === 'android' && isAndroidStatusBarEnabled
-      ? insets.top
-      : 0;
+  const isSelectionTrayCompact = windowWidth < NARROW_TRAY_WIDTH;
+  const topContentInset = getTopSafeAreaInset(Platform.OS, insets.top, isAndroidStatusBarEnabled);
 
   const [expandedSub, setExpandedSub] = useState<Record<string, boolean>>({});
   const [search, setSearch] = useState('');
@@ -538,7 +563,7 @@ const GrammarCategoryList: React.FC<{ onSelectLesson: (lesson: GrammarLesson) =>
 
     return grammarProgressCounts[getGrammarLessonProgressKey(lesson)] ?? 0;
   };
-  const selectionTrayBottomPadding = Platform.OS === 'web' ? 16 : Math.max(insets.bottom, 12);
+  const selectionTrayBottomPadding = getBottomSafeAreaInset(insets.bottom);
   const studySurface = useMemo(() => getStudySurfaceColors(colors, isDarkMode), [colors, isDarkMode]);
   const trayColors = useMemo(() => getSelectionTrayColors(colors, isDarkMode), [colors, isDarkMode]);
   const traySurfaceColor = trayColors.surface;
@@ -589,14 +614,23 @@ const GrammarCategoryList: React.FC<{ onSelectLesson: (lesson: GrammarLesson) =>
           paddingTop: topContentInset,
           paddingBottom: selectionMode ? 142 : 18,
         },
-        isDesktopWeb && styles.desktopContentWrap,
+        isDesktopWeb && [styles.desktopContentWrap, { maxWidth: desktopContentMaxWidth }],
       ]}
       ListHeaderComponent={(
         <>
           <BackButton label={commonCopy.backToHome} onPress={() => navigation.goBack()} />
 
           <View style={styles.headerRow}>
-            <Text style={[styles.headerTitle, { color: colors.text }]}>
+            <Text
+              style={[
+                styles.headerTitle,
+                isSelectionTrayCompact && styles.headerTitleCompact,
+                { color: colors.text },
+              ]}
+              numberOfLines={1}
+              adjustsFontSizeToFit
+              minimumFontScale={0.7}
+            >
               {copy.header}
             </Text>
             <TouchableOpacity
@@ -604,6 +638,13 @@ const GrammarCategoryList: React.FC<{ onSelectLesson: (lesson: GrammarLesson) =>
               onPress={toggleSelectionMode}
               style={[
               styles.headerSelectButton,
+              isSelectionTrayCompact && styles.headerSelectButtonCompact,
+              isScaledLayout && {
+                minHeight: Math.round(42 * selectButtonScale),
+                maxWidth: Math.round(174 * selectButtonScale),
+                paddingHorizontal: Math.round(12 * selectButtonScale),
+                gap: Math.round(7 * selectButtonScale),
+              },
               {
                   backgroundColor: selectionMode ? colors.primarySoft : studySurface.control,
                   borderColor: selectionMode ? colors.primary : studySurface.controlBorder,
@@ -614,11 +655,16 @@ const GrammarCategoryList: React.FC<{ onSelectLesson: (lesson: GrammarLesson) =>
             >
               <MaterialIcons
                 name={selectionMode ? 'close' : 'checklist'}
-                size={18}
+                size={Math.round(18 * (isScaledLayout ? selectButtonScale : 1))}
                 color={selectionMode ? colors.primary : colors.secondaryText}
               />
               <Text
-                style={[styles.headerSelectText, { color: selectionMode ? colors.primary : colors.text }]}
+                style={[
+                  styles.headerSelectText,
+                  isSelectionTrayCompact && styles.headerSelectTextCompact,
+                  isScaledLayout && { fontSize: Math.round(14 * selectButtonScale) },
+                  { color: selectionMode ? colors.primary : colors.text },
+                ]}
                 numberOfLines={1}
               >
                 {selectionMode ? copy.cancelSelection : copy.selectLessons}
@@ -634,6 +680,12 @@ const GrammarCategoryList: React.FC<{ onSelectLesson: (lesson: GrammarLesson) =>
                 backgroundColor: searchSurfaceColor,
                 borderRadius: uiRadii.control,
               },
+
+
+
+
+
+              desktopScale > 1 && { borderRadius: Math.round(uiRadii.control * desktopScale) },
               searchFocusAnim.animatedStyle,
             ]}
           >
@@ -655,20 +707,42 @@ const GrammarCategoryList: React.FC<{ onSelectLesson: (lesson: GrammarLesson) =>
                   paddingVertical: 14,
                   fontSize: 16,
                 },
+
+
+
+
+                desktopScale > 1 && {
+                  minHeight: Math.round(46 * desktopScale),
+                  paddingRight: Math.round(45 * desktopScale),
+                  paddingLeft: Math.round(44 * desktopScale),
+                  paddingVertical: Math.round(14 * desktopScale),
+                },
               ]}
             />
 
-            <View style={styles.searchIconWrap}>
-              <MaterialIcons name="search" size={20} color={searchActiveColor} />
+            <View
+              style={[
+                styles.searchIconWrap,
+                desktopScale > 1 && { left: Math.round(16 * desktopScale), width: Math.round(24 * desktopScale) },
+              ]}
+            >
+              <MaterialIcons name="search" size={Math.round(20 * desktopScale)} color={searchActiveColor} />
             </View>
 
             {search.length > 0 && (
-              <Animated.View entering={FadeIn.duration(140)} exiting={FadeOut.duration(110)} style={styles.searchClearButton}>
+              <Animated.View
+                entering={FadeIn.duration(140)}
+                exiting={FadeOut.duration(110)}
+                style={[
+                  styles.searchClearButton,
+                  desktopScale > 1 && { right: Math.round(18 * desktopScale), width: Math.round(40 * desktopScale) },
+                ]}
+              >
                 <TouchableOpacity
                   onPress={() => setSearch('')}
                   hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
                 >
-                  <MaterialIcons name="close" size={20} color={searchActiveColor} />
+                  <MaterialIcons name="close" size={Math.round(20 * desktopScale)} color={searchActiveColor} />
                 </TouchableOpacity>
               </Animated.View>
             )}
@@ -676,7 +750,7 @@ const GrammarCategoryList: React.FC<{ onSelectLesson: (lesson: GrammarLesson) =>
 
           {!hasGrammarLessons && (
             <View style={[styles.searchEmptyState, { backgroundColor: colors.card, borderColor: colors.border }]}>
-              <FloatingIcon name="menu-book" size={28} color={colors.secondaryText} />
+              <FloatingIcon name="menu-book" size={Math.round(28 * desktopScale)} color={colors.secondaryText} />
               <Text style={[styles.searchEmptyTitle, { color: colors.text }]}>{copy.noLessonTitle}</Text>
               <Text style={[styles.searchEmptySubtitle, { color: colors.secondaryText }]}>
                 {copy.noLessonText}
@@ -686,7 +760,7 @@ const GrammarCategoryList: React.FC<{ onSelectLesson: (lesson: GrammarLesson) =>
 
           {hasGrammarLessons && !hasSearchResults && (
             <View style={[styles.searchEmptyState, { backgroundColor: colors.card, borderColor: colors.border }]}>
-              <FloatingIcon name="search-off" size={28} color={colors.secondaryText} />
+              <FloatingIcon name="search-off" size={Math.round(28 * desktopScale)} color={colors.secondaryText} />
               <Text style={[styles.searchEmptyTitle, { color: colors.text }]}>{copy.noSearchTitle}</Text>
               <Text style={[styles.searchEmptySubtitle, { color: colors.secondaryText }]}>
                 {copy.noSearchText}
@@ -713,16 +787,22 @@ const GrammarCategoryList: React.FC<{ onSelectLesson: (lesson: GrammarLesson) =>
           <View
             style={[
               styles.categoryContainer,
-              getPanelStyle(colors, isDarkMode, open ? 'raised' : 'soft'),
+              desktopScale > 1 && {
+                marginBottom: Math.round(16 * desktopScale),
+                marginHorizontal: Math.round(16 * desktopScale),
+                borderRadius: Math.round(uiRadii.card * desktopScale),
+              },
               {
                 backgroundColor: colors.card,
-                borderWidth: 0,
+                borderWidth: 2.5,
+                borderColor: '#FFFFFF',
               }
             ]}
           >
             <TouchableOpacity
               style={[
                 styles.categoryHeader,
+                desktopScale > 1 && { padding: Math.round(16 * desktopScale) },
                 { backgroundColor: subColor },
               ]}
               onPress={() => toggleSub(key)}
@@ -740,7 +820,7 @@ const GrammarCategoryList: React.FC<{ onSelectLesson: (lesson: GrammarLesson) =>
               {!search && (
                 <MaterialIcons
                   name={open ? 'expand-less' : 'expand-more'}
-                  size={20}
+                  size={Math.round(20 * desktopScale)}
                   color="#FFFFFF"
                 />
               )}
@@ -793,7 +873,8 @@ const GrammarCategoryList: React.FC<{ onSelectLesson: (lesson: GrammarLesson) =>
         <View
           style={[
             styles.selectionControls,
-            getSoftShadow(isDarkMode, 'raised'),
+            getSoftShadow(isDarkMode, 'raised', colors.shadow, colors.visualStyle === 'pixel'),
+            isDesktopWeb && [styles.selectionControlsDesktopWeb, { maxWidth: desktopContentMaxWidth }],
             {
               backgroundColor: traySurfaceColor,
               borderColor: trayBorderColor,
@@ -866,7 +947,7 @@ const GrammarCategoryList: React.FC<{ onSelectLesson: (lesson: GrammarLesson) =>
                         styles.selectedMixStackCard,
                         isSelectionTrayCompact && styles.selectedMixStackCardCompact,
                         {
-                          left: stackIndex * (isSelectionTrayCompact ? 20 : 23),
+                          left: stackIndex * (isSelectionTrayCompact ? 22 : 32),
                           zIndex: stackIndex + 1,
                           transform: [{ rotate: stackIndex === 0 ? '-7deg' : stackIndex === 1 ? '-1deg' : stackIndex === 2 ? '5deg' : '10deg' }],
                           backgroundColor: trayColors.stackFrame,
@@ -956,8 +1037,9 @@ const styles = StyleSheet.create({
   },
   container: { flex: 1 },
   desktopContentWrap: {
+
+
     width: '100%',
-    maxWidth: 1000,
     alignSelf: 'center',
   },
 
@@ -974,6 +1056,13 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     minWidth: 0,
   },
+
+
+
+
+  headerTitleCompact: {
+    fontSize: 26,
+  },
   headerSelectButton: {
     alignItems: 'center',
     borderRadius: uiRadii.control,
@@ -984,15 +1073,23 @@ const styles = StyleSheet.create({
     maxWidth: 174,
     paddingHorizontal: 12,
   },
+  headerSelectButtonCompact: {
+    maxWidth: 132,
+    paddingHorizontal: 9,
+    gap: 5,
+  },
   headerSelectText: {
     flexShrink: 1,
     fontSize: 14,
     fontWeight: '800',
   },
+  headerSelectTextCompact: {
+    fontSize: 12.5,
+  },
   searchShell: {
     marginHorizontal: 16,
     marginTop: 10,
-    marginBottom: 14,
+    marginBottom: 20,
     borderWidth: 1.5,
     borderRadius: uiRadii.control,
     overflow: 'hidden',
@@ -1053,12 +1150,22 @@ const styles = StyleSheet.create({
   selectionTrayWrap: {
     backgroundColor: 'transparent',
     bottom: 0,
+    // Keep elevation (it's what puts the tray above the tab bar on Android), but this
+    // wrapper is explicitly transparent — the shadow it casts is a rectangular grey halo
+    // around the rounded tray inside it, drawn from this view's own outline.
     elevation: 20,
+    shadowColor: 'transparent',
     left: 0,
     paddingTop: 10,
     position: 'absolute',
     right: 0,
     zIndex: 20,
+  },
+  selectionControlsDesktopWeb: {
+
+
+    width: '100%',
+    alignSelf: 'center',
   },
   selectionActionRow: {
     alignItems: 'center',
@@ -1120,12 +1227,15 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: '800',
   },
+
+
+
   selectedMixPreviewRow: {
     alignItems: 'center',
     borderTopWidth: StyleSheet.hairlineWidth,
     flexDirection: 'row',
     gap: 12,
-    minHeight: 78,
+    minHeight: 96,
     paddingHorizontal: 0,
     paddingTop: 8,
   },
@@ -1133,38 +1243,35 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   selectedMixStackCanvas: {
-    height: 78,
+    height: 96,
     position: 'relative',
-    width: 156,
+    width: 200,
   },
   selectedMixStackCanvasCompact: {
-    width: 112,
+    width: 134,
   },
   selectedMixStackCard: {
     alignItems: 'center',
-    borderRadius: 10,
     borderColor: '#FFFFFF',
-    borderWidth: 2.5,
-    elevation: 3,
-    height: 72,
+    borderRadius: 12,
+    borderWidth: 2.5,
+    height: 90,
     justifyContent: 'center',
     overflow: 'hidden',
+    padding: 0,
     position: 'absolute',
-    boxShadow: '0px 2px 5px rgba(0,0,0,0.16)',
+    boxShadow: '0px 2px 6px rgba(0,0,0,0.18)',
     top: 3,
-    width: 56,
+    width: 74,
   },
   selectedMixStackCardCompact: {
-    height: 64,
-    width: 50,
+    height: 74,
+    width: 60,
   },
   selectedMixStackImage: {
-    borderRadius: 7,
-    bottom: 3,
-    left: 3,
-    position: 'absolute',
-    right: 3,
-    top: 3,
+    borderRadius: 0,
+    height: '100%',
+    width: '100%',
   },
   selectedMixMoreBadge: {
     alignItems: 'center',
@@ -1222,8 +1329,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     padding: 16,
     justifyContent: 'space-between',
-    borderWidth: 1.5,
-    borderColor: 'rgba(255,255,255,0.55)',
   },
 
   categoryIcon: {
@@ -1287,7 +1392,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     overflow: 'hidden',
-    elevation: 2,
+    // No elevation: the row fades/slides in (FadeInDown), and Android composites a native
+    // elevation shadow separately from that, so mid-animation it read as a grey plate
+    // around the thumbnail. The boxShadow applied at the call site fades with the row.
   },
   mixedLessonThumbnail: {
     backgroundColor: 'transparent',
@@ -1297,9 +1404,6 @@ const styles = StyleSheet.create({
     width: '100%',
     height: '100%',
     borderRadius: 10,
-  },
-  lessonThumbnailImageLoading: {
-    opacity: 0,
   },
   mixedLessonIcon: {
     width: '100%',

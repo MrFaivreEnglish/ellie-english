@@ -2,23 +2,23 @@ const OpinionLevel1Vocab = {
   id: '200',
   title: 'Opinion Basics',
   description: 'Easy opinion phrases and adjectives to express simple viewpoints',
-  imageUrl: 'https://i.ibb.co/bVCHwGt/Opinion-Vocabulary-Level-1.webp',
+  imageUrl: 'https://wretggbpaejzjdilemit.supabase.co/storage/v1/object/public/lesson-images/15274719ab/opinion-basics.webp',
   thumbnail: require('../../assets/thumbnails/opinion-level-1-thumbnail.png'),
   flashcards: [
-    { "english": "Fun", "french": "amusant" },
-    { "english": "Funny", "french": "drôle" },
-    { "english": "Famous", "french": "célèbre" },
-    { "english": "Scary", "french": "effrayant" },
-    { "english": "Boring", "french": "ennuyeux" },
-    { "english": "Strange", "french": "étrange" },
-    { "english": "Awful", "french": "terrible" },
-    { "english": "Terrible", "french": "horrible" },
-    { "english": "Surprising", "french": "surprenant" },
-    { "english": "Sad", "french": "triste" },
-    { "english": "Crazy", "french": "fou" },
-    { "english": "Silly", "french": "bête" },
-    { "english": "Embarrassing", "french": "gênant" },
-    { "english": "Disgusting", "french": "dégoûtant" }
+    { "english": "Fun", "french": "Amusant" },
+    { "english": "Funny", "french": "Drôle" },
+    { "english": "Famous", "french": "Célèbre" },
+    { "english": "Scary", "french": "Effrayant" },
+    { "english": "Boring", "french": "Ennuyeux" },
+    { "english": "Strange", "french": "Étrange" },
+    { "english": "Awful", "french": "Affreux" },
+    { "english": "Terrible", "french": "Horrible" },
+    { "english": "Surprising", "french": "Surprenant" },
+    { "english": "Sad", "french": "Triste" },
+    { "english": "Crazy", "french": "Fou" },
+    { "english": "Silly", "french": "Bête" },
+    { "english": "Embarrassing", "french": "Gênant" },
+    { "english": "Disgusting", "french": "Dégoûtant" }
   ]
 };
 

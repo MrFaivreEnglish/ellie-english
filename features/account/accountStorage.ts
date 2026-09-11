@@ -397,6 +397,17 @@ export const getSignedInAccountIdIfSignedIn = async () => {
   }
 };
 
+export const getSignedInAccountAccessToken = async () => {
+  if (!isAccountBackendConfigured()) return null;
+
+  try {
+    const authSession = await getActiveAuthSession();
+    return authSession?.access_token ?? null;
+  } catch {
+    return null;
+  }
+};
+
 const normalizeProgressValue = (value: unknown): Record<string, unknown> => {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return {};
 
@@ -514,8 +525,8 @@ export const loadAccountSession = async (): Promise<AccountSession | null> => {
 
     if (!authSession) return null;
 
-    // Build from locally cached auth metadata — no network call needed.
-    // The startup effect will refresh from the DB in the background.
+
+
     const metadata = getAuthMetadata(authSession.user);
     const username = normalizeUsername(metadata.username || authSession.user.email?.split('@')[0] || '');
 

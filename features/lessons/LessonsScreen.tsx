@@ -1,7 +1,8 @@
 import React, { useMemo, useState } from 'react';
-import { Alert, View, Text, StyleSheet, ScrollView, TouchableOpacity, Linking, Platform, useWindowDimensions } from 'react-native';
+import { Alert, AppState, View, StyleSheet, ScrollView, TouchableOpacity, Linking, Platform, useWindowDimensions } from 'react-native';
 import BackButton from '../shared/BackButton';
-import { MaterialIcons } from '@expo/vector-icons';
+import Text from '../shared/ThemedText';
+import MaterialIcons from '../shared/ThemedMaterialIcon';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import type { CompositeNavigationProp } from '@react-navigation/native';
 import type { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
@@ -13,6 +14,8 @@ import { lessonCategories as chapterCategories } from '../../content/lessons/cha
 import { resourceCategories as resourceLinkCategories } from '../../content/lessons/resourceLinks';
 import { resolveChapterAppLink } from '../../content/lessons/appLessonRegistry';
 import { createMixedGrammarLesson } from '../../content/lessons/grammarRegistry';
+import { getDesktopContentMaxWidth, getDesktopTypographyScale, getTopSafeAreaInset, isDesktopWebWidth, NARROW_CARD_WIDTH, NARROW_TRAY_WIDTH } from '../shared/responsiveLayout';
+import { DesktopTypographyProvider } from '../shared/DesktopTypography';
 import type { ResolvedChapterAppLink } from '../../content/lessons/lessonTypes';
 import { getLessonImage, getSerializableVocabularyLesson } from '../vocabulary/vocabularyUtils';
 import { getMenuCopy } from '../shared/menuCopy';
@@ -22,15 +25,18 @@ import {
   normalizeChapterLinkOverrides,
   type ChapterLinkOverride,
 } from './chapterLinkStorage';
-import { getPanelStyle, getSoftShadow, uiRadii } from '../shared/uiPrimitives';
-import { FRESH_COLORS, freshRadii } from '../shared/freshDirection';
+import { getSoftShadow, uiRadii } from '../shared/uiPrimitives';
+import { FRESH_COLORS } from '../shared/freshDirection';
 import type { Word } from '../../types/VocabularyTypes';
+import { getCustomChapters, type CustomChapter } from './customChapterStorage';
+import { mergeCustomChapters } from './chapterContent';
+import { getCustomVocabularyLessons, type CustomVocabularyLesson } from './customLessonStorage';
 
 const bundledCustomChapterLinks = require('../../content/lessons/customChapterLinks.json') as any[];
 
-// Same sequence Grammar selection cycles through for its subcategory
-// headers (features/grammar/GrammarCategoryList.tsx `subColors`) — kept in
-// sync by hand so Chapters reads as the same visual system.
+
+
+
 const LEVEL_COLORS = [
   '#ee9cb0ff',
   '#D9A6E8',
@@ -40,10 +46,10 @@ const LEVEL_COLORS = [
   '#92c490ff',
 ];
 
-// Mirrors VocabularyScreen.tsx's `getVocabularyLessonImageUrl` — same
-// raw-URL-with-generated-fallback resolution, so a vocabulary Mix built
-// from Chapters carries the same multi-image carousel data a Mix built
-// from the Vocabulary selection tray does.
+
+
+
+
 const getVocabularyLessonImageUrl = (lesson: any) => {
   const rawImage = lesson?.imageUrl ?? lesson?.image;
 
@@ -85,20 +91,33 @@ type LessonsNavigationProp = CompositeNavigationProp<
 
 export default function LessonsScreen() {
   const navigation = useNavigation<LessonsNavigationProp>();
-  const { width: windowWidth } = useWindowDimensions();
-  const isDesktopWeb = Platform.OS === 'web' && windowWidth >= 768;
+  const { width: windowWidth, height: windowHeight } = useWindowDimensions();
+  const isDesktopWeb = isDesktopWebWidth(windowWidth, undefined, windowHeight);
+  const desktopContentMaxWidth = getDesktopContentMaxWidth(windowWidth, 'scroll', windowHeight);
+
+
+
+
+
+  const desktopScale = getDesktopTypographyScale(windowWidth, windowHeight, 'scroll');
+  // Tablet keeps the mobile structural layout (isDesktopWeb stays false)
+  // but still gets a real desktopScale > 1 — numeric-only scale call sites
+  // gate on this instead of isDesktopWeb alone, which used to leave tablet
+  // at the flat phone size even though its own scale was already correct.
+  const isScaledLayout = isDesktopWeb || desktopScale > 1;
+
+
+
+  const isNarrowScreen = windowWidth < NARROW_CARD_WIDTH;
+  const isHeaderTitleCompact = windowWidth < NARROW_TRAY_WIDTH;
   const { isDarkMode, colors, isAndroidStatusBarEnabled } = useTheme();
   const appCopy = getMenuCopy();
   const copy = appCopy.lessons;
   const commonCopy = appCopy.common;
   const insets = useSafeAreaInsets();
-  const topContentInset = Platform.OS === 'ios'
-    ? (insets.top > 0 ? insets.top : 0)
-    : Platform.OS === 'android' && isAndroidStatusBarEnabled
-      ? insets.top
-      : 0;
+  const topContentInset = getTopSafeAreaInset(Platform.OS, insets.top, isAndroidStatusBarEnabled);
   const [viewMode, setViewMode] = useState<'chapters' | 'resources'>('chapters');
-  // Independently expandable rows (§2.14) — several levels can be open at once.
+
   const [openChapterLevels, setOpenChapterLevels] = useState<Set<string>>(() => new Set());
   const [openResourceLevels, setOpenResourceLevels] = useState<Set<string>>(() => new Set());
   const bundledChapterLinkOverrides = useMemo(
@@ -106,6 +125,12 @@ export default function LessonsScreen() {
     []
   );
   const [localChapterLinkOverrides, setLocalChapterLinkOverrides] = useState<ChapterLinkOverride[]>([]);
+  const [customChapters, setCustomChapters] = useState<CustomChapter[]>([]);
+  const [liveVocabularyLessons, setLiveVocabularyLessons] = useState<CustomVocabularyLesson[]>([]);
+  const effectiveChapterCategories = useMemo(
+    () => mergeCustomChapters(chapterCategories, customChapters),
+    [customChapters]
+  );
   const chapterLinkOverrideMap = useMemo(() => {
     const map = new Map<string, ChapterLinkOverride>();
 
@@ -120,19 +145,30 @@ export default function LessonsScreen() {
     return map;
   }, [bundledChapterLinkOverrides, localChapterLinkOverrides]);
 
+  const refreshLiveContent = React.useCallback(async () => {
+    const [overrides, chapters, vocabularyLessons] = await Promise.all([
+      getCustomChapterLinkOverrides({ forceRefresh: true }),
+      getCustomChapters({ forceRefresh: true }),
+      getCustomVocabularyLessons({ forceRefresh: true }),
+    ]);
+    setLocalChapterLinkOverrides(overrides);
+    setCustomChapters(chapters);
+    setLiveVocabularyLessons(vocabularyLessons);
+  }, []);
+
   useFocusEffect(
     React.useCallback(() => {
-      let active = true;
-
-      getCustomChapterLinkOverrides().then((overrides) => {
-        if (active) setLocalChapterLinkOverrides(overrides);
-      });
-
-      return () => {
-        active = false;
-      };
-    }, [])
+      void refreshLiveContent();
+      return undefined;
+    }, [refreshLiveContent])
   );
+
+  React.useEffect(() => {
+    const subscription = AppState.addEventListener('change', (state) => {
+      if (state === 'active') void refreshLiveContent();
+    });
+    return () => subscription.remove();
+  }, [refreshLiveContent]);
 
   const openLink = async (url: string) => {
     try {
@@ -277,16 +313,17 @@ export default function LessonsScreen() {
 
   const hasAnyOpen = viewMode === 'chapters' ? openChapterLevels.size > 0 : openResourceLevels.size > 0;
 
-  // Shows a "scroll for more" hint whenever the list overflows the screen
-  // and the user hasn't scrolled near the bottom yet — with more chapter
-  // categories than fit on one screen, there was no other cue that more
-  // content exists below the fold.
+
+
+
+
   const [scrollViewportHeight, setScrollViewportHeight] = useState(0);
   const [scrollContentHeight, setScrollContentHeight] = useState(0);
   const [isNearScrollEnd, setIsNearScrollEnd] = useState(false);
   const canShowScrollHint = scrollContentHeight > scrollViewportHeight + 40 && !isNearScrollEnd;
 
   return (
+    <DesktopTypographyProvider mode="scroll">
     <View style={{ flex: 1 }}>
     <ScrollView
       style={[
@@ -306,12 +343,16 @@ export default function LessonsScreen() {
       }}
       scrollEventThrottle={32}
     >
-      <View style={isDesktopWeb && styles.desktopContentWrap}>
+      <View style={isDesktopWeb && [styles.desktopContentWrap, { maxWidth: desktopContentMaxWidth }]}>
       <BackButton label={commonCopy.backToHome} onPress={() => (navigation as any).navigate('Home')} />
 
       <View style={styles.headerRow}>
         <Text
-          style={[styles.headerTitle, { color: colors.text }]}
+          style={[
+            styles.headerTitle,
+            isHeaderTitleCompact && styles.headerTitleCompact,
+            { color: colors.text },
+          ]}
           numberOfLines={1}
           adjustsFontSizeToFit
           minimumFontScale={0.7}
@@ -321,7 +362,15 @@ export default function LessonsScreen() {
         {hasAnyOpen && (
           <TouchableOpacity
             onPress={collapseAll}
-            style={[styles.collapseAllPill, { backgroundColor: colors.card }, getSoftShadow(isDarkMode, 'soft')]}
+            style={[
+              styles.collapseAllPill,
+              isScaledLayout && {
+                paddingHorizontal: Math.round(16 * desktopScale),
+                paddingVertical: Math.round(9 * desktopScale),
+              },
+              { backgroundColor: colors.card },
+              getSoftShadow(isDarkMode, 'soft', colors.shadow, colors.visualStyle === 'pixel'),
+            ]}
             accessibilityRole="button"
             accessibilityLabel="Collapse all"
           >
@@ -333,13 +382,20 @@ export default function LessonsScreen() {
       <View
         style={[
           styles.modeToggle,
+          isScaledLayout && {
+            marginBottom: Math.round(18 * desktopScale),
+            marginHorizontal: Math.round(16 * desktopScale),
+            padding: Math.round(5 * desktopScale),
+            gap: Math.round(2 * desktopScale),
+          },
           { backgroundColor: colors.card },
-          getSoftShadow(isDarkMode, 'soft'),
+          getSoftShadow(isDarkMode, 'soft', colors.shadow, colors.visualStyle === 'pixel'),
         ]}
       >
         <TouchableOpacity
           style={[
             styles.modeOption,
+            isScaledLayout && { minHeight: Math.round(44 * desktopScale) },
             viewMode === 'chapters' && { backgroundColor: colors.buttonBackground },
           ]}
           onPress={() => handleViewModeChange('chapters')}
@@ -360,6 +416,7 @@ export default function LessonsScreen() {
         <TouchableOpacity
           style={[
             styles.modeOption,
+            isScaledLayout && { minHeight: Math.round(44 * desktopScale) },
             viewMode === 'resources' && { backgroundColor: colors.buttonBackground },
           ]}
           onPress={() => handleViewModeChange('resources')}
@@ -379,7 +436,7 @@ export default function LessonsScreen() {
         </TouchableOpacity>
       </View>
 
-      {viewMode === 'chapters' && chapterCategories.map((category, levelIndex) => {
+      {viewMode === 'chapters' && effectiveChapterCategories.map((category, levelIndex) => {
         const isOpen = openChapterLevels.has(category.title);
         const levelColor = LEVEL_COLORS[levelIndex % LEVEL_COLORS.length];
 
@@ -388,12 +445,27 @@ export default function LessonsScreen() {
             key={category.title}
             style={[
               styles.categoryContainer,
-              getPanelStyle(colors, isDarkMode, isOpen ? 'raised' : 'soft'),
-              { backgroundColor: colors.card, borderWidth: 0 },
+              isScaledLayout && {
+                marginBottom: Math.round(16 * desktopScale),
+                marginHorizontal: Math.round(16 * desktopScale),
+              },
+              {
+                backgroundColor: colors.card,
+                borderWidth: 2.5,
+                borderColor: '#FFFFFF',
+              },
             ]}
           >
             <TouchableOpacity
-              style={[styles.levelRow, { backgroundColor: levelColor }]}
+              style={[
+                styles.levelRow,
+                isScaledLayout && {
+                  paddingVertical: Math.round(16 * desktopScale),
+                  paddingHorizontal: Math.round(18 * desktopScale),
+                  gap: Math.round(12 * desktopScale),
+                },
+                { backgroundColor: levelColor },
+              ]}
               onPress={() => toggleChapterLevel(category.title)}
               activeOpacity={0.85}
               accessibilityRole="button"
@@ -407,11 +479,16 @@ export default function LessonsScreen() {
                   {category.lessons.length} {category.lessons.length > 1 ? copy.chapterPlural : copy.chapterSingular}
                 </Text>
               </View>
-              <MaterialIcons name={isOpen ? 'expand-less' : 'expand-more'} size={22} color="white" />
+              <MaterialIcons name={isOpen ? 'expand-less' : 'expand-more'} size={Math.round(22 * desktopScale)} color="white" />
             </TouchableOpacity>
 
             {isOpen && (
-              <View style={styles.lessonsContainer}>
+              <View
+                style={[
+                  styles.lessonsContainer,
+                  isScaledLayout && { padding: Math.round(14 * desktopScale), gap: Math.round(10 * desktopScale) },
+                ]}
+              >
                 {category.lessons.map((lesson, lessonIndex) => {
                   const chapterLinkOverride = chapterLinkOverrideMap.get(
                     makeChapterLinkOverrideId(category.title, lesson.title)
@@ -419,22 +496,34 @@ export default function LessonsScreen() {
                   const chapterUrl = chapterLinkOverride?.url ?? lesson.url;
                   const displayLessonTitle = chapterLinkOverride?.displayTitle || lesson.title;
                   const chapter = parseChapterTitle(displayLessonTitle);
+                  const overrideAppLink = chapterLinkOverride?.appLink
+                    ? resolveChapterAppLink({
+                        label: displayLessonTitle,
+                        target: chapterLinkOverride.appLink.target,
+                        lessonTitle: chapterLinkOverride.appLink.lessonTitle,
+                        ...(chapterLinkOverride.appLink.lessonId ? { lessonId: chapterLinkOverride.appLink.lessonId } : {}),
+                      }, { vocabularyLessons: liveVocabularyLessons })
+                    : null;
+                  const directLiveAppLink = lesson.liveAppLink
+                    ? resolveChapterAppLink(lesson.liveAppLink, { vocabularyLessons: liveVocabularyLessons })
+                    : null;
+                  const primaryAppLink = overrideAppLink ?? directLiveAppLink;
                   const appLinks = (lesson.appLinks ?? [])
                     .filter((link) => link.target !== 'pronunciation')
-                    .map(resolveChapterAppLink)
+                    .map((link) => resolveChapterAppLink(link, { vocabularyLessons: liveVocabularyLessons }))
                     .filter((link): link is ResolvedChapterAppLink => !!link);
                   const vocabularyAppLinks = appLinks.filter((link) => link.target === 'vocabulary');
                   const grammarAppLinks = appLinks.filter(
                     (link) => link.target === 'grammar' && link.lesson?.practiceType !== 'vocabulary'
                   );
-                  // "Irregular Verbs" is a standalone reference chapter, not paired
-                  // vocab/grammar content — it links straight to each verb-group
-                  // lesson instead of showing the usual two-column split.
+
+
+
                   const isLinksOnlyChapter = category.title === 'Irregular Verbs';
 
                   return (
                     <View
-                      key={lessonIndex}
+                      key={lesson.id ?? lessonIndex}
                       style={[
                         styles.chapterCard,
                         {
@@ -443,7 +532,7 @@ export default function LessonsScreen() {
                         },
                       ]}
                     >
-                      <View style={styles.chapterCardHeaderRow}>
+                      <View style={[styles.chapterCardHeaderRow, isNarrowScreen && styles.chapterCardHeaderRowNarrow]}>
                         <View style={[styles.chapterBadge, { backgroundColor: levelColor }]}>
                           <Text style={styles.chapterBadgePrefix} numberOfLines={1}>
                             {chapter.labelPrefix ? chapter.labelPrefix.toUpperCase() : copy.chapterFallback.toUpperCase()}
@@ -456,14 +545,18 @@ export default function LessonsScreen() {
                           {chapter.title}
                         </Text>
                         <TouchableOpacity
-                          style={[styles.openChapterPill, { backgroundColor: colors.card, borderColor: levelColor }]}
-                          onPress={() => openLink(chapterUrl)}
+                          style={[
+                            styles.openChapterPill,
+                            isNarrowScreen && styles.openChapterPillNarrow,
+                            { backgroundColor: colors.card, borderColor: levelColor },
+                          ]}
+                          onPress={() => (primaryAppLink ? openAppLink(primaryAppLink) : openLink(chapterUrl))}
                           activeOpacity={0.82}
                           accessibilityRole="link"
                           accessibilityLabel={`Open ${displayLessonTitle}`}
                         >
                           <Text style={[styles.openChapterPillText, { color: colors.text }]} numberOfLines={1}>
-                            Open chapter ↗
+                            {primaryAppLink ? 'Open chapter' : 'Open chapter ↗'}
                           </Text>
                         </TouchableOpacity>
                       </View>
@@ -491,13 +584,13 @@ export default function LessonsScreen() {
                           ))}
                         </View>
                       ) : (
-                      <View style={styles.chapterColumns}>
-                        <View style={styles.chapterColumn}>
-                          <Text style={[styles.chapterColumnHeader, { color: colors.secondaryText }]}>
+                      <View style={[styles.chapterColumns, isNarrowScreen && styles.chapterColumnsNarrow]}>
+                        <View style={[styles.chapterColumn, isNarrowScreen && styles.chapterColumnNarrow]}>
+                          <Text style={[styles.chapterColumnHeader, { color: colors.secondaryText }, isNarrowScreen && styles.chapterColumnHeaderNarrow]}>
                             📕 VOCABULARY
                           </Text>
                           {vocabularyAppLinks.length ? (
-                            <View style={styles.chipRow}>
+                            <View style={[styles.chipRow, isNarrowScreen && styles.chipRowNarrow]}>
                               {vocabularyAppLinks.map((appLink) => (
                                 <TouchableOpacity
                                   key={appLink.label}
@@ -534,14 +627,19 @@ export default function LessonsScreen() {
                           )}
                         </View>
 
-                        <View style={[styles.chapterColumnVerticalDivider, { backgroundColor: colors.border }]} />
+                        <View
+                          style={[
+                            isNarrowScreen ? styles.chapterColumnHorizontalDivider : styles.chapterColumnVerticalDivider,
+                            { backgroundColor: colors.border },
+                          ]}
+                        />
 
-                        <View style={styles.chapterColumn}>
-                          <Text style={[styles.chapterColumnHeader, { color: colors.secondaryText }]}>
+                        <View style={[styles.chapterColumn, isNarrowScreen && styles.chapterColumnNarrow]}>
+                          <Text style={[styles.chapterColumnHeader, { color: colors.secondaryText }, isNarrowScreen && styles.chapterColumnHeaderNarrow]}>
                             ✏️ GRAMMAR
                           </Text>
                           {grammarAppLinks.length ? (
-                            <View style={styles.chipRow}>
+                            <View style={[styles.chipRow, isNarrowScreen && styles.chipRowNarrow]}>
                               {grammarAppLinks.map((appLink) => (
                                 <TouchableOpacity
                                   key={appLink.label}
@@ -596,12 +694,27 @@ export default function LessonsScreen() {
             key={category.title}
             style={[
               styles.categoryContainer,
-              getPanelStyle(colors, isDarkMode, isOpen ? 'raised' : 'soft'),
-              { backgroundColor: colors.card, borderWidth: 0 },
+              isScaledLayout && {
+                marginBottom: Math.round(16 * desktopScale),
+                marginHorizontal: Math.round(16 * desktopScale),
+              },
+              {
+                backgroundColor: colors.card,
+                borderWidth: 2.5,
+                borderColor: '#FFFFFF',
+              },
             ]}
           >
             <TouchableOpacity
-              style={[styles.levelRow, { backgroundColor: category.color }]}
+              style={[
+                styles.levelRow,
+                isScaledLayout && {
+                  paddingVertical: Math.round(16 * desktopScale),
+                  paddingHorizontal: Math.round(18 * desktopScale),
+                  gap: Math.round(12 * desktopScale),
+                },
+                { backgroundColor: category.color },
+              ]}
               onPress={() => toggleResourceLevel(category.title)}
               activeOpacity={0.85}
               accessibilityRole="button"
@@ -615,11 +728,16 @@ export default function LessonsScreen() {
                   {category.resources.length} {category.resources.length > 1 ? copy.linkPlural : copy.linkSingular}
                 </Text>
               </View>
-              <MaterialIcons name={isOpen ? 'expand-less' : 'expand-more'} size={22} color="white" />
+              <MaterialIcons name={isOpen ? 'expand-less' : 'expand-more'} size={Math.round(22 * desktopScale)} color="white" />
             </TouchableOpacity>
 
             {isOpen && (
-              <View style={styles.lessonsContainer}>
+              <View
+                style={[
+                  styles.lessonsContainer,
+                  isScaledLayout && { padding: Math.round(14 * desktopScale), gap: Math.round(10 * desktopScale) },
+                ]}
+              >
                 {category.resources.map((resource, resourceIndex) => (
                   <TouchableOpacity
                     key={resource.title}
@@ -639,7 +757,7 @@ export default function LessonsScreen() {
                       <Text style={[styles.resourceTitle, { color: colors.text }]}>{resource.title}</Text>
                       <Text style={[styles.resourceDescription, { color: colors.secondaryText }]}>{resource.description}</Text>
                     </View>
-                    <MaterialIcons name="open-in-new" size={18} color={colors.secondaryText} />
+                    <MaterialIcons name="open-in-new" size={Math.round(18 * desktopScale)} color={colors.secondaryText} />
                   </TouchableOpacity>
                 ))}
               </View>
@@ -652,11 +770,12 @@ export default function LessonsScreen() {
     {canShowScrollHint && (
       <View style={[styles.scrollHintWrap, { pointerEvents: 'none' }]}>
         <View style={[styles.scrollHintBubble, { backgroundColor: colors.card }]}>
-          <MaterialIcons name="keyboard-arrow-down" size={20} color={colors.secondaryText} />
+          <MaterialIcons name="keyboard-arrow-down" size={Math.round(20 * desktopScale)} color={colors.secondaryText} />
         </View>
       </View>
     )}
     </View>
+    </DesktopTypographyProvider>
   );
 }
 
@@ -680,7 +799,7 @@ const styles = StyleSheet.create({
   },
   desktopContentWrap: {
     width: '100%',
-    maxWidth: 1000,
+    maxWidth: 1680,
     alignSelf: 'center',
   },
   headerRow: {
@@ -693,13 +812,16 @@ const styles = StyleSheet.create({
   },
   headerTitle: {
     flex: 1,
+    fontSize: 32,
+    fontWeight: 'bold',
     minWidth: 0,
-    fontSize: 30,
-    fontWeight: '800',
+  },
+  headerTitleCompact: {
+    fontSize: 26,
   },
   collapseAllPill: {
     flexShrink: 0,
-    borderRadius: freshRadii.pill,
+    borderRadius: uiRadii.pill,
     paddingHorizontal: 16,
     paddingVertical: 9,
   },
@@ -708,7 +830,7 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
   modeToggle: {
-    borderRadius: freshRadii.pill,
+    borderRadius: uiRadii.pill,
     flexDirection: 'row',
     marginBottom: 18,
     marginHorizontal: 16,
@@ -717,7 +839,7 @@ const styles = StyleSheet.create({
   },
   modeOption: {
     alignItems: 'center',
-    borderRadius: freshRadii.pill,
+    borderRadius: uiRadii.pill,
     flex: 1,
     justifyContent: 'center',
     minHeight: 44,
@@ -753,7 +875,7 @@ const styles = StyleSheet.create({
     color: 'white',
   },
   levelCountPill: {
-    borderRadius: freshRadii.pill,
+    borderRadius: uiRadii.pill,
     paddingHorizontal: 12,
     paddingVertical: 6,
     backgroundColor: 'rgba(255,255,255,0.28)',
@@ -764,8 +886,8 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
   chapterCard: {
-    borderWidth: 1,
-    borderRadius: freshRadii.card,
+    borderWidth: 2,
+    borderRadius: uiRadii.card,
     padding: 14,
     paddingHorizontal: 16,
     overflow: 'hidden',
@@ -775,9 +897,13 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 14,
   },
+  chapterCardHeaderRowNarrow: {
+    flexWrap: 'wrap',
+    rowGap: 10,
+  },
   chapterBadge: {
     minWidth: 64,
-    borderRadius: freshRadii.chapterBadge,
+    borderRadius: uiRadii.chapterBadge,
     paddingHorizontal: 11,
     paddingVertical: 7,
     alignItems: 'center',
@@ -801,10 +927,14 @@ const styles = StyleSheet.create({
     minWidth: 0,
   },
   openChapterPill: {
-    borderRadius: freshRadii.pill,
+    borderRadius: uiRadii.pill,
     borderWidth: 1.5,
     paddingHorizontal: 14,
     paddingVertical: 8,
+  },
+  openChapterPillNarrow: {
+    width: '100%',
+    alignItems: 'center',
   },
   openChapterPillText: {
     fontSize: 12.5,
@@ -818,13 +948,26 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     gap: 18,
   },
+  chapterColumnsNarrow: {
+    flexDirection: 'column',
+    gap: 14,
+  },
   chapterColumn: {
     flex: 1,
     minWidth: 0,
     alignItems: 'center',
   },
+  chapterColumnNarrow: {
+    flex: undefined,
+    width: '100%',
+    alignItems: 'flex-start',
+  },
   chapterColumnVerticalDivider: {
     width: 1,
+  },
+  chapterColumnHorizontalDivider: {
+    width: '100%',
+    height: 1,
   },
   chapterColumnHeader: {
     fontSize: 10,
@@ -834,14 +977,20 @@ const styles = StyleSheet.create({
     marginBottom: 9,
     textAlign: 'center',
   },
+  chapterColumnHeaderNarrow: {
+    textAlign: 'left',
+  },
   chipRow: {
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: 8,
     justifyContent: 'center',
   },
+  chipRowNarrow: {
+    justifyContent: 'flex-start',
+  },
   chip: {
-    borderRadius: freshRadii.pill,
+    borderRadius: uiRadii.pill,
     borderWidth: 1.5,
     paddingHorizontal: 14,
     paddingVertical: 8,
@@ -853,7 +1002,7 @@ const styles = StyleSheet.create({
   mixChip: {
     flexDirection: 'row',
     alignItems: 'center',
-    borderRadius: freshRadii.pill,
+    borderRadius: uiRadii.pill,
     paddingHorizontal: 14,
     paddingVertical: 8,
     gap: 4,
@@ -873,8 +1022,8 @@ const styles = StyleSheet.create({
     minHeight: 72,
     paddingVertical: 10,
     paddingHorizontal: 12,
-    borderRadius: freshRadii.card,
-    borderWidth: 1,
+    borderRadius: uiRadii.card,
+    borderWidth: 2,
   },
   resourceNumberBadge: {
     width: 30,

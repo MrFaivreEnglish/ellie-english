@@ -4,25 +4,28 @@ import {
   ImageSourcePropType,
   LayoutChangeEvent,
   StyleSheet,
-  Text,
   TouchableOpacity,
   View,
+  StyleProp,
   ViewStyle,
   Animated,
   Platform,
+  useWindowDimensions,
 } from 'react-native';
 import { useTheme } from '../settings/ThemeContext';
+import Text from './ThemedText';
+import { getWebLessonScale, scaleValue } from './responsiveLayout';
 
 interface ImageWithCreditProps {
   source?: ImageSourcePropType;
   uri?: string;
-  style?: ViewStyle[];
+  style?: StyleProp<ViewStyle>;
   imageScale?: number;
   onPress?: () => void;
   showCredit?: boolean;
   creditLabel?: string;
   accessibilityLabel?: string;
-  /** Fires once the image's natural pixel size is known (or re-known after a source change). */
+
   onNaturalSize?: (size: { width: number; height: number }) => void;
 }
 
@@ -50,6 +53,11 @@ const ImageWithCredit: React.FC<ImageWithCreditProps> = ({
   onNaturalSize,
 }) => {
   const { colors } = useTheme();
+  const { width: windowWidth, height: windowHeight } = useWindowDimensions();
+
+
+
+  const creditScale = getWebLessonScale(windowWidth, windowHeight);
   const isLocalBundledAsset = typeof source === 'number';
   const [loading, setLoading] = useState(!isLocalBundledAsset && (!!source || !!uri));
   const [loadingText, setLoadingText] = useState('');
@@ -61,21 +69,36 @@ const ImageWithCredit: React.FC<ImageWithCreditProps> = ({
   const fadeAnim = useRef(new Animated.Value(isLocalBundledAsset ? 1 : 0)).current;
   const safeImageScale = Number.isFinite(imageScale) ? Math.max(1, imageScale) : 1;
 
-  // ----------------------------
-  // Image source
-  // ----------------------------
+
+
+
   const imgSource = useMemo(() => {
     if (source) return source as any;
     if (uri) return { uri } as any;
     return undefined;
   }, [source, uri]);
+  // Changing this key remounts the native image so stale load callbacks cannot win.
+  const imageIdentity = useMemo(() => {
+    if (typeof source === 'number') return `asset:${source}`;
 
-  // ----------------------------
-  // Reset on image change
-  // ----------------------------
+    const sourceUri = source && typeof source === 'object' && 'uri' in source
+      ? String((source as { uri?: unknown }).uri ?? '')
+      : '';
+
+    return `uri:${sourceUri || uri || ''}`;
+  }, [source, uri]);
+
+
+
+
   useEffect(() => {
     const hasImageSource = !!source || !!uri;
     const isLocal = typeof source === 'number';
+
+
+
+
+    setNaturalSize(null);
 
     if (isLocal) {
       setLoading(false);
@@ -90,10 +113,11 @@ const ImageWithCredit: React.FC<ImageWithCreditProps> = ({
     fadeAnim.setValue(0);
   }, [uri, source]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // ----------------------------
-  // Resolve natural size
-  // ----------------------------
+
+
+
   useEffect(() => {
+    // Ignore a late natural-size callback after the source changes or unmounts.
     let cancelled = false;
 
     const applyNaturalSize = (size: { width: number; height: number }) => {
@@ -134,17 +158,17 @@ const ImageWithCredit: React.FC<ImageWithCreditProps> = ({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [source, uri]);
 
-  // ----------------------------
-  // Layout
-  // ----------------------------
+
+
+
   const onLayout = (e: LayoutChangeEvent) => {
     const { width, height } = e.nativeEvent.layout;
     setContainerSize({ width, height });
   };
 
-  // ----------------------------
-  // Contain math (KEEP THIS)
-  // ----------------------------
+
+
+
   const fittedBox = useMemo(() => {
     const { width: cw, height: ch } = containerSize;
     if (cw <= 0 || ch <= 0) return { width: 0, height: 0 };
@@ -171,9 +195,9 @@ const ImageWithCredit: React.FC<ImageWithCreditProps> = ({
     (containerSize.height - fittedBox.height * safeImageScale) / 2
   );
 
-  // ----------------------------
-  // On load
-  // ----------------------------
+
+
+
   const handleLoad = () => {
     setLoading(false);
     setHasImageError(false);
@@ -193,16 +217,16 @@ const ImageWithCredit: React.FC<ImageWithCreditProps> = ({
     fadeAnim.setValue(0);
   };
 
-  // ----------------------------
-  // Content
-  // ----------------------------
+
+
+
   const content = (
     <View
       onLayout={onLayout}
       style={[
         styles.container,
         safeImageScale > 1 && styles.scaledImageContainer,
-        style as any,
+        style,
       ]}
     >
       {loading && !hasImageError && (
@@ -210,8 +234,17 @@ const ImageWithCredit: React.FC<ImageWithCreditProps> = ({
           style={[styles.placeholder, styles.placeholderContent, { pointerEvents: 'none' }]}
         >
           {!!loadingText && (
-            <View style={styles.loadingBadge}>
-              <Text style={styles.placeholderText}>
+            <View
+              style={[
+                styles.loadingBadge,
+                {
+                  borderRadius: scaleValue(12, creditScale),
+                  paddingVertical: scaleValue(6, creditScale),
+                  paddingHorizontal: scaleValue(14, creditScale),
+                },
+              ]}
+            >
+              <Text style={[styles.placeholderText, { fontSize: scaleValue(13, creditScale) }]}>
                 {loadingText}
               </Text>
             </View>
@@ -219,9 +252,9 @@ const ImageWithCredit: React.FC<ImageWithCreditProps> = ({
         </View>
       )}
 
-      {/* IMAGE */}
       {!!imgSource && !hasImageError && (
         <Animated.Image
+          key={imageIdentity}
           source={imgSource}
           style={[
             styles.image,
@@ -229,6 +262,7 @@ const ImageWithCredit: React.FC<ImageWithCreditProps> = ({
             { opacity: fadeAnim },
           ]}
           resizeMode="contain"
+          fadeDuration={0}
           onLoad={handleLoad}
           onError={handleError}
           accessible
@@ -249,11 +283,15 @@ const ImageWithCredit: React.FC<ImageWithCreditProps> = ({
         </View>
       )}
 
-      {/* CREDIT — DO NOT TOUCH THIS */}
       {showCredit && (
         <View
           style={[
             styles.creditBadge,
+            {
+              paddingVertical: scaleValue(6, creditScale),
+              paddingHorizontal: scaleValue(12, creditScale),
+              borderRadius: scaleValue(12, creditScale),
+            },
             {
               pointerEvents: 'none',
               position: 'absolute',
@@ -262,7 +300,7 @@ const ImageWithCredit: React.FC<ImageWithCreditProps> = ({
             },
           ]}
         >
-          <Text style={styles.creditText}>{creditLabel}</Text>
+          <Text style={[styles.creditText, { fontSize: scaleValue(14, creditScale) }]}>{creditLabel}</Text>
         </View>
       )}
     </View>

@@ -1,7 +1,7 @@
 const CinemaVocab = {
   id: '33',
   title: 'Cinema',
-  description: 'Learn vocabulary related to movies and cinema',  imageUrl: 'https://i.ibb.co/G4ZfHY7J/cinema.webp',
+  description: 'Learn vocabulary related to movies and cinema',  imageUrl: 'https://wretggbpaejzjdilemit.supabase.co/storage/v1/object/public/lesson-images/15274719ab/cinema.webp',
   thumbnail: require('../../assets/thumbnails/cinema-thumbnail.png'),
   flashcards: [
    { english: 'An actor', french: 'Un acteur' },

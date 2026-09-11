@@ -2,38 +2,37 @@ const ExtremeSportsVocab = {
   id: '40',
   title: 'Extreme Sports',
   description: 'Learn vocabulary related to extreme and adventure sports',
-  // Provide a canonical remote image as a reliable fallback for the lesson detail view
-  imageUrl: 'https://i.ibb.co/8gBGbtXN/extreme-sports.webp',
+  imageUrl: 'https://wretggbpaejzjdilemit.supabase.co/storage/v1/object/public/lesson-images/15274719ab/extreme-sports.webp',
   thumbnail: require('../../assets/thumbnails/extreme-sports-thumbnail.png'),
   flashcards: [
     {
       category: 'Water Sports 🌊',
       words: [
-        { english: '(to) surf', french: 'surfer' },
-        { english: '(to) kayak', french: 'faire du kayak' },
-        { english: '(to) scuba dive', french: 'faire de la plongée' },
-        { english: '(to) canoe', french: 'faire du canoë' },
+        { english: '(to) surf', french: 'Surfer' },
+        { english: '(to) kayak', french: 'Faire du kayak' },
+        { english: '(to) scuba dive', french: 'Faire de la plongée' },
+        { english: '(to) canoe', french: 'Faire du canoë' },
       ]
     },
     {
       category: 'Air & Heights 🪂',
       words: [
-        { english: '(to) sky dive', french: 'faire du parachutisme' },
-        { english: '(to) paraglide', french: 'faire du parapente' },
-        { english: '(to) bungee jump', french: "faire du saut à l'élastique" },
-        { english: '(to) take a helicopter', french: 'prendre un hélicoptère' },
+        { english: '(to) sky dive', french: 'Faire du parachutisme' },
+        { english: '(to) paraglide', french: 'Faire du parapente' },
+        { english: '(to) bungee jump', french: "Faire du saut à l'élastique" },
+        { english: '(to) take a helicopter', french: 'Prendre un hélicoptère' },
       ]
     },
     {
       category: 'Land & Outdoor 🧗',
       words: [
-        { english: '(to) ski', french: 'faire du ski' },
-        { english: '(to) cave', french: 'faire de la spéléologie' },
-        { english: '(to) ride a bike', french: 'faire du vélo' },
-        { english: '(to) hike', french: 'faire de la randonnée' },
-        { english: '(to) drive a car', french: 'conduire une voiture' },
-        { english: "(to) ride a horse", french: "faire de l'équitation" },
-        { english: '(to) climb', french: 'escalader' },
+        { english: '(to) ski', french: 'Faire du ski' },
+        { english: '(to) cave', french: 'Faire de la spéléologie' },
+        { english: '(to) ride a bike', french: 'Faire du vélo' },
+        { english: '(to) hike', french: 'Faire de la randonnée' },
+        { english: '(to) drive a car', french: 'Conduire une voiture' },
+        { english: "(to) ride a horse", french: "Faire de l'équitation" },
+        { english: '(to) climb', french: 'Escalader' },
       ]
     }
   ],

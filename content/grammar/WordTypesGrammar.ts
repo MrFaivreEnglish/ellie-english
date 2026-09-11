@@ -2,7 +2,7 @@ const WordTypesGrammar = {
   id: '41',
   title: 'Les groupes de mots',
   description: 'Identify common word types: nouns, verbs, adjectives, pronouns',
-  imageUrl: 'https://i.ibb.co/wNYxhH6t/Groupes-de-mots.png',
+  imageUrl: 'https://wretggbpaejzjdilemit.supabase.co/storage/v1/object/public/lesson-images/15274719ab/les-groupes-de-mots.webp',
   textContent: {
     cards: [
       {
@@ -51,36 +51,41 @@ const WordTypesGrammar = {
   },
 
   exercises: [
-    { question: 'Dog est un _____ :', answer: 'nom', options: ['nom', 'verbe', 'adjectif'] },
-    { question: 'Cat est un _____ :', answer: 'nom', options: ['nom', 'verbe', 'adjectif'] },
-    { question: 'Run est un _____ :', answer: 'verbe', options: ['verbe', 'nom', 'adjectif'] },
-    { question: 'Eat est un _____ :', answer: 'verbe', options: ['verbe', 'nom', 'adjectif'] },
-    { question: 'Big est un _____ :', answer: 'adjectif', options: ['adjectif', 'nom', 'verbe'] },
-    { question: 'Small est un _____ :', answer: 'adjectif', options: ['adjectif', 'nom', 'verbe'] },
-    { question: 'He est un _____ :', answer: 'pronom', options: ['pronom', 'nom', 'adjectif'] },
-    { question: 'She est un _____ :', answer: 'pronom', options: ['pronom', 'nom', 'adjectif'] },
-    { question: 'It est un _____ :', answer: 'pronom', options: ['pronom', 'nom', 'adjectif'] },
-    { question: 'Book est un _____ :', answer: 'nom', options: ['nom', 'verbe', 'adjectif'] },
-    { question: 'Play est un _____ :', answer: 'verbe', options: ['verbe', 'nom', 'adjectif'] },
-    { question: 'Happy est un _____ :', answer: 'adjectif', options: ['adjectif', 'nom', 'verbe'] },
-    { question: 'Sad est un _____ :', answer: 'adjectif', options: ['adjectif', 'nom', 'verbe'] },
-    { question: 'Walk est un _____ :', answer: 'verbe', options: ['verbe', 'nom', 'adjectif'] },
-    { question: 'Jump est un _____ :', answer: 'verbe', options: ['verbe', 'nom', 'adjectif'] },
-    { question: 'House est un _____ :', answer: 'nom', options: ['nom', 'verbe', 'adjectif'] },
-    { question: 'Car est un _____ :', answer: 'nom', options: ['nom', 'verbe', 'adjectif'] },
-    { question: 'Apple est un _____ :', answer: 'nom', options: ['nom', 'verbe', 'adjectif'] },
-    { question: 'Banana est un _____ :', answer: 'nom', options: ['nom', 'verbe', 'adjectif'] },
-    { question: 'Friend est un _____ :', answer: 'nom', options: ['nom', 'adjectif', 'verbe'] },
-    { question: 'School est un _____ :', answer: 'nom', options: ['nom', 'verbe', 'adjectif'] },
-    { question: 'Teacher est un _____ :', answer: 'nom', options: ['nom', 'verbe', 'adjectif'] },
-    { question: 'Under est un _____ :', answer: 'préposition', options: ['préposition', 'conjonction', 'adverbe'] },
-    { question: 'On est un _____ :', answer: 'préposition', options: ['préposition', 'conjonction', 'adverbe'] },
-    { question: 'In est un _____ :', answer: 'préposition', options: ['préposition', 'conjonction', 'adverbe'] },
-    { question: 'And est un _____ :', answer: 'conjonction', options: ['conjonction', 'préposition', 'adverbe'] },
-    { question: 'But est un _____ :', answer: 'conjonction', options: ['conjonction', 'préposition', 'adverbe'] },
-    { question: 'We est un _____ :', answer: 'pronom', options: ['pronom', 'nom', 'adjectif'] },
-    { question: 'They est un _____ :', answer: 'pronom', options: ['pronom', 'nom', 'adjectif'] },
-    { question: 'Fast est un _____ :', answer: 'adverbe', options: ['adverbe', 'adjectif', 'verbe'] }
+    { question: '"Dog" est :', answer: 'un nom', options: ['un nom', 'un verbe', 'un adjectif'] },
+    { question: '"Cat" est :', answer: 'un nom', options: ['un nom', 'un verbe', 'un adjectif'] },
+    { question: '"Run" est :', answer: 'un verbe', options: ['un verbe', 'un nom', 'un adjectif'] },
+    { question: '"Eat" est :', answer: 'un verbe', options: ['un verbe', 'un nom', 'un adjectif'] },
+    { question: '"Big" est :', answer: 'un adjectif', options: ['un adjectif', 'un nom', 'un verbe'] },
+    { question: '"Small" est :', answer: 'un adjectif', options: ['un adjectif', 'un nom', 'un verbe'] },
+    { question: '"He" est :', answer: 'un pronom', options: ['un pronom', 'un nom', 'un adjectif'] },
+    { question: '"She" est :', answer: 'un pronom', options: ['un pronom', 'un nom', 'un adjectif'] },
+    { question: '"It" est :', answer: 'un pronom', options: ['un pronom', 'un nom', 'un adjectif'] },
+    { question: '"Book" est :', answer: 'un nom', options: ['un nom', 'un verbe', 'un adjectif'] },
+    { question: '"Play" est :', answer: 'un verbe', options: ['un verbe', 'un nom', 'un adjectif'] },
+    { question: '"Happy" est :', answer: 'un adjectif', options: ['un adjectif', 'un nom', 'un verbe'] },
+    { question: '"Sad" est :', answer: 'un adjectif', options: ['un adjectif', 'un nom', 'un verbe'] },
+    { question: '"Walk" est :', answer: 'un verbe', options: ['un verbe', 'un nom', 'un adjectif'] },
+    { question: '"Jump" est :', answer: 'un verbe', options: ['un verbe', 'un nom', 'un adjectif'] },
+    { question: '"House" est :', answer: 'un nom', options: ['un nom', 'un verbe', 'un adjectif'] },
+    { question: '"Car" est :', answer: 'un nom', options: ['un nom', 'un verbe', 'un adjectif'] },
+    { question: '"Apple" est :', answer: 'un nom', options: ['un nom', 'un verbe', 'un adjectif'] },
+    { question: '"Banana" est :', answer: 'un nom', options: ['un nom', 'un verbe', 'un adjectif'] },
+    { question: '"Friend" est :', answer: 'un nom', options: ['un nom', 'un adjectif', 'un verbe'] },
+    { question: '"School" est :', answer: 'un nom', options: ['un nom', 'un verbe', 'un adjectif'] },
+    { question: '"Teacher" est :', answer: 'un nom', options: ['un nom', 'un verbe', 'un adjectif'] },
+    // Articles and adverbs instead of prépositions/conjonctions: those two are never
+    // introduced in the lesson's cards above, so they were testing untaught material.
+    // Articles are taught (A, The, My, This) and had no exercises until now.
+    { question: '"The" est :', answer: 'un article', options: ['un article', 'un nom', 'un verbe'] },
+    { question: '"A" est :', answer: 'un article', options: ['un article', 'un nom', 'un adjectif'] },
+    { question: '"My" est :', answer: 'un article', options: ['un article', 'un verbe', 'un adverbe'] },
+    { question: '"This" est :', answer: 'un article', options: ['un article', 'un nom', 'un verbe'] },
+    { question: '"Loudly" est :', answer: 'un adverbe', options: ['un adverbe', 'un adjectif', 'un nom'] },
+    { question: '"We" est :', answer: 'un pronom', options: ['un pronom', 'un nom', 'un adjectif'] },
+    { question: '"They" est :', answer: 'un pronom', options: ['un pronom', 'un nom', 'un adjectif'] },
+    // Was "Fast", which is both an adjective and an adverb in English — no defensible
+    // single answer. "Slowly" is unambiguous, and it's one of the lesson's own examples.
+    { question: '"Slowly" est :', answer: 'un adverbe', options: ['un adverbe', 'un adjectif', 'un verbe'] }
   ]
 };
 

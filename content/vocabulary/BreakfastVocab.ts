@@ -1,7 +1,7 @@
 const BreakfastVocab = {
   id: '6',
   title: 'Breakfast',
-  description: 'Learn vocabulary related to breakfast and morning meals',  imageUrl: 'https://i.ibb.co/sdpKmrrP/Breakfast-vocab-full.webp',
+  description: 'Learn vocabulary related to breakfast and morning meals',  imageUrl: 'https://wretggbpaejzjdilemit.supabase.co/storage/v1/object/public/lesson-images/15274719ab/breakfast.webp',
   thumbnail: require('../../assets/thumbnails/breakfast-thumbnail.png'),
   flashcards: [
     {

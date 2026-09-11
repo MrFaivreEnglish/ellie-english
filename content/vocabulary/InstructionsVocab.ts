@@ -2,7 +2,7 @@ const InstructionsVocab = {
   id: '43',
   title: 'Instructions',
   description: 'Learn vocabulary related to giving and following instructions',
-  imageUrl: 'https://i.ibb.co/q3hBqjMr/Instructions.webp',
+  imageUrl: 'https://wretggbpaejzjdilemit.supabase.co/storage/v1/object/public/lesson-images/15274719ab/instructions.webp',
   thumbnail: require('../../assets/thumbnails/instructions-thumbnail.png'),
   flashcards: [
         { english: 'Read', french: 'Lire' },

@@ -1,7 +1,7 @@
 import { useCallback, useRef, useState, type Dispatch, type SetStateAction } from 'react';
 import type { LayoutChangeEvent } from 'react-native';
 import { triggerSelectionHaptic } from '../../shared/haptics';
-import type { DragGestureState } from './DraggableWordChip';
+import { CHIP_DRAG_COMMIT_THRESHOLD_DY, type DragGestureState } from './DraggableWordChip';
 
 type ChipLayout = {
   x: number;
@@ -46,6 +46,20 @@ export const useSelectedWordDrag = <T,>(
     });
   }, [setItems]);
 
+
+
+
+
+  const removeItem = useCallback((position: number) => {
+    setItems((currentItems) => {
+      if (position < 0 || position >= currentItems.length) return currentItems;
+
+      const nextItems = [...currentItems];
+      nextItems.splice(position, 1);
+      return nextItems;
+    });
+  }, [setItems]);
+
   const getDropTargetPosition = useCallback((fromPosition: number, gestureState: DragGestureState) => {
     const currentLayout = chipLayoutsRef.current[fromPosition];
     const positions = Object.keys(chipLayoutsRef.current)
@@ -82,12 +96,21 @@ export const useSelectedWordDrag = <T,>(
   }, []);
 
   const handleDragMove = useCallback((position: number, gestureState: DragGestureState) => {
+
+
+
+
+    if (gestureState.dy > CHIP_DRAG_COMMIT_THRESHOLD_DY) {
+      setDropTargetPosition(null);
+      return;
+    }
     const target = getDropTargetPosition(position, gestureState);
     setDropTargetPosition(target !== position ? target : null);
   }, [getDropTargetPosition]);
 
   const handleDragEnd = useCallback((position: number, didDrag: boolean, gestureState: DragGestureState) => {
-    const targetPosition = didDrag ? getDropTargetPosition(position, gestureState) : position;
+    const shouldRemove = didDrag && gestureState.dy > CHIP_DRAG_COMMIT_THRESHOLD_DY;
+    const targetPosition = didDrag && !shouldRemove ? getDropTargetPosition(position, gestureState) : position;
 
     if (didDrag) {
       dragJustEndedRef.current = true;
@@ -99,11 +122,17 @@ export const useSelectedWordDrag = <T,>(
     setDraggingPosition(null);
     setDropTargetPosition(null);
 
+    if (shouldRemove) {
+      triggerSelectionHaptic();
+      removeItem(position);
+      return;
+    }
+
     if (didDrag && targetPosition !== position) {
       triggerSelectionHaptic();
       moveItem(position, targetPosition);
     }
-  }, [getDropTargetPosition, moveItem]);
+  }, [getDropTargetPosition, moveItem, removeItem]);
 
   const shouldIgnorePress = useCallback(() => dragJustEndedRef.current, []);
 

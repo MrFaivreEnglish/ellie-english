@@ -1,44 +1,46 @@
 import React from 'react';
-import { TouchableOpacity, Text, StyleSheet, ViewStyle, TextStyle } from 'react-native';
-import { MaterialIcons } from '@expo/vector-icons';
+import { TouchableOpacity, StyleSheet, ViewStyle, TextStyle } from 'react-native';
+import Text from './ThemedText';
+import MaterialIcons from './ThemedMaterialIcon';
 import { useNavigation } from '@react-navigation/native';
 import { useTheme } from '../settings/ThemeContext';
 import { getMenuCopy } from './menuCopy';
+import { useDesktopTypographyScale } from './DesktopTypography';
 
 interface BackButtonProps {
-  /**
-   * Optional custom label – defaults to "Back".
-   */
+
+
+
   label?: string;
-  /**
-   * Optional press handler – when omitted the button simply performs `navigation.goBack()`.
-   */
+
+
+
   onPress?: () => void;
-  /**
-   * Override container style if needed by a specific screen.
-   */
+
+
+
   style?: ViewStyle;
-  /**
-   * Override text style if needed by a specific screen.
-   */
+
+
+
   textStyle?: TextStyle;
-  /**
-   * Icon-only variant — drops the label text. The label is still used as the
-   * accessibility label. Only the vocabulary lesson screen uses this today,
-   * where the header title (lesson name + mode breadcrumb) needs the room
-   * the label would otherwise take.
-   */
+
+
+
+
+
+
   hideLabel?: boolean;
 }
 
-/**
- * A tiny, theme-aware back button so we don't duplicate the same JSX & styles
- * across multiple screens.  Usage:
- *
- * ```tsx
- * <BackButton onPress={() => navigation.navigate('Home')} />
- * ```
- */
+
+
+
+
+
+
+
+
 const BackButton: React.FC<BackButtonProps> = ({
   label,
   onPress,
@@ -49,6 +51,7 @@ const BackButton: React.FC<BackButtonProps> = ({
   const navigation = useNavigation<any>();
   const { colors } = useTheme();
   const copy = getMenuCopy().common;
+  const desktopScale = useDesktopTypographyScale();
   const resolvedLabel = label ?? copy.back;
 
   const handlePress = React.useCallback(() => {
@@ -61,14 +64,27 @@ const BackButton: React.FC<BackButtonProps> = ({
 
   return (
     <TouchableOpacity
-      style={[styles.button, style]}
+      style={[
+        styles.button,
+        desktopScale > 1 && {
+          marginTop: Math.round(4 * desktopScale),
+          paddingVertical: Math.round(6 * desktopScale),
+          marginLeft: Math.round(4 * desktopScale),
+        },
+        style,
+      ]}
       onPress={handlePress}
       accessibilityRole="button"
       accessibilityLabel={resolvedLabel}
     >
-      <MaterialIcons name="arrow-back" size={24} color={colors.text} />
+      <MaterialIcons name="arrow-back" size={Math.round(24 * desktopScale)} color={colors.text} />
       {!hideLabel && (
-        <Text style={[styles.label, { color: colors.text }, textStyle]}>{resolvedLabel}</Text>
+        <Text style={[
+          styles.label,
+          desktopScale > 1 && { marginLeft: Math.round(4 * desktopScale) },
+          { color: colors.text },
+          textStyle,
+        ]}>{resolvedLabel}</Text>
       )}
     </TouchableOpacity>
   );
@@ -79,7 +95,7 @@ const styles = StyleSheet.create({
     marginTop: 4,
     paddingVertical: 6,
     paddingHorizontal: 0,
-    // Align with content column – most ScrollViews add 8 px horizontal padding
+
     marginLeft: 4,
     alignSelf: 'flex-start',
     flexDirection: 'row',

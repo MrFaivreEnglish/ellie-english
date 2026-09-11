@@ -206,11 +206,13 @@ const AccountProviderInner = ({ children }: { children: React.ReactNode }) => {
     }
 
     let preferredShinyEllieMode: boolean | null = null;
+    let preferredShinyEllieColorVariant: 'cool' | 'warm' | null = null;
 
     try {
       const cloudPreferences = findAccountPreferenceSnapshot(cloudProgressItems);
       if (cloudPreferences) {
         preferredShinyEllieMode = cloudPreferences.shinyEllieMode;
+        preferredShinyEllieColorVariant = cloudPreferences.shinyEllieColorVariant;
         await saveLocalAccountPreferenceSnapshot(cloudPreferences, nextSession.user.id);
         applyAccountPreferences(cloudPreferences);
         setAccountAvatarId(cloudPreferences.accountAvatarId);
@@ -226,6 +228,12 @@ const AccountProviderInner = ({ children }: { children: React.ReactNode }) => {
       mergedProgress.shinyEllie.unlocked,
       mergedProgress.shinyEllie.unlocked
         ? preferredShinyEllieMode ?? mergedProgress.shinyEllie.mode
+        : false,
+      mergedProgress.shinyEllie.unlocked
+        ? preferredShinyEllieColorVariant ?? mergedProgress.shinyEllie.colorVariant
+        : 'cool',
+      mergedProgress.shinyEllie.unlocked
+        ? mergedProgress.shinyEllie.presentationMode
         : false
     );
 
@@ -275,8 +283,8 @@ const AccountProviderInner = ({ children }: { children: React.ReactNode }) => {
           return;
         }
 
-        // Show the locally cached account immediately so the app is usable offline.
-        // The network refresh below updates it in the background.
+
+
         setSession(savedSession);
         setSyncStatus('waiting');
         setIsLoading(false);
@@ -405,7 +413,7 @@ const AccountProviderInner = ({ children }: { children: React.ReactNode }) => {
     }
   }, [session]);
 
-  // While signed in, keep the online backup fresh without requiring a manual Sync tap.
+
   useEffect(() => {
     if (!session) return;
 
@@ -416,7 +424,7 @@ const AccountProviderInner = ({ children }: { children: React.ReactNode }) => {
     return () => clearInterval(intervalId);
   }, [session, autoSyncQuietly]);
 
-  // Also catch progress right before the app is backgrounded or closed.
+
   useEffect(() => {
     if (!session) return;
 
@@ -437,7 +445,12 @@ const AccountProviderInner = ({ children }: { children: React.ReactNode }) => {
       const guestSnapshot = await getGuestProgressSnapshot();
       await restoreLocalStudentProgressSnapshot(guestSnapshot);
       const restoredShinyEllie = await getShinyEllieProgress();
-      updateShinyEllieProgress(restoredShinyEllie.unlocked, restoredShinyEllie.mode);
+      updateShinyEllieProgress(
+        restoredShinyEllie.unlocked,
+        restoredShinyEllie.mode,
+        restoredShinyEllie.colorVariant,
+        restoredShinyEllie.presentationMode
+      );
       await clearLocalProgressOwner();
       await clearAccountSession();
       setSession(null);
@@ -455,7 +468,7 @@ const AccountProviderInner = ({ children }: { children: React.ReactNode }) => {
   const resetSavedProgress = useCallback(async () => {
     await runWithSyncState(async () => {
       await clearLocalStudentProgress();
-      updateShinyEllieProgress(false, false);
+      updateShinyEllieProgress(false, false, 'cool', false);
 
       if (session) {
         await clearCloudProgressItems();

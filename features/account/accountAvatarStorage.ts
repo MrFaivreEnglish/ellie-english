@@ -2,7 +2,6 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import type { ImageSourcePropType } from 'react-native';
 
 export type AccountAvatarId =
-  | 'avatar-student'
   | 'avatar-teacher'
   | 'avatar-thumbsup'
   | 'avatar-heart'
@@ -32,6 +31,39 @@ export type AccountAvatarId =
   | 'avatar-queen'
   | 'avatar-witch'
   | 'avatar-dragon'
+  | 'avatar-bats'
+  | 'avatar-brown-bear'
+  | 'avatar-shark'
+  | 'avatar-unicorn'
+  | 'avatar-phoenix'
+  | 'avatar-spirit'
+  | 'avatar-melting'
+  | 'avatar-magician'
+  | 'avatar-celebrity'
+  | 'avatar-double-decker-bus'
+  | 'avatar-maple-leaf'
+  | 'avatar-usa'
+  | 'avatar-basketball'
+  | 'avatar-skateboard'
+  | 'avatar-bike'
+  | 'avatar-fishing'
+  | 'avatar-wrench'
+  | 'avatar-police-car'
+  | 'avatar-payphone'
+  | 'avatar-elf'
+  | 'avatar-fairy'
+  | 'avatar-crown'
+  | 'avatar-gameboy'
+  | 'avatar-watercolor'
+  | 'avatar-movie'
+  | 'avatar-music-notes'
+  | 'avatar-excalibur'
+  | 'avatar-ball'
+  | 'avatar-apple'
+  | 'avatar-snowman'
+  | 'avatar-rose'
+  | 'avatar-wales'
+  | 'avatar-ireland'
   | 'asset-ellie'
   | 'end-good'
   | 'end-perfect'
@@ -41,20 +73,10 @@ export type AccountAvatarId =
   | 'end-timer-beat'
   | 'thumb-activities'
   | 'thumb-american-dishes'
-  | 'thumb-family'
-  | 'thumb-daily-routine'
-  | 'thumb-body'
   | 'thumb-breakfast'
-  | 'thumb-physical'
-  | 'thumb-personality'
-  | 'thumb-personality-plus'
   | 'thumb-describing'
-  | 'thumb-getting-job'
-  | 'thumb-job-examples'
-  | 'thumb-emotions-plus'
   | 'thumb-bullying'
   | 'thumb-animals'
-  | 'thumb-space'
   | 'thumb-robot'
   | 'thumb-videogames'
   | 'thumb-video-game-actions'
@@ -62,38 +84,16 @@ export type AccountAvatarId =
   | 'thumb-cinema'
   | 'thumb-cooking'
   | 'thumb-extreme'
-  | 'thumb-ecology'
   | 'thumb-detective'
   | 'thumb-blitz'
   | 'thumb-geography'
-  | 'thumb-love'
-  | 'thumb-city'
   | 'thumb-legends'
-  | 'thumb-emotions'
   | 'thumb-dystopia'
   | 'thumb-school'
   | 'thumb-school-basics'
   | 'thumb-segregation'
-  | 'thumb-uk'
   | 'thumb-classroom-english'
-  | 'thumb-clothes'
-  | 'thumb-colours'
-  | 'thumb-daily-questions'
-  | 'thumb-date'
-  | 'thumb-food-basics'
-  | 'thumb-frequency'
-  | 'thumb-furniture'
-  | 'thumb-house'
-  | 'thumb-instructions'
-  | 'thumb-likes'
-  | 'thumb-location'
-  | 'thumb-nationality'
-  | 'thumb-opinion-basics'
-  | 'thumb-opinion-plus'
-  | 'thumb-question-words'
-  | 'thumb-the-internet'
-  | 'thumb-time'
-  | 'thumb-types-docs'
+  | 'thumb-sports'
   | 'thumb-christmas'
   | 'thumb-halloween'
   | 'thumb-school-subjects'
@@ -102,15 +102,14 @@ export type AccountAvatarId =
 export type AccountAvatarColorId =
   | 'ocean'
   | 'forest'
-  | 'violet'
-  | 'sunset'
-  | 'gold'
-  | 'rose'
+  | 'lime'
   | 'mint'
+  | 'sunset'
+  | 'rose'
+  | 'berry'
+  | 'violet'
+  | 'sand'
   | 'graphite'
-  | 'aurora'
-  | 'royal'
-  | 'platinum'
   | 'cosmic'
   | 'legend-gold';
 
@@ -147,24 +146,33 @@ export type AccountAvatarColorPreset = {
   borderWidth?: number;
 };
 
-export const ACCOUNT_AVATAR_COLOR_PRESETS: AccountAvatarColorPreset[] = [
+// Ten borders, one per hue family, so no two ever read as "the same colour again" — an
+// earlier pass at 28 produced near-duplicates nobody could tell apart. Pictures carry the
+// bulk of the ladder instead. Unlock levels aren't written here: buildRewardSchedule deals
+// them out so exactly one reward lands on each level. Order is the order they're handed
+// out in, so the showiest belong at the end.
+//
+//   ocean blue (free) · forest green · lime yellow-green · mint teal · sunset orange
+//   rose red · berry magenta · violet purple · sand tan · graphite grey · cosmic indigo
+//   legend gold (prestige, pinned high — see PRESTIGE_BORDER_LEVEL)
+const BASE_ACCOUNT_AVATAR_COLOR_PRESETS: AccountAvatarColorPreset[] = [
   { id: 'ocean', label: 'Ocean', backgroundColor: '#EAF5FF', accentColor: '#1671B6' },
-  { id: 'forest', label: 'Forest', backgroundColor: '#E9F8EF', accentColor: '#2C8F54', unlockLevel: 5 },
-  { id: 'violet', label: 'Violet', backgroundColor: '#F1EDFF', accentColor: '#7654D4', unlockLevel: 10 },
-  { id: 'sunset', label: 'Sunset', backgroundColor: '#FFF0E2', accentColor: '#D4681D', unlockLevel: 15 },
-  { id: 'rose', label: 'Rose', backgroundColor: '#FFECEF', accentColor: '#D63B55', unlockLevel: 20 },
-  { id: 'mint', label: 'Mint', backgroundColor: '#EAF4F2', accentColor: '#327E76', unlockLevel: 25 },
-  { id: 'gold', label: 'Amber', backgroundColor: '#FFF6DE', accentColor: '#B87500', unlockLevel: 35 },
-  { id: 'graphite', label: 'Graphite', backgroundColor: '#EEF3F8', accentColor: '#44505C', unlockLevel: 45 },
-  { id: 'aurora', label: 'Aurora', backgroundColor: '#EAFBF5', accentColor: '#178A72', unlockLevel: 55 },
-  { id: 'royal', label: 'Royal', backgroundColor: '#EEE9FF', accentColor: '#5B3DBB', unlockLevel: 65 },
-  { id: 'platinum', label: 'Platinum', backgroundColor: '#F4F8FA', accentColor: '#6D7D87', unlockLevel: 80 },
-  { id: 'cosmic', label: 'Cosmic', backgroundColor: '#E9EDFF', accentColor: '#3349C9', unlockLevel: 92, borderWidth: 3 },
-  { id: 'legend-gold', label: 'Legend gold', backgroundColor: '#FFF4BC', accentColor: '#C48B00', unlockLevel: 100, borderWidth: 3 },
+  { id: 'forest', label: 'Forest', backgroundColor: '#E9F8EF', accentColor: '#2C8F54' },
+  { id: 'lime', label: 'Lime', backgroundColor: '#F0F9E3', accentColor: '#5B8F1F' },
+  { id: 'mint', label: 'Mint', backgroundColor: '#EAF4F2', accentColor: '#327E76' },
+  { id: 'sunset', label: 'Sunset', backgroundColor: '#FFF0E2', accentColor: '#D4681D' },
+  { id: 'rose', label: 'Rose', backgroundColor: '#FFECEF', accentColor: '#D63B55' },
+  { id: 'berry', label: 'Berry', backgroundColor: '#FCEAF2', accentColor: '#B3336B' },
+  { id: 'violet', label: 'Violet', backgroundColor: '#F1EDFF', accentColor: '#7654D4' },
+  { id: 'sand', label: 'Sand', backgroundColor: '#FBF3E4', accentColor: '#9A7B3F' },
+  { id: 'graphite', label: 'Graphite', backgroundColor: '#EEF3F8', accentColor: '#44505C' },
+  { id: 'cosmic', label: 'Cosmic', backgroundColor: '#E9EDFF', accentColor: '#3349C9', borderWidth: 3 },
+  { id: 'legend-gold', label: 'Legend gold', backgroundColor: '#FFF4BC', accentColor: '#C48B00', borderWidth: 3 },
 ];
 
+const PRESTIGE_BORDER_ID: AccountAvatarColorId = 'legend-gold';
+
 export const ASSET_ACCOUNT_AVATAR_PRESETS: ThumbnailAccountAvatarPreset[] = [
-  { type: 'thumbnail', id: 'avatar-student', label: 'Student', image: require('../../assets/Avatars/student.png'), backgroundColor: '#EAF5FF', accentColor: '#1671B6', imageFit: 'contain', imageInsetRatio: 0.08 },
   { type: 'thumbnail', id: 'avatar-open-book', label: 'Open book', image: require('../../assets/Avatars/open-book.png'), backgroundColor: '#ECF8F3', accentColor: '#258B62', imageFit: 'contain', imageInsetRatio: 0.08 },
   { type: 'thumbnail', id: 'avatar-thumbsup', label: 'Thumbs up', image: require('../../assets/Avatars/thumbsup.png'), backgroundColor: '#E9F8EF', accentColor: '#2C8F54', imageFit: 'contain', imageInsetRatio: 0.08 },
   { type: 'thumbnail', id: 'avatar-heart', label: 'Heart', image: require('../../assets/Avatars/heart.png'), backgroundColor: '#FFECEF', accentColor: '#D63B55', imageFit: 'contain', imageInsetRatio: 0.08 },
@@ -194,6 +202,43 @@ export const ASSET_ACCOUNT_AVATAR_PRESETS: ThumbnailAccountAvatarPreset[] = [
   { type: 'thumbnail', id: 'avatar-exam', label: 'Exam', image: require('../../assets/Avatars/exam.png'), backgroundColor: '#F1EDFF', accentColor: '#7654D4', unlockLevel: 87, imageFit: 'contain', imageInsetRatio: 0.08 },
   { type: 'thumbnail', id: 'avatar-teacher', label: 'Teacher', image: require('../../assets/Avatars/teacher.png'), backgroundColor: '#EAF4F2', accentColor: '#327E76', unlockLevel: 91, imageFit: 'contain', imageInsetRatio: 0.08 },
   { type: 'thumbnail', id: 'avatar-medal', label: 'Medal', image: require('../../assets/Avatars/medal.png'), backgroundColor: '#FFF4BC', accentColor: '#C48B00', unlockLevel: 98, imageFit: 'contain', imageInsetRatio: 0.08 },
+  // Characters and culture icons, replacing the abstract lesson thumbnails that made poor
+  // profile pictures. Ordered everyday -> showy, since that's the order they're handed out
+  // in: hobbies and objects early, animals and culture next, then fantasy, then prestige.
+  { type: 'thumbnail', id: 'avatar-basketball', label: 'Basketball', image: require('../../assets/Avatars/basketball.png'), backgroundColor: '#FFF0E2', accentColor: '#D4681D', imageFit: 'contain', imageInsetRatio: 0.08 },
+  { type: 'thumbnail', id: 'avatar-ball', label: 'Football', image: require('../../assets/Avatars/ball.png'), backgroundColor: '#F8EFE6', accentColor: '#8F5D2C', imageFit: 'contain', imageInsetRatio: 0.08 },
+  { type: 'thumbnail', id: 'avatar-apple', label: 'Apple', image: require('../../assets/Avatars/apple.png'), backgroundColor: '#FFECEF', accentColor: '#D63B55', imageFit: 'contain', imageInsetRatio: 0.08 },
+  { type: 'thumbnail', id: 'avatar-skateboard', label: 'Skateboard', image: require('../../assets/Avatars/skateboard.png'), backgroundColor: '#EEF3F8', accentColor: '#44505C', imageFit: 'contain', imageInsetRatio: 0.08 },
+  { type: 'thumbnail', id: 'avatar-bike', label: 'Bike', image: require('../../assets/Avatars/bike.png'), backgroundColor: '#E9F8EF', accentColor: '#2C8F54', imageFit: 'contain', imageInsetRatio: 0.08 },
+  { type: 'thumbnail', id: 'avatar-fishing', label: 'Fishing', image: require('../../assets/Avatars/fishing.png'), backgroundColor: '#EAF7FF', accentColor: '#1687A7', imageFit: 'contain', imageInsetRatio: 0.08 },
+  { type: 'thumbnail', id: 'avatar-wrench', label: 'Wrench', image: require('../../assets/Avatars/wrench.png'), backgroundColor: '#F4F8FA', accentColor: '#6D7D87', imageFit: 'contain', imageInsetRatio: 0.08 },
+  { type: 'thumbnail', id: 'avatar-gameboy', label: 'Handheld', image: require('../../assets/Avatars/gameboy.png'), backgroundColor: '#EAF7FF', accentColor: '#1687A7', imageFit: 'contain', imageInsetRatio: 0.08 },
+  { type: 'thumbnail', id: 'avatar-watercolor', label: 'Painting', image: require('../../assets/Avatars/watercolor.png'), backgroundColor: '#FFF0E2', accentColor: '#D4681D', imageFit: 'contain', imageInsetRatio: 0.08 },
+  { type: 'thumbnail', id: 'avatar-movie', label: 'Movie', image: require('../../assets/Avatars/movie.png'), backgroundColor: '#EEF3F8', accentColor: '#44505C', imageFit: 'contain', imageInsetRatio: 0.08 },
+  { type: 'thumbnail', id: 'avatar-music-notes', label: 'Music notes', image: require('../../assets/Avatars/music-notes.png'), backgroundColor: '#FFECEF', accentColor: '#D63B55', imageFit: 'contain', imageInsetRatio: 0.08 },
+  { type: 'thumbnail', id: 'avatar-brown-bear', label: 'Brown bear', image: require('../../assets/Avatars/brown-bear.png'), backgroundColor: '#F8EFE6', accentColor: '#8F5D2C', imageFit: 'contain', imageInsetRatio: 0.08 },
+  { type: 'thumbnail', id: 'avatar-shark', label: 'Shark', image: require('../../assets/Avatars/shark.png'), backgroundColor: '#EAF7FF', accentColor: '#1687A7', imageFit: 'contain', imageInsetRatio: 0.08 },
+  { type: 'thumbnail', id: 'avatar-bats', label: 'Bats', image: require('../../assets/Avatars/bats.png'), backgroundColor: '#EEF3F8', accentColor: '#44505C', imageFit: 'contain', imageInsetRatio: 0.08 },
+  { type: 'thumbnail', id: 'avatar-snowman', label: 'Snowman', image: require('../../assets/Avatars/snowman.png'), backgroundColor: '#EAF7FF', accentColor: '#1687A7', imageFit: 'contain', imageInsetRatio: 0.08 },
+  { type: 'thumbnail', id: 'avatar-police-car', label: 'Police car', image: require('../../assets/Avatars/police-car.png'), backgroundColor: '#EAF5FF', accentColor: '#1671B6', imageFit: 'contain', imageInsetRatio: 0.08 },
+  { type: 'thumbnail', id: 'avatar-payphone', label: 'Red phone box', image: require('../../assets/Avatars/payphone.png'), backgroundColor: '#FFECEF', accentColor: '#D63B55', imageFit: 'contain', imageInsetRatio: 0.08 },
+  { type: 'thumbnail', id: 'avatar-double-decker-bus', label: 'London bus', image: require('../../assets/Avatars/double-decker-bus.png'), backgroundColor: '#FFECEF', accentColor: '#D63B55', imageFit: 'contain', imageInsetRatio: 0.08 },
+  // The four UK nations, sitting together: Scotland is already earlier in this list.
+  { type: 'thumbnail', id: 'avatar-rose', label: 'England', image: require('../../assets/Avatars/rose.png'), backgroundColor: '#FCEAF2', accentColor: '#B3336B', imageFit: 'contain', imageInsetRatio: 0.08 },
+  { type: 'thumbnail', id: 'avatar-wales', label: 'Wales', image: require('../../assets/Avatars/wales.png'), backgroundColor: '#FFECEF', accentColor: '#D63B55', imageFit: 'contain', imageInsetRatio: 0.08 },
+  { type: 'thumbnail', id: 'avatar-ireland', label: 'Ireland', image: require('../../assets/Avatars/ireland.png'), backgroundColor: '#EEF7E7', accentColor: '#4B8F2F', imageFit: 'contain', imageInsetRatio: 0.08 },
+  { type: 'thumbnail', id: 'avatar-usa', label: 'USA', image: require('../../assets/Avatars/usa.png'), backgroundColor: '#EAF5FF', accentColor: '#1671B6', imageFit: 'contain', imageInsetRatio: 0.08 },
+  { type: 'thumbnail', id: 'avatar-maple-leaf', label: 'Canada', image: require('../../assets/Avatars/maple-leaf.png'), backgroundColor: '#FFECEF', accentColor: '#D63B55', imageFit: 'contain', imageInsetRatio: 0.08 },
+  { type: 'thumbnail', id: 'avatar-celebrity', label: 'Celebrity', image: require('../../assets/Avatars/celebrity.png'), backgroundColor: '#FCEAF2', accentColor: '#B3336B', imageFit: 'contain', imageInsetRatio: 0.08 },
+  { type: 'thumbnail', id: 'avatar-magician', label: 'Magician', image: require('../../assets/Avatars/magician.png'), backgroundColor: '#F1EDFF', accentColor: '#7654D4', imageFit: 'contain', imageInsetRatio: 0.08 },
+  { type: 'thumbnail', id: 'avatar-melting', label: 'Melting', image: require('../../assets/Avatars/melting.png'), backgroundColor: '#FFF0E2', accentColor: '#D4681D', imageFit: 'contain', imageInsetRatio: 0.08 },
+  { type: 'thumbnail', id: 'avatar-spirit', label: 'Spirit', image: require('../../assets/Avatars/spirit.png'), backgroundColor: '#EAF4F2', accentColor: '#327E76', imageFit: 'contain', imageInsetRatio: 0.08 },
+  { type: 'thumbnail', id: 'avatar-elf', label: 'Elf', image: require('../../assets/Avatars/elf.png'), backgroundColor: '#EEF7E7', accentColor: '#4B8F2F', imageFit: 'contain', imageInsetRatio: 0.08 },
+  { type: 'thumbnail', id: 'avatar-fairy', label: 'Fairy', image: require('../../assets/Avatars/fairy.png'), backgroundColor: '#F5EEFF', accentColor: '#8B4DD6', imageFit: 'contain', imageInsetRatio: 0.08 },
+  { type: 'thumbnail', id: 'avatar-unicorn', label: 'Unicorn', image: require('../../assets/Avatars/unicorn.png'), backgroundColor: '#F5EEFF', accentColor: '#8B4DD6', imageFit: 'contain', imageInsetRatio: 0.08 },
+  { type: 'thumbnail', id: 'avatar-excalibur', label: 'Excalibur', image: require('../../assets/Avatars/excalibur.png'), backgroundColor: '#E9EDFF', accentColor: '#3349C9', imageFit: 'contain', imageInsetRatio: 0.08 },
+  { type: 'thumbnail', id: 'avatar-phoenix', label: 'Phoenix', image: require('../../assets/Avatars/phoenix.png'), backgroundColor: '#FFF4BC', accentColor: '#C48B00', imageFit: 'contain', imageInsetRatio: 0.08 },
+  { type: 'thumbnail', id: 'avatar-crown', label: 'Crown', image: require('../../assets/Avatars/crown.png'), backgroundColor: '#FFF4BC', accentColor: '#C48B00', imageFit: 'contain', imageInsetRatio: 0.08 },
 ];
 
 export const END_CARD_ACCOUNT_AVATAR_PRESETS: ThumbnailAccountAvatarPreset[] = [
@@ -208,23 +253,10 @@ export const END_CARD_ACCOUNT_AVATAR_PRESETS: ThumbnailAccountAvatarPreset[] = [
 export const THUMBNAIL_ACCOUNT_AVATAR_PRESETS: ThumbnailAccountAvatarPreset[] = [
   { type: 'thumbnail', id: 'thumb-activities', label: 'Activities', image: require('../../assets/thumbnails/activities-thumbnail.png'), backgroundColor: '#EAF7FF', accentColor: '#1687A7' },
   { type: 'thumbnail', id: 'thumb-classroom-english', label: 'Classroom', image: require('../../assets/thumbnails/classroom-english-thumbnail.png'), backgroundColor: '#ECF8F3', accentColor: '#258B62' },
-  { type: 'thumbnail', id: 'thumb-family', label: 'Family', image: require('../../assets/thumbnails/family-thumbnail.png'), backgroundColor: '#E9F8EF', accentColor: '#2C8F54', unlockLevel: 4 },
   { type: 'thumbnail', id: 'thumb-breakfast', label: 'Breakfast', image: require('../../assets/thumbnails/breakfast-thumbnail.png'), backgroundColor: '#FFF0E2', accentColor: '#D4681D', unlockLevel: 7 },
-  { type: 'thumbnail', id: 'thumb-daily-routine', label: 'Daily routine', image: require('../../assets/thumbnails/daily-routine-thumbnail.png'), backgroundColor: '#EAF5FF', accentColor: '#1671B6', unlockLevel: 8 },
-  { type: 'thumbnail', id: 'thumb-clothes', label: 'Clothes', image: require('../../assets/thumbnails/clothes-thumbnail.png'), backgroundColor: '#FFECEF', accentColor: '#D63B55', unlockLevel: 10 },
-  { type: 'thumbnail', id: 'thumb-food-basics', label: 'Food basics', image: require('../../assets/thumbnails/food-basics-thumbnail.png'), backgroundColor: '#FFF0E2', accentColor: '#D4681D', unlockLevel: 14 },
-  { type: 'thumbnail', id: 'thumb-colours', label: 'Colours', image: require('../../assets/thumbnails/colours-thumbnail.png'), backgroundColor: '#F1EDFF', accentColor: '#7654D4', unlockLevel: 17 },
-  { type: 'thumbnail', id: 'thumb-daily-questions', label: 'Daily questions', image: require('../../assets/thumbnails/daily-questions-thumbnail.png'), backgroundColor: '#EAF5FF', accentColor: '#1671B6', unlockLevel: 18 },
-  { type: 'thumbnail', id: 'thumb-personality', label: 'Personality', image: require('../../assets/thumbnails/personality-thumbnail.png'), backgroundColor: '#FFF6DE', accentColor: '#B87500', unlockLevel: 21 },
-  { type: 'thumbnail', id: 'thumb-nationality', label: 'Nationality', image: require('../../assets/thumbnails/nationality-thumbnail.png'), backgroundColor: '#EEF7E7', accentColor: '#4B8F2F', unlockLevel: 23 },
   { type: 'thumbnail', id: 'thumb-school-basics', label: 'School basics', image: require('../../assets/thumbnails/school-basics-thumbnail.png'), backgroundColor: '#ECF8F3', accentColor: '#258B62', unlockLevel: 24 },
   { type: 'thumbnail', id: 'thumb-school', label: 'School life', image: require('../../assets/thumbnails/school-life-thumbnail.png'), backgroundColor: '#ECF8F3', accentColor: '#258B62', unlockLevel: 27 },
-  { type: 'thumbnail', id: 'thumb-instructions', label: 'Instructions', image: require('../../assets/thumbnails/instructions-thumbnail.png'), backgroundColor: '#EAF7FF', accentColor: '#1687A7', unlockLevel: 31 },
-  { type: 'thumbnail', id: 'thumb-time', label: 'Time', image: require('../../assets/thumbnails/time-thumbnail.png'), backgroundColor: '#EAF5FF', accentColor: '#1671B6', unlockLevel: 33 },
-  { type: 'thumbnail', id: 'thumb-opinion-basics', label: 'Opinion', image: require('../../assets/thumbnails/opinion-level-1-thumbnail.png'), backgroundColor: '#F1EDFF', accentColor: '#7654D4', unlockLevel: 35 },
-  { type: 'thumbnail', id: 'thumb-job-examples', label: 'Jobs', image: require('../../assets/thumbnails/job-examples-thumbnail.png'), backgroundColor: '#EAF4F2', accentColor: '#327E76', unlockLevel: 38 },
-  { type: 'thumbnail', id: 'thumb-emotions-plus', label: 'More emotions', image: require('../../assets/thumbnails/emotions-level-2-thumbnail.png'), backgroundColor: '#FFECEF', accentColor: '#D63B55', unlockLevel: 41 },
-  { type: 'thumbnail', id: 'thumb-love', label: 'Love', image: require('../../assets/thumbnails/love-thumbnail.png'), backgroundColor: '#FFECEF', accentColor: '#D63B55', unlockLevel: 43 },
+  { type: 'thumbnail', id: 'thumb-sports', label: 'Sports', image: require('../../assets/thumbnails/sports-thumbnail.png'), backgroundColor: '#EAF7FF', accentColor: '#1687A7' },
   { type: 'thumbnail', id: 'thumb-cooking', label: 'Cooking', image: require('../../assets/thumbnails/cooking-thumbnail.png'), backgroundColor: '#FFF0E2', accentColor: '#D4681D', unlockLevel: 46 },
   { type: 'thumbnail', id: 'thumb-cinema', label: 'Cinema', image: require('../../assets/thumbnails/cinema-thumbnail.png'), backgroundColor: '#F1EDFF', accentColor: '#7654D4', unlockLevel: 49 },
   { type: 'thumbnail', id: 'thumb-fashion', label: 'Fashion', image: require('../../assets/thumbnails/fashion-thumbnail.png'), backgroundColor: '#FFECEF', accentColor: '#D63B55', unlockLevel: 50 },
@@ -233,9 +265,7 @@ export const THUMBNAIL_ACCOUNT_AVATAR_PRESETS: ThumbnailAccountAvatarPreset[] = 
   { type: 'thumbnail', id: 'thumb-american-dishes', label: 'American dishes', image: require('../../assets/thumbnails/american-dishes-thumbnail.png'), backgroundColor: '#FFF0E2', accentColor: '#D4681D', unlockLevel: 57 },
   { type: 'thumbnail', id: 'thumb-animals', label: 'Animals', image: require('../../assets/thumbnails/animals-thumbnail.png'), backgroundColor: '#E9F8EF', accentColor: '#2C8F54', unlockLevel: 60 },
   { type: 'thumbnail', id: 'thumb-geography', label: 'Geography', image: require('../../assets/thumbnails/geography-thumbnail.png'), backgroundColor: '#EAF5FF', accentColor: '#1671B6', unlockLevel: 63 },
-  { type: 'thumbnail', id: 'thumb-space', label: 'Space', image: require('../../assets/thumbnails/space-thumbnail.png'), backgroundColor: '#EAF5FF', accentColor: '#1671B6', unlockLevel: 64 },
   { type: 'thumbnail', id: 'thumb-robot', label: 'Robots', image: require('../../assets/thumbnails/robot-thumbnail.png'), backgroundColor: '#EAF4F2', accentColor: '#327E76', unlockLevel: 65 },
-  { type: 'thumbnail', id: 'thumb-ecology', label: 'Ecology', image: require('../../assets/thumbnails/ecology-thumbnail.png'), backgroundColor: '#EEF7E7', accentColor: '#4B8F2F', unlockLevel: 68 },
   { type: 'thumbnail', id: 'thumb-detective', label: 'Detective', image: require('../../assets/thumbnails/detective-stories-thumbnail.png'), backgroundColor: '#F5EEFF', accentColor: '#8B4DD6', unlockLevel: 70 },
   { type: 'thumbnail', id: 'thumb-extreme', label: 'Extreme', image: require('../../assets/thumbnails/extreme-sports-thumbnail.png'), backgroundColor: '#EAF5FF', accentColor: '#1671B6', unlockLevel: 71 },
   { type: 'thumbnail', id: 'thumb-legends', label: 'Legends', image: require('../../assets/thumbnails/legends-thumbnail.png'), backgroundColor: '#FFF6DE', accentColor: '#B87500', unlockLevel: 74 },
@@ -246,6 +276,8 @@ export const THUMBNAIL_ACCOUNT_AVATAR_PRESETS: ThumbnailAccountAvatarPreset[] = 
   { type: 'thumbnail', id: 'thumb-halloween', label: 'Halloween', image: require('../../assets/thumbnails/halloween-thumbnail.png'), backgroundColor: '#FFF0E2', accentColor: '#D4681D' },
   { type: 'thumbnail', id: 'thumb-school-subjects', label: 'Subjects', image: require('../../assets/thumbnails/subjects-thumbnail.png'), backgroundColor: '#EAF5FF', accentColor: '#1671B6' },
   { type: 'thumbnail', id: 'thumb-school-supplies', label: 'Supplies', image: require('../../assets/thumbnails/supplies-thumbnail.png'), backgroundColor: '#ECF8F3', accentColor: '#258B62' },
+  // Thumbnails that already shipped as lesson art but were never offered as profile
+  // pictures. They carry the levels that 18 near-identical borders used to waste.
 ];
 
 const defaultImageAccountAvatarIds: AccountAvatarId[] = [
@@ -257,67 +289,146 @@ const defaultImageAccountAvatarIds: AccountAvatarId[] = [
 ];
 const defaultImageAccountAvatarIdSet = new Set<AccountAvatarId>(defaultImageAccountAvatarIds);
 
-const fixedImageUnlockLevels: Partial<Record<AccountAvatarId, number>> = {
-  'end-good': 82,
-  'end-shooting-star': 84,
-  'end-timer-beat': 86,
-  'end-perfect': 90,
-  'avatar-student': 92,
-  'avatar-teacher': 96,
-  'avatar-medal': 98,
-  'asset-ellie': 100,
-};
+const FIRST_REWARD_LEVEL = 2;
 
+// Legend gold is the one border worth waiting for, so it sits out the even spread and lands
+// as the last thing before the closing trio.
+const PRESTIGE_BORDER_LEVEL = 97;
+
+// The closing trio is pinned to the last three levels before Ellie Master, so the run to 100
+// always ends on the same three rather than wherever the schedule happened to land.
+const FINAL_IMAGE_UNLOCK_LEVELS = [98, 99, 100];
 const finalImageAccountAvatarIds: AccountAvatarId[] = [
-  'avatar-student',
   'avatar-teacher',
   'avatar-medal',
   'asset-ellie',
 ];
-const fixedImageAccountAvatarIdSet = new Set<AccountAvatarId>(Object.keys(fixedImageUnlockLevels) as AccountAvatarId[]);
 const isFinalImageAccountAvatarPreset = (preset: ThumbnailAccountAvatarPreset) =>
   finalImageAccountAvatarIds.includes(preset.id);
 
-const withEvenImageUnlockLevels = (
-  presets: ThumbnailAccountAvatarPreset[]
-): ThumbnailAccountAvatarPreset[] => {
-  const flexiblePresets = presets.filter((preset) => (
-    !defaultImageAccountAvatarIdSet.has(preset.id) &&
-    !fixedImageAccountAvatarIdSet.has(preset.id)
-  ));
-  const lastFlexibleIndex = Math.max(1, flexiblePresets.length - 1);
-  const flexibleStartLevel = 2;
-  const flexibleEndLevel = 80;
-  const flexibleLevels = new Map<AccountAvatarId, number>();
+/**
+ * Deals out levels so that exactly one reward lands on each, colours included.
+ *
+ * Colours used to carry hardcoded unlock levels that happened to sit on top of avatar
+ * levels: 11 levels handed out two rewards while 27 handed out none. Here colours are
+ * spread evenly through the run and take their level outright, and avatars fill every
+ * level left over, in order.
+ */
+const buildRewardSchedule = (colorCount: number, avatarCount: number) => {
+  const slotCount = colorCount + avatarCount;
+  const colorSlots = new Set<number>();
 
-  flexiblePresets.forEach((preset, index) => {
-    flexibleLevels.set(
-      preset.id,
-      Math.round(flexibleStartLevel + ((flexibleEndLevel - flexibleStartLevel) * index) / lastFlexibleIndex)
-    );
-  });
+  // Offset by one band so the very first reward is a picture rather than a border — a new
+  // avatar reads as the bigger prize, and level 2 is the one a student sees soonest.
+  for (let index = 0; index < colorCount; index += 1) {
+    colorSlots.add(Math.floor(((index + 1) * slotCount) / (colorCount + 1)));
+  }
 
-  return presets.map((preset) => {
-    const fixedUnlockLevel = fixedImageUnlockLevels[preset.id];
-    if (fixedUnlockLevel !== undefined) return { ...preset, unlockLevel: fixedUnlockLevel };
-    if (defaultImageAccountAvatarIdSet.has(preset.id)) return { ...preset, unlockLevel: undefined };
+  // Levels available before the pinned prestige border and closing trio.
+  const availableLevels = PRESTIGE_BORDER_LEVEL - FIRST_REWARD_LEVEL;
 
-    const flexibleUnlockLevel = flexibleLevels.get(preset.id);
-    return flexibleUnlockLevel !== undefined
-      ? { ...preset, unlockLevel: flexibleUnlockLevel }
-      : preset;
-  });
+  // Once there are more rewards than levels below the finale, the surplus carries on past
+  // level 100 rather than landing on top of the pinned ones — the master range has nothing
+  // in it, so that's where the overflow belongs.
+  const reservedLevels = new Set([PRESTIGE_BORDER_LEVEL, ...FINAL_IMAGE_UNLOCK_LEVELS]);
+  const packedLevels: number[] = [];
+  for (let level = FIRST_REWARD_LEVEL; packedLevels.length < slotCount; level += 1) {
+    if (!reservedLevels.has(level)) packedLevels.push(level);
+  }
+
+  // With fewer rewards than levels, share the shortfall out evenly instead of packing from
+  // level 2 and leaving one dead stretch just before the finale — a gap every few levels is
+  // barely noticeable, thirteen in a row is. Once the art catches up this packs densely again.
+  const slotToLevel = (slot: number) => (
+    slotCount >= availableLevels || slotCount <= 1
+      ? packedLevels[slot]
+      : FIRST_REWARD_LEVEL + Math.round((slot * (availableLevels - 1)) / (slotCount - 1))
+  );
+
+  const colorLevels: number[] = [];
+  const avatarLevels: number[] = [];
+
+  for (let slot = 0; slot < slotCount; slot += 1) {
+    const level = slotToLevel(slot);
+    if (colorSlots.has(slot) && colorLevels.length < colorCount) colorLevels.push(level);
+    else avatarLevels.push(level);
+  }
+
+  // Rounding can only collide if colours outnumber the slots between them; if it ever does,
+  // take levels back off the avatars rather than leaving a colour unreachable forever.
+  while (colorLevels.length < colorCount && avatarLevels.length > 0) {
+    colorLevels.push(avatarLevels.pop() as number);
+  }
+
+  return {
+    colorLevels: colorLevels.sort((a, b) => a - b),
+    avatarLevels: avatarLevels.sort((a, b) => a - b),
+  };
 };
 
-export const IMAGE_ACCOUNT_AVATAR_PRESETS: ThumbnailAccountAvatarPreset[] = withEvenImageUnlockLevels([
-  ...ASSET_ACCOUNT_AVATAR_PRESETS.filter((preset) => !isFinalImageAccountAvatarPreset(preset)),
-  ...THUMBNAIL_ACCOUNT_AVATAR_PRESETS.filter((preset) => !isFinalImageAccountAvatarPreset(preset)),
-  ...END_CARD_ACCOUNT_AVATAR_PRESETS.filter((preset) => !isFinalImageAccountAvatarPreset(preset)),
-  ...ASSET_ACCOUNT_AVATAR_PRESETS.filter((preset) => preset.id === 'avatar-student'),
-  ...ASSET_ACCOUNT_AVATAR_PRESETS.filter((preset) => preset.id === 'avatar-teacher'),
-  ...ASSET_ACCOUNT_AVATAR_PRESETS.filter((preset) => preset.id === 'avatar-medal'),
-  ...END_CARD_ACCOUNT_AVATAR_PRESETS.filter((preset) => preset.id === 'asset-ellie'),
-]);
+// The legendary ones. They live in the asset list next to the everyday avatars, but handing
+// them out in list order put them around level 55 and left the last forty levels paying out
+// lesson thumbnails — the ladder got less exciting the higher you climbed. Pulling them to
+// the end makes the run escalate: objects and animals, then lesson art, then these.
+const prestigeImageAccountAvatarIds: AccountAvatarId[] = [
+  'avatar-dragon',
+  'avatar-magician',
+  'avatar-elf',
+  'avatar-fairy',
+  'avatar-unicorn',
+  'avatar-excalibur',
+  'avatar-phoenix',
+  'avatar-crown',
+];
+
+const isReservedImageAccountAvatarPreset = (preset: ThumbnailAccountAvatarPreset) =>
+  isFinalImageAccountAvatarPreset(preset) ||
+  prestigeImageAccountAvatarIds.includes(preset.id);
+
+const findImageAccountAvatarPreset = (id: AccountAvatarId) => (
+  [
+    ...ASSET_ACCOUNT_AVATAR_PRESETS,
+    ...THUMBNAIL_ACCOUNT_AVATAR_PRESETS,
+    ...END_CARD_ACCOUNT_AVATAR_PRESETS,
+  ].find((preset) => preset.id === id) as ThumbnailAccountAvatarPreset
+);
+
+const orderedImageAccountAvatarPresets: ThumbnailAccountAvatarPreset[] = [
+  ...ASSET_ACCOUNT_AVATAR_PRESETS.filter((preset) => !isReservedImageAccountAvatarPreset(preset)),
+  ...THUMBNAIL_ACCOUNT_AVATAR_PRESETS.filter((preset) => !isReservedImageAccountAvatarPreset(preset)),
+  ...END_CARD_ACCOUNT_AVATAR_PRESETS.filter((preset) => !isReservedImageAccountAvatarPreset(preset)),
+  ...prestigeImageAccountAvatarIds.map(findImageAccountAvatarPreset),
+  ...finalImageAccountAvatarIds.map(findImageAccountAvatarPreset),
+];
+
+// Minus the free starting border and minus legend gold, which is pinned rather than spread.
+const unlockableColorCount = BASE_ACCOUNT_AVATAR_COLOR_PRESETS.length - 2;
+const scheduledAvatarCount = orderedImageAccountAvatarPresets.filter((preset) => (
+  !defaultImageAccountAvatarIdSet.has(preset.id) && !isFinalImageAccountAvatarPreset(preset)
+)).length;
+
+const rewardSchedule = buildRewardSchedule(unlockableColorCount, scheduledAvatarCount);
+
+export const ACCOUNT_AVATAR_COLOR_PRESETS: AccountAvatarColorPreset[] = (() => {
+  const levels = [...rewardSchedule.colorLevels];
+  // The first colour is the one everybody starts with, so it never consumes a level.
+  return BASE_ACCOUNT_AVATAR_COLOR_PRESETS.map((preset, index) => {
+    if (index === 0) return preset;
+    if (preset.id === PRESTIGE_BORDER_ID) return { ...preset, unlockLevel: PRESTIGE_BORDER_LEVEL };
+    return { ...preset, unlockLevel: levels.shift() };
+  });
+})();
+
+export const IMAGE_ACCOUNT_AVATAR_PRESETS: ThumbnailAccountAvatarPreset[] = (() => {
+  const levels = [...rewardSchedule.avatarLevels];
+  const finalLevels = [...FINAL_IMAGE_UNLOCK_LEVELS];
+
+  return orderedImageAccountAvatarPresets.map((preset) => {
+    if (defaultImageAccountAvatarIdSet.has(preset.id)) return { ...preset, unlockLevel: undefined };
+    if (isFinalImageAccountAvatarPreset(preset)) return { ...preset, unlockLevel: finalLevels.shift() };
+    return { ...preset, unlockLevel: levels.shift() };
+  });
+})();
 
 export const PICKER_ACCOUNT_AVATAR_PRESETS: AccountAvatarPreset[] = IMAGE_ACCOUNT_AVATAR_PRESETS;
 
@@ -341,6 +452,20 @@ export const getAccountAvatarUnlocksBetweenLevels = (
   if (toLevel <= fromLevel) return [];
 
   return IMAGE_ACCOUNT_AVATAR_PRESETS.filter((preset) => (
+    !!preset.unlockLevel && preset.unlockLevel > fromLevel && preset.unlockLevel <= toLevel
+  ));
+};
+
+export const getAccountAvatarColorUnlocksBetweenLevels = (
+  previousLevel: number,
+  currentLevel: number
+) => {
+  const fromLevel = normalizeLevel(previousLevel);
+  const toLevel = normalizeLevel(currentLevel);
+
+  if (toLevel <= fromLevel) return [];
+
+  return ACCOUNT_AVATAR_COLOR_PRESETS.filter((preset) => (
     !!preset.unlockLevel && preset.unlockLevel > fromLevel && preset.unlockLevel <= toLevel
   ));
 };

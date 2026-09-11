@@ -1,7 +1,7 @@
 const VideoGamesVocab = {
   id: '24',
   title: 'Video Games',
-  description: 'Learn vocabulary related to gaming and entertainment',  imageUrl: 'https://i.ibb.co/CNR94Kf/Video-games.webp',
+  description: 'Learn vocabulary related to gaming and entertainment',  imageUrl: 'https://wretggbpaejzjdilemit.supabase.co/storage/v1/object/public/lesson-images/15274719ab/video-games.webp',
   thumbnail: require('../../assets/thumbnails/videogames-thumbnail.png'),
   flashcards: [
   {

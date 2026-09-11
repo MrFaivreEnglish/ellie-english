@@ -2,7 +2,7 @@ const ImperativeGrammar = {
   id: '25',
   title: 'Impératif',
   description: 'Learn how to use the imperative mood',
-  imageUrl: 'https://i.ibb.co/7tY3p7dm/Imp-ratif.png',
+  imageUrl: 'https://wretggbpaejzjdilemit.supabase.co/storage/v1/object/public/lesson-images/15274719ab/imperatif.webp',
   textContent: {
     cards: [
       {

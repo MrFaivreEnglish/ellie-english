@@ -2,7 +2,7 @@ const DateVocab = {
   id: '303',
   title: 'Date',
   description: 'Days, months and common date words',
-  imageUrl: 'https://i.ibb.co/wNdFcDkZ/date-vocab.webp',
+  imageUrl: 'https://wretggbpaejzjdilemit.supabase.co/storage/v1/object/public/lesson-images/15274719ab/date.webp',
   thumbnail: require('../../assets/thumbnails/date-thumbnail.png'),
   flashcards: [
     {

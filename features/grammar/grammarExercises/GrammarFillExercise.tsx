@@ -1,18 +1,40 @@
 ﻿import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { Platform, Pressable, StyleSheet, Text, TextInput, TouchableOpacity, View, useWindowDimensions } from 'react-native';
-import { MaterialIcons } from '@expo/vector-icons';
-import { CARD_HEIGHT, Exercise, normalizeAnswer } from './GrammarExerciseUtils';
-import { clampNumber, getWebLessonScale, scaleValue } from '../../shared/responsiveLayout';
-import { getGrammarGameColors } from '../../shared/uiPrimitives';
+import { Platform, Pressable, StyleSheet, TouchableOpacity, View, useWindowDimensions } from 'react-native';
+import Text, { ThemedTextInput as TextInput } from '../../shared/ThemedText';
+import MaterialIcons from '../../shared/ThemedMaterialIcon';
+import { Exercise, normalizeAnswer } from './GrammarExerciseUtils';
+import { getGrammarGameColors, getSoftShadow, withColorAlpha } from '../../shared/uiPrimitives';
 import { triggerSelectionHaptic } from '../../shared/haptics';
 import { usePersistentExerciseKeyboard } from '../../shared/usePersistentExerciseKeyboard';
+import { clampNumber, getWebLessonScale, isDesktopWebWidth, scaleValue } from '../../shared/responsiveLayout';
 import type { ThemeColors } from '../../settings/ThemeContext';
 
 interface GrammarFillExerciseProps {
   exercise?: Exercise;
   colors: ThemeColors;
   isDarkMode: boolean;
-  keyboardVisible?: boolean;
+
+
+
+
+
+  practiceSheetReady?: boolean;
+
+
+
+
+
+
+  keyboardDismissed?: boolean;
+  onKeyboardRestore?: () => void;
+
+
+
+
+
+
+
+  reservesKeyboardSpace?: boolean;
   layoutHeight?: number;
   userAnswer: string;
   incorrectAnswer: string;
@@ -29,7 +51,10 @@ const GrammarFillExercise: React.FC<GrammarFillExerciseProps> = ({
   exercise,
   colors,
   isDarkMode,
-  keyboardVisible = false,
+  practiceSheetReady = true,
+  keyboardDismissed = false,
+  onKeyboardRestore,
+  reservesKeyboardSpace = false,
   layoutHeight,
   userAnswer,
   incorrectAnswer,
@@ -42,49 +67,36 @@ const GrammarFillExercise: React.FC<GrammarFillExerciseProps> = ({
   onIncorrect,
 }) => {
   const { width, height } = useWindowDimensions();
-  const responsiveHeight = layoutHeight ?? height;
-  const isDesktopWeb = Platform.OS === 'web' && width >= 768;
-  const isAndroid = Platform.OS === 'android';
-  const webScale = getWebLessonScale(width, responsiveHeight);
-  const isKeyboardTight = !isDesktopWeb && (responsiveHeight < 700 || width < 380);
-  const keyboardMode = keyboardVisible || isKeyboardTight;
-  const roomyKeyboardMode = Platform.OS === 'android' && keyboardMode;
-  const useTightKeyboardStyles = keyboardMode && !roomyKeyboardMode;
-  const inputRef = useRef<TextInput | null>(null);
+  const isDesktopWeb = isDesktopWebWidth(width);
+  const webLessonScale = getWebLessonScale(width, height);
+
+
+
+
+
+  const isScaledLayout = isDesktopWeb || webLessonScale > 1;
+  const inputRef = useRef<React.ElementRef<typeof TextInput> | null>(null);
   const [fillAnswer, setFillAnswer] = useState('');
   const [isInputFocused, setIsInputFocused] = useState(false);
-  // Sized to just fit the input + Check button plus a little breathing room —
-  // not a generous fraction of screen height — since fillCard hugs its
-  // content from the top now instead of centering it in a tall box (that
-  // combo was what left a huge void above and below the input on desktop).
-  const desktopFillCardHeight = Math.round(clampNumber(responsiveHeight * 0.22, 190, 260));
-  const androidFillCardHeight = keyboardMode
-    ? Math.round(clampNumber(responsiveHeight * 0.29, 224, 264))
-    : Math.round(clampNumber(responsiveHeight * 0.22, 200, 250));
-  const fillCardHeight = isDesktopWeb
-    ? desktopFillCardHeight
-    : isAndroid
-      ? androidFillCardHeight
-      : keyboardMode
-        ? 158
-        : Math.round(clampNumber(responsiveHeight * 0.22, 180, 230));
-  const fillCardPadding = isDesktopWeb ? scaleValue(30, webScale) : isAndroid ? (keyboardMode ? 13 : 16) : keyboardMode ? 9 : 18;
-  const inputShellMinHeight = isDesktopWeb ? scaleValue(52, webScale) : isAndroid ? (keyboardMode ? 78 : 104) : keyboardMode ? 54 : 86;
-  const inputShellVerticalPadding = isDesktopWeb ? 0 : isAndroid ? (keyboardMode ? 8 : 12) : keyboardMode ? 5 : 13;
-  const inputShellMarginBottom = isDesktopWeb ? scaleValue(28, webScale) : isAndroid ? (keyboardMode ? 11 : 15) : keyboardMode ? 7 : 15;
-  const fillInputMinHeight = isDesktopWeb ? scaleValue(46, webScale) : isAndroid ? (keyboardMode ? 46 : 60) : keyboardMode ? 36 : 56;
-  const fillInputFontSize = isDesktopWeb ? scaleValue(22, webScale) : isAndroid ? (keyboardMode ? 21 : 27) : keyboardMode ? 18 : 24;
   const grammarGame = getGrammarGameColors(colors, isDarkMode);
   const {
     shouldKeepKeyboardOpen: shouldAllowKeyboardFocus,
     focusInput,
     focusInputSequence,
     focusOnExerciseChange,
+    clearFocusTimeouts,
   } = usePersistentExerciseKeyboard({
     inputRef,
-    enabled: !isDesktopWeb,
+
+
+    enabled: !isDesktopWeb && !keyboardDismissed,
     androidFocusRetries: Platform.OS === 'android',
   });
+
+
+
+
+  const isSubmitRefocusPendingRef = useRef(false);
 
   const handleFillAnswerChange = useCallback((value: string) => {
     if (userAnswer !== '') return;
@@ -95,25 +107,59 @@ const GrammarFillExercise: React.FC<GrammarFillExerciseProps> = ({
     setFillAnswer('');
   }, [exercise?.question, exercise?.answer]);
 
-  useEffect(() => {
-    if (!shouldAllowKeyboardFocus) return;
 
+
+
+
+
+
+
+
+
+
+
+
+  // Waiting for sheet readiness avoids an Android keyboard-resize race during entrance.
+  useEffect(() => {
+    if (!practiceSheetReady || !exercise) return;
+
+
+
+
+    if (isDesktopWeb) {
+      inputRef.current?.focus();
+      return;
+    }
+
+    if (!shouldAllowKeyboardFocus) return;
     focusOnExerciseChange();
-  }, [exercise?.question, focusOnExerciseChange, shouldAllowKeyboardFocus]);
+  }, [exercise?.question, focusOnExerciseChange, isDesktopWeb, practiceSheetReady, shouldAllowKeyboardFocus]);
 
   const handleSubmit = useCallback(async () => {
     if (!exercise || userAnswer !== '' || typeof exercise.answer !== 'string') return;
 
     const isCorrect = normalizeAnswer(fillAnswer) === normalizeAnswer(exercise.answer);
 
-    if (isCorrect) {
-      await onCorrect(exercise.answer);
-      focusInputSequence([0, 180, 1900]);
-    } else {
-      onIncorrect('fill');
-      focusInput();
+    isSubmitRefocusPendingRef.current = true;
+    try {
+      if (isCorrect) {
+        await onCorrect(exercise.answer);
+
+
+
+
+        // Feedback transitions can consume the first Android focus request.
+        focusInputSequence([0, 180, 1900]);
+      } else {
+        onIncorrect('fill');
+        focusInput();
+      }
+    } finally {
+      setTimeout(() => {
+        isSubmitRefocusPendingRef.current = false;
+      }, isCorrect ? 2000 : 300);
     }
-  }, [exercise, userAnswer, fillAnswer, onCorrect, onIncorrect, focusInput]);
+  }, [exercise, userAnswer, fillAnswer, onCorrect, onIncorrect, focusInput, focusInputSequence]);
 
   const handleClear = useCallback(() => {
     triggerSelectionHaptic();
@@ -121,20 +167,241 @@ const GrammarFillExercise: React.FC<GrammarFillExerciseProps> = ({
     focusInput();
   }, [focusInput]);
 
+  const handleInputPress = useCallback(() => {
+    onKeyboardRestore?.();
+    focusInput();
+  }, [focusInput, onKeyboardRestore]);
+
   const handleInputBlur = useCallback(() => {
     setIsInputFocused(false);
+    if (keyboardDismissed || isSubmitRefocusPendingRef.current) return;
     focusInput(120);
-  }, [focusInput]);
+  }, [focusInput, keyboardDismissed]);
+
+
+
+  useEffect(() => {
+    if (!keyboardDismissed) return;
+    clearFocusTimeouts();
+    inputRef.current?.blur();
+  }, [clearFocusTimeouts, keyboardDismissed]);
 
   const disabled = fillAnswer.trim() === '' || userAnswer !== '';
   const canClear = fillAnswer.length > 0 && userAnswer === '';
 
-  return (
-    <View
-      ref={optionsContainerRef}
-      onLayout={(e) => onOptionsLayout(e.nativeEvent.layout.y)}
-      style={[styles.fillContainer, { height: fillCardHeight }]}
+  const inputProps = {
+    ref: inputRef,
+    value: fillAnswer,
+    onChangeText: handleFillAnswerChange,
+    autoCapitalize: 'none' as const,
+    autoCorrect: false,
+    blurOnSubmit: false,
+    submitBehavior: 'submit' as const,
+    editable: !!exercise,
+    showSoftInputOnFocus: true,
+    returnKeyType: 'send' as const,
+    onFocus: () => setIsInputFocused(true),
+    onBlur: handleInputBlur,
+    onSubmitEditing: handleSubmit,
+  };
+  const inputShellStateStyle = [
+    isInputFocused && styles.inputShellFocused,
+    isInputFocused && {
+      backgroundColor: grammarGame.inputFocusedSurface,
+      borderColor: grammarGame.answerSelectedBorder,
+    },
+    incorrectAnswer === 'fill' && styles.inputShellIncorrect,
+    incorrectAnswer === 'fill' && {
+      backgroundColor: grammarGame.incorrectSurface,
+      borderColor: grammarGame.incorrectBorder,
+    },
+  ];
+  const clearButton = canClear && (
+    <TouchableOpacity
+      onPress={handleClear}
+      style={[
+        styles.clearInputButton,
+
+
+        isScaledLayout && {
+          width: scaleValue(44, webLessonScale),
+          height: scaleValue(44, webLessonScale),
+          right: scaleValue(12, webLessonScale),
+          marginTop: -scaleValue(22, webLessonScale),
+          borderRadius: scaleValue(22, webLessonScale),
+        },
+      ]}
+      hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
     >
+      <MaterialIcons name="close" size={scaleValue(22, webLessonScale)} color={grammarGame.metaText} />
+    </TouchableOpacity>
+  );
+  const errorText = incorrectAnswer === 'fill' && (
+    <Text style={[styles.fillErrorText, { color: grammarGame.incorrectText }]}>Try again.</Text>
+  );
+
+  if (isDesktopWeb) {
+    const availableStageHeight = layoutHeight ?? height;
+    const isRoomyDesktop = availableStageHeight >= 520;
+    const inputHeight = scaleValue(isRoomyDesktop ? 80 : 74, webLessonScale);
+    const buttonHeight = scaleValue(isRoomyDesktop ? 54 : 50, webLessonScale);
+    const controlFontSize = scaleValue(isRoomyDesktop ? 20 : 18, webLessonScale);
+    // Re-anchored from the old 760 base to ~900 so it starts at the confirmed-good width
+    // at reference scale, while still scaling proportionally with the monitor like before.
+    const desktopCardMaxWidth = scaleValue(900, webLessonScale);
+
+    return (
+      <View
+        ref={optionsContainerRef}
+        onLayout={(e) => onOptionsLayout(e.nativeEvent.layout.y)}
+
+
+
+
+        style={[styles.fillContainer, { maxWidth: desktopCardMaxWidth }]}
+      >
+        <View
+          ref={firstOptionRef}
+          onLayout={(e) => {
+            onFirstOptionLayout(e.nativeEvent.layout.y);
+            onCardHeightChange?.(e.nativeEvent.layout.height);
+          }}
+          style={[
+            styles.fillCard,
+            styles.fillCardDesktop,
+            {
+              maxWidth: desktopCardMaxWidth,
+              borderRadius: scaleValue(20, webLessonScale),
+              gap: scaleValue(isRoomyDesktop ? 24 : 22, webLessonScale),
+              paddingHorizontal: scaleValue(isRoomyDesktop ? 30 : 26, webLessonScale),
+              paddingVertical: scaleValue(isRoomyDesktop ? 20 : 18, webLessonScale),
+              backgroundColor: grammarGame.panelSurface,
+              borderColor: grammarGame.panelBorder,
+              ...getSoftShadow(isDarkMode, 'soft', colors.shadow, colors.visualStyle === 'pixel'),
+            },
+          ]}
+        >
+          <Pressable
+            onPress={handleInputPress}
+            style={[
+              styles.inputShell,
+              styles.inputShellDesktopWeb,
+              {
+                height: inputHeight,
+                borderRadius: scaleValue(14, webLessonScale),
+                paddingHorizontal: scaleValue(18, webLessonScale),
+              },
+              {
+                backgroundColor: grammarGame.inputSurface,
+                borderColor: grammarGame.answerBorder,
+                boxShadow: isDarkMode
+                  ? '0px 2px 4px rgba(0,0,0,0.20)'
+                  : `0px 2px 6px ${withColorAlpha(colors.shadow, 0.72)}`,
+              },
+              ...inputShellStateStyle,
+            ]}
+          >
+            <TextInput
+              {...inputProps}
+              style={[
+                styles.fillInput,
+                styles.fillInputDesktopWeb,
+
+
+
+
+                { paddingLeft: scaleValue(44, webLessonScale), paddingRight: scaleValue(44, webLessonScale) },
+                { fontSize: controlFontSize },
+                { color: grammarGame.answerText },
+                { outlineStyle: 'none' } as any,
+              ]}
+            />
+            {!fillAnswer && (
+              <View style={[styles.fillPlaceholderOverlay, { pointerEvents: 'none' }]}>
+                <Text
+                  style={[
+                    styles.fillPlaceholderText,
+                    styles.fillInputDesktopWeb,
+                    { fontSize: controlFontSize },
+                    { color: grammarGame.metaText },
+                  ]}
+                >
+                  Type your answer...
+                </Text>
+              </View>
+            )}
+            {clearButton}
+          </Pressable>
+          <TouchableOpacity
+            onPress={handleSubmit}
+            disabled={disabled}
+            style={[
+              styles.checkAnswerButton,
+              styles.checkAnswerButtonDesktopWeb,
+              { height: buttonHeight, minHeight: buttonHeight, marginTop: 0 },
+              {
+                backgroundColor: grammarGame.checkButtonBg,
+                borderColor: grammarGame.checkButtonBg,
+                borderBottomColor: grammarGame.checkButtonBg,
+                borderRadius: 999,
+                boxShadow: `0px 4px 12px ${withColorAlpha(grammarGame.checkButtonBg, 0.3)}`,
+              },
+              disabled && styles.disabledCheckAnswerButton,
+            ]}
+          >
+            <View style={styles.checkAnswerButtonInner}>
+              <MaterialIcons name="check" size={scaleValue(isRoomyDesktop ? 23 : 21, webLessonScale)} color={grammarGame.buttonText} />
+              <Text
+                style={[
+                  styles.checkAnswerButtonText,
+                  { color: grammarGame.buttonText },
+                  styles.checkAnswerButtonTextDesktop,
+
+
+
+                  { fontSize: scaleValue(isRoomyDesktop ? 19 : 18, webLessonScale) },
+                ]}
+              >
+                Check
+              </Text>
+            </View>
+          </TouchableOpacity>
+          {errorText}
+        </View>
+      </View>
+    );
+  }
+
+
+
+
+
+
+
+
+  // Screens with real vertical headroom — a tall phone, or native running full-screen with
+  // no browser chrome eating into the viewport — get a noticeably bigger card instead of the
+  // same fixed size everywhere; the card used to leave a large unused gap under the prompt.
+  const availableStageHeight = layoutHeight ?? height;
+  const roomFactor = clampNumber((availableStageHeight - 560) / 220, 0, 1);
+  const inputHeight = scaleValue(reservesKeyboardSpace ? 60 + 12 * roomFactor : 72 + 18 * roomFactor, webLessonScale);
+  const controlFontSize = scaleValue(reservesKeyboardSpace ? 17 + 2 * roomFactor : 19 + 3 * roomFactor, webLessonScale);
+  const buttonHeight = scaleValue(reservesKeyboardSpace ? 44 + 8 * roomFactor : 52 + 10 * roomFactor, webLessonScale);
+  const buttonMarginTop = scaleValue(reservesKeyboardSpace ? 14 + 6 * roomFactor : 24 + 10 * roomFactor, webLessonScale);
+  const cardGap = Math.round(12 + 8 * roomFactor);
+  const checkIconSize = scaleValue(18, webLessonScale);
+  const checkButtonTextFontSize = scaleValue(15.5, webLessonScale);
+  // The card's intrinsic content (input + button) is short, so anchoring it to the prompt
+  // without a height floor left most of the screen empty below it. Claim a real share of the
+  // available stage height and center the input/button inside that taller card instead.
+  const cardMinHeight = Math.round(clampNumber(
+    availableStageHeight * (reservesKeyboardSpace ? 0.3 : 0.4),
+    reservesKeyboardSpace ? 180 : 240,
+    reservesKeyboardSpace ? 320 : 440
+  ));
+
+  return (
+    <View style={styles.fillContainer}>
       <View
         ref={firstOptionRef}
         onLayout={(e) => {
@@ -143,111 +410,74 @@ const GrammarFillExercise: React.FC<GrammarFillExerciseProps> = ({
         }}
         style={[
           styles.fillCard,
-          {
-            height: fillCardHeight,
-            padding: fillCardPadding,
-            backgroundColor: 'transparent',
-            borderWidth: 0,
-            borderRadius: 0,
-            boxShadow: 'none',
-            elevation: 0,
-          },
+          styles.fillCardMobile,
+          { gap: cardGap, minHeight: cardMinHeight, justifyContent: 'center' },
         ]}
       >
-        <Pressable
-          onPress={() => focusInput()}
-          style={[
-            styles.inputShell,
-            useTightKeyboardStyles && styles.inputShellTight,
-            isDesktopWeb && styles.inputShellDesktopWeb,
-            {
-              minHeight: inputShellMinHeight,
-              paddingVertical: inputShellVerticalPadding,
-              marginBottom: inputShellMarginBottom,
-              backgroundColor: grammarGame.inputSurface,
-              borderColor: grammarGame.answerBorder,
-              borderBottomColor: grammarGame.answerBottom,
-            },
-            isInputFocused && styles.inputShellFocused,
-            isInputFocused && {
-              backgroundColor: grammarGame.inputFocusedSurface,
-              borderColor: grammarGame.answerSelectedBorder,
-              borderBottomColor: grammarGame.answerSelectedBottom,
-            },
-            incorrectAnswer === 'fill' && styles.inputShellIncorrect,
-            incorrectAnswer === 'fill' && {
-              backgroundColor: grammarGame.incorrectSurface,
-              borderColor: grammarGame.incorrectBorder,
-              borderBottomColor: grammarGame.incorrectBottom,
-            },
-          ]}
+        {/* The success card measures this group, not the card above it: the card claims a
+            share of the stage height (cardMinHeight) and centres these controls inside it,
+            so measuring the card covered a tall band of empty space as well. */}
+        <View
+          ref={optionsContainerRef}
+          onLayout={(e) => onOptionsLayout(e.nativeEvent.layout.y)}
+          style={[styles.fillControlGroup, { gap: cardGap }]}
         >
-          <TextInput
-            ref={inputRef}
-            value={fillAnswer}
-            onChangeText={handleFillAnswerChange}
-            autoCapitalize="none"
-            autoCorrect={false}
-            blurOnSubmit={false}
-            submitBehavior="submit"
-            editable={!!exercise}
-            showSoftInputOnFocus
-            returnKeyType="send"
-            onFocus={() => setIsInputFocused(true)}
-            onBlur={handleInputBlur}
-            onSubmitEditing={handleSubmit}
+          <Pressable
+            onPress={handleInputPress}
             style={[
-              styles.fillInput,
-              useTightKeyboardStyles && styles.fillInputTight,
-              isDesktopWeb && styles.fillInputDesktopWeb,
-              { minHeight: fillInputMinHeight, fontSize: fillInputFontSize },
-              { color: grammarGame.answerText },
-              { outlineStyle: 'none' } as any,
+              styles.inputShell,
+              { height: inputHeight },
+              {
+                backgroundColor: grammarGame.inputSurface,
+                borderColor: grammarGame.answerBorder,
+                boxShadow: isDarkMode
+                  ? '0px 2px 4px rgba(0,0,0,0.20)'
+                  : `0px 2px 6px ${withColorAlpha(colors.shadow, 0.72)}`,
+              },
+              ...inputShellStateStyle,
             ]}
-          />
-          {!fillAnswer && (
-            <View style={[styles.fillPlaceholderOverlay, { pointerEvents: 'none' }]}>
-              <Text
-                style={[
-                  styles.fillPlaceholderText,
-                  useTightKeyboardStyles && styles.fillInputTight,
-                  isDesktopWeb && styles.fillInputDesktopWeb,
-                  { fontSize: fillInputFontSize, color: grammarGame.metaText },
-                ]}
-              >
-                Type your answer...
-              </Text>
+          >
+            <TextInput
+              {...inputProps}
+              style={[
+                styles.fillInput,
+                { fontSize: controlFontSize },
+                { color: grammarGame.answerText },
+                { outlineStyle: 'none' } as any,
+              ]}
+            />
+            {!fillAnswer && (
+              <View style={[styles.fillPlaceholderOverlay, { pointerEvents: 'none' }]}>
+                <Text style={[styles.fillPlaceholderText, { fontSize: controlFontSize }, { color: grammarGame.metaText }]}>
+                  Type your answer...
+                </Text>
+              </View>
+            )}
+            {clearButton}
+          </Pressable>
+          <TouchableOpacity
+            onPress={handleSubmit}
+            disabled={disabled}
+            style={[
+              styles.checkAnswerButton,
+              { height: buttonHeight, minHeight: buttonHeight, marginTop: buttonMarginTop },
+              {
+                backgroundColor: grammarGame.checkButtonBg,
+                borderColor: grammarGame.checkButtonBg,
+                borderBottomColor: grammarGame.checkButtonBg,
+                borderRadius: 999,
+                boxShadow: `0px 4px 12px ${withColorAlpha(grammarGame.checkButtonBg, 0.3)}`,
+              },
+              disabled && styles.disabledCheckAnswerButton,
+            ]}
+          >
+            <View style={styles.checkAnswerButtonInner}>
+              <MaterialIcons name="check" size={checkIconSize} color={grammarGame.buttonText} />
+              <Text style={[styles.checkAnswerButtonText, { fontSize: checkButtonTextFontSize, color: grammarGame.buttonText }]}>Check</Text>
             </View>
-          )}
-          {canClear && (
-            <TouchableOpacity
-              onPress={handleClear}
-              style={styles.clearInputButton}
-              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-            >
-              <MaterialIcons name="close" size={22} color={grammarGame.metaText} />
-            </TouchableOpacity>
-          )}
-        </Pressable>
-        <TouchableOpacity
-          onPress={handleSubmit}
-          disabled={disabled}
-          style={[
-            styles.checkAnswerButton,
-            useTightKeyboardStyles && styles.checkAnswerButtonTight,
-            isDesktopWeb && styles.checkAnswerButtonDesktopWeb,
-            { backgroundColor: grammarGame.checkButtonBg, borderColor: grammarGame.checkButtonBg, borderBottomColor: grammarGame.checkButtonBg, borderRadius: 999 },
-            disabled && styles.disabledCheckAnswerButton,
-          ]}
-        >
-          <View style={styles.checkAnswerButtonInner}>
-            <MaterialIcons name="check" size={isDesktopWeb ? scaleValue(17, webScale) : 22} color="#fff" />
-            <Text style={[styles.checkAnswerButtonText, { color: '#fff' }, isDesktopWeb && { fontSize: scaleValue(15, webScale) }]}>Check</Text>
-          </View>
-        </TouchableOpacity>
-        {incorrectAnswer === 'fill' && (
-          <Text style={[styles.fillErrorText, { color: grammarGame.incorrectText }]}>Try again.</Text>
-        )}
+          </TouchableOpacity>
+        </View>
+        {errorText}
       </View>
     </View>
   );
@@ -256,39 +486,48 @@ const GrammarFillExercise: React.FC<GrammarFillExerciseProps> = ({
 export default React.memo(GrammarFillExercise);
 
 const styles = StyleSheet.create({
+
+
+
+
+
+
   fillContainer: {
-    height: CARD_HEIGHT,
+    width: '90%',
+    alignSelf: 'center',
+  },
+  fillControlGroup: {
+    width: '100%',
   },
   fillCard: {
-    height: CARD_HEIGHT,
-    padding: 20,
+    width: '100%',
+    backgroundColor: 'transparent',
+    gap: 12,
+  },
+  fillCardMobile: {
+    paddingHorizontal: 14,
+  },
+  fillCardDesktop: {
+    alignSelf: 'center',
+    maxWidth: 760,
     borderRadius: 20,
-    backgroundColor: '#fff',
-    borderWidth: 0,
-    justifyContent: 'flex-start',
-    boxShadow: '0px 4px 12px rgba(0,0,0,0.05)',
-    elevation: 2,
+    borderWidth: 1,
   },
   inputShell: {
-    minHeight: 104,
-    borderRadius: 12,
+    height: 72,
+    borderRadius: 14,
     borderWidth: 1.5,
-    borderBottomWidth: 1.5,
-    borderColor: '#D6E2EE',
-    borderBottomColor: '#D6E2EE',
-    backgroundColor: '#F8FBFF',
-    paddingHorizontal: 22,
-    paddingVertical: 18,
+    borderColor: '#DDD4C9',
+    backgroundColor: '#FFFFFF',
+    paddingHorizontal: 16,
     justifyContent: 'center',
-    marginBottom: 22,
     position: 'relative',
+    boxShadow: '0px 2px 6px rgba(110,75,69,0.08)',
   },
-  inputShellTight: {
-    paddingHorizontal: 12,
-    borderBottomWidth: 3,
-  },
+
+
   inputShellDesktopWeb: {
-    paddingHorizontal: 24,
+    paddingHorizontal: 18,
   },
   inputShellIncorrect: {
     backgroundColor: '#FFF4F6',
@@ -296,22 +535,21 @@ const styles = StyleSheet.create({
     borderBottomColor: '#D94E64',
   },
   inputShellFocused: {
-    backgroundColor: '#EEF3FF',
-    borderColor: '#4AA3D2',
-    borderBottomColor: '#2584B2',
+    backgroundColor: '#FFFFFF',
+    borderColor: '#0891C9',
   },
   fillInput: {
-    minHeight: 56,
-    fontSize: 20,
-    fontWeight: '600',
+    height: '100%',
+    fontSize: 19,
+    fontWeight: '500',
     textAlign: 'center',
     borderWidth: 0,
-    paddingLeft: 16,
+
+
+
+
+    paddingLeft: 44,
     paddingRight: 44,
-  },
-  fillInputTight: {
-    paddingLeft: 12,
-    paddingRight: 36,
   },
   fillPlaceholderOverlay: {
     ...StyleSheet.absoluteFill,
@@ -323,10 +561,13 @@ const styles = StyleSheet.create({
     fontWeight: '500',
     fontStyle: 'italic',
     textAlign: 'center',
+    width: '100%',
+    fontSize: 19,
   },
   fillInputDesktopWeb: {
-    paddingLeft: 16,
+    paddingLeft: 44,
     paddingRight: 44,
+    fontSize: 16,
   },
   clearInputButton: {
     position: 'absolute',
@@ -341,13 +582,21 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
+
+
+
   checkAnswerButton: {
-    minHeight: 48,
+    height: 52,
+    minHeight: 52,
+    width: '68%',
+    marginTop: 24,
+    alignSelf: 'center',
     borderRadius: 999,
     backgroundColor: '#1F7AD1',
     borderWidth: 0,
     alignItems: 'center',
     justifyContent: 'center',
+    boxShadow: '0px 4px 12px rgba(8,145,201,0.30)',
   },
   disabledCheckAnswerButton: {
     opacity: 0.45,
@@ -358,9 +607,8 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   checkAnswerButtonText: {
-    color: '#fff',
-    fontSize: 18,
-    fontWeight: '700',
+    fontSize: 15.5,
+    fontWeight: '800',
   },
   fillErrorText: {
     color: '#A12A3D',
@@ -369,12 +617,10 @@ const styles = StyleSheet.create({
     marginTop: 10,
     textAlign: 'center',
   },
-  checkAnswerButtonTight: {
-    minHeight: 38,
-  },
-  checkAnswerButtonDesktopWeb: {
-    minHeight: 44,
-  },
+
+
+  checkAnswerButtonDesktopWeb: {},
+  checkAnswerButtonTextDesktop: { fontSize: 16 },
   incorrectOption: {
     backgroundColor: '#FFE8EC',
     borderColor: '#F06A7F',

@@ -2,7 +2,7 @@ const HypothesesGrammar = {
   id: '26',
   title: 'Hypothèses',
   description: 'Form hypotheses using may, might, and must',
-  imageUrl: 'https://i.ibb.co/B7g41zK/Hypoth-ses.png',
+  imageUrl: 'https://wretggbpaejzjdilemit.supabase.co/storage/v1/object/public/lesson-images/15274719ab/hypotheses.webp',
   textContent: {
     cards: [
       {

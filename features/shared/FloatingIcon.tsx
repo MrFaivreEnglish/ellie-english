@@ -1,8 +1,8 @@
 import React, { useEffect } from 'react';
 import Animated, { Easing, useAnimatedStyle, useSharedValue, withRepeat, withSequence, withTiming } from 'react-native-reanimated';
-import { MaterialIcons } from '@expo/vector-icons';
+import MaterialIcons from './ThemedMaterialIcon';
 
-// A gentle idle float for empty-state icons so the screen doesn't read as inert.
+
 export default function FloatingIcon({ name, size, color }: { name: React.ComponentProps<typeof MaterialIcons>['name']; size: number; color: string }) {
   const translateY = useSharedValue(0);
 

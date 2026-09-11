@@ -74,17 +74,19 @@ const run = () => {
   assert.strictEqual(getQuestionsForMode(exercises, 'reorder', 10).every(isReorderExercise), true);
   assert.strictEqual(getQuestionsForMode(exercises, 'translate', 10).every(isTranslateExercise), true);
 
-  assert.strictEqual(xpNeededForLevel(1), 50);
-  assert.strictEqual(xpNeededForLevel(99), 200);
+  assert.strictEqual(xpNeededForLevel(1), 80);
+  assert.strictEqual(xpNeededForLevel(99), 280);
   assert.strictEqual(xpForLevel(1), 0);
   assert.strictEqual(getXPLevel(0), 1);
-  assert.strictEqual(getXPLevel(50), 2);
-  assert.strictEqual(getXPLevelStats(25).progressPercent, 50);
-  assert.strictEqual(getLevelBadgeLabel(100), 'Level 100+');
+  assert.strictEqual(getXPLevel(80), 2);
+  assert.strictEqual(getXPLevelStats(40).progressPercent, 50);
+  assert.strictEqual(getLevelBadgeLabel(100), 'Level 100');
+  assert.strictEqual(getLevelBadgeLabel(187), 'Level 187');
   assert.strictEqual(getLevelDisplayLabel(100), 'Level 100 - Ellie Master');
-  assert.strictEqual(getMasterTierLabel(109), 'Master I');
-  assert.strictEqual(getMasterTierLabel(110), 'Master II');
-  assert.strictEqual(getMasterStarCount(200), 5);
+  assert.strictEqual(getMasterTierLabel(124), 'Master I');
+  assert.strictEqual(getMasterTierLabel(125), 'Master II');
+  assert.strictEqual(getMasterStarCount(200), 4);
+  assert.strictEqual(getMasterStarCount(230), 5);
 
   assert.deepStrictEqual(getTypingComboReward(2), { streak: 0, bonus: 0, label: '' });
   assert.strictEqual(getTypingComboReward(7).bonus, 3);

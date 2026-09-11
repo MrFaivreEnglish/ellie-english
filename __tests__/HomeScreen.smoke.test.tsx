@@ -1,5 +1,4 @@
-import React from 'react';
-import { render } from '@testing-library/react-native';
+import { act, render } from '@testing-library/react-native';
 
 jest.mock('../features/account/AccountContext', () => ({
   useAccount: () => ({
@@ -55,7 +54,11 @@ import HomeScreen from '../features/home/HomeScreen';
 
 describe('HomeScreen', () => {
   it('renders without crashing', async () => {
-    const { getAllByText } = await render(<HomeScreen />);
+    const { getAllByText } = render(<HomeScreen />);
+    await act(async () => {
+      await Promise.resolve();
+      await Promise.resolve();
+    });
     expect(getAllByText(/grammar|vocabulary|lessons|home/i).length).toBeGreaterThan(0);
   });
 });

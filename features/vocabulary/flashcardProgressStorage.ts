@@ -120,6 +120,37 @@ export const getLearnedFlashcardKeysByLesson = async (): Promise<Map<string, Set
   return cloneLearnedByLesson(await learnedByLessonCache);
 };
 
+
+
+
+
+
+
+export const getLearnedFlashcardRecencyByActivityKey = async (): Promise<Map<string, string>> => {
+  try {
+    const allKeys = await AsyncStorage.getAllKeys();
+    const todayStorageKeys = allKeys.filter((key) => key.startsWith(`${LEARNED_FLASHCARDS_TODAY_PREFIX}:`));
+    const entries = await AsyncStorage.multiGet(todayStorageKeys);
+    const recencyByActivityKey = new Map<string, string>();
+
+    entries.forEach(([storageKey, raw]) => {
+      const dateKey = storageKey.replace(`${LEARNED_FLASHCARDS_TODAY_PREFIX}:`, '');
+      const activityKeys = parseStringSet(raw);
+
+      activityKeys.forEach((activityKey) => {
+        const existing = recencyByActivityKey.get(activityKey);
+        if (!existing || dateKey > existing) {
+          recencyByActivityKey.set(activityKey, dateKey);
+        }
+      });
+    });
+
+    return recencyByActivityKey;
+  } catch {
+    return new Map<string, string>();
+  }
+};
+
 export const saveLearnedFlashcardKeys = async (lessonKey: string, keys: Set<string>) => {
   try {
     await AsyncStorage.setItem(getStorageKey(lessonKey), JSON.stringify([...keys]));

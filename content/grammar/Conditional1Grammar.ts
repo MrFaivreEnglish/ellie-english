@@ -1,7 +1,7 @@
 const Conditional1Grammar = {
   id: '12',
   title: 'Conditionnel 1',
-  description: 'Learn how to use the first conditional',  imageUrl: 'https://i.ibb.co/bRFdNdnS/Conditionnel-1.png',
+  description: 'Learn how to use the first conditional',  imageUrl: 'https://wretggbpaejzjdilemit.supabase.co/storage/v1/object/public/lesson-images/15274719ab/conditionnel-1.webp',
   textContent: {
     cards: [
       {

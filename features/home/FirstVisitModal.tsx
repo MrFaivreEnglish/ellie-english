@@ -5,12 +5,13 @@ import {
   Platform,
   Pressable,
   StyleSheet,
-  Text,
   View,
 } from 'react-native';
-import { MaterialIcons } from '@expo/vector-icons';
+import Text from '../shared/ThemedText';
+import MaterialIcons from '../shared/ThemedMaterialIcon';
 import { useTheme } from '../settings/ThemeContext';
 import { uiRadii } from '../shared/uiPrimitives';
+import { useDesktopTypographyScale } from '../shared/DesktopTypography';
 
 type MaterialIconName = React.ComponentProps<typeof MaterialIcons>['name'];
 
@@ -57,6 +58,7 @@ type Props = {
 
 export default function FirstVisitModal({ visible, onDismiss, onSetupAccount }: Props) {
   const { colors, isDarkMode } = useTheme();
+  const desktopScale = useDesktopTypographyScale();
   const [slide, setSlide] = useState(0);
   const fadeAnim = useRef(new Animated.Value(1)).current;
   const isLast = slide === SLIDES.length - 1;
@@ -83,8 +85,8 @@ export default function FirstVisitModal({ visible, onDismiss, onSetupAccount }: 
 
   const current = SLIDES[slide];
   const iconBg = isDarkMode ? current.bgDark : current.bg;
-  const cardBg = isDarkMode ? colors.card : '#FFFFFF';
-  const borderColor = isDarkMode ? colors.border : '#E1EAF3';
+  const cardBg = colors.card;
+  const borderColor = colors.border;
 
   return (
     <Modal
@@ -97,10 +99,32 @@ export default function FirstVisitModal({ visible, onDismiss, onSetupAccount }: 
       onRequestClose={onDismiss}
     >
       <Pressable style={styles.backdrop} onPress={onDismiss}>
-        <Pressable style={[styles.sheet, { backgroundColor: cardBg, borderColor }]} onPress={() => {}}>
+        <Pressable
+          style={[
+            styles.sheet,
+            desktopScale > 1 && {
+              maxWidth: Math.round(480 * desktopScale),
+              borderRadius: Math.round(uiRadii.card * desktopScale),
+              paddingTop: Math.round(32 * desktopScale),
+              paddingBottom: Math.round(24 * desktopScale),
+              paddingHorizontal: Math.round(28 * desktopScale),
+            },
+            { backgroundColor: cardBg, borderColor },
+          ]}
+          onPress={() => {}}
+        >
           <Animated.View style={[styles.slideContent, { opacity: fadeAnim }]}>
-            <View style={[styles.iconCircle, { backgroundColor: iconBg, borderColor: current.color + '44' }]}>
-              <MaterialIcons name={current.icon} size={52} color={current.color} />
+            <View style={[
+              styles.iconCircle,
+              desktopScale > 1 && {
+                width: Math.round(100 * desktopScale),
+                height: Math.round(100 * desktopScale),
+                borderRadius: Math.round(50 * desktopScale),
+                marginBottom: Math.round(22 * desktopScale),
+              },
+              { backgroundColor: iconBg, borderColor: current.color + '44' },
+            ]}>
+              <MaterialIcons name={current.icon} size={Math.round(52 * desktopScale)} color={current.color} />
             </View>
             <Text style={[styles.title, { color: colors.text }]}>{current.title}</Text>
             <Text style={[styles.body, { color: colors.secondaryText }]}>{current.body}</Text>
@@ -113,7 +137,7 @@ export default function FirstVisitModal({ visible, onDismiss, onSetupAccount }: 
                   style={[
                     styles.dot,
                     {
-                      backgroundColor: i === slide ? SLIDES[i].color : (isDarkMode ? colors.border : '#CBD5E1'),
+                      backgroundColor: i === slide ? SLIDES[i].color : colors.progressTrack,
                       width: i === slide ? 22 : 8,
                     },
                   ]}
@@ -130,7 +154,7 @@ export default function FirstVisitModal({ visible, onDismiss, onSetupAccount }: 
             onPress={handleNext}
           >
             <Text style={styles.buttonText}>{isLast ? "C'est parti !" : 'Suivant'}</Text>
-            {!isLast && <MaterialIcons name="arrow-forward" size={18} color="#fff" />}
+            {!isLast && <MaterialIcons name="arrow-forward" size={Math.round(18 * desktopScale)} color="#fff" />}
           </Pressable>
 
           {isLast ? (
@@ -165,8 +189,7 @@ const styles = StyleSheet.create({
     paddingBottom: 24,
     paddingHorizontal: 28,
     alignItems: 'center',
-    boxShadow: '0px 10px 24px rgba(0,0,0,0.22)',
-    elevation: 12,
+    boxShadow: '0px 10px 24px rgba(0,0,0,0.22)',
   },
   slideContent: {
     alignItems: 'center',

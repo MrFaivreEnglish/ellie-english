@@ -2,13 +2,13 @@ const HalloweenVocab = {
   id: '402',
   title: 'Halloween',
   description: 'Vocabulary for Halloween traditions and costumes',
-  imageUrl: 'https://i.ibb.co/99rRPfg9/Halloween-1.webp',
+  imageUrl: 'https://wretggbpaejzjdilemit.supabase.co/storage/v1/object/public/lesson-images/15274719ab/halloween.webp',
   categoryPickerTitle: 'Choose a category',
   categoryPickerLabel: 'Category',
   categoryPickerAllLabel: 'All Halloween words',
   flashcards: [
     {
-      category: 'Characters',
+      category: 'Characters 🧛',
       words: [
         { english: 'A witch', french: 'Une sorcière' },
         { english: 'A wizard', french: 'Un sorcier' },
@@ -23,7 +23,7 @@ const HalloweenVocab = {
       ],
     },
     {
-      category: 'Objects',
+      category: 'Objects 🕯️',
       words: [
         { english: 'A pumpkin', french: 'Une citrouille' },
         { english: "A jack-o'-lantern", french: 'Une citrouille sculptée' },
@@ -35,7 +35,7 @@ const HalloweenVocab = {
       ],
     },
     {
-      category: 'Animals',
+      category: 'Animals 🦇',
       words: [
         { english: 'A bat', french: 'Une chauve-souris' },
         { english: 'A spider', french: "Une araignée" },
@@ -44,7 +44,7 @@ const HalloweenVocab = {
       ],
     },
     {
-      category: 'Adjectives',
+      category: 'Adjectives 👻',
       words: [
         { english: 'Scary', french: 'Effrayant' },
         { english: 'Haunted', french: 'Hanté' },
@@ -53,7 +53,7 @@ const HalloweenVocab = {
       ],
     },
     {
-      category: 'Treats',
+      category: 'Treats 🍬',
       words: [
         { english: 'Candy', french: 'Des bonbons' },
         { english: 'Chocolate', french: 'Du chocolat' },

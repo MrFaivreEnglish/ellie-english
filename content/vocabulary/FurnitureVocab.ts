@@ -1,7 +1,7 @@
 const FurnitureVocab = {
   id: '25',
   title: 'Furniture',
-  description: 'Learn vocabulary related to home furniture and furnishings',  imageUrl: 'https://i.ibb.co/4nsb5CV9/vocab-furniture-v2.webp',
+  description: 'Learn vocabulary related to home furniture and furnishings',  imageUrl: 'https://wretggbpaejzjdilemit.supabase.co/storage/v1/object/public/lesson-images/15274719ab/furniture.webp',
   thumbnail: require('../../assets/thumbnails/furniture-thumbnail.png'),
   flashcards: [
     {

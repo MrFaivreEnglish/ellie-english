@@ -2,7 +2,7 @@ const SuperlativeInferiorityGrammar = {
   id: '22',
   title: "Superlatif d'infériorité",
   description: 'Learn how to use superlatives of inferiority in English',
-  imageUrl: 'https://i.ibb.co/whqPnFQh/Superlatif-inf-riorit.png',
+  imageUrl: 'https://wretggbpaejzjdilemit.supabase.co/storage/v1/object/public/lesson-images/15274719ab/superlatif-d-inferiorite.webp',
   textContent: {
     cards: [
       {

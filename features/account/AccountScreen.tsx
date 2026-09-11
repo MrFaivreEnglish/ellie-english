@@ -1,20 +1,27 @@
 import React from 'react';
-import { ActivityIndicator, Alert, Platform, ScrollView, StyleSheet, Text, TouchableOpacity, useWindowDimensions, View } from 'react-native';
-import { useNavigation } from '@react-navigation/native';
+import { ActivityIndicator, Alert, Platform, ScrollView, StyleSheet, TouchableOpacity, useWindowDimensions, View } from 'react-native';
+import { useNavigation, useRoute } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import type { RouteProp } from '@react-navigation/native';
 import type { RootStackParamList } from '../../types/navigationTypes';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { MaterialIcons } from '@expo/vector-icons';
+import Text from '../shared/ThemedText';
+import MaterialIcons from '../shared/ThemedMaterialIcon';
 import AccountPanel from './AccountPanel';
 import BackButton from '../shared/BackButton';
 import { useAccount } from './AccountContext';
 import { useTheme } from '../settings/ThemeContext';
 import { getButtonStyle, getButtonTextColor, getSoftShadow } from '../shared/uiPrimitives';
+import { getDesktopContentMaxWidth, getDesktopTypographyScale, getTopSafeAreaInset, isDesktopWebWidth } from '../shared/responsiveLayout';
+import { DesktopTypographyProvider } from '../shared/DesktopTypography';
 
 const cleanDisplayName = (value: string) => value.trim().replace(/\s+/g, ' ');
 
 export default function AccountScreen() {
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
+  const route = useRoute<RouteProp<RootStackParamList, 'Account'>>();
+  const openAvatarPicker = route.params?.openAvatarPicker === true;
+  const scrollRef = React.useRef<ScrollView | null>(null);
   const { colors, isDarkMode, isAndroidStatusBarEnabled } = useTheme();
   const {
     session,
@@ -25,16 +32,26 @@ export default function AccountScreen() {
     clearError,
   } = useAccount();
   const insets = useSafeAreaInsets();
-  const { width: windowWidth } = useWindowDimensions();
-  const isDesktopWeb = Platform.OS === 'web' && windowWidth >= 768;
+  const { width: windowWidth, height: windowHeight } = useWindowDimensions();
+  const isDesktopWeb = isDesktopWebWidth(windowWidth, undefined, windowHeight);
+  const desktopContentMaxWidth = getDesktopContentMaxWidth(windowWidth, 'fit', windowHeight);
+
+
+
+
+
+  const desktopScale = getDesktopTypographyScale(windowWidth, windowHeight, 'fit');
   const [resetMessage, setResetMessage] = React.useState('');
   const [isAdvancedOpen, setIsAdvancedOpen] = React.useState(false);
+  const [avatarSectionOffset, setAvatarSectionOffset] = React.useState<number | null>(null);
+  const accountPanelYRef = React.useRef(0);
+
+  React.useEffect(() => {
+    if (!openAvatarPicker || avatarSectionOffset === null) return;
+    scrollRef.current?.scrollTo({ y: Math.max(0, avatarSectionOffset - 20), animated: true });
+  }, [openAvatarPicker, avatarSectionOffset]);
   const accountName = cleanDisplayName(session?.user.displayName || session?.user.username || '');
-  const topContentInset = Platform.OS === 'ios'
-    ? (insets.top > 0 ? insets.top : 0)
-    : Platform.OS === 'android' && isAndroidStatusBarEnabled
-      ? insets.top
-      : 0;
+  const topContentInset = getTopSafeAreaInset(Platform.OS, insets.top, isAndroidStatusBarEnabled);
   const warningButtonStyle = getButtonStyle(colors, isDarkMode, 'warning');
   const warningButtonTextColor = getButtonTextColor(colors, isDarkMode, 'warning');
   const dangerButtonStyle = getButtonStyle(colors, isDarkMode, 'danger');
@@ -51,7 +68,7 @@ export default function AccountScreen() {
       await deleteAccount();
       resetToHome();
     } catch {
-      // AccountContext exposes the readable error in the panel.
+
     }
   }, [deleteAccount, resetToHome]);
 
@@ -62,7 +79,7 @@ export default function AccountScreen() {
       await resetSavedProgress();
       setResetMessage(session ? 'Saved work reset here and online.' : 'Saved work reset on this device.');
     } catch {
-      // AccountContext exposes the readable error in the panel.
+
     }
   }, [resetSavedProgress, session]);
 
@@ -73,7 +90,7 @@ export default function AccountScreen() {
       await signOut();
       resetToHome();
     } catch {
-      // AccountContext exposes the readable error in the panel.
+
     }
   }, [resetToHome, signOut]);
 
@@ -138,7 +155,9 @@ export default function AccountScreen() {
   }, [clearError, runDeleteAccount, session]);
 
   return (
+    <DesktopTypographyProvider mode="fit">
     <ScrollView
+      ref={scrollRef}
       style={[styles.container, { backgroundColor: colors.background }]}
       contentContainerStyle={{
         paddingTop: topContentInset,
@@ -147,7 +166,7 @@ export default function AccountScreen() {
       keyboardShouldPersistTaps="handled"
       keyboardDismissMode="none"
     >
-      <View style={isDesktopWeb && styles.desktopContentWrap}>
+      <View style={isDesktopWeb && [styles.desktopContentWrap, { maxWidth: desktopContentMaxWidth }]}>
       <BackButton onPress={() => navigation.goBack()} />
 
       <View style={styles.header}>
@@ -163,18 +182,25 @@ export default function AccountScreen() {
         </View>
       </View>
 
-      <AccountPanel colors={colors} isDarkMode={isDarkMode} />
+      <View onLayout={(event) => { accountPanelYRef.current = event.nativeEvent.layout.y; }}>
+        <AccountPanel
+          colors={colors}
+          isDarkMode={isDarkMode}
+          openAvatarPicker={openAvatarPicker}
+          onAvatarSectionLayout={(y) => setAvatarSectionOffset(accountPanelYRef.current + y)}
+        />
+      </View>
 
       {session && (
         <TouchableOpacity
           onPress={confirmSignOut}
           disabled={isSyncing}
-          style={[styles.signOutCard, getSoftShadow(isDarkMode, 'soft'), { backgroundColor: colors.card, borderColor: colors.danger }]}
+          style={[styles.signOutCard, getSoftShadow(isDarkMode, 'soft', colors.shadow, colors.visualStyle === 'pixel'), { backgroundColor: colors.card, borderColor: colors.danger }]}
           accessibilityRole="button"
           accessibilityLabel="Sign out"
         >
           <View style={[styles.signOutIcon, { backgroundColor: colors.dangerSoft }]}>
-            <MaterialIcons name="logout" size={21} color={colors.danger} />
+            <MaterialIcons name="logout" size={Math.round(21 * desktopScale)} color={colors.danger} />
           </View>
           <View style={styles.signOutCopy}>
             <Text style={[styles.signOutTitle, { color: colors.danger }]}>Sign out</Text>
@@ -185,7 +211,7 @@ export default function AccountScreen() {
           {isSyncing ? (
             <ActivityIndicator color={colors.danger} />
           ) : (
-            <MaterialIcons name="chevron-right" size={24} color={colors.danger} />
+            <MaterialIcons name="chevron-right" size={Math.round(24 * desktopScale)} color={colors.danger} />
           )}
         </TouchableOpacity>
       )}
@@ -193,13 +219,13 @@ export default function AccountScreen() {
       <View style={styles.accountSection}>
         <TouchableOpacity
           onPress={() => setIsAdvancedOpen((current) => !current)}
-          style={[styles.advancedToggle, getSoftShadow(isDarkMode, 'soft'), { backgroundColor: colors.card, borderColor: colors.border }]}
+          style={[styles.advancedToggle, getSoftShadow(isDarkMode, 'soft', colors.shadow, colors.visualStyle === 'pixel'), { backgroundColor: colors.card, borderColor: colors.border }]}
           accessibilityRole="button"
           accessibilityLabel={isAdvancedOpen ? 'Close advanced account actions' : 'Open advanced account actions'}
           accessibilityState={{ expanded: isAdvancedOpen }}
         >
           <View style={styles.advancedCopy}>
-            <MaterialIcons name="tune" size={22} color={colors.secondaryText} />
+            <MaterialIcons name="tune" size={Math.round(22 * desktopScale)} color={colors.secondaryText} />
             <View style={styles.dangerTextBlock}>
               <Text style={[styles.advancedTitle, { color: colors.text }]}>Advanced</Text>
               <Text style={[styles.advancedText, { color: colors.secondaryText }]}>
@@ -207,14 +233,20 @@ export default function AccountScreen() {
               </Text>
             </View>
           </View>
-          <MaterialIcons name={isAdvancedOpen ? 'expand-less' : 'expand-more'} size={24} color={colors.secondaryText} />
+          <MaterialIcons name={isAdvancedOpen ? 'expand-less' : 'expand-more'} size={Math.round(24 * desktopScale)} color={colors.secondaryText} />
         </TouchableOpacity>
 
         {isAdvancedOpen && (
           <>
-            <View style={[styles.resetCard, getSoftShadow(isDarkMode, 'soft'), { backgroundColor: colors.card, borderColor: colors.warning }]}>
+            <View
+              style={[
+                styles.resetCard,
+                getSoftShadow(isDarkMode, 'soft', colors.shadow, colors.visualStyle === 'pixel'),
+                { backgroundColor: colors.card, borderColor: colors.warning },
+              ]}
+            >
               <View style={styles.dangerCopy}>
-                <MaterialIcons name="restart-alt" size={22} color={colors.warning} />
+                <MaterialIcons name="restart-alt" size={Math.round(22 * desktopScale)} color={colors.warning} />
                 <View style={styles.dangerTextBlock}>
                   <Text style={[styles.dangerTitle, { color: colors.text }]}>Reset saved work</Text>
                   <Text style={[styles.dangerText, { color: colors.secondaryText }]}>
@@ -240,9 +272,15 @@ export default function AccountScreen() {
             </View>
 
             {session && (
-              <View style={[styles.dangerCard, getSoftShadow(isDarkMode, 'soft'), { backgroundColor: colors.card, borderColor: colors.danger }]}>
+              <View
+                style={[
+                  styles.dangerCard,
+                  getSoftShadow(isDarkMode, 'soft', colors.shadow, colors.visualStyle === 'pixel'),
+                  { backgroundColor: colors.card, borderColor: colors.danger },
+                ]}
+              >
                 <View style={styles.dangerCopy}>
-                  <MaterialIcons name="delete-outline" size={22} color={colors.danger} />
+                  <MaterialIcons name="delete-outline" size={Math.round(22 * desktopScale)} color={colors.danger} />
                   <View style={styles.dangerTextBlock}>
                     <Text style={[styles.dangerTitle, { color: colors.text }]}>Delete online account</Text>
                     <Text style={[styles.dangerText, { color: colors.secondaryText }]}>
@@ -270,6 +308,7 @@ export default function AccountScreen() {
       </View>
       </View>
     </ScrollView>
+    </DesktopTypographyProvider>
   );
 }
 
@@ -278,8 +317,9 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   desktopContentWrap: {
+
+
     width: '100%',
-    maxWidth: 760,
     alignSelf: 'center',
   },
   header: {

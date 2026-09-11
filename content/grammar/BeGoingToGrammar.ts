@@ -2,7 +2,7 @@ const BeGoingToGrammar = {
   id: '16',
   title: 'Futur Proche (Be Going To)',
   description: 'Learn how to use be going to for near future',
-  category: 'Temps principaux',  imageUrl: 'https://i.ibb.co/6cxHGw3F/Be-Going-to.png',
+  category: 'Temps principaux',  imageUrl: 'https://wretggbpaejzjdilemit.supabase.co/storage/v1/object/public/lesson-images/15274719ab/futur-proche-be-going-to.webp',
   textContent: {
     cards: [
       {
@@ -42,8 +42,6 @@ const BeGoingToGrammar = {
     ],
   },
 translateExercises: [
-  // POSITIVE
-
   {
     type: 'translate',
     question: 'Translate into English.',
@@ -115,8 +113,6 @@ translateExercises: [
     wordBank: ["He", "is", "am", "are", "going to", "read", "the newspaper."]
   },
 
-  // NEGATIVE
-
   {
     type: 'translate',
     question: 'Translate into English.',
@@ -173,8 +169,6 @@ translateExercises: [
     answer: "I am not going to listen to the music.",
     wordBank: ["I", "am", "is", "are", "not", "going to", "listen to", "the music."]
   },
-
-  // QUESTIONS
 
   {
     type: 'translate',

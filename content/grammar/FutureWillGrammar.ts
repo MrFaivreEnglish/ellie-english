@@ -3,7 +3,7 @@ const FutureWillGrammar = {
   title: 'Future Tense (Will)',
   description: 'Translate the sentences into English using "will" for future tense.',
   category: 'Main Tenses',
-  imageUrl: 'https://i.ibb.co/F4pH7Bf7/Will.png',
+  imageUrl: 'https://wretggbpaejzjdilemit.supabase.co/storage/v1/object/public/lesson-images/15274719ab/future-tense-will.webp',
   textContent: {
     cards: [
       {

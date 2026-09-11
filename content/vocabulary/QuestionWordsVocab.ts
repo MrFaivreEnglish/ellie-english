@@ -2,7 +2,7 @@ const QuestionWordsVocab = {
   id: '305',
   title: 'Question Words',
   description: 'Who, what, where, when, why, how',
-  imageUrl: 'https://i.ibb.co/Ndqg96Yk/Question-Words.webp',
+  imageUrl: 'https://wretggbpaejzjdilemit.supabase.co/storage/v1/object/public/lesson-images/15274719ab/question-words.webp',
   thumbnail: require('../../assets/thumbnails/question-words-thumbnail.png'),
   flashcards: [
  { "english": "Who", "french": "Qui" },

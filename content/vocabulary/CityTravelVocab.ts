@@ -2,7 +2,7 @@ const CityTravelVocab = {
   id: '36',
   title: 'City Travel',
   description: 'Learn vocabulary for navigating and exploring cities',
-  imageUrl: 'https://i.ibb.co/pB891gS6/In-the-city-vocab.webp',
+  imageUrl: 'https://wretggbpaejzjdilemit.supabase.co/storage/v1/object/public/lesson-images/15274719ab/city-travel.webp',
   thumbnail: require('../../assets/thumbnails/city-travel-thumbnail.png'),
   flashcards: [
 {
@@ -10,7 +10,7 @@ const CityTravelVocab = {
   words: [
     { english: 'A street', french: 'Une rue' },
     { english: 'An avenue', french: 'Une avenue' },
-    { english: 'A footpath', french: 'Un trottoir' },
+    { english: 'A pavement', french: 'Un trottoir' },
     { english: 'A square', french: 'Une place' },
     { english: 'A neighbourhood', french: 'Un quartier' },
     { english: 'A garden', french: 'Un jardin' },

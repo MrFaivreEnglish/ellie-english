@@ -1,4 +1,4 @@
-// Fallback registry for older/custom lessons that do not define their own thumbnail.
+
 import Assets from '../../assets/index';
 
 const normalizeKey = (s: string) =>
@@ -17,7 +17,7 @@ Object.keys(lessonThumbnails).forEach(k => {
 
 const cleanLessonTitle = (title: string) => title.replace(/\s*\d+/, '').trim();
 
-const DEFAULT_LESSON_IMAGE_URL = 'https://i.ibb.co/yBB0N2GJ/united-kingdom2.png';
+const DEFAULT_LESSON_IMAGE_URL = 'https://wretggbpaejzjdilemit.supabase.co/storage/v1/object/public/lesson-images/15274719ab/_default.png';
 
 const REMOTE_LESSON_IMAGE_MAP: Record<string, string> = {
   'Breakfast': 'https://i.ibb.co/ccHn7jd6/Breakfast-vocab-full-1.png',
@@ -30,12 +30,12 @@ const REMOTE_LESSON_IMAGE_MAP: Record<string, string> = {
   'City Travel': 'https://i.ibb.co/YT4vs9wz/City-Travel-vocab-1.png',
   'Clothes': 'https://i.ibb.co/ZRyWgvpd/clothes-vocab-1.png',
   'Detective': 'https://i.ibb.co/DPMqZP1s/detective-vocab.png',
-  'Dystopia': 'https://i.ibb.co/1JQDKq8C/vocab-dystopia.webp',
+  'Dystopia': 'https://wretggbpaejzjdilemit.supabase.co/storage/v1/object/public/lesson-images/15274719ab/dystopia.webp',
   'Emotions': 'https://i.ibb.co/2Y6s2xj9/emotions.png',
-  'Emotions +': 'https://i.ibb.co/6c2cc9ZB/emotions-Level-2.webp',
-  'Emotions Plus': 'https://i.ibb.co/6c2cc9ZB/emotions-Level-2.webp',
-  'More Emotions': 'https://i.ibb.co/6c2cc9ZB/emotions-Level-2.webp',
-  // 'Extreme Sports' thumbnail mapping intentionally removed to allow fallback behavior
+  'Emotions +': 'https://wretggbpaejzjdilemit.supabase.co/storage/v1/object/public/lesson-images/15274719ab/emotions-plus.webp',
+  'Emotions Plus': 'https://wretggbpaejzjdilemit.supabase.co/storage/v1/object/public/lesson-images/15274719ab/emotions-plus.webp',
+  'More Emotions': 'https://wretggbpaejzjdilemit.supabase.co/storage/v1/object/public/lesson-images/15274719ab/emotions-plus.webp',
+
   'Legends': 'https://i.ibb.co/MxL8yr1M/Legends-1.png',
   'American Dishes': 'https://i.ibb.co/G4XBTJqc/American-dishes-1.png',
   'Furniture': 'https://i.ibb.co/GQcCgKJP/Furniture-1.png',
@@ -54,7 +54,7 @@ const REMOTE_LESSON_IMAGE_MAP: Record<string, string> = {
   'Video game actions / Superpowers': 'https://i.ibb.co/JWkDKwqh/vocabulary-superpowers.png',
   'Space': 'https://i.ibb.co/pjrn98PB/Space-1.png',
   'Food Basics': 'https://i.ibb.co/ZRJb70VG/Food-basics-1.png',
-  'Frequency Adverbs': 'https://i.ibb.co/3mgWMh47/Frequency-Adverbs.png',
+  'Frequency Adverbs': 'https://wretggbpaejzjdilemit.supabase.co/storage/v1/object/public/lesson-images/15274719ab/frequency-adverbs.png',
   'School Basics': 'https://i.ibb.co/QjH4wXwB/School-basics-1.png',
   'Instructions': 'https://i.ibb.co/yFRkjChy/Instructions-1.png',
   'Colours': 'https://i.ibb.co/SD63ymQ6/Colours-21-x-29-7-cm-1.png',
@@ -82,13 +82,73 @@ Object.keys(REMOTE_LESSON_IMAGE_MAP).forEach(k => {
   NORMALIZED_REMOTE_LESSON_IMAGE_MAP[normalizeKey(k)] = REMOTE_LESSON_IMAGE_MAP[k];
 });
 
-export const shuffleArray = <T,>(array: T[]): T[] => {
+export const shuffleArray = <T,>(array: T[], random: () => number = Math.random): T[] => {
   const shuffled = [...array];
   for (let i = shuffled.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
+    const randomValue = Math.max(0, Math.min(0.9999999999999999, random()));
+    const j = Math.floor(randomValue * (i + 1));
     [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
   }
   return shuffled;
+};
+
+const countAlignedMatchingPairs = <T,>(
+  left: T[],
+  right: T[],
+  getPairId: (card: T) => string | number
+) => left.reduce(
+  (count, card, index) => count + (right[index] && getPairId(card) === getPairId(right[index]) ? 1 : 0),
+  0
+);
+
+
+
+
+
+export const shuffleMatchingPairColumns = <T,>(
+  leftCards: T[],
+  rightCards: T[],
+  getPairId: (card: T) => string | number,
+  options: { random?: () => number; adjacentPairChance?: number } = {}
+): { left: T[]; right: T[] } => {
+  const random = options.random ?? Math.random;
+  const adjacentPairChance = Math.max(0, Math.min(1, options.adjacentPairChance ?? 0.22));
+  const left = shuffleArray(leftCards, random);
+  const maxAlignedPairs = random() < adjacentPairChance ? 1 : 0;
+
+  let bestRight = shuffleArray(rightCards, random);
+  let bestAlignedCount = countAlignedMatchingPairs(left, bestRight, getPairId);
+
+  for (let attempt = 1; attempt < 12 && bestAlignedCount > maxAlignedPairs; attempt += 1) {
+    const candidate = shuffleArray(rightCards, random);
+    const alignedCount = countAlignedMatchingPairs(left, candidate, getPairId);
+
+    if (alignedCount < bestAlignedCount) {
+      bestRight = candidate;
+      bestAlignedCount = alignedCount;
+    }
+  }
+
+  if (bestAlignedCount <= maxAlignedPairs || left.length <= 1) {
+    return { left, right: bestRight };
+  }
+
+
+
+
+  // Deterministic rotation enforces the adjacency cap if random retries fail.
+  const rightByPairId = new Map(rightCards.map((card) => [getPairId(card), card]));
+  const rightInLeftOrder = left.map((card) => rightByPairId.get(getPairId(card)));
+
+  if (rightInLeftOrder.every((card): card is T => card !== undefined)) {
+    const offset = 1 + Math.floor(Math.max(0, Math.min(0.9999999999999999, random())) * (left.length - 1));
+    return {
+      left,
+      right: rightInLeftOrder.map((_, index) => rightInLeftOrder[(index + offset) % rightInLeftOrder.length]),
+    };
+  }
+
+  return { left, right: bestRight };
 };
 
 export const getLessonImage = (title: string): string => {
@@ -99,7 +159,15 @@ export const getLessonImage = (title: string): string => {
   return NORMALIZED_REMOTE_LESSON_IMAGE_MAP[lookupKey] || REMOTE_LESSON_IMAGE_MAP[cleanTitle] || DEFAULT_LESSON_IMAGE_URL;
 };
 
-export const PAIRS_PER_SET = 6;
+export const PAIRS_PER_SET = 5;
+export const DESKTOP_PAIRS_PER_SET = 6;
+
+
+
+
+
+export const getPairsPerSetForLayout = (isDesktopWeb: boolean) =>
+  isDesktopWeb ? DESKTOP_PAIRS_PER_SET : PAIRS_PER_SET;
 
 export const getMatchingSetRanges = (wordCount: number, maxPairsPerSet = PAIRS_PER_SET) => {
   const safeWordCount = Math.max(0, wordCount);
@@ -116,6 +184,7 @@ export const getMatchingSetRanges = (wordCount: number, maxPairsPerSet = PAIRS_P
   const lastRange = ranges[ranges.length - 1];
   const previousRange = ranges[ranges.length - 2];
 
+  // Avoid a final matching set containing only one pair.
   if (lastRange && previousRange && lastRange.end - lastRange.start === 1 && previousRange.end - previousRange.start > 2) {
     previousRange.end -= 1;
     lastRange.start -= 1;
@@ -159,12 +228,12 @@ export const getLessonThumbnailSource = (lesson: { title?: string; thumbnail?: a
   return getLocalLessonImage(lesson.title);
 };
 
-/**
- * React Navigation requires route params to contain plain serializable data.
- * Web asset modules can include helper functions (notably `toString`), so keep
- * only their URI when a lesson is placed in navigation state. Native numeric
- * require() handles are already serializable and can pass through unchanged.
- */
+
+
+
+
+
+
 export const getSerializableVocabularyLesson = <T extends { thumbnail?: any }>(lesson: T): T => {
   const thumbnail = lesson?.thumbnail;
   if (!thumbnail || typeof thumbnail === 'number') return lesson;
@@ -173,6 +242,7 @@ export const getSerializableVocabularyLesson = <T extends { thumbnail?: any }>(l
     return { ...lesson, thumbnail: { uri: thumbnail.uri } };
   }
 
+  // Navigation params may keep numeric asset IDs or URI objects, but not native asset records.
   const serializableLesson = { ...lesson };
   delete serializableLesson.thumbnail;
   return serializableLesson;

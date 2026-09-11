@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useState } from 'react';
 import { interpolateColor, useAnimatedStyle, useSharedValue, withTiming } from 'react-native-reanimated';
 
-// Animates a search field's border between its idle and active states based on
-// focus or non-empty text, instead of the raw style-array swap that snapped instantly.
+
+
 export function useSearchFocusAnimation(hasText: boolean, inactiveColor: string, activeColor: string) {
   const [isFocused, setIsFocused] = useState(false);
   const isActive = isFocused || hasText;

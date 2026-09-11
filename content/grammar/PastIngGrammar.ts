@@ -3,7 +3,7 @@ const PastIngGrammar = {
   title: 'Prétérit en ING',
   description: 'Learn how to use the past continuous tense',
   category: 'Temps principaux',
-  imageUrl: 'https://i.ibb.co/FGQm45L/Pr-t-rit-ING.png',
+  imageUrl: 'https://wretggbpaejzjdilemit.supabase.co/storage/v1/object/public/lesson-images/15274719ab/preterit-en-ing.webp',
   textContent: {
     cards: [
       {

@@ -2,11 +2,21 @@ import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { createAudioPlayer } from 'expo-audio';
 import type { AudioPlayer } from 'expo-audio';
 import { Word, GameCard, MatchingGamePairs, GameState } from '../../types/VocabularyTypes';
-import { PAIRS_PER_SET, getMatchingSetCount, getMatchingSetWords, shuffleArray } from './vocabularyUtils';
+import { PAIRS_PER_SET, getMatchingSetCount, getMatchingSetWords, shuffleArray, shuffleMatchingPairColumns } from './vocabularyUtils';
 import { getVocabularyTimerBests, saveVocabularyTimerBest } from './vocabularyTimerStorage';
-import { SOUND_EFFECT_OPTIONS, SUCCESS_SOUND, replaySoundEffect } from '../shared/soundEffects';
-import { awardActivityXPOnceToday } from '../progress/xpStorage';
-import { XP_REWARDS } from '../progress/xpRewards';
+import { SOUND_EFFECT_OPTIONS, SUCCESS_SOUND, restartSoundEffect } from '../shared/soundEffects';
+import {
+  awardActivityXPOnceToday,
+  previewActivityXPOnceToday,
+  getDailyXPSnapshot,
+} from '../progress/xpStorage';
+import { recordPracticeToday } from '../progress/streakStorage';
+import {
+  XP_REWARDS,
+  PERFECT_RUN_XP_MULTIPLIER,
+  getReplayXpFraction,
+  applyDailyXpTaper,
+} from '../progress/xpRewards';
 import { triggerSelectionHaptic, triggerSuccessHaptic, triggerWarningHaptic } from '../shared/haptics';
 
 const buildMatchingPracticeActivityKey = (
@@ -21,8 +31,11 @@ const buildMatchingPracticeActivityKey = (
   return `vocabulary:matching:${isTimerMode ? 'timer' : 'practice'}:${categoryKey}:${englishText}:${frenchText}`;
 };
 
-const buildMatchingTimerBestActivityKey = (categoryKey: string, elapsedMs: number) =>
-  `vocabulary:matching-timer-best:${categoryKey}:${Math.floor(elapsedMs)}`;
+// Deliberately keyed on the category alone. Including the time meant every personal best
+// was a brand new key, so shaving a millisecond off paid the full bonus again, over and
+// over — this way beating your record is worth the full bonus once a day.
+const buildMatchingTimerBestActivityKey = (categoryKey: string) =>
+  `vocabulary:matching-timer-best:${categoryKey}`;
 
 const getMatchingPairXP = (isTimerMode: boolean, hadMistake: boolean) => {
   if (isTimerMode) {
@@ -39,6 +52,10 @@ const getMatchingPairXP = (isTimerMode: boolean, hadMistake: boolean) => {
 const REFILL_MATCH_DELAY_MS = 150;
 const WRONG_MATCH_FEEDBACK_MS = 650;
 const NEXT_SET_DELAY_MS = 420;
+// Comfortably longer than the advance delay above, and far shorter than any real gap
+// between two sets being finished.
+const SET_COMPLETE_SOUND_DEBOUNCE_MS = 1200;
+let lastSetCompleteSoundAt = 0;
 
 const buildMatchingCards = (word: Word, pairId: number) => ({
   english: {
@@ -68,9 +85,15 @@ const buildMatchingPairs = (
     frenchCards.push(cards.french);
   });
 
+  const shuffledColumns = shuffleMatchingPairColumns(
+    englishCards,
+    frenchCards,
+    (card) => card.pairId
+  );
+
   return {
-    english: shuffleArray(englishCards),
-    french: shuffleArray(frenchCards),
+    english: shuffledColumns.left,
+    french: shuffledColumns.right,
   };
 };
 
@@ -87,18 +110,28 @@ export const useVocabularyGame = (
   isActive: boolean,
   categoryKey: string = 'default',
   saveTimerRecords: boolean = false,
-  refillOnMatch: boolean = false
+  refillOnMatch: boolean = false,
+  pairsPerSet: number = PAIRS_PER_SET,
+  lessonDifficulty: number | null = null
 ) => {
+  const replayXpFraction = getReplayXpFraction(lessonDifficulty);
   const setCompletePlayerRef = useRef<AudioPlayer | null>(null);
 
+
+  // Built up front rather than on the first match: creating a player costs a native round
+  // trip, and paying it at match time is audible as the first sound of a game arriving late.
   useEffect(() => {
+    if (!setCompletePlayerRef.current) {
+      setCompletePlayerRef.current = createAudioPlayer(SUCCESS_SOUND, SOUND_EFFECT_OPTIONS);
+    }
+
     return () => {
       setCompletePlayerRef.current?.remove();
       setCompletePlayerRef.current = null;
     };
   }, []);
 
-  // ---------------- STATE ----------------
+
   const [gameState, setGameState] = useState<GameState>({
     currentSet: 0,
     matchedPairs: [],
@@ -112,6 +145,7 @@ export const useVocabularyGame = (
     hasAdvancedSet: false,
     isInputLocked: false,
     lastCompletionWasPersonalBest: false,
+    lastCompletionPreviousBest: null,
   });
   const gameStateRef = useRef(gameState);
 
@@ -129,22 +163,52 @@ export const useVocabularyGame = (
   const [matchingReviewWords, setMatchingReviewWords] = useState<Word[]>([]);
   const [matchingSessionXp, setMatchingSessionXp] = useState(0);
   const [lastMatchingXpGain, setLastMatchingXpGain] = useState(0);
+  const [wasMatchingPerfectRun, setWasMatchingPerfectRun] = useState(false);
+  const [matchingBonusXp, setMatchingBonusXp] = useState(0);
 
-  // ---------------- REFS ----------------
+
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const timerStartedAtRef = useRef<number | null>(null);
   const timerValueRef = useRef(0);
 
-  // prevents duplicate completion writes
+
   const completionLockedRef = useRef(false);
-  const setAdvanceLockedRef = useRef(false);
+  // Which set index already got its completion sound. A plain "locked" flag could not do
+  // this: the advance effect has to re-arm its timer whenever its deps change, and the
+  // cleanup that allowed for that also cleared the flag — so a dep change while a set sat
+  // completed replayed the sound.
+  const setCompleteSoundedSetRef = useRef<number | null>(null);
   const recordedMatchingActivityKeysRef = useRef<Set<string>>(new Set());
   const mistakenMatchingActivityKeysRef = useRef<Set<string>>(new Set());
+  // Per-pair XP earned during play is only persisted once the whole session is confirmed
+  // complete (see commitPendingMatchingXp) — not per match, so quitting early doesn't bank it.
+  const pendingMatchXpRef = useRef<{ activityKey: string; amount: number }[]>([]);
+  // What the "XP" metric above the board has shown so far. Kept as a ref as well as state
+  // because pricing the next pair depends on the running total, and the day's soft cap is
+  // applied against it.
+  const displayedMatchingXpRef = useRef(0);
+  // Refreshed at the start of each session: pairs already practised today are worth a
+  // fraction, and the day's cap may already be partly spent. Without this the metric
+  // counted every pair at full price and then disagreed with the completion screen.
+  const dailyXpSnapshotRef = useRef<{ awardedActivityKeys: Set<string>; grantedToday: number }>({
+    awardedActivityKeys: new Set(),
+    grantedToday: 0,
+  });
   const matchingXpTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const refillTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const nextRefillWordIndexRef = useRef(0);
 
-  // ---------------- TIMER ----------------
+
+  const refreshDailyXpSnapshot = useCallback(() => {
+    getDailyXPSnapshot()
+      .then((snapshot) => { dailyXpSnapshotRef.current = snapshot; })
+      .catch(() => {});
+  }, []);
+
+  useEffect(() => {
+    refreshDailyXpSnapshot();
+  }, [refreshDailyXpSnapshot]);
+
   const startTimer = useCallback(() => {
     if (timerRef.current) return;
 
@@ -164,10 +228,21 @@ export const useVocabularyGame = (
   }, []);
 
   const playSetCompleteSound = useCallback(() => {
+    // Module-scoped rather than a ref, deliberately. A stack can hold more than one lesson
+    // screen at a time, and each mounted copy of this hook owns its own players — so a
+    // per-instance guard would still let two of them chime together. Finishing a set is
+    // seconds apart from the next one, so nothing legitimate is ever suppressed here.
+    const now = Date.now();
+    if (now - lastSetCompleteSoundAt < SET_COMPLETE_SOUND_DEBOUNCE_MS) return;
+    lastSetCompleteSoundAt = now;
+
     if (!setCompletePlayerRef.current) {
       setCompletePlayerRef.current = createAudioPlayer(SUCCESS_SOUND, SOUND_EFFECT_OPTIONS);
     }
-    replaySoundEffect(setCompletePlayerRef.current);
+    // One voice, restarted from a stop. The pool exists for sounds that retrigger faster
+    // than a clip lasts (a run of correct answers), which a set completing never does, and
+    // restartSoundEffect is the variant that cannot start the clip twice — see its comment.
+    restartSoundEffect(setCompletePlayerRef.current);
   }, []);
 
   const key = categoryKey || "All";
@@ -212,23 +287,107 @@ export const useVocabularyGame = (
     mistakenMatchingActivityKeysRef.current.add(activityKey);
   }, [getMatchingActivityKeyForPairId]);
 
+  // Pends the award and shows it, exactly like a matched pair does. It must not persist
+  // here: XP is banked only when the student claims it on the end screen, and writing early
+  // would also double-count this bonus (once in the stored total the end screen reads, once
+  // again in the session total it adds on top).
+  //
+  // The figure shown is priced the same way claiming will price it — discounted if this
+  // pair already paid out today, then put through the day's soft cap — so the metric above
+  // the board agrees with the completion screen. The one thing still unknown mid-session is
+  // the perfect-run multiplier, which can only go up and is surfaced separately as
+  // matchingBonusXp.
   const awardMatchingXP = useCallback((activityKey: string, amount: number) => {
-    void awardActivityXPOnceToday(activityKey, amount).then((xpGain) => {
-      if (xpGain <= 0) return;
+    const normalizedAmount = Math.max(0, Math.round(amount));
+    if (normalizedAmount <= 0 || recordedMatchingActivityKeysRef.current.has(activityKey)) return;
 
-      setMatchingSessionXp(current => current + xpGain);
-      setLastMatchingXpGain(xpGain);
+    recordedMatchingActivityKeysRef.current.add(activityKey);
+    pendingMatchXpRef.current.push({ activityKey, amount: normalizedAmount });
 
-      if (matchingXpTimeoutRef.current) {
-        clearTimeout(matchingXpTimeoutRef.current);
-      }
+    const { awardedActivityKeys, grantedToday } = dailyXpSnapshotRef.current;
+    const discountedAmount = awardedActivityKeys.has(activityKey)
+      ? Math.round(normalizedAmount * replayXpFraction)
+      : normalizedAmount;
+    const displayedGain = applyDailyXpTaper(
+      discountedAmount,
+      grantedToday + displayedMatchingXpRef.current
+    );
 
+    displayedMatchingXpRef.current += displayedGain;
+    setMatchingSessionXp(displayedMatchingXpRef.current);
+
+    if (displayedGain <= 0) return;
+    setLastMatchingXpGain(displayedGain);
+
+    if (matchingXpTimeoutRef.current) {
+      clearTimeout(matchingXpTimeoutRef.current);
+    }
+
+    matchingXpTimeoutRef.current = setTimeout(() => {
+      setLastMatchingXpGain(0);
+      matchingXpTimeoutRef.current = null;
+    }, 1400);
+  }, [replayXpFraction]);
+
+  // Called by the screen once it confirms the whole session (all sets) is actually complete.
+  // Persists every pair's XP earned during play in one batch, applying the perfect-run
+  // bonus if no mistakes were made anywhere this session.
+  // Running totals during play are optimistic: each match adds its full value, because
+  // whether a pair is discounted (already practised today) or boosted (perfect run) isn't
+  // known until the session ends. This resolves the real figure — with `persist` false it
+  // only reads, so the end screen can show the true number before anything is banked.
+  const resolvePendingMatchingXp = useCallback(async (persist: boolean) => {
+    const pending = pendingMatchXpRef.current;
+    if (pending.length === 0) return 0;
+
+    const isPerfectRun = mistakenMatchingActivityKeysRef.current.size === 0;
+    setWasMatchingPerfectRun(isPerfectRun);
+    let totalAwarded = 0;
+    // What the running metric showed during play — the difference is the perfect-run
+    // bonus, which is the one part that can't be known until the session ends.
+    const displayedDuringPlay = displayedMatchingXpRef.current;
+
+    for (const { activityKey, amount } of pending) {
+      const finalAmount = isPerfectRun ? Math.round(amount * PERFECT_RUN_XP_MULTIPLIER) : amount;
+      // Awarding banks as it goes, so the day's soft cap advances on its own; previewing
+      // banks nothing, so it has to carry the running total forward itself to taper the
+      // session as one batch rather than restarting from the stored figure each pair.
+      totalAwarded += persist
+        ? await awardActivityXPOnceToday(activityKey, finalAmount, replayXpFraction)
+        : await previewActivityXPOnceToday(activityKey, finalAmount, replayXpFraction, totalAwarded);
+    }
+
+    // Set absolutely rather than by delta, so previewing and then committing can't apply the
+    // same correction twice — both land on the same figure.
+    displayedMatchingXpRef.current = totalAwarded;
+    setMatchingSessionXp(totalAwarded);
+    setMatchingBonusXp(Math.max(0, totalAwarded - displayedDuringPlay));
+    return totalAwarded;
+  }, [replayXpFraction]);
+
+  // Read-only: shows what claiming will actually give, without awarding or consuming the
+  // pending list.
+  const previewPendingMatchingXp = useCallback(
+    () => resolvePendingMatchingXp(false),
+    [resolvePendingMatchingXp]
+  );
+
+  const commitPendingMatchingXp = useCallback(async () => {
+    if (pendingMatchXpRef.current.length === 0) return 0;
+    const totalAwarded = await resolvePendingMatchingXp(true);
+    pendingMatchXpRef.current = [];
+
+    if (totalAwarded > 0) {
+      setLastMatchingXpGain(totalAwarded);
+      if (matchingXpTimeoutRef.current) clearTimeout(matchingXpTimeoutRef.current);
       matchingXpTimeoutRef.current = setTimeout(() => {
         setLastMatchingXpGain(0);
         matchingXpTimeoutRef.current = null;
       }, 1400);
-    });
-  }, []);
+    }
+
+    return totalAwarded;
+  }, [resolvePendingMatchingXp]);
 
   useEffect(() => {
     gameStateRef.current = gameState;
@@ -261,10 +420,10 @@ export const useVocabularyGame = (
     };
   }, [saveTimerRecords]);
 
-  // ---------------- RESET ----------------
+
   const resetGameState = useCallback((options?: { preserveTimer?: boolean }) => {
     completionLockedRef.current = false;
-    setAdvanceLockedRef.current = false;
+    setCompleteSoundedSetRef.current = null;
     if (refillTimeoutRef.current) {
       clearTimeout(refillTimeoutRef.current);
       refillTimeoutRef.current = null;
@@ -272,6 +431,13 @@ export const useVocabularyGame = (
     nextRefillWordIndexRef.current = 0;
     recordedMatchingActivityKeysRef.current = new Set();
     mistakenMatchingActivityKeysRef.current = new Set();
+    pendingMatchXpRef.current = [];
+    displayedMatchingXpRef.current = 0;
+    // Replaying in the same sitting means pairs just claimed are now discounted, and the
+    // day's cap has moved — re-read both so the next run prices itself correctly.
+    refreshDailyXpSnapshot();
+    setWasMatchingPerfectRun(false);
+    setMatchingBonusXp(0);
     if (matchingXpTimeoutRef.current) {
       clearTimeout(matchingXpTimeoutRef.current);
       matchingXpTimeoutRef.current = null;
@@ -297,10 +463,11 @@ export const useVocabularyGame = (
       hasAdvancedSet: false,
       isInputLocked: false,
       lastCompletionWasPersonalBest: false,
+      lastCompletionPreviousBest: null,
     }));
   }, []);
 
-  // ---------------- INIT ----------------
+
   const initializeGameSet = useCallback((options?: { preserveTimer?: boolean }) => {
     if (!words.length) return;
 
@@ -317,14 +484,14 @@ export const useVocabularyGame = (
     sessionWordsRef.current = shuffled;
 
     const currentWords = refillOnMatch
-      ? shuffled.slice(0, Math.min(PAIRS_PER_SET, shuffled.length))
-      : getMatchingSetWords(shuffled, 0);
+      ? shuffled.slice(0, Math.min(pairsPerSet, shuffled.length))
+      : getMatchingSetWords(shuffled, 0, pairsPerSet);
     nextRefillWordIndexRef.current = currentWords.length;
 
     setMatchingGamePairs(buildMatchingPairs(currentWords, (index) => index));
-  }, [refillOnMatch, resetGameState, stopTimer, words]);
+  }, [pairsPerSet, refillOnMatch, resetGameState, stopTimer, words]);
 
-  // ---------------- SET COMPLETE ----------------
+
   const isSetComplete = useMemo(() => {
     if (refillOnMatch) return false;
 
@@ -332,7 +499,7 @@ export const useVocabularyGame = (
     return size > 0 && gameState.matchedPairs.length === size * 2;
   }, [refillOnMatch, matchingGamePairs, gameState.matchedPairs.length]);
 
-  // ---------------- ALL COMPLETE ----------------
+
   const isGameComplete = useMemo(() => {
     const setReady = (matchingGamePairs?.english?.length || 0) > 0;
 
@@ -340,7 +507,7 @@ export const useVocabularyGame = (
       return setReady && words.length > 0 && gameState.totalScore >= words.length;
     }
 
-    const totalSets = getMatchingSetCount(words.length);
+    const totalSets = getMatchingSetCount(words.length, pairsPerSet);
     const isLastSet = gameState.currentSet >= totalSets - 1;
 
     return setReady && isLastSet && isSetComplete;
@@ -349,12 +516,13 @@ export const useVocabularyGame = (
     gameState.currentSet,
     gameState.matchedPairs.length,
     gameState.totalScore,
+    pairsPerSet,
     words.length,
     isSetComplete,
     refillOnMatch
   ]);
 
-  // ---------------- BEST TIME (FIXED CORE) ----------------
+
   useEffect(() => {
     if (!isGameComplete) return;
     if (completionLockedRef.current) return;
@@ -372,6 +540,7 @@ export const useVocabularyGame = (
           ...prev,
           hasCompletedOnce: true,
           lastCompletionWasPersonalBest: false,
+          lastCompletionPreviousBest: null,
         };
       }
 
@@ -388,7 +557,7 @@ export const useVocabularyGame = (
 
       if (beatExistingBest) {
         awardMatchingXP(
-          buildMatchingTimerBestActivityKey(key, currentTime),
+          buildMatchingTimerBestActivityKey(key),
           XP_REWARDS.vocabularyMatchingTimerBestBonus
         );
       }
@@ -398,6 +567,7 @@ export const useVocabularyGame = (
         timer: currentTime,
         hasCompletedOnce: true,
         lastCompletionWasPersonalBest: isNewBest,
+        lastCompletionPreviousBest: previousBest != null && previousBest > 0 ? previousBest : null,
         bestTimeByCategory: isNewBest
           ? {
               ...prev.bestTimeByCategory,
@@ -408,7 +578,7 @@ export const useVocabularyGame = (
     });
   }, [awardMatchingXP, isGameComplete, key, saveTimerRecords, timerMode]);
 
-  // ---------------- TIMER CONTROL ----------------
+
   useEffect(() => {
     const setReady = (matchingGamePairs?.english?.length || 0) > 0;
 
@@ -430,7 +600,7 @@ export const useVocabularyGame = (
     stopTimer,
   ]);
 
-  // ---------------- CLEANUP ----------------
+
   useEffect(() => {
     return () => {
       stopTimer();
@@ -463,13 +633,22 @@ export const useVocabularyGame = (
       const activityKey = buildMatchingPracticeActivityKey(key, englishCard, frenchCard, timerMode);
       if (recordedMatchingActivityKeysRef.current.has(activityKey)) return;
 
-      recordedMatchingActivityKeysRef.current.add(activityKey);
+      // Routed through awardMatchingXP rather than tracked here: it is what keeps
+      // displayedMatchingXpRef in step with the metric above the board. Adding to the
+      // metric without it left that ref at zero all session, so the end screen read the
+      // whole total as perfect-run bonus and showed the badge after any number of
+      // mistakes. It also prices the pair the way claiming will (replay discount, daily
+      // taper), which this path used to skip.
       const hadMistake = mistakenMatchingActivityKeysRef.current.has(activityKey);
       awardMatchingXP(activityKey, getMatchingPairXP(timerMode, hadMistake));
+
+      // Practice counts toward the streak as soon as it happens, independently of the
+      // end-screen XP claim — the student did the work either way.
+      void recordPracticeToday();
     });
   }, [awardMatchingXP, gameState.matchedPairs, key, matchingCardsById, timerMode]);
 
-  // ---------------- CARD LOGIC ----------------
+
   const handleCardPress = useCallback((card: GameCard) => {
     const current = gameStateRef.current;
 
@@ -561,8 +740,8 @@ export const useVocabularyGame = (
     setGameState(prev => ({
       ...prev,
       currentSet: Math.min(
-        Math.max(0, getMatchingSetCount(words.length) - 1),
-        Math.floor(prev.totalScore / PAIRS_PER_SET)
+        Math.max(0, getMatchingSetCount(words.length, pairsPerSet) - 1),
+        Math.floor(prev.totalScore / pairsPerSet)
       ),
       matchedPairs: [],
       selectedCard: null,
@@ -570,7 +749,7 @@ export const useVocabularyGame = (
       hasAdvancedSet: false,
       isInputLocked: false,
     }));
-  }, [words]);
+  }, [pairsPerSet, words]);
 
   useEffect(() => {
     if (!refillOnMatch || !gameState.isInputLocked || gameState.incorrectPair || gameState.matchedPairs.length < 2) {
@@ -601,7 +780,7 @@ export const useVocabularyGame = (
     gameState.matchedPairs,
   ]);
 
-  // Clear wrong-answer feedback and unlock input after a short pause.
+
   useEffect(() => {
     if (!gameState.isInputLocked || !gameState.incorrectPair) return;
 
@@ -616,14 +795,14 @@ export const useVocabularyGame = (
     return () => clearTimeout(timeoutId);
   }, [gameState.isInputLocked, gameState.incorrectPair]);
 
-  // ---------------- NEXT SET ----------------
+
   const advanceToNextSet = useCallback(() => {
     setGameState(prev => {
       const nextSet = prev.currentSet + 1;
 
       const base = sessionWords.length ? sessionWords : words;
 
-      const nextWords = getMatchingSetWords(base, nextSet);
+      const nextWords = getMatchingSetWords(base, nextSet, pairsPerSet);
       setMatchingGamePairs(buildMatchingPairs(nextWords, (index) => index));
 
       return {
@@ -635,26 +814,25 @@ export const useVocabularyGame = (
         isInputLocked: false,
       };
     });
-  }, [sessionWords, words]);
+  }, [pairsPerSet, sessionWords, words]);
 
   useEffect(() => {
-    if (!isSetComplete || isGameComplete || setAdvanceLockedRef.current) return;
+    if (!isSetComplete || isGameComplete) {
+      setCompleteSoundedSetRef.current = null;
+      return undefined;
+    }
 
-    setAdvanceLockedRef.current = true;
-    void playSetCompleteSound();
+    // Once per completed set, however often this effect re-runs while the set sits there.
+    if (setCompleteSoundedSetRef.current !== gameState.currentSet) {
+      setCompleteSoundedSetRef.current = gameState.currentSet;
+      void playSetCompleteSound();
+    }
 
-    const timeoutId = setTimeout(() => {
-      advanceToNextSet();
-      setAdvanceLockedRef.current = false;
-    }, NEXT_SET_DELAY_MS);
+    const timeoutId = setTimeout(advanceToNextSet, NEXT_SET_DELAY_MS);
+    return () => clearTimeout(timeoutId);
+  }, [isSetComplete, isGameComplete, gameState.currentSet, advanceToNextSet, playSetCompleteSound]);
 
-    return () => {
-      clearTimeout(timeoutId);
-      setAdvanceLockedRef.current = false;
-    };
-  }, [isSetComplete, isGameComplete, advanceToNextSet, playSetCompleteSound]);
 
-  // ---------------- EXPOSED ----------------
   return {
     gameState,
     setGameState,
@@ -668,5 +846,9 @@ export const useVocabularyGame = (
     matchingSessionXp,
     lastMatchingXpGain,
     matchingReviewWords,
+    commitPendingMatchingXp,
+    previewPendingMatchingXp,
+    wasMatchingPerfectRun,
+    matchingBonusXp,
   };
 };

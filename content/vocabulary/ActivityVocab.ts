@@ -1,7 +1,7 @@
 const ActivityVocab = {
   id: '31',
   title: 'Activities',
-  description: 'Learn vocabulary related to various activities and hobbies',  imageUrl: 'https://i.ibb.co/MDv8dkg4/Activities-vocab.webp',
+  description: 'Learn vocabulary related to various activities and hobbies',  imageUrl: 'https://wretggbpaejzjdilemit.supabase.co/storage/v1/object/public/lesson-images/15274719ab/activities.webp',
   thumbnail: require('../../assets/thumbnails/activities-thumbnail.png'),
   flashcards: [
     {

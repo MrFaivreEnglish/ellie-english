@@ -1,18 +1,17 @@
 import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Image, Dimensions, Animated, Platform, Easing, KeyboardAvoidingView, ScrollView, Keyboard } from 'react-native';
+import { View, StyleSheet, TouchableOpacity, Pressable, Image, Animated, Platform, Easing, ScrollView, Keyboard } from 'react-native';
 import { useGrammarQuizLayout } from './useGrammarQuizLayout';
 import { useAudioPlayer } from 'expo-audio';
-import { MaterialIcons } from '@expo/vector-icons';
-import { useNavigation } from '@react-navigation/native';
-import assets from '../../assets/index';
-import BackButton from '../shared/BackButton';
+import MaterialIcons from '../shared/ThemedMaterialIcon';
+import Text from '../shared/ThemedText';
+import { useNavigation, type NavigationProp } from '@react-navigation/native';
 import ImageWithCredit from '../shared/ImageWithCredit';
 import GrammarFillExercise from './grammarExercises/GrammarFillExercise';
 import GrammarLessonTextContent from './GrammarLessonTextContent';
+import GrammarQuizExercise from './grammarExercises/GrammarQuizExercise';
 import GrammarReorderExercise from './grammarExercises/GrammarReorderExercise';
 import GrammarTranslateExercise from './grammarExercises/GrammarTranslateExercise';
-import LessonPracticeSheet from '../vocabulary/LessonPracticeSheet';
-import { clampNumber, scaleValue } from '../shared/responsiveLayout';
+import { commitMeasuredSize, fitSlots, getDesktopContentMaxWidth, scaleValue } from '../shared/responsiveLayout';
 import {
   CARD_HEIGHT,
   Exercise,
@@ -25,18 +24,30 @@ import {
 import {
   SOUND_EFFECT_OPTIONS,
   SUCCESS_SOUND,
-  replaySoundEffect,
+  preloadSoundEffects,
+  replayPooledSoundEffect,
+  warmUpSoundEffect,
 } from '../shared/soundEffects';
-import { getGrammarLessonProgressKey, recordGrammarCorrectAnswer } from './grammarProgressStorage';
-import { addXP, getXP, markPracticeActivityToday } from '../progress/xpStorage';
-import { XP_REWARDS } from '../progress/xpRewards';
+import { getGrammarLessonProgressKey } from './grammarProgressStorage';
+import { getXP, grantXP, previewGrantXP } from '../progress/xpStorage';
+import { PERFECT_RUN_XP_MULTIPLIER } from '../progress/xpRewards';
 import { saveLastLesson } from '../progress/lastLessonStorage';
-import VocabularyCompletionModal from '../vocabulary/VocabularyCompletionModal';
-import { triggerSelectionHaptic, triggerSuccessHaptic, triggerWarningHaptic } from '../shared/haptics';
-import { getButtonStyle, getButtonTextColor, getGrammarGameColors, getSoftShadow } from '../shared/uiPrimitives';
+import { unlockMode } from '../progress/modeUnlockStorage';
+import PracticeSheet from '../shared/PracticeSheet';
+import { triggerSelectionHaptic } from '../shared/haptics';
+import { getButtonStyle, getButtonTextColor, getGrammarGameColors, getSoftShadow, withColorAlpha } from '../shared/uiPrimitives';
+import PracticeDock from '../shared/PracticeDock';
+import LessonHeaderRow from '../shared/LessonHeaderRow';
 import { FRESH_COLORS, freshFontFamily } from '../shared/freshDirection';
 import type { GrammarLesson } from '../../types/lessonTypes';
+import type { RootStackParamList } from '../../types/navigationTypes';
 import { useEnglishSpeech } from '../shared/useEnglishSpeech';
+import { useGrammarSession } from './grammarSessionReducer';
+import { useGrammarFeedback } from './useGrammarFeedback';
+import { useGrammarQuizTimers } from './useGrammarQuizTimers';
+import { useGrammarAnswerController } from './useGrammarAnswerController';
+import { useGrammarLessonMedia } from './useGrammarLessonMedia';
+import GrammarQuizCompletion from './GrammarQuizCompletion';
 
 interface GrammarQuizProps {
   lesson: GrammarLesson;
@@ -44,13 +55,26 @@ interface GrammarQuizProps {
   backLabel?: string;
 }
 
-type MixedLessonImageCard = {
-  id: string;
-  title?: string;
-  imageUrl: string;
+const PRACTICE_LABEL_COLOR = FRESH_COLORS.exerciseBlueLabel;
+
+// Keep in sync with the answer-area styles; sizing subtracts this padding from measured height.
+const ANSWER_AREA_PADDING = {
+  desktop: { top: 20, bottom: 18 },
+  mobile: { top: 4, bottom: 20 },
 };
 
-const { width: screenWidth } = Dimensions.get('window');
+// Shared by prompt styles and Translate's reserved prompt height.
+const PROMPT_TYPE = {
+  desktop: { fontSize: 34, lineHeight: 39 },
+  mobile: { fontSize: 29, lineHeight: 34.8 },
+};
+
+const PRACTICE_MODE_LABELS: Record<ExerciseMode, string> = {
+  quiz: 'Quiz',
+  fill: 'Fill',
+  reorder: 'Reorder',
+  translate: 'Translate',
+};
 
 const renderPromptText = (prompt?: string) => {
   if (!prompt) return null;
@@ -66,236 +90,190 @@ const renderPromptText = (prompt?: string) => {
   });
 };
 
-const withColorAlpha = (color: string, alpha: number): string => {
-  const match = /^#([0-9a-f]{6})$/i.exec(color.trim());
-  if (!match) return color;
-
-  const value = parseInt(match[1], 16);
-  const clampedAlpha = Math.max(0, Math.min(1, alpha));
-
-  return `rgba(${(value >> 16) & 255}, ${(value >> 8) & 255}, ${value & 255}, ${clampedAlpha})`;
-};
-
-const GrammarQuiz: React.FC<GrammarQuizProps> = ({ lesson, onBack, backLabel = 'Back to Grammar', navigation }: any) => {
+const GrammarQuiz: React.FC<GrammarQuizProps> = ({ lesson, onBack, backLabel = 'Back to Grammar' }) => {
   const {
     colors, isDarkMode, isGrammarGameMode, isGrammarSpeechEnabled,
-    insets, windowWidth, rawWindowHeight,
+    insets, windowWidth, stableViewportHeight,
     exerciseMode, setExerciseMode,
-    setViewportHeight,
-    setIsSecondViewActive,
-    stableWindowHeight, setStableWindowHeight,
-    keyboardHeight, setKeyboardHeight,
-    keyboardHeightDrop, isKeyboardOpen, isFillKeyboardOpen, lessonViewportHeight,
-    isDesktopWebLayout, isCompactScreen, isKeyboardTightScreen, isLargeScreen,
-    webLessonScale, webLessonImageScale, isScaledWebLesson, webLessonMediaMaxWidth,
-    lessonMediaWidth, lessonImageContentScale, webExerciseMaxWidth,
-    quizCardHeight, quizOptionGap, quizOptionHeight, exerciseCardBaseHeight,
-    layoutTopInset, layoutBottomInset,
-    STICKY_TOP_SNAP_OFFSET,
-    QUIZ_VIEW_SNAP_EXTRA, FILL_VIEW_SNAP_EXTRA, REORDER_VIEW_SNAP_EXTRA, TRANSLATE_VIEW_SNAP_EXTRA,
-    FIRST_VIEW_BOTTOM_SPACE, FIRST_VIEW_PEEK, FIRST_VIEW_MODE_RAISE,
+    hasSoftKeyboard, reservesFillKeyboardSpace,
+    isDesktopWebLayout, isTabletLayout, isCompactScreen,
+    webLessonScale,
+    lessonImageContentScale,
+    quizOptionGap,
+    layoutTopInset,
   } = useGrammarQuizLayout();
-  const scrollViewRef = useRef<ScrollView>(null);
-  const overviewHeightRef = useRef(0);
-  const secondViewYRef = useRef(0);
-  const lastLessonScrollYRef = useRef(0);
-  const lastLessonScrollDirectionRef = useRef<'up' | 'down'>('down');
-  const secondViewThresholdRef = useRef(0);
-  const isManualLessonScrollRef = useRef(false);
+  const desktopContentMaxWidth = getDesktopContentMaxWidth(windowWidth, 'fit', stableViewportHeight);
+  const desktopPromptFontSize = scaleValue(PROMPT_TYPE.desktop.fontSize, webLessonScale);
+  const desktopPromptLineHeight = scaleValue(PROMPT_TYPE.desktop.lineHeight, webLessonScale);
+  const isScaledLayout = isDesktopWebLayout || isTabletLayout;
+  // The progress dots/counter and the "Correct N/Total" badge read slightly oversized on
+  // desktop specifically, so they scale a touch gentler than the rest of the quiz chrome.
+  const STATUS_BADGE_DESKTOP_SCALE_ADJUSTMENT = 0.9;
+  const statusBadgeScale = isDesktopWebLayout
+    ? webLessonScale * STATUS_BADGE_DESKTOP_SCALE_ADJUSTMENT
+    : webLessonScale;
+  const desktopProgressDotHeight = scaleValue(6, statusBadgeScale);
+  const desktopProgressTextFontSize = scaleValue(13, statusBadgeScale);
+  const desktopHeartIconSize = scaleValue(32, webLessonScale);
+  const desktopLifeSlotWidth = scaleValue(38, webLessonScale);
+  const desktopLifeSlotHeight = scaleValue(36, webLessonScale);
+  const desktopLivesPillMinHeight = scaleValue(36, webLessonScale);
   const initializedLessonKeyRef = useRef<string | null>(null);
-  const [titleBlockHeight, setTitleBlockHeight] = useState(72);
-  const stickyHeaderHeight = 112;
   const [lessonContentMode, setLessonContentMode] = useState<'image' | 'text'>('image');
   const [practiceSheetOpen, setPracticeSheetOpen] = useState(false);
+  // Fill waits for sheet entrance to finish before requesting the keyboard.
+  const [sheetEntered, setSheetEntered] = useState(false);
+  // Prevents Fill's blur handler from reopening a deliberately dismissed keyboard.
+  const [fillKeyboardDismissed, setFillKeyboardDismissed] = useState(false);
+
+  const [imageStageSize, setImageStageSize] = useState({ width: 0, height: 0 });
+  // Every exercise must fit this measured, non-scrolling viewport.
+  const [practiceStageHeight, setPracticeStageHeight] = useState(0);
+  const practiceExerciseViewportHeight = Math.max(160, practiceStageHeight);
+  const [answerAreaHeight, setAnswerAreaHeight] = useState(0);
   const hasLessonTextContent = !!lesson.textContent?.cards?.length;
-  const overviewMinHeight = Math.max(
-    isCompactScreen ? 420 : 500,
-    lessonViewportHeight - layoutTopInset - layoutBottomInset - stickyHeaderHeight - FIRST_VIEW_PEEK - FIRST_VIEW_MODE_RAISE
-  );
-  // Ensure we always have a navigation object (works when component is rendered without prop)
-  const navHook = useNavigation<any>();
-  const nav = navigation ?? navHook;
-  const mixedLessonImageCards = useMemo<MixedLessonImageCard[]>(() => {
-    if (!lesson.isMixedGrammarLesson) return [];
+  const nav = useNavigation<NavigationProp<RootStackParamList>>();
+  const {
+    imageUri,
+    imageSource,
+    mixedImageCards: mixedLessonImageCards,
+    showMixedImageCarousel: shouldShowMixedImageCarousel,
+    stageInsets: imageStageInsets,
+    availableSize: imageStageAvailableSize,
+    fittedSize: fittedLessonImageSize,
+    handleNaturalSize: handleLessonImageNaturalSize,
+  } = useGrammarLessonMedia({
+    lesson,
+    isDesktopWebLayout,
+    stageSize: imageStageSize,
+  });
 
-    if (Array.isArray(lesson.sourceLessonImageCards)) {
-      return lesson.sourceLessonImageCards
-        .filter((imageCard: { id?: string | number; title?: string; imageUrl?: string } | null | undefined): imageCard is { id?: string | number; title?: string; imageUrl: string } =>
-          typeof imageCard?.imageUrl === 'string' && imageCard.imageUrl.trim().length > 0
-        )
-        .map((imageCard: { id?: string | number; title?: string; imageUrl: string }, index: number) => ({
-          id: String(imageCard.id ?? imageCard.imageUrl ?? index),
-          title: imageCard.title,
-          imageUrl: imageCard.imageUrl,
-        }));
-    }
-
-    if (Array.isArray(lesson.sourceLessonImages)) {
-      return lesson.sourceLessonImages
-        .filter((imageUrl: unknown): imageUrl is string => typeof imageUrl === 'string' && imageUrl.trim().length > 0)
-        .map((imageUrl: string, index: number) => ({
-          id: `${imageUrl}-${index}`,
-          title: undefined,
-          imageUrl,
-        }));
-    }
-
-    return [];
-  }, [lesson.isMixedGrammarLesson, lesson.sourceLessonImageCards, lesson.sourceLessonImages]);
-  const shouldShowMixedImageCarousel = mixedLessonImageCards.length > 1;
-
-  // Prefetch every slide up front so swiping the carousel doesn't re-trigger
-  // the "Loading picture…" placeholder for images that are about to be seen.
-  useEffect(() => {
-    if (!shouldShowMixedImageCarousel) return;
-
-    let cancelled = false;
-    mixedLessonImageCards.forEach((imageCard) => {
-      if (cancelled) return;
-      Image.prefetch(imageCard.imageUrl).catch(() => {});
-    });
-
-    return () => {
-      cancelled = true;
-    };
-  }, [mixedLessonImageCards, shouldShowMixedImageCarousel]);
-
-  const activeLessonImage = lesson.imageUrl;
-  // Normalize image source and uri so we pass the same payload to the root FullImageModal
-  const imageSource = useMemo(() => {
-  return typeof activeLessonImage === 'string'
-    ? { uri: activeLessonImage }
-    : activeLessonImage;
-}, [activeLessonImage]);
-  const imageUri = typeof activeLessonImage === 'string' ? activeLessonImage : (activeLessonImage as any)?.uri;
   const handleImagePress = useCallback(() => {
-  nav.navigate('FullImageModal', { source: imageSource, uri: imageUri });
-}, [nav, imageSource, imageUri]);
+    nav.navigate('FullImageModal', { source: imageSource, uri: imageUri });
+  }, [nav, imageSource, imageUri]);
 
-  const lessonImageHeight = useMemo(() => {
-    const imageReservedGap = Platform.OS === 'web'
-      ? (isCompactScreen ? 54 : 60)
-      : (isCompactScreen ? 10 : 14);
-    const availableHeight =
-      overviewMinHeight - titleBlockHeight - FIRST_VIEW_BOTTOM_SPACE - imageReservedGap;
-
-    const minHeight = Math.round(clampNumber(
-      lessonViewportHeight * (isCompactScreen ? 0.45 : 0.53),
-      isCompactScreen ? 300 : 405,
-      isCompactScreen ? 400 : 545
-    ));
-    const maxByViewport = Math.round(clampNumber(
-      lessonViewportHeight * (isCompactScreen ? 0.72 : isLargeScreen ? 0.82 : 0.78),
-      isCompactScreen ? 430 : 560,
-      isLargeScreen ? 1060 : 900
-    ));
-    const maxByWidth = Platform.OS === 'web'
-      ? Math.round(clampNumber(windowWidth * 0.95, 680, 1260) * webLessonImageScale)
-      : Math.round(clampNumber(windowWidth * 2.05, 560, isLargeScreen ? 1040 : 910));
-    const maxHeight = Math.max(minHeight, Math.min(maxByViewport, maxByWidth));
-
-    return Math.round(clampNumber(availableHeight, minHeight, maxHeight));
-  }, [FIRST_VIEW_BOTTOM_SPACE, isCompactScreen, isLargeScreen, lessonViewportHeight, overviewMinHeight, titleBlockHeight, webLessonImageScale, windowWidth]);
-
-  const secondViewMinHeight = useMemo(() => {
-    const availableHeight =
-      lessonViewportHeight - layoutBottomInset - stickyHeaderHeight - (isCompactScreen ? 8 : 12);
-    const minHeight = isCompactScreen ? 250 : 280;
-    return Math.max(minHeight, availableHeight);
-  }, [isCompactScreen, layoutBottomInset, lessonViewportHeight, stickyHeaderHeight]);
-
+  // Two voices, alternated, so a correct answer never waits on the previous one rewinding.
   const successPlayer = useAudioPlayer(SUCCESS_SOUND, SOUND_EFFECT_OPTIONS);
-  const [selectedQuestions, setSelectedQuestions] = useState<Exercise[]>([]);
-  const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
-  const [userAnswer, setUserAnswer] = useState<string>('');
-  const [incorrectAnswer, setIncorrectAnswer] = useState<string>('');
-  const optionShakeAnimsRef = useRef<Map<string, Animated.Value>>(new Map());
-  const getOptionShakeAnim = useCallback((option: string) => {
-    const existing = optionShakeAnimsRef.current.get(option);
-    if (existing) return existing;
-    const shakeAnim = new Animated.Value(0);
-    optionShakeAnimsRef.current.set(option, shakeAnim);
-    return shakeAnim;
-  }, []);
+  const successPlayerAlt = useAudioPlayer(SUCCESS_SOUND, SOUND_EFFECT_OPTIONS);
+  const successVoiceCursor = useRef(0);
 
   useEffect(() => {
-    if (!incorrectAnswer) return;
-    const shakeAnim = getOptionShakeAnim(incorrectAnswer);
-    shakeAnim.setValue(0);
-    Animated.sequence([
-      Animated.timing(shakeAnim, { toValue: -8, duration: 45, useNativeDriver: Platform.OS !== 'web' }),
-      Animated.timing(shakeAnim, { toValue: 8, duration: 90, useNativeDriver: Platform.OS !== 'web' }),
-      Animated.timing(shakeAnim, { toValue: -6, duration: 80, useNativeDriver: Platform.OS !== 'web' }),
-      Animated.timing(shakeAnim, { toValue: 6, duration: 70, useNativeDriver: Platform.OS !== 'web' }),
-      Animated.timing(shakeAnim, { toValue: 0, duration: 60, useNativeDriver: Platform.OS !== 'web' }),
-    ]).start();
-  }, [incorrectAnswer, getOptionShakeAnim]);
-
-  const optionPulseAnimsRef = useRef<Map<string, Animated.Value>>(new Map());
-  const getOptionPulseAnim = useCallback((option: string) => {
-    const existing = optionPulseAnimsRef.current.get(option);
-    if (existing) return existing;
-    const pulseAnim = new Animated.Value(1);
-    optionPulseAnimsRef.current.set(option, pulseAnim);
-    return pulseAnim;
-  }, []);
-
-  useEffect(() => {
-    if (!userAnswer) return;
-    const correctAnswerValue = selectedQuestions[currentQuestionIndex]?.answer;
-    if (userAnswer !== correctAnswerValue) return;
-    const pulseAnim = getOptionPulseAnim(userAnswer);
-    pulseAnim.setValue(1);
-    Animated.sequence([
-      Animated.timing(pulseAnim, { toValue: 1.06, duration: 110, easing: Easing.out(Easing.cubic), useNativeDriver: Platform.OS !== 'web' }),
-      Animated.timing(pulseAnim, { toValue: 1, duration: 140, easing: Easing.out(Easing.cubic), useNativeDriver: Platform.OS !== 'web' }),
-    ]).start();
-  }, [userAnswer, currentQuestionIndex, selectedQuestions, getOptionPulseAnim]);
-  const [feedback, setFeedback] = useState<string>('');
-  const [answerSaveMessage, setAnswerSaveMessage] = useState('');
-  const [grammarSessionXp, setGrammarSessionXp] = useState(0);
-  const [lastGrammarXpGain, setLastGrammarXpGain] = useState(0);
-  const [_grammarTotalXP, setGrammarTotalXP] = useState(0);
-  const [isComplete, setIsComplete] = useState(false);
-  const [isGameMode, setIsGameMode] = useState(false);
-  const [startedGameMode, setStartedGameMode] = useState(isGrammarGameMode);
-  const [lives, setLives] = useState(3);
-  const [isGameOver, setIsGameOver] = useState(false);
-  const [perfectRun, setPerfectRun] = useState(false);
-  const [sessionMistakeCount, setSessionMistakeCount] = useState(0);
+    // Silent play now so the first correct answer does not pay for decode and output setup.
+    warmUpSoundEffect(successPlayer);
+    warmUpSoundEffect(successPlayerAlt);
+    // The players above claim the preloaded instance as they are constructed; refill it so
+    // the next lesson opened in this session starts warm too.
+    preloadSoundEffects();
+  }, [successPlayer, successPlayerAlt]);
+  const [session, dispatchSession] = useGrammarSession(isGrammarGameMode);
+  const {
+    selectedQuestions,
+    currentQuestionIndex,
+    userAnswer,
+    incorrectAnswer,
+    answerSaveMessage,
+    grammarSessionXp,
+    lastGrammarXpGain,
+    isComplete,
+    isGameMode,
+    startedGameMode,
+    gameModeJustUnlocked,
+    completionUnlockResolved,
+    lives,
+    isGameOver,
+    sessionMistakeCount,
+  } = session;
+  const currentExercise = selectedQuestions[currentQuestionIndex];
+  // Option height is owned here because every mode shares the measured answer-area budget.
+  // Budget four slots so option size does not vary with the number of answers.
+  const QUIZ_MAX_OPTION_SLOTS = 4;
+  const baseAnswerAreaPadding = isDesktopWebLayout
+    ? {
+        top: scaleValue(ANSWER_AREA_PADDING.desktop.top, webLessonScale),
+        bottom: scaleValue(ANSWER_AREA_PADDING.desktop.bottom, webLessonScale),
+      }
+    : ANSWER_AREA_PADDING.mobile;
+  const promptGapBumpBase = exerciseMode === 'translate'
+    ? 12
+    : exerciseMode === 'quiz'
+      ? (isDesktopWebLayout ? 6 : 12)
+      : exerciseMode === 'fill'
+        ? (isDesktopWebLayout ? 28 : 16)
+        : 0;
+  const promptGapBump = isDesktopWebLayout || isTabletLayout
+    ? scaleValue(promptGapBumpBase, webLessonScale)
+    : promptGapBumpBase;
+  const answerAreaPadding = {
+    top: baseAnswerAreaPadding.top + promptGapBump,
+    bottom: baseAnswerAreaPadding.bottom,
+  };
+  const answerAreaVerticalPadding = answerAreaPadding.top + answerAreaPadding.bottom;
+  // Reorder and Translate also use this budget to keep their controls inside the viewport.
+  const fitQuizCardHeight = answerAreaHeight > 0
+    ? Math.max(160, answerAreaHeight - answerAreaVerticalPadding)
+    : 280;
+  const fitQuizOptionHeightFloor = isDesktopWebLayout || isTabletLayout ? scaleValue(52, webLessonScale) : 44;
+  const fitQuizOptionHeightCap = isDesktopWebLayout || isTabletLayout ? scaleValue(80, webLessonScale) : 68;
+  const fitQuizOptionHeight = fitSlots(
+    fitQuizCardHeight,
+    QUIZ_MAX_OPTION_SLOTS,
+    quizOptionGap,
+    { floor: fitQuizOptionHeightFloor, cap: fitQuizOptionHeightCap }
+  );
   const previousLivesRef = useRef(3);
   const [lostLifeIndex, setLostLifeIndex] = useState<number | null>(null);
   const lostLifeAnim = useRef(new Animated.Value(0)).current;
-  // feedbackAnim now represents a translateY offset (in px). We animate with useNativeDriver for smooth native performance.
-  // Positive values move the card down (off-screen below), 0 is its resting position (aligned with target top).
-  // Initialize off-screen below so the card will rise up into place.
-  const feedbackAnim = useRef(new Animated.Value(CARD_HEIGHT)).current;
-  // feedbackTop controls the absolute top position (in px) of the feedback card within the exercise container.
-  // We default to a safe inset-based value and compute a more precise value when possible via measureInWindow.
-  const [feedbackTop, setFeedbackTop] = useState<number>(insets.top + 8);
   const [activeCardHeight, setActiveCardHeight] = useState(CARD_HEIGHT);
   const exerciseContainerRef = useRef<View>(null);
   const firstOptionRef = useRef<View>(null);
   const questionRef = useRef<View>(null);
-  const pendingKeyboardHideScrollModeRef = useRef<ExerciseMode | null>(null);
-  const lastModeSwitchAtRef = useRef(0);
-  const feedbackTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const incorrectTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const gameOverTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const speechTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const { speak: speakGrammarAnswer, stop: stopGrammarSpeech } = useEnglishSpeech();
-  // Fallback layout tracking to ensure exact alignment even if measure APIs fail (esp. on web)
+  const { scheduleTimer, clearAllTimers } = useGrammarQuizTimers(stopGrammarSpeech);
+  const {
+    feedback,
+    feedbackFrame,
+    feedbackAnim,
+    resetFeedback,
+    showSuccess: showSuccessFeedback,
+  } = useGrammarFeedback(insets.top + 8, CARD_HEIGHT);
   const optionsContainerRef = useRef<View>(null);
-  const [optionsContainerY, setOptionsContainerY] = useState(0); // Y of options container within exercise container
-  const [firstOptionLocalY, setFirstOptionLocalY] = useState(0); // Y of first option within options container
+  // Fallback Y when native measurement is unavailable.
+  const [optionsContainerY, setOptionsContainerY] = useState(0);
+  // Preserves the shared exercise callback contract without layout-triggered rerenders.
+  const setFirstOptionLocalY = useCallback(() => {}, []);
   const hasFillExercises = (lesson.availableModes?.fill ?? true) && lesson.exercises.some(isFillExercise);
   const hasReorderExercises = (lesson.availableModes?.reorder ?? true) && lesson.exercises.some(isReorderExercise);
   const hasTranslateExercises = (lesson.availableModes?.translate ?? true) && lesson.exercises.some(isTranslateExercise);
-  const exerciseModeOptions = [
-    { key: 'quiz' as const, label: 'Quiz' },
-    ...(hasFillExercises ? [{ key: 'fill' as const, label: 'Fill' }] : []),
-    ...(hasReorderExercises ? [{ key: 'reorder' as const, label: 'Reorder' }] : []),
-    ...(hasTranslateExercises ? [{ key: 'translate' as const, label: 'Translate' }] : []),
+  // Reserve only as many prompt lines as this lesson's longest sentence needs.
+  const translateMaxPromptLines = useMemo(() => {
+    if (!hasTranslateExercises) return 1;
+    const charsPerLine = isDesktopWebLayout ? 46 : 30;
+    const longestPromptLength = (lesson.exercises as Exercise[])
+      .filter(isTranslateExercise)
+      .reduce((longest, ex) => {
+        const text = (typeof ex.prompt === 'string' ? ex.prompt : ex.question) ?? '';
+        return Math.max(longest, text.length);
+      }, 0);
+    // Sized to the longest prompt in the lesson rather than a flat 2, so a long sentence
+    // gets the lines it needs instead of being cut off mid-word. Capped so a single long
+    // question can't reserve half the screen for every other question in the set; anything
+    // past the cap is handled by shrinking the text (adjustsFontSizeToFit at the Text).
+    const needed = Math.ceil(longestPromptLength / charsPerLine);
+    return Math.min(Math.max(1, needed), isDesktopWebLayout ? 2 : 3);
+  }, [lesson.exercises, hasTranslateExercises, isDesktopWebLayout]);
+  const promptMobileFontSize = isTabletLayout
+    ? scaleValue(PROMPT_TYPE.mobile.fontSize, webLessonScale)
+    : windowWidth > 0 && windowWidth < 380 ? 26 : PROMPT_TYPE.mobile.fontSize;
+  const promptMobileLineHeight = Math.round(promptMobileFontSize * 1.2 * 10) / 10;
+  const exerciseModeOptions: Array<{
+    key: ExerciseMode;
+    label: string;
+    icon: React.ComponentProps<typeof MaterialIcons>['name'];
+  }> = [
+    { key: 'quiz', label: 'Quiz', icon: 'quiz' },
+    ...(hasFillExercises ? [{ key: 'fill' as const, label: 'Fill', icon: 'edit' as const }] : []),
+    ...(hasReorderExercises ? [{ key: 'reorder' as const, label: 'Reorder', icon: 'reorder' as const }] : []),
+    ...(hasTranslateExercises ? [{ key: 'translate' as const, label: 'Translate', icon: 'translate' as const }] : []),
   ];
   const resolveSafeMode = useCallback(
     (requestedMode: ExerciseMode): ExerciseMode => {
@@ -306,84 +284,60 @@ const GrammarQuiz: React.FC<GrammarQuizProps> = ({ lesson, onBack, backLabel = '
     },
     [hasFillExercises, hasReorderExercises, hasTranslateExercises]
   );
-  const getSecondViewScrollY = useCallback(
-    (snapExtra = 0) => {
-      if (Platform.OS === 'android') {
-        const secondViewAnchorY = secondViewYRef.current > 0
-          ? secondViewYRef.current
-          : overviewHeightRef.current + layoutTopInset;
-
-        return Math.max(0, secondViewAnchorY + snapExtra);
-      }
-
-      return Math.max(0, overviewHeightRef.current + snapExtra);
-    },
-    [layoutTopInset]
-  );
-  // full-image sizing handled by FullImageScreen at the root
-  // const [exerciseBottomY, setExerciseBottomY] = useState<number>(0);
-  // const [firstOptionYWindow, setFirstOptionYWindow] = useState<number>(0);
-
   useEffect(() => {
     let active = true;
 
     getXP().then((xp) => {
-      if (active) setGrammarTotalXP(xp);
-    }).catch(() => {});
+      if (active) dispatchSession({ type: 'SET_TOTAL_XP', totalXp: xp });
+    });
 
     return () => {
       active = false;
     };
   }, []);
 
-  useEffect(() => {
-    const heightDrop = stableWindowHeight - rawWindowHeight;
-
-    if (!isKeyboardOpen || rawWindowHeight > stableWindowHeight || heightDrop < 80) {
-      setStableWindowHeight(rawWindowHeight);
-    }
-  }, [isKeyboardOpen, rawWindowHeight, stableWindowHeight]);
-
-  const playSound = useCallback((player: ReturnType<typeof useAudioPlayer>) => {
-    replaySoundEffect(player);
-  }, []);
-
-  // Image sizing for native is handled in the root FullImageScreen; keep local fallback removed
-
   const playSuccess = useCallback(() => {
-    playSound(successPlayer);
-  }, [playSound, successPlayer]);
+    replayPooledSoundEffect([successPlayer, successPlayerAlt], successVoiceCursor);
+  }, [successPlayer, successPlayerAlt]);
 
-  // Initialize questions on lesson change
   useEffect(() => {
     if (lesson.exercises.length) {
       const nextMode = resolveSafeMode('quiz');
+      clearAllTimers();
+      stopGrammarSpeech();
+      resetFeedback();
       setExerciseMode(nextMode);
-      setIsGameMode(isGrammarGameMode);
-      setStartedGameMode(isGrammarGameMode);
-      setLives(3);
-      setIsGameOver(false);
-      setIsComplete(false);
-      setPerfectRun(false);
-      setUserAnswer('');
-      setIncorrectAnswer('');
-      setFeedback('');
-      setAnswerSaveMessage('');
-      setGrammarSessionXp(0);
-      setLastGrammarXpGain(0);
-      setSessionMistakeCount(0);
-      setSelectedQuestions(getQuestionsForMode(lesson.exercises, nextMode));
-      setCurrentQuestionIndex(0);
+      dispatchSession({
+        type: 'RESET_SESSION',
+        questions: getQuestionsForMode(lesson.exercises, nextMode),
+        gameMode: isGrammarGameMode,
+      });
     }
   }, [lesson, resolveSafeMode]);
 
-  // isGameMode otherwise only re-syncs from the Settings toggle when a lesson
-  // loads or the exercise mode switches — flipping Grammar Game Mode in
-  // Settings while an exercise is already open would silently do nothing
-  // until one of those happened. Sync it live instead.
+  // Toggling Game Mode in Settings mid-lesson must start a fresh run, not re-label the one
+  // already in progress: keeping the same questions (and the answers practice mode already
+  // revealed) let a player walk a solved set into Game Mode for a free perfect clear.
+  const syncedGrammarGameModeRef = useRef(isGrammarGameMode);
   useEffect(() => {
-    setIsGameMode(isGrammarGameMode);
-  }, [isGrammarGameMode]);
+    if (syncedGrammarGameModeRef.current === isGrammarGameMode) return;
+    syncedGrammarGameModeRef.current = isGrammarGameMode;
+
+    if (!lesson.exercises.length) {
+      dispatchSession({ type: 'SYNC_GAME_MODE', enabled: isGrammarGameMode });
+      return;
+    }
+
+    clearAllTimers();
+    stopGrammarSpeech();
+    resetFeedback();
+    Keyboard.dismiss();
+    dispatchSession({
+      type: 'RESET_SESSION',
+      questions: getQuestionsForMode(lesson.exercises, exerciseMode),
+      gameMode: isGrammarGameMode,
+    });
+  }, [isGrammarGameMode, exerciseMode, lesson.exercises, clearAllTimers, resetFeedback]);
 
   useEffect(() => {
     void saveLastLesson({
@@ -393,20 +347,89 @@ const GrammarQuiz: React.FC<GrammarQuizProps> = ({ lesson, onBack, backLabel = '
     });
   }, [lesson?.id, lesson.title]);
 
+  // Stable lesson identity prevents recreated prop objects from retriggering unlocks.
+  const gameModeUnlockKey = useMemo(
+    () => getGrammarLessonProgressKey({ id: lesson?.id, title: lesson?.title }),
+    [lesson?.id, lesson?.title]
+  );
+
+  // Only announce a newly earned unlock outside Game Mode.
+  useEffect(() => {
+    if (!isComplete) {
+      dispatchSession({ type: 'SET_COMPLETION_UNLOCK_RESOLVED', resolved: false });
+      return;
+    }
+
+    const wasPlayingGameMode = startedGameMode;
+    let active = true;
+    unlockMode('grammarGame', gameModeUnlockKey)
+      .then((isNewUnlock) => {
+        // Always honor a genuine new-unlock signal, even from a run a later effect
+        // invocation superseded (e.g. StrictMode's double-invoke) — otherwise the run that
+        // actually saw isNewUnlock===true gets skipped by `active`, while the surviving run
+        // sees isNewUnlock===false because the first run's storage write already landed.
+        if (isNewUnlock && !wasPlayingGameMode) dispatchSession({ type: 'MARK_GAME_MODE_UNLOCKED' });
+      })
+      .catch((error) => {
+        console.warn('Failed to unlock Grammar Game Mode', error);
+      })
+      .finally(() => {
+        if (active) dispatchSession({ type: 'SET_COMPLETION_UNLOCK_RESOLVED', resolved: true });
+      });
+    return () => { active = false; };
+  }, [gameModeUnlockKey, isComplete, startedGameMode]);
+
+  // Same formula the award effect below uses, computed here too so the completion screen
+  // can show the actual post-bonus amount instead of the raw pre-bonus session total.
+  const isGrammarSessionPerfect = grammarSessionXp > 0 && sessionMistakeCount === 0;
+  const earnedGrammarSessionXp = isGrammarSessionPerfect
+    ? Math.round(grammarSessionXp * PERFECT_RUN_XP_MULTIPLIER)
+    : grammarSessionXp;
+
+  // The day's soft cap can reduce what this session is actually worth, and that isn't
+  // knowable from the session alone — resolve it (read-only) before the completion screen
+  // promises a figure. Falls back to the earned amount until the preview lands.
+  const [resolvedGrammarSessionXp, setResolvedGrammarSessionXp] = useState<number | null>(null);
+  useEffect(() => {
+    if (!isComplete || earnedGrammarSessionXp <= 0) {
+      setResolvedGrammarSessionXp(null);
+      return;
+    }
+
+    let active = true;
+    previewGrantXP(earnedGrammarSessionXp)
+      .then((granted) => { if (active) setResolvedGrammarSessionXp(granted); })
+      .catch(() => {});
+
+    return () => { active = false; };
+  }, [isComplete, earnedGrammarSessionXp]);
+
+  const displayedGrammarSessionXp = resolvedGrammarSessionXp ?? earnedGrammarSessionXp;
+  const grammarBonusXp = Math.max(0, displayedGrammarSessionXp - grammarSessionXp);
+
+  // XP is persisted to the account once, here, when the lesson is actually completed —
+  // handleAnswer only accumulates grammarSessionXp locally so quitting mid-lesson doesn't
+  // bank partial XP.
+  const sessionXpAwardedRef = useRef(false);
+  useEffect(() => {
+    if (!isComplete) sessionXpAwardedRef.current = false;
+  }, [isComplete]);
+
+  // Banked only when the student claims it on the end screen — leaving without
+  // claiming forfeits the session's XP.
+  const claimGrammarSessionXp = useCallback(async () => {
+    if (sessionXpAwardedRef.current || grammarSessionXp <= 0) return 0;
+    sessionXpAwardedRef.current = true;
+
+    const granted = await grantXP(earnedGrammarSessionXp);
+    setResolvedGrammarSessionXp(granted);
+    dispatchSession({ type: 'SET_TOTAL_XP', totalXp: await getXP() });
+    return granted;
+  }, [grammarSessionXp, earnedGrammarSessionXp, dispatchSession]);
 
   useEffect(() => {
-    setActiveCardHeight(quizCardHeight);
-  }, [exerciseMode, currentQuestionIndex, quizCardHeight]);
-
-  useEffect(() => {
-    return () => {
-      if (feedbackTimeoutRef.current) clearTimeout(feedbackTimeoutRef.current);
-      if (incorrectTimeoutRef.current) clearTimeout(incorrectTimeoutRef.current);
-      if (gameOverTimeoutRef.current) clearTimeout(gameOverTimeoutRef.current);
-      if (speechTimeoutRef.current) clearTimeout(speechTimeoutRef.current);
-      stopGrammarSpeech();
-    };
-  }, [stopGrammarSpeech]);
+    setActiveCardHeight(fitQuizCardHeight);
+  }, [exerciseMode, currentQuestionIndex, fitQuizCardHeight]);
 
   useEffect(() => {
     const lessonKey = String(lesson?.title || 'grammar-lesson');
@@ -414,10 +437,6 @@ const GrammarQuiz: React.FC<GrammarQuizProps> = ({ lesson, onBack, backLabel = '
     initializedLessonKeyRef.current = lessonKey;
 
     setExerciseMode('quiz');
-    setIsSecondViewActive(false);
-    requestAnimationFrame(() => {
-      scrollViewRef.current?.scrollTo({ y: 0, animated: false });
-    });
   }, [lesson?.title]);
 
   useEffect(() => {
@@ -445,335 +464,97 @@ const GrammarQuiz: React.FC<GrammarQuizProps> = ({ lesson, onBack, backLabel = '
     previousLivesRef.current = lives;
   }, [lives, lostLifeAnim]);
 
-  const scrollToExercise = useCallback((targetMode: ExerciseMode = exerciseMode, animated = true) => {
-    if (practiceSheetOpen) return;
-
-    isManualLessonScrollRef.current = false;
-    const snapExtra =
-      targetMode === 'fill'
-        ? FILL_VIEW_SNAP_EXTRA
-        : targetMode === 'translate'
-          ? TRANSLATE_VIEW_SNAP_EXTRA
-          : targetMode === 'reorder'
-            ? REORDER_VIEW_SNAP_EXTRA
-            : QUIZ_VIEW_SNAP_EXTRA;
-    const targetY = getSecondViewScrollY(STICKY_TOP_SNAP_OFFSET + snapExtra);
-
-    if (Platform.OS === 'android') {
-      setIsSecondViewActive(true);
-    }
-
-    requestAnimationFrame(() => {
-      scrollViewRef.current?.scrollTo({ y: targetY, animated });
-    });
-
-    setTimeout(() => {
-      scrollViewRef.current?.scrollTo({ y: targetY, animated });
-    }, 140);
-  }, [
-    QUIZ_VIEW_SNAP_EXTRA,
-    FILL_VIEW_SNAP_EXTRA,
-    REORDER_VIEW_SNAP_EXTRA,
-    TRANSLATE_VIEW_SNAP_EXTRA,
-    exerciseMode,
-    getSecondViewScrollY,
-    practiceSheetOpen,
-    STICKY_TOP_SNAP_OFFSET,
-  ]);
-
-  useEffect(() => {
-    const showSub = Keyboard.addListener('keyboardDidShow', (event) => {
-      if (exerciseMode !== 'fill') return;
-
-      setKeyboardHeight(event.endCoordinates?.height ?? Math.max(0, stableWindowHeight - rawWindowHeight));
-      if (Date.now() - lastModeSwitchAtRef.current < 650) return;
-
-      setTimeout(() => scrollToExercise('fill', false), 60);
-      setTimeout(() => scrollToExercise('fill', false), 240);
-    });
-    const hideSub = Keyboard.addListener('keyboardDidHide', () => {
-      setKeyboardHeight(0);
-
-      const pendingMode = pendingKeyboardHideScrollModeRef.current;
-      if (!pendingMode) return;
-
-      pendingKeyboardHideScrollModeRef.current = null;
-      setTimeout(() => scrollToExercise(pendingMode, true), 40);
-      setTimeout(() => scrollToExercise(pendingMode, false), 220);
-    });
-
-    return () => {
-      showSub.remove();
-      hideSub.remove();
-    };
-  }, [exerciseMode, rawWindowHeight, scrollToExercise, stableWindowHeight]);
-
-  const switchExerciseMode = (mode: ExerciseMode, shouldScroll = true) => {
+  const switchExerciseMode = (mode: ExerciseMode) => {
     const safeMode = resolveSafeMode(mode);
     if (safeMode !== exerciseMode) {
       triggerSelectionHaptic();
     }
 
-    if (feedbackTimeoutRef.current) { clearTimeout(feedbackTimeoutRef.current); feedbackTimeoutRef.current = null; }
-    if (incorrectTimeoutRef.current) { clearTimeout(incorrectTimeoutRef.current); incorrectTimeoutRef.current = null; }
-    if (gameOverTimeoutRef.current) { clearTimeout(gameOverTimeoutRef.current); gameOverTimeoutRef.current = null; }
-    if (speechTimeoutRef.current) { clearTimeout(speechTimeoutRef.current); speechTimeoutRef.current = null; stopGrammarSpeech(); }
-    feedbackAnim.stopAnimation();
-    feedbackAnim.setValue(CARD_HEIGHT);
-
-    const shouldScrollAfterKeyboardHides = shouldScroll && exerciseMode === 'fill' && safeMode !== 'fill' && isKeyboardOpen;
-    pendingKeyboardHideScrollModeRef.current = shouldScrollAfterKeyboardHides ? safeMode : null;
+    clearAllTimers();
+    stopGrammarSpeech();
+    resetFeedback();
 
     Keyboard.dismiss();
-    lastModeSwitchAtRef.current = Date.now();
     setExerciseMode(safeMode);
-    setIsGameMode(isGrammarGameMode);
-    setStartedGameMode(isGrammarGameMode);
-    setLives(3);
-    setIsGameOver(false);
-    setIsComplete(false);
-    setPerfectRun(false);
-    setUserAnswer('');
-    setIncorrectAnswer('');
-    setFeedback('');
-    setAnswerSaveMessage('');
-    setGrammarSessionXp(0);
-    setLastGrammarXpGain(0);
-    setSessionMistakeCount(0);
-    setSelectedQuestions(getQuestionsForMode(lesson.exercises, safeMode));
-    setCurrentQuestionIndex(0);
-    if (shouldScroll) scrollToExercise(safeMode);
-
-    if (shouldScrollAfterKeyboardHides) {
-      setTimeout(() => scrollToExercise(safeMode, false), 360);
-      setTimeout(() => scrollToExercise(safeMode, false), 560);
-    }
+    dispatchSession({
+      type: 'RESET_SESSION',
+      questions: getQuestionsForMode(lesson.exercises, safeMode),
+      gameMode: isGrammarGameMode,
+    });
   };
 
   const openPracticeMode = (mode: ExerciseMode) => {
+    // Mode switches keep the sheet mounted; reset entrance state only when opening it.
+    if (!practiceSheetOpen) {
+      setSheetEntered(false);
+    }
+    setFillKeyboardDismissed(false);
     setPracticeSheetOpen(true);
-    switchExerciseMode(mode, false);
-  };
-
-  const switchPracticeMode = (mode: ExerciseMode) => {
-    switchExerciseMode(mode, false);
+    switchExerciseMode(mode);
   };
 
   const closePracticeSheet = () => {
     Keyboard.dismiss();
+    setFillKeyboardDismissed(true);
     setPracticeSheetOpen(false);
+    setSheetEntered(false);
   };
 
-  const handleAnswer = async (option: string) => {
-    // prevent rapid multiple taps when an answer is already selected
-    if (userAnswer !== '') return;
-    setUserAnswer(option);
-    setAnswerSaveMessage('');
-    setLastGrammarXpGain(0);
-    const current = selectedQuestions[currentQuestionIndex];
-    const isTrueFalse = typeof current.answer === 'boolean';
-    const correct = isTrueFalse
-      ? (option === 'True') === current.answer
-      : option === current.answer;
-
-    if (correct) {
-      triggerSuccessHaptic();
-
-      const lessonProgressKey = getGrammarLessonProgressKey(current.sourceLesson ?? lesson);
-      const answerProgressKey = `${exerciseMode}:${current.question}:${String(current.answer)}`;
-
-      void markPracticeActivityToday(`grammar:${lessonProgressKey}:${answerProgressKey}`);
-      const isNewCorrectAnswer = await recordGrammarCorrectAnswer(lessonProgressKey, answerProgressKey);
-      const xpGain = isNewCorrectAnswer
-        ? XP_REWARDS.grammarCorrect + (isGameMode ? XP_REWARDS.grammarGameModeBonus : 0)
-        : 0;
-
-      if (xpGain > 0) {
-        const nextXP = await addXP(xpGain);
-        setGrammarTotalXP(nextXP);
-        setGrammarSessionXp((currentXp) => currentXp + xpGain);
-      }
-
-      setLastGrammarXpGain(xpGain);
-      setAnswerSaveMessage(isNewCorrectAnswer ? 'saved' : 'reviewed');
-
-      // only play short success for non-final questions
-      if (currentQuestionIndex < selectedQuestions.length - 1) {
-        playSuccess();
-      }
-
-      if (isGrammarSpeechEnabled && typeof current.answer === 'string' && current.answer.trim()) {
-        const answerText = current.answer.trim();
-        if (speechTimeoutRef.current) clearTimeout(speechTimeoutRef.current);
-        speechTimeoutRef.current = setTimeout(() => {
-          speechTimeoutRef.current = null;
-          speakGrammarAnswer(answerText, { rate: 0.88, pitch: 1.0 });
-        }, 700);
-      }
-      setFeedback('Well done! 🎉');
-
-      // Compute a precise top value so the top of the card aligns with the top of the first option.
-      // Prefer measureLayout relative to the exercise container to avoid window/scroll offsets.
-      // Fallback: use onLayout-derived values (optionsContainerY + firstOptionLocalY).
-      const computeFeedbackTop = (): Promise<number> => new Promise(resolve => {
-        const fallbackTop = optionsContainerY + firstOptionLocalY;
-        try {
-          if (firstOptionRef.current && exerciseContainerRef.current) {
-            // measureLayout(target, onSuccess, onFail)
-            (firstOptionRef.current as any).measureLayout(
-              (exerciseContainerRef.current as any),
-              (_x: number, y: number) => {
-                // Guard against NaN/undefined and negative values
-                if (typeof y === 'number' && isFinite(y) && y >= 0) {
-                  resolve(y);
-                } else {
-                  resolve(fallbackTop);
-                }
-              },
-              () => resolve(fallbackTop)
-            );
-          } else {
-            resolve(fallbackTop);
-          }
-        } catch {
-          resolve(fallbackTop);
-        }
-      });
-
-      const top = await computeFeedbackTop();
-      setFeedbackTop(top);
-
-      // Platform-safe native driver usage (RN Web doesn't support native driver)
-      const canUseNativeDriver = Platform.OS !== 'web';
-
-      // start from below the final location (so it rises up into place)
-      feedbackAnim.setValue(activeCardHeight);
-      // entrance: slight delay then a slower, eased timing so it rises up smoothly
-      Animated.sequence([
-        Animated.delay(30),
-        Animated.timing(feedbackAnim, {
-          toValue: 0,
-          duration: 420,
-          easing: Easing.out(Easing.cubic),
-          useNativeDriver: canUseNativeDriver,
-        }),
-      ]).start();
-      // keep feedback visible a bit before hiding; exit animation slides back down
-      if (feedbackTimeoutRef.current) clearTimeout(feedbackTimeoutRef.current);
-      feedbackTimeoutRef.current = setTimeout(() => {
-        feedbackTimeoutRef.current = null;
-        Animated.timing(feedbackAnim, { toValue: activeCardHeight, duration: 420, easing: Easing.in(Easing.cubic), useNativeDriver: canUseNativeDriver }).start(() => {
-          setFeedback('');
-          setAnswerSaveMessage('');
-          setLastGrammarXpGain(0);
-          if (currentQuestionIndex < selectedQuestions.length - 1) {
-            setCurrentQuestionIndex(i => i + 1);
-            setUserAnswer('');
-          } else {
-            if (isGameMode && lives === 3) {
-              setPerfectRun(true);
-            }
-            setIsComplete(true);
-            setIsGameMode(false);
-          }
-        });
-      }, 1400);
-    } else {
-      triggerWarningHaptic();
-      setAnswerSaveMessage('');
-      setLastGrammarXpGain(0);
-      setIncorrectAnswer(option);
-      setSessionMistakeCount(c => c + 1);
-      if (isGameMode) {
-        const nl = lives - 1;
-        setLives(nl);
-        if (nl <= 0) {
-          setIsGameOver(true);
-          if (gameOverTimeoutRef.current) clearTimeout(gameOverTimeoutRef.current);
-          gameOverTimeoutRef.current = setTimeout(() => {
-            gameOverTimeoutRef.current = null;
-            setCurrentQuestionIndex(0);
-            setLives(3);
-            setUserAnswer('');
-            setIncorrectAnswer('');
-            setIsGameOver(false);
-          }, 10000);
-        }
-      }
-      if (incorrectTimeoutRef.current) clearTimeout(incorrectTimeoutRef.current);
-      incorrectTimeoutRef.current = setTimeout(() => {
-        incorrectTimeoutRef.current = null;
-        setIncorrectAnswer('');
-        setUserAnswer('');
-      }, 1100);
+  const handlePracticeModePress = (mode: ExerciseMode) => {
+    if (practiceSheetOpen && exerciseMode === mode) {
+      closePracticeSheet();
+      return;
     }
+
+    openPracticeMode(mode);
   };
 
-  const handleExerciseIncorrect = (marker: string) => {
-    triggerWarningHaptic();
-    setIncorrectAnswer(marker);
-    setLastGrammarXpGain(0);
-    setSessionMistakeCount(c => c + 1);
-    if (isGameMode) {
-      const nextLives = lives - 1;
-      setLives(nextLives);
-      if (nextLives <= 0) {
-        setIsGameOver(true);
-        if (gameOverTimeoutRef.current) clearTimeout(gameOverTimeoutRef.current);
-        gameOverTimeoutRef.current = setTimeout(() => {
-          gameOverTimeoutRef.current = null;
-          setCurrentQuestionIndex(0);
-          setLives(3);
-          setUserAnswer('');
-          setIncorrectAnswer('');
-          setIsGameOver(false);
-        }, 10000);
-      }
-    }
-    if (incorrectTimeoutRef.current) clearTimeout(incorrectTimeoutRef.current);
-    incorrectTimeoutRef.current = setTimeout(() => {
-      incorrectTimeoutRef.current = null;
-      setIncorrectAnswer('');
-    }, 1100);
-  };
+  const { handleAnswer, handleExerciseIncorrect } = useGrammarAnswerController({
+    lesson,
+    exerciseMode,
+    selectedQuestions,
+    currentQuestionIndex,
+    userAnswer,
+    isGameMode,
+    lives,
+    isGrammarSpeechEnabled,
+    activeContentRef: optionsContainerRef,
+    containerRef: exerciseContainerRef,
+    fallbackTop: optionsContainerY,
+    fallbackHeight: activeCardHeight,
+    dispatchSession,
+    playSuccess,
+    speakAnswer: speakGrammarAnswer,
+    scheduleTimer,
+    showSuccessFeedback,
+  });
 
   const startChallenge = useCallback(() => {
     triggerSelectionHaptic();
-    setPerfectRun(false);
-    setIsComplete(false);
-    setIsGameOver(false);
-    setIsGameMode(true);
-    setStartedGameMode(true);
-    setLives(3);
-    setIncorrectAnswer('');
-    setUserAnswer('');
-    setAnswerSaveMessage('');
-    setGrammarSessionXp(0);
-    setLastGrammarXpGain(0);
-    setSessionMistakeCount(0);
-    setSelectedQuestions(getQuestionsForMode(lesson.exercises, exerciseMode, 10));
-    setCurrentQuestionIndex(0);
-  }, [exerciseMode, lesson.exercises]);
+    clearAllTimers();
+    stopGrammarSpeech();
+    resetFeedback();
+    dispatchSession({
+      type: 'START_CHALLENGE',
+      questions: getQuestionsForMode(lesson.exercises, exerciseMode, 10),
+    });
+  }, [clearAllTimers, exerciseMode, lesson.exercises, resetFeedback, stopGrammarSpeech]);
 
-  const currentExercise = selectedQuestions[currentQuestionIndex];
-  const currentQuizOptionsCount = currentExercise?.options?.length
-    ?? (typeof currentExercise?.answer === 'boolean' ? 2 : 4);
   const currentPrompt =
     exerciseMode === 'translate'
       ? currentExercise?.prompt ?? currentExercise?.question
-      // Reorder-only exercises store a generic "Put the words in order." in
-      // `question` (there's no sentence to translate/fill) — showing it as
-      // the big prompt just repeats the "Reorder the words" label above it.
-      : exerciseMode === 'reorder' && currentExercise?.question?.trim().toLowerCase() === 'put the words in order.'
+      : exerciseMode === 'reorder'
         ? ''
         : currentExercise?.question;
+  const isMultiLessonPractice = lesson.isMixedGrammarLesson === true;
   const currentSourceLessonTitle =
-    typeof currentExercise?.sourceLesson?.title === 'string'
+    isMultiLessonPractice && typeof currentExercise?.sourceLesson?.title === 'string'
       ? currentExercise.sourceLesson.title
       : '';
   const hasCurrentExercise = !!currentExercise;
-  const exerciseContainerTopOffset = (isCompactScreen ? 16 : 22)
-    + (Platform.OS !== 'web' && isGameMode ? (isCompactScreen ? 18 : 22) : 0);
+  const exerciseContainerTopOffset = isDesktopWebLayout
+    ? (isGameMode ? 14 : 18)
+    : 8;
 
   const modeInstructionLabel = exerciseMode === 'quiz'
     ? 'Choose the right word'
@@ -790,10 +571,119 @@ const GrammarQuiz: React.FC<GrammarQuizProps> = ({ lesson, onBack, backLabel = '
     currentQuestionIndex + (hasFreshCorrectAnswer ? 1 : 0)
   );
   const answerBadgeLabel = hasFreshCorrectAnswer
-    ? lastGrammarXpGain > 0 ? `+${lastGrammarXpGain} XP` : 'Reviewed'
+    ? answerSaveMessage === 'unsaved'
+      ? 'Progress not saved'
+      : lastGrammarXpGain > 0 ? `+${lastGrammarXpGain} XP` : 'Reviewed'
     : `Correct ${correctSavedCount}/${selectedQuestions.length}`;
+  const answerBadgeAccentColor = answerSaveMessage === 'unsaved'
+    ? grammarGame.heartLost
+    : hasFreshCorrectAnswer ? grammarGame.feedbackBorder : grammarGame.progressFill;
+  const answerBadgeTextColor = answerSaveMessage === 'unsaved'
+    ? grammarGame.heartLost
+    : hasFreshCorrectAnswer ? grammarGame.feedbackBorder : grammarGame.progressLabelText;
+  const answerSavedBadgeNode = selectedQuestions.length > 0 ? (
+    <View
+      style={[
+        styles.answerSavedBadge,
+        {
+          minHeight: scaleValue(isDesktopWebLayout ? 38 : 29, statusBadgeScale),
+          maxWidth: scaleValue(isDesktopWebLayout ? 220 : 180, statusBadgeScale),
+          paddingHorizontal: scaleValue(isDesktopWebLayout ? 18 : 13, statusBadgeScale),
+          gap: scaleValue(isDesktopWebLayout ? 6 : 5, statusBadgeScale),
+        },
+        {
+          backgroundColor: withColorAlpha(answerBadgeAccentColor, isDarkMode ? 0.26 : 0.14),
+          borderColor: answerBadgeAccentColor,
+          borderWidth: 1,
+        },
+      ]}
+    >
+      <MaterialIcons
+        name={answerSaveMessage === 'unsaved' ? 'cloud-off' : 'check-circle'}
+        size={scaleValue(isDesktopWebLayout ? 18 : 15, statusBadgeScale)}
+        color={answerBadgeAccentColor}
+      />
+      <Text
+        style={[
+          styles.answerSavedText,
+          { fontSize: scaleValue(isDesktopWebLayout ? 15 : 12, statusBadgeScale) },
+          { color: answerBadgeTextColor },
+        ]}
+        numberOfLines={1}
+      >
+        {answerBadgeLabel}
+      </Text>
+    </View>
+  ) : null;
+  // Desktop shows this in place of the "Correct N/Total" badge (same slot, same row) so
+  // toggling game mode doesn't grow the header by an extra row — only mobile still gets a
+  // dedicated lives row (see statusBlock below).
+  const livesNode = (
+    <View style={[styles.livesContainer, { minHeight: desktopLivesPillMinHeight }]}>
+      <View style={[styles.livesPill, { minHeight: desktopLivesPillMinHeight }]}>
+        {Array.from({ length: 3 }).map((_, i) => {
+          const isFilled = i < lives;
+          const isLost = i === lostLifeIndex;
+
+          return (
+            <View key={i} style={[styles.lifeSlot, { width: desktopLifeSlotWidth, height: desktopLifeSlotHeight }]}>
+              <MaterialIcons
+                name={isFilled ? 'favorite' : 'favorite-border'}
+                size={desktopHeartIconSize}
+                color={isFilled ? grammarGame.heartFilled : grammarGame.heartEmpty}
+                style={styles.lifeIcon}
+              />
+              {isLost && (
+                <Animated.View
+                  style={[
+                    styles.lostLifeOverlay,
+                    {
+                      pointerEvents: 'none',
+                      opacity: lostLifeAnim.interpolate({
+                        inputRange: [0, 0.55, 1],
+                        outputRange: [1, 1, 0],
+                      }),
+                      transform: [
+                        {
+                          translateY: lostLifeAnim.interpolate({
+                            inputRange: [0, 1],
+                            outputRange: [0, -22],
+                          }),
+                        },
+                        {
+                          scale: lostLifeAnim.interpolate({
+                            inputRange: [0, 0.35, 1],
+                            outputRange: [1, 1.35, 0.65],
+                          }),
+                        },
+                        {
+                          rotate: lostLifeAnim.interpolate({
+                            inputRange: [0, 1],
+                            outputRange: ['0deg', '-18deg'],
+                          }),
+                        },
+                      ],
+                    },
+                  ]}
+                >
+                  <MaterialIcons name="favorite" size={desktopHeartIconSize} color={grammarGame.heartLost} />
+                </Animated.View>
+              )}
+            </View>
+          );
+        })}
+      </View>
+    </View>
+  );
   const handleGoToAccount = useCallback(() => {
-    nav.getParent?.()?.navigate('Account' as never);
+    dispatchSession({ type: 'CLOSE_COMPLETION' });
+    // Close the practice sheet too — same reason as the vocabulary screen: returning from
+    // Account with it still open shows the lesson scaled and dimmed behind the sheet, and
+    // back then collapses the sheet instead of leaving the lesson.
+    setPracticeSheetOpen(false);
+    setSheetEntered(false);
+    Keyboard.dismiss();
+    nav.getParent<NavigationProp<RootStackParamList>>()?.navigate('Account', { openAvatarPicker: true });
   }, [nav]);
 
   const gameModeButtonStyle = getButtonStyle(colors, isDarkMode, 'primary');
@@ -801,339 +691,298 @@ const GrammarQuiz: React.FC<GrammarQuizProps> = ({ lesson, onBack, backLabel = '
 
 
   const renderPracticeDock = () => {
-    const modeIcons: Record<ExerciseMode, React.ComponentProps<typeof MaterialIcons>['name']> = {
-      quiz: 'quiz',
-      fill: 'edit-note',
-      reorder: 'swap-vert',
-      translate: 'translate',
-    };
-
     return (
-      <View
-        style={[
-          styles.practiceDock,
-          isDesktopWebLayout ? styles.practiceDockDesktop : styles.practiceDockMobile,
-          { backgroundColor: colors.background },
-        ]}
-      >
-        <View style={isDesktopWebLayout ? styles.practiceDockLabelDesktop : styles.practiceDockLabelMobile}>
-          <Text style={[styles.practiceDockLabel, { color: colors.text }]}>Practice</Text>
-        </View>
-
-        <View style={[styles.practiceActions, isDesktopWebLayout ? styles.practiceActionsDesktop : styles.practiceActionsMobile]}>
-          {exerciseModeOptions.map((option) => (
-            <TouchableOpacity
-              key={option.key}
-              activeOpacity={0.76}
-              onPress={() => openPracticeMode(option.key)}
-              accessibilityRole="button"
-              accessibilityLabel={`Open ${option.label}`}
-              style={[
-                styles.practiceAction,
-                isDesktopWebLayout ? styles.practiceActionDesktop : styles.practiceActionMobile,
-                { backgroundColor: isDarkMode ? colors.surface : colors.card, borderColor: colors.border },
-              ]}
-            >
-              <MaterialIcons
-                name={modeIcons[option.key]}
-                size={isDesktopWebLayout ? 18 : 17}
-                color={colors.primary}
-              />
-              <Text
-                style={[
-                  styles.practiceActionText,
-                  isDesktopWebLayout ? styles.practiceActionTextDesktop : styles.practiceActionTextMobile,
-                  { color: colors.text },
-                ]}
-                numberOfLines={1}
-              >
-                {option.label}
-              </Text>
-            </TouchableOpacity>
-          ))}
-        </View>
-      </View>
+      <PracticeDock
+        modes={exerciseModeOptions}
+        activeKey={practiceSheetOpen ? exerciseMode : null}
+        onSelect={handlePracticeModePress}
+        isDesktopWeb={isDesktopWebLayout}
+        isDarkMode={isDarkMode}
+        colors={colors}
+        desktopMaxWidth={460}
+        showActiveCollapseIcon={false}
+        // Keep mounted while the keyboard is open to avoid sheet reflow.
+      />
     );
   };
 
-  const handleViewportLayout = useCallback((event: any) => {
-    const nextHeight = Math.round(event.nativeEvent.layout.height);
-    if (nextHeight <= 0) return;
-
-    setViewportHeight((currentHeight) => {
-      if (isKeyboardOpen && nextHeight < currentHeight) {
-        return currentHeight;
-      }
-
-      return Math.abs(currentHeight - nextHeight) > 1 ? nextHeight : currentHeight;
-    });
-  }, [isKeyboardOpen]);
-
-  const handleLessonScroll = useCallback((event: any) => {
-    const y = event.nativeEvent.contentOffset?.y ?? 0;
-    const previousY = lastLessonScrollYRef.current;
-    lastLessonScrollYRef.current = y;
-    if (y > previousY + 0.5) lastLessonScrollDirectionRef.current = 'down';
-    if (y < previousY - 0.5) lastLessonScrollDirectionRef.current = 'up';
-    if (overviewHeightRef.current <= 0) return;
-
-    const secondViewThreshold = Platform.OS === 'android'
-      ? Math.max(0, (secondViewYRef.current || overviewHeightRef.current + layoutTopInset) - 2)
-      : Math.max(0, overviewHeightRef.current - stickyHeaderHeight - 2);
-    secondViewThresholdRef.current = secondViewThreshold;
-    const nextIsSecondViewActive = y >= secondViewThreshold;
-
-    setIsSecondViewActive((current) => (
-      current === nextIsSecondViewActive ? current : nextIsSecondViewActive
-    ));
-
-  }, [layoutTopInset, stickyHeaderHeight]);
-
-  const handleManualLessonScrollStart = useCallback(() => {
-    isManualLessonScrollRef.current = true;
-  }, []);
-
-  const handleManualLessonScrollEnd = useCallback(() => {
-    if (!isManualLessonScrollRef.current) return;
-    isManualLessonScrollRef.current = false;
-
-    const secondViewThreshold = secondViewThresholdRef.current;
-    if (!isKeyboardOpen && lastLessonScrollDirectionRef.current === 'down' && lastLessonScrollYRef.current > secondViewThreshold + 1) {
-      lastLessonScrollYRef.current = secondViewThreshold;
-      scrollViewRef.current?.scrollTo({ y: secondViewThreshold, animated: false });
+  const replayGrammarCompletion = () => {
+    if (startedGameMode || gameModeJustUnlocked) {
+      startChallenge();
+      return;
     }
-  }, [isKeyboardOpen]);
-
-  const sessionTotalAttempts = selectedQuestions.length + sessionMistakeCount;
-  const sessionAccuracyPercent = sessionTotalAttempts > 0
-    ? Math.round((selectedQuestions.length / sessionTotalAttempts) * 100)
-    : 100;
+    switchExerciseMode(exerciseMode);
+  };
+  const activePracticeLabel = practiceSheetOpen
+    ? PRACTICE_MODE_LABELS[exerciseMode as keyof typeof PRACTICE_MODE_LABELS] ?? null
+    : null;
+  const practiceContextTitle = isMultiLessonPractice
+    ? (isDesktopWebLayout ? 'Mixed practice: Selected lessons' : 'Mixed practice')
+    : lesson.title;
+  const headerHorizontalPadding = isDesktopWebLayout ? 32 : 16;
+  const headerBackSize = isDesktopWebLayout ? 38 : 34;
+  const headerLayoutWidth = Math.min(windowWidth, 800);
+  const breadcrumbCharacterCount = practiceSheetOpen
+    ? practiceContextTitle.length + (activePracticeLabel?.length ?? 0)
+    : lesson.title.length;
+  const breadcrumbSeparatorCount = practiceSheetOpen ? 1 : 0;
+  const estimatedBreadcrumbWidth = breadcrumbCharacterCount * (isDesktopWebLayout ? 8 : 7.2)
+    + breadcrumbSeparatorCount * (isDesktopWebLayout ? 26 : 22);
+  const labeledContentToggleWidth = 142;
+  const headerBreadcrumbRoom = headerLayoutWidth - headerHorizontalPadding * 2 - headerBackSize - 14;
+  const showContentToggleLabels = headerBreadcrumbRoom - estimatedBreadcrumbWidth >= labeledContentToggleWidth;
 
   return (
     <>
-    <KeyboardAvoidingView
-      style={[styles.container, { backgroundColor: colors.background }]}
-      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-      onLayout={handleViewportLayout}
-    >
-      <ScrollView
-        ref={scrollViewRef}
-        style={[styles.container, { backgroundColor: colors.background }]}
-        contentContainerStyle={{
+    <View
+      style={[
+        styles.container,
+        {
+          backgroundColor: colors.background,
           paddingTop: layoutTopInset,
-          paddingBottom: Math.max(insets.bottom, 8) + (isKeyboardOpen ? Math.min(Math.max(keyboardHeight || keyboardHeightDrop, 220), 420) : 0),
-        }}
-        onScroll={handleLessonScroll}
-        onScrollBeginDrag={handleManualLessonScrollStart}
-        onScrollEndDrag={handleManualLessonScrollEnd}
-        {...(Platform.OS === 'web' ? ({
-          onWheel: handleManualLessonScrollStart,
-          onScrollEnd: handleManualLessonScrollEnd,
-        } as any) : {})}
-        scrollEventThrottle={16}
-        keyboardShouldPersistTaps="always"
-        bounces={false}
-        alwaysBounceVertical={false}
-        overScrollMode="never"
-      >
-        <View
-          style={[
-            styles.overviewSection,
-            { minHeight: overviewMinHeight },
-          ]}
-          onLayout={(event) => {
-            overviewHeightRef.current = event.nativeEvent.layout.height;
-          }}
-        >
-          <BackButton
-            label={backLabel}
-            onPress={onBack}
-            style={Platform.OS === 'android' ? styles.androidTopBackButton : undefined}
-          />
-          <View
-            style={[
-              styles.header,
-              Platform.OS === 'web' ? styles.webHeader : undefined,
-              { backgroundColor: colors.card },
-            ]}
-            onLayout={(event) => {
-              setTitleBlockHeight(event.nativeEvent.layout.height);
-            }}
-          >
-            <View style={styles.lessonTitleRow}>
-              <Text
-                style={[
-                  styles.title,
-                  Platform.OS === 'web' ? styles.webTitle : undefined,
-                  isScaledWebLesson && { fontSize: scaleValue(22, webLessonScale), marginLeft: scaleValue(8, webLessonScale) },
-                  { color: colors.text },
-                ]}
-                numberOfLines={2}
-              >
-                {lesson.title}
-              </Text>
-              {hasLessonTextContent && !shouldShowMixedImageCarousel && (
-                <View style={[styles.lessonContentModeToggle, { backgroundColor: colors.surface }, getSoftShadow(isDarkMode, 'soft')]}>
-                  <TouchableOpacity
-                    onPress={() => setLessonContentMode('image')}
-                    accessibilityRole="button"
-                    accessibilityLabel="Show lesson image"
-                    accessibilityState={{ selected: lessonContentMode === 'image' }}
-                    style={[
-                      styles.lessonContentModeButton,
-                      lessonContentMode === 'image' && { backgroundColor: FRESH_COLORS.exerciseBlueLabel },
-                    ]}
-                  >
-                    <MaterialIcons
-                      name="image"
-                      size={15}
-                      color={lessonContentMode === 'image' ? '#FFFFFF' : colors.secondaryText}
-                    />
-                    <Text
-                      style={[
-                        styles.lessonContentModeButtonText,
-                        { color: lessonContentMode === 'image' ? '#FFFFFF' : colors.secondaryText },
-                      ]}
-                    >
-                      Image
-                    </Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity
-                    onPress={() => setLessonContentMode('text')}
-                    accessibilityRole="button"
-                    accessibilityLabel="Show lesson text"
-                    accessibilityState={{ selected: lessonContentMode === 'text' }}
-                    style={[
-                      styles.lessonContentModeButton,
-                      lessonContentMode === 'text' && { backgroundColor: FRESH_COLORS.exerciseBlueLabel },
-                    ]}
-                  >
-                    <MaterialIcons
-                      name="article"
-                      size={15}
-                      color={lessonContentMode === 'text' ? '#FFFFFF' : colors.secondaryText}
-                    />
-                    <Text
-                      style={[
-                        styles.lessonContentModeButtonText,
-                        { color: lessonContentMode === 'text' ? '#FFFFFF' : colors.secondaryText },
-                      ]}
-                    >
-                      Text
-                    </Text>
-                  </TouchableOpacity>
+        },
+      ]}
+    >
+      {/* KeyboardAvoidingView races PracticeSheet's entrance animation; Fill reserves keyboard space internally. */}
+      <View style={styles.lessonSheetHost}>
+        <PracticeSheet
+          open={practiceSheetOpen}
+          onClose={closePracticeSheet}
+          onEntered={() => setSheetEntered(true)}
+          isDarkMode={isDarkMode}
+          isDesktopWeb={isDesktopWebLayout}
+          colors={colors}
+          baseLayer={
+            <>
+            <LessonHeaderRow
+              isDesktopWeb={isDesktopWebLayout}
+              isDarkMode={isDarkMode}
+              colors={colors}
+              onBack={onBack}
+              backLabel={backLabel}
+              title={activePracticeLabel ? practiceContextTitle : lesson.title}
+              activeModeLabel={activePracticeLabel}
+              idleTrailingSlot={hasLessonTextContent && (
+                <View
+                  style={[
+                    styles.lessonContentModeToggle,
+                    {
+                      height: scaleValue(isDesktopWebLayout ? 44 : 38, webLessonScale),
+                      gap: scaleValue(4, webLessonScale),
+                      padding: scaleValue(4, webLessonScale),
+                      borderRadius: scaleValue(100, webLessonScale),
+                      marginBottom: isDesktopWebLayout ? scaleValue(8, webLessonScale) : 0,
+                      backgroundColor: colors.surface,
+                    },
+                  ]}
+                >
+                  {(['image', 'text'] as const).map((contentMode) => {
+                    const selected = lessonContentMode === contentMode;
+                    const label = contentMode === 'image' ? 'Image' : 'Text';
+
+                    return (
+                      <TouchableOpacity
+                        key={contentMode}
+                        onPress={() => setLessonContentMode(contentMode)}
+                        accessibilityRole="button"
+                        accessibilityLabel={`Show lesson ${contentMode}`}
+                        accessibilityState={{ selected }}
+                        style={[
+                          styles.lessonContentModeButton,
+                          {
+                            height: scaleValue(isDesktopWebLayout ? 36 : 30, webLessonScale),
+                            minWidth: scaleValue(isDesktopWebLayout ? 36 : 30, webLessonScale),
+                            paddingHorizontal: scaleValue(isDesktopWebLayout ? 14 : 10, webLessonScale),
+                            gap: scaleValue(5, webLessonScale),
+                            borderRadius: scaleValue(100, webLessonScale),
+                          },
+                          selected && { backgroundColor: colors.primary },
+                        ]}
+                      >
+                        <MaterialIcons
+                          name={contentMode === 'image' ? 'image' : 'article'}
+                          size={scaleValue(isDesktopWebLayout ? 18 : 16, webLessonScale)}
+                          color={selected ? '#FFFFFF' : colors.secondaryText}
+                        />
+                        {showContentToggleLabels && (
+                          <Text
+                            style={[
+                              styles.lessonContentModeButtonText,
+                              { fontSize: scaleValue(13, webLessonScale), color: selected ? '#FFFFFF' : colors.secondaryText },
+                            ]}
+                          >
+                            {label}
+                          </Text>
+                        )}
+                      </TouchableOpacity>
+                    );
+                  })}
                 </View>
               )}
-            </View>
-          </View>
-          {hasLessonTextContent && !shouldShowMixedImageCarousel && lessonContentMode === 'text' ? (
-            <GrammarLessonTextContent content={lesson.textContent!} colors={colors} isDarkMode={isDarkMode} height={lessonImageHeight} />
-          ) : shouldShowMixedImageCarousel ? (
+            />
+            {/* Plain flex stage, the same as the vocabulary lesson's: pinning this to the
+                measured height while the sheet covered it left the stage shorter than the
+                space it sat in, so the lesson image centred high with a band of empty space
+                under it as the sheet was dragged away. The image's own size is still held
+                steady by the measurement guard below. */}
             <View
-              style={[
-                styles.mixedImageCarouselWrap,
-                {
-                  width: lessonMediaWidth,
-                  maxWidth: webLessonMediaMaxWidth,
-                },
-              ]}
+              style={styles.contentArea}
+              onLayout={(event) => {
+                // Measuring while the sheet covers the stage would refit the image to a
+                // keyboard-shrunk height, so it is left at the size the open stage gave it.
+                if (practiceSheetOpen) return;
+                const nextWidth = Math.round(event.nativeEvent.layout.width);
+                const nextHeight = Math.round(event.nativeEvent.layout.height);
+                if (nextWidth <= 0 || nextHeight <= 0) return;
+                setImageStageSize((current) => {
+                  // Ignore sub-pixel jitter.
+                  const widthChanged = Math.abs(current.width - nextWidth) > 1;
+                  const heightChanged = Math.abs(current.height - nextHeight) > 1;
+                  if (!widthChanged && !heightChanged) return current;
+                  // Android reports a transient shorter height while dismissing the keyboard.
+                  // Ignore height-only shrink; width-changing resize or rotation remains valid.
+                  if (hasSoftKeyboard && !widthChanged && nextHeight < current.height) return current;
+                  return { width: nextWidth, height: nextHeight };
+                });
+              }}
             >
-              <ScrollView
-                horizontal
-                pagingEnabled
-                showsHorizontalScrollIndicator={false}
-                snapToInterval={lessonMediaWidth}
-                decelerationRate="fast"
-                directionalLockEnabled
-                disableIntervalMomentum
-                nestedScrollEnabled
+              <View
                 style={[
-                  styles.mixedImageScroll,
+                  styles.contentLayer,
+                  styles.lessonLayer,
                   {
-                    width: lessonMediaWidth,
-                    height: lessonImageHeight,
+                    paddingHorizontal: imageStageInsets.horizontal,
+                    paddingTop: imageStageInsets.top,
+                    paddingBottom: imageStageInsets.bottom,
                   },
                 ]}
-                contentContainerStyle={styles.mixedImageScrollContent}
               >
-                {mixedLessonImageCards.map((imageCard: MixedLessonImageCard, imageIndex: number) => {
-                  const slideSource = { uri: imageCard.imageUrl };
-
-                  return (
-                    <View
-                      key={`${imageCard.id}-${imageIndex}`}
-                      style={[
-                        styles.mixedImageSlide,
-                        {
-                          width: lessonMediaWidth,
-                          height: lessonImageHeight,
-                        },
-                      ]}
+                {hasLessonTextContent && lessonContentMode === 'text' ? (
+                  <View
+                    style={[
+                      styles.lessonTextFrame,
+                      {
+                        // Text mode uses the full stage rather than the image aspect-ratio box.
+                        width: isDesktopWebLayout
+                          ? Math.min(imageStageAvailableSize.width, scaleValue(880, webLessonScale))
+                          : imageStageAvailableSize.width,
+                        height: imageStageAvailableSize.height,
+                      },
+                    ]}
+                  >
+                    <GrammarLessonTextContent
+                      content={lesson.textContent!}
+                      colors={colors}
+                      isDarkMode={isDarkMode}
+                      height={fittedLessonImageSize.height}
+                      scale={webLessonScale}
+                    />
+                  </View>
+                ) : shouldShowMixedImageCarousel ? (
+                  <View
+                    style={[
+                      styles.lessonPoster,
+                      {
+                        width: fittedLessonImageSize.width,
+                        height: fittedLessonImageSize.height,
+                      },
+                    ]}
+                  >
+                    <ScrollView
+                      horizontal
+                      pagingEnabled
+                      showsHorizontalScrollIndicator={false}
+                      snapToInterval={fittedLessonImageSize.width}
+                      decelerationRate="fast"
+                      directionalLockEnabled
+                      disableIntervalMomentum
+                      nestedScrollEnabled
+                      style={{ width: fittedLessonImageSize.width, height: fittedLessonImageSize.height }}
                     >
-                      <ImageWithCredit
-                        source={slideSource}
-                        imageScale={lessonImageContentScale}
-                        style={[
-                          styles.mixedCarouselImage,
-                          {
-                            width: lessonMediaWidth,
-                            height: lessonImageHeight,
-                          },
-                        ] as any}
-                        accessibilityLabel={imageCard.title ? `${imageCard.title} lesson image` : 'Lesson image'}
-                      />
-                    </View>
-                  );
-                })}
-              </ScrollView>
-          
+                      {mixedLessonImageCards.map((imageCard, imageIndex) => (
+                        <View
+                          key={`${imageCard.id}-${imageIndex}`}
+                          style={{
+                            width: fittedLessonImageSize.width,
+                            height: fittedLessonImageSize.height,
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                          }}
+                        >
+                          <ImageWithCredit
+                            source={{ uri: imageCard.imageUrl }}
+                            imageScale={lessonImageContentScale}
+                            onNaturalSize={imageIndex === 0 ? handleLessonImageNaturalSize : undefined}
+                            style={[
+                              {
+                                width: fittedLessonImageSize.width,
+                                height: fittedLessonImageSize.height,
+                              },
+                            ]}
+                            accessibilityLabel={imageCard.title ? `${imageCard.title} lesson image` : 'Lesson image'}
+                          />
+                        </View>
+                      ))}
+                    </ScrollView>
+                  </View>
+                ) : (
+                  <ImageWithCredit
+                    onPress={handleImagePress}
+                    source={imageSource}
+                    imageScale={lessonImageContentScale}
+                    onNaturalSize={handleLessonImageNaturalSize}
+                    style={[
+                      styles.lessonPoster,
+                      {
+                        width: fittedLessonImageSize.width,
+                        height: fittedLessonImageSize.height,
+                      },
+                    ]}
+                  />
+                )}
+              </View>
             </View>
-          ) : (
-            <ImageWithCredit
-              onPress={handleImagePress}
-              source={imageSource}
-              imageScale={lessonImageContentScale}
-              style={
-                Platform.OS === 'web'
-                  ? [styles.lessonImage, styles.webLessonImage, { height: lessonImageHeight, maxWidth: webLessonMediaMaxWidth }] as any
-                  : [styles.lessonImage, { height: lessonImageHeight }] as any
-              }
-            />
-          )}
-          {renderPracticeDock()}
-        </View>
-        <View style={[styles.practicePanelHost, { minHeight: secondViewMinHeight }]}>
-        <LessonPracticeSheet<ExerciseMode>
-          visible={practiceSheetOpen}
-          mode={exerciseMode}
-          segments={exerciseModeOptions}
-          isDarkMode={isDarkMode}
-          colors={colors}
-          onClose={closePracticeSheet}
-          onSwitchMode={switchPracticeMode}
-        >
-        <ScrollView
-          style={styles.practiceSheetScroll}
-          contentContainerStyle={styles.practiceSheetScrollContent}
-          keyboardShouldPersistTaps="always"
-          bounces={false}
-          overScrollMode="never"
+            </>
+          }
         >
         <View
+          style={styles.practiceLayerBody}
+          onLayout={(event) => setPracticeStageHeight(commitMeasuredSize(event.nativeEvent.layout.height))}
+        >
+        <Pressable
           ref={exerciseContainerRef}
+          onPress={() => {
+            if (exerciseMode !== 'fill' || isDesktopWebLayout) return;
+            setFillKeyboardDismissed(true);
+            // A same-tick dismiss can race Android's own focus-retry timers (see
+            // usePersistentExerciseKeyboard's androidFocusRetries) and get silently
+            // reopened; deferring to the next tick lets the state update above clear
+            // those timers first.
+            setTimeout(() => Keyboard.dismiss(), 0);
+          }}
           style={[
             styles.exerciseContainer,
-            Platform.OS === 'web' && {
+            isDesktopWebLayout && {
               alignSelf: 'center',
-              maxWidth: webExerciseMaxWidth,
+              maxWidth: desktopContentMaxWidth,
               width: '100%',
-              paddingHorizontal: scaleValue(16, webLessonScale),
+              paddingHorizontal: scaleValue(22, webLessonScale),
+              // Fill's answer card (and any other mode whose content is shorter than the
+              // available stage) used to stack at the top, leaving all the slack as a single
+              // dead zone below it. Centering the whole prompt+answer group distributes that
+              // slack evenly instead — a no-op for modes that already fill the space.
+              justifyContent: 'center',
             },
-            // Translate exercise trims its own card padding to use the full screen
-            // width on mobile/APK, so it needs less outer breathing room here too.
-            exerciseMode === 'translate' && !isDesktopWebLayout && { paddingHorizontal: 8 },
+            // Fill's desktop card sits on its own intrinsic height (no minHeight), so
+            // centering left equal dead space above and below it. Pin the group to the
+            // bottom instead — the card ends up close to the mode row, and the (larger)
+            // slack collects above the prompt where it reads as intentional breathing room.
+            isDesktopWebLayout && exerciseMode === 'fill' && {
+              justifyContent: 'flex-end',
+              paddingBottom: 28,
+            },
+            !isDesktopWebLayout && { paddingHorizontal: 14 },
             {
-              minHeight: secondViewMinHeight,
               paddingTop: exerciseContainerTopOffset,
             },
           ]}
@@ -1141,9 +990,19 @@ const GrammarQuiz: React.FC<GrammarQuizProps> = ({ lesson, onBack, backLabel = '
         {!isComplete ? (
           <>
             {!hasCurrentExercise && (
-              <View style={[styles.emptyStateCard, { backgroundColor: colors.card }]}>
-                <Text style={[styles.emptyStateTitle, { color: colors.text }]}>No exercises available</Text>
-                <Text style={[styles.emptyStateText, { color: colors.text }]}>
+              <View
+                style={[
+                  styles.emptyStateCard,
+                  {
+                    padding: scaleValue(24, webLessonScale),
+                    borderRadius: scaleValue(16, webLessonScale),
+                    marginVertical: scaleValue(16, webLessonScale),
+                    backgroundColor: colors.card,
+                  },
+                ]}
+              >
+                <Text style={[styles.emptyStateTitle, { fontSize: scaleValue(22, webLessonScale), marginBottom: scaleValue(8, webLessonScale), color: colors.text }]}>No exercises available</Text>
+                <Text style={[styles.emptyStateText, { fontSize: scaleValue(15, webLessonScale), color: colors.text }]}>
                   This lesson does not have content for the current mode yet.
                 </Text>
               </View>
@@ -1155,9 +1014,13 @@ const GrammarQuiz: React.FC<GrammarQuizProps> = ({ lesson, onBack, backLabel = '
                 style={[
                   styles.gameOverContainer,
                   {
+                    padding: scaleValue(24, webLessonScale),
+                    borderRadius: scaleValue(16, webLessonScale),
+                    marginVertical: scaleValue(16, webLessonScale),
+                    borderWidth: scaleValue(1.5, webLessonScale),
                     backgroundColor: grammarGame.panelSurface,
                     borderColor: grammarGame.panelBorder,
-                    boxShadow: `0px 6px 12px ${withColorAlpha(grammarGame.panelShadow, 0.16)}`,
+                    ...getSoftShadow(isDarkMode, 'raised', colors.shadow, colors.visualStyle === 'pixel'),
                   },
                 ]}
               >
@@ -1165,13 +1028,30 @@ const GrammarQuiz: React.FC<GrammarQuizProps> = ({ lesson, onBack, backLabel = '
                   source={require('../../assets/embarrassed.png')}
                   style={[
                     styles.gameOverImage,
-                    Platform.OS === 'web' && { width: scaleValue(80, webLessonScale), height: scaleValue(80, webLessonScale) }
+                    Platform.OS === 'web'
+                      ? { width: scaleValue(80, webLessonScale), height: scaleValue(80, webLessonScale) }
+                      // Live width keeps the native image responsive to rotation.
+                      : { width: windowWidth * 0.25, height: windowWidth * 0.25 },
                   ]}
                   resizeMode="contain"
                 />
                 <Text style={[styles.gameOverText, { color: colors.text }]}>Oops! Too bad!</Text>
                 <Text style={[styles.gameOverSubText, { color: colors.text }]}>It's ok, you can do it!</Text>
-                <TouchableOpacity style={[styles.gameModeButton, gameModeButtonStyle]} onPress={startChallenge} accessibilityRole="button" accessibilityLabel="Retry Game Mode">
+                <TouchableOpacity
+                  style={[
+                    styles.gameModeButton,
+                    {
+                      minWidth: scaleValue(220, webLessonScale),
+                      paddingVertical: scaleValue(13, webLessonScale),
+                      paddingHorizontal: scaleValue(24, webLessonScale),
+                      marginTop: scaleValue(12, webLessonScale),
+                    },
+                    gameModeButtonStyle,
+                  ]}
+                  onPress={startChallenge}
+                  accessibilityRole="button"
+                  accessibilityLabel="Retry Game Mode"
+                >
                   <Text style={[styles.gameModeButtonText, { color: gameModeButtonTextColor }]}>Retry Game Mode</Text>
                 </TouchableOpacity>
               </View>
@@ -1180,108 +1060,111 @@ const GrammarQuiz: React.FC<GrammarQuizProps> = ({ lesson, onBack, backLabel = '
                 <View
                   style={[
                     styles.statusBlock,
-                    !isGameMode && styles.statusBlockNoLives,
-                    exerciseMode === 'fill' && isFillKeyboardOpen && styles.statusBlockFillKeyboard,
+                    // Desktop never renders a lives row here (it's in questionHeaderRow
+                    // instead), so it always gets the compact "no lives" sizing.
+                    (isDesktopWebLayout || !isGameMode) && styles.statusBlockNoLives,
+                    reservesFillKeyboardSpace && styles.statusBlockFillKeyboard,
                   ]}
                 >
-                  <View style={styles.progressContainer}>
-                    <View style={styles.progressDotsRow}>
-                      {Array.from({ length: Math.min(selectedQuestions.length, 10) }).map((_, i) => {
-                        const totalDots = Math.min(selectedQuestions.length, 10);
-                        const filledDots = Math.round(((currentQuestionIndex + 1) / selectedQuestions.length) * totalDots);
+                  <View
+                    style={[
+                      styles.progressContainer,
+                      !isDesktopWebLayout && styles.progressContainerWithCollapseMobile,
+                      isDesktopWebLayout && styles.progressContainerWithCollapseDesktop,
+                    ]}
+                  >
+                    <View style={[styles.progressDotsRow, isDesktopWebLayout && styles.progressDotsRowDesktop]}>
+                      {Array.from({ length: 10 }).map((_, i) => {
+                        const filledDots = Math.max(1, Math.round(((currentQuestionIndex + 1) / Math.max(1, selectedQuestions.length)) * 10));
                         const isFilled = i < filledDots;
                         return (
                           <View
                             key={i}
                             style={[
                               styles.progressDot,
+                              { height: desktopProgressDotHeight, borderRadius: desktopProgressDotHeight / 2 },
                               { backgroundColor: isFilled ? grammarGame.progressFill : grammarGame.progressTrack },
                             ]}
                           />
                         );
                       })}
                     </View>
-                    <Text style={[styles.progressText, { color: grammarGame.progressLabelText }]}>
-                      Question {currentQuestionIndex + 1}/{selectedQuestions.length}
+                    <Text style={[styles.progressText, isDesktopWebLayout && styles.progressTextDesktop, { fontSize: desktopProgressTextFontSize, color: grammarGame.progressLabelText }]}>
+                      {isDesktopWebLayout ? 'Question ' : ''}{currentQuestionIndex + 1}/{selectedQuestions.length}
                     </Text>
                   </View>
-                  <View style={!(isGameMode && !isComplete) ? styles.livesSlotEmpty : styles.livesSlot}>
-                    {isGameMode && !isComplete && (
-                      <View style={styles.livesContainer}>
-                        <View style={styles.livesPill}>
-                          {Array.from({ length: 3 }).map((_, i) => {
-                            const isFilled = i < lives;
-                            const isLost = i === lostLifeIndex;
+                  {!isDesktopWebLayout && isGameMode && !isComplete && (
+                    <View style={styles.secondaryStatusRow}>
+                      <View style={[styles.livesSlot, { minHeight: desktopLivesPillMinHeight }]}>
+                        <View style={styles.livesContainer}>
+                          <View style={[styles.livesPill, { minHeight: desktopLivesPillMinHeight }]}>
+                            {Array.from({ length: 3 }).map((_, i) => {
+                              const isFilled = i < lives;
+                              const isLost = i === lostLifeIndex;
 
-                            return (
-                              <View key={i} style={styles.lifeSlot}>
-                                <MaterialIcons
-                                  name={isFilled ? 'favorite' : 'favorite-border'}
-                                  size={28}
-                                  color={isFilled ? grammarGame.heartFilled : grammarGame.heartEmpty}
-                                  style={styles.lifeIcon}
-                                />
-                                {isLost && (
-                                  <Animated.View
-                                    style={[
-                                      styles.lostLifeOverlay,
-                                      {
-                                        pointerEvents: 'none',
-                                        opacity: lostLifeAnim.interpolate({
-                                          inputRange: [0, 0.55, 1],
-                                          outputRange: [1, 1, 0],
-                                        }),
-                                        transform: [
-                                          {
-                                            translateY: lostLifeAnim.interpolate({
-                                              inputRange: [0, 1],
-                                              outputRange: [0, -22],
-                                            }),
-                                          },
-                                          {
-                                            scale: lostLifeAnim.interpolate({
-                                              inputRange: [0, 0.35, 1],
-                                              outputRange: [1, 1.35, 0.65],
-                                            }),
-                                          },
-                                          {
-                                            rotate: lostLifeAnim.interpolate({
-                                              inputRange: [0, 1],
-                                              outputRange: ['0deg', '-18deg'],
-                                            }),
-                                          },
-                                        ],
-                                      },
-                                    ]}
-                                  >
-                                    <MaterialIcons name="favorite" size={28} color={grammarGame.heartLost} />
-                                  </Animated.View>
-                                )}
-                              </View>
-                            );
-                          })}
+                              return (
+                                <View key={i} style={[styles.lifeSlot, { width: desktopLifeSlotWidth, height: desktopLifeSlotHeight }]}>
+                                  <MaterialIcons
+                                    name={isFilled ? 'favorite' : 'favorite-border'}
+                                    size={desktopHeartIconSize}
+                                    color={isFilled ? grammarGame.heartFilled : grammarGame.heartEmpty}
+                                    style={styles.lifeIcon}
+                                  />
+                                  {isLost && (
+                                    <Animated.View
+                                      style={[
+                                        styles.lostLifeOverlay,
+                                        {
+                                          pointerEvents: 'none',
+                                          opacity: lostLifeAnim.interpolate({
+                                            inputRange: [0, 0.55, 1],
+                                            outputRange: [1, 1, 0],
+                                          }),
+                                          transform: [
+                                            {
+                                              translateY: lostLifeAnim.interpolate({
+                                                inputRange: [0, 1],
+                                                outputRange: [0, -22],
+                                              }),
+                                            },
+                                            {
+                                              scale: lostLifeAnim.interpolate({
+                                                inputRange: [0, 0.35, 1],
+                                                outputRange: [1, 1.35, 0.65],
+                                              }),
+                                            },
+                                            {
+                                              rotate: lostLifeAnim.interpolate({
+                                                inputRange: [0, 1],
+                                                outputRange: ['0deg', '-18deg'],
+                                              }),
+                                            },
+                                          ],
+                                        },
+                                      ]}
+                                    >
+                                      <MaterialIcons name="favorite" size={desktopHeartIconSize} color={grammarGame.heartLost} />
+                                    </Animated.View>
+                                  )}
+                                </View>
+                              );
+                            })}
+                          </View>
                         </View>
                       </View>
-                    )}
-                  </View>
+                    </View>
+                  )}
                 </View>
                 <View
-                  style={[
-                    styles.exercise,
-                    Platform.OS === 'web' && {
-                      minHeight: (exerciseMode === 'quiz'
-                        ? currentQuizOptionsCount * quizOptionHeight + Math.max(0, currentQuizOptionsCount - 1) * quizOptionGap
-                        : exerciseCardBaseHeight) + scaleValue(126, webLessonScale),
-                    },
-                  ]}
+                  style={styles.exercise}
                 >
-                  <View
-                    ref={questionRef}
-                    style={[
-                      styles.questionCard,
-                      exerciseMode === 'fill' && (isFillKeyboardOpen || isKeyboardTightScreen) && (
-                        Platform.OS === 'android' ? styles.questionCardFillAndroidRoomy : styles.questionCardFillTight
-                      ),
+                    <View
+                      ref={questionRef}
+                      style={[
+                        styles.questionCard,
+                        isDesktopWebLayout && exerciseMode === 'fill' && styles.questionCardFillDesktop,
+                        isDesktopWebLayout && exerciseMode === 'fill' && { maxWidth: scaleValue(760, webLessonScale) },
+                        !currentPrompt && styles.questionCardNoPrompt,
                       {
                         backgroundColor: 'transparent',
                         borderWidth: 0,
@@ -1290,37 +1173,45 @@ const GrammarQuiz: React.FC<GrammarQuizProps> = ({ lesson, onBack, backLabel = '
                         boxShadow: 'none',
                         elevation: 0,
                       },
-                      isScaledWebLesson && {
-                        paddingVertical: 0,
-                        paddingHorizontal: 0,
-                        minHeight: 0,
-                      },
                     ]}
                   >
                     <View style={styles.questionHeaderRow}>
+                      {isDesktopWebLayout && isGameMode && !isComplete && (
+                        // Absolutely centered over the row (not squeezed into the flex gap
+                        // between the label and the badge) so it doesn't shift with either
+                        // one's width, and doesn't disturb the row's own height.
+                        <View style={styles.livesCenterOverlay} pointerEvents="none">
+                          {livesNode}
+                        </View>
+                      )}
                       <View style={styles.questionLabelRow}>
                         <Text
                           style={[
                             styles.questionModeText,
-                            { color: isDarkMode ? grammarGame.progressFill : FRESH_COLORS.exerciseBlueLabel },
-                            isScaledWebLesson && { fontSize: scaleValue(11, webLessonScale) },
+                            isDesktopWebLayout ? styles.questionModeTextDesktop : styles.questionModeTextMobile,
+                            isScaledLayout && { fontSize: scaleValue(14, webLessonScale) },
+                            { color: isDarkMode ? grammarGame.progressFill : PRACTICE_LABEL_COLOR },
                           ]}
                         >
                           {modeInstructionLabel}
                         </Text>
-                        {currentSourceLessonTitle ? (
+                        {isDesktopWebLayout && currentSourceLessonTitle ? (
                           <View
                             style={[
                               styles.sourceLessonBadge,
                               {
+                                minHeight: scaleValue(25, webLessonScale),
+                                maxWidth: scaleValue(260, webLessonScale),
+                                paddingHorizontal: scaleValue(11, webLessonScale),
+                                gap: scaleValue(4, webLessonScale),
                                 backgroundColor: grammarGame.badgeSurface,
                                 borderColor: grammarGame.badgeBorder,
+                                boxShadow: `0px 1px 3px ${withColorAlpha(colors.shadow, 0.72)}`,
                               },
                             ]}
                           >
-                            <MaterialIcons name="school" size={13} color={grammarGame.badgeText} />
                             <Text
-                              style={[styles.sourceLessonBadgeText, { color: grammarGame.badgeText }]}
+                              style={[styles.sourceLessonBadgeText, { fontSize: scaleValue(12.5, webLessonScale), color: grammarGame.badgeText }]}
                               numberOfLines={1}
                             >
                               {currentSourceLessonTitle}
@@ -1328,46 +1219,71 @@ const GrammarQuiz: React.FC<GrammarQuizProps> = ({ lesson, onBack, backLabel = '
                           </View>
                         ) : null}
                       </View>
-                      {selectedQuestions.length > 0 && (
+                      {answerSavedBadgeNode}
+                    </View>
+                    {!isDesktopWebLayout && currentSourceLessonTitle ? (
+                      <View style={styles.sourceLessonRowMobile}>
                         <View
                           style={[
-                            styles.answerSavedBadge,
+                            styles.sourceLessonBadge,
                             {
-                              backgroundColor: hasFreshCorrectAnswer ? grammarGame.correctSurface : grammarGame.progressFill,
-                              borderColor: hasFreshCorrectAnswer ? grammarGame.correctBorder : grammarGame.statusBorder,
-                              borderWidth: hasFreshCorrectAnswer ? 1 : 0,
+                              minHeight: scaleValue(25, webLessonScale),
+                              maxWidth: scaleValue(260, webLessonScale),
+                              paddingHorizontal: scaleValue(11, webLessonScale),
+                              gap: scaleValue(4, webLessonScale),
+                              backgroundColor: grammarGame.badgeSurface,
+                              borderColor: grammarGame.badgeBorder,
+                              boxShadow: `0px 1px 3px ${withColorAlpha(colors.shadow, 0.72)}`,
                             },
                           ]}
                         >
-                          {hasFreshCorrectAnswer && (
-                            <MaterialIcons
-                              name="check-circle"
-                              size={14}
-                              color={grammarGame.correctBorder}
-                            />
-                          )}
                           <Text
-                            style={[
-                              styles.answerSavedText,
-                              { color: hasFreshCorrectAnswer ? grammarGame.correctText : '#FFFFFF' },
-                            ]}
+                            style={[styles.sourceLessonBadgeText, { fontSize: scaleValue(11.5, webLessonScale), color: grammarGame.badgeText }]}
                             numberOfLines={1}
                           >
-                            {answerBadgeLabel}
+                            {currentSourceLessonTitle}
                           </Text>
                         </View>
-                      )}
-                    </View>
+                      </View>
+                    ) : null}
                     {!!currentPrompt && (
                       <Text
+                        // Clamp Translate prompts so controls stay fixed between questions.
+                        numberOfLines={exerciseMode === 'translate' ? translateMaxPromptLines : undefined}
+                        // Shrink to fit rather than truncate: a sentence longer than the
+                        // reserved lines scales down instead of ending in "…", so the whole
+                        // thing stays readable without the layout shifting.
+                        adjustsFontSizeToFit={exerciseMode === 'translate'}
+                        minimumFontScale={0.7}
                         style={[
                           styles.question,
-                          exerciseMode === 'fill' && (isFillKeyboardOpen || isKeyboardTightScreen) && (
-                            Platform.OS === 'android' ? styles.questionFillAndroidRoomy : styles.questionFillTight
-                          ),
-                          isDesktopWebLayout && {
-                            fontSize: scaleValue(32, webLessonScale),
-                            lineHeight: scaleValue(41, webLessonScale),
+                          // Keep prompt metrics stable while Fill auto-focuses the keyboard.
+                          isDesktopWebLayout
+                            ? [
+                                styles.questionDesktop,
+                                {
+                                  fontSize: desktopPromptFontSize,
+                                  lineHeight: desktopPromptLineHeight,
+                                  marginTop: scaleValue(28, webLessonScale),
+                                },
+                              ]
+                            : [
+                                styles.questionMobile,
+                                (() => {
+                                  // Fill's prompt is a single sentence with no line clamp — a long one
+                                  // wraps to two lines and reads oversized next to the compact answer
+                                  // card below it, so dial the size back a touch when that happens.
+                                  const isFillPromptLong = exerciseMode === 'fill' && currentPrompt.length > 30;
+                                  const fillPromptScale = isFillPromptLong ? 0.86 : 1;
+                                  return {
+                                    fontSize: promptMobileFontSize * fillPromptScale,
+                                    lineHeight: promptMobileLineHeight * fillPromptScale,
+                                    marginTop: scaleValue(28, webLessonScale),
+                                  };
+                                })(),
+                              ],
+                          exerciseMode === 'translate' && {
+                            minHeight: (isDesktopWebLayout ? desktopPromptLineHeight : promptMobileLineHeight) * translateMaxPromptLines,
                           },
                           { color: colors.text },
                         ]}
@@ -1376,14 +1292,33 @@ const GrammarQuiz: React.FC<GrammarQuizProps> = ({ lesson, onBack, backLabel = '
                       </Text>
                     )}
                   </View>
-                  <View style={isDesktopWebLayout && exerciseMode !== 'quiz' && styles.exerciseCenterFill}>
+                  <View
+                    onLayout={(event) => setAnswerAreaHeight(commitMeasuredSize(event.nativeEvent.layout.height))}
+                    style={[
+                      styles.answerArea,
+                      isDesktopWebLayout ? styles.answerAreaDesktop : styles.answerAreaMobile,
+                      { paddingTop: answerAreaPadding.top, paddingBottom: answerAreaPadding.bottom },
+                      // Fixed-height answer blocks prevent vertical movement between questions.
+                      (!isDesktopWebLayout || exerciseMode === 'fill' || exerciseMode === 'quiz')
+                        && styles.answerAreaCenter,
+                      // Desktop/tablet Fill uses intrinsic height so its card stays attached to the
+                      // prompt, instead of centering in the full answer area and leaving a big gap.
+                      (isDesktopWebLayout || isTabletLayout) && exerciseMode === 'fill' && styles.answerAreaFillDesktopCompact,
+                      // Mobile Fill also stays attached to the prompt instead of centering in the
+                      // full answer area — centering was leaving a large unused gap on tall phones.
+                      !isDesktopWebLayout && exerciseMode === 'fill' && styles.answerAreaFillMobileKeyboardTop,
+                    ]}
+                  >
                   {exerciseMode === 'fill' ? (
                     <GrammarFillExercise
                       exercise={selectedQuestions[currentQuestionIndex]}
                       colors={colors}
                       isDarkMode={isDarkMode}
-                      keyboardVisible={isFillKeyboardOpen}
-                      layoutHeight={lessonViewportHeight}
+                      practiceSheetReady={sheetEntered}
+                      keyboardDismissed={fillKeyboardDismissed}
+                      onKeyboardRestore={() => setFillKeyboardDismissed(false)}
+                      reservesKeyboardSpace={reservesFillKeyboardSpace}
+                      layoutHeight={practiceExerciseViewportHeight}
                       userAnswer={userAnswer}
                       incorrectAnswer={incorrectAnswer}
                       optionsContainerRef={optionsContainerRef}
@@ -1401,6 +1336,8 @@ const GrammarQuiz: React.FC<GrammarQuizProps> = ({ lesson, onBack, backLabel = '
                       colors={colors}
                       isDarkMode={isDarkMode}
                       compact={isCompactScreen}
+                      layoutHeight={practiceExerciseViewportHeight}
+                      availableHeight={fitQuizCardHeight}
                       userAnswer={userAnswer}
                       incorrectAnswer={incorrectAnswer}
                       optionsContainerRef={optionsContainerRef}
@@ -1412,130 +1349,43 @@ const GrammarQuiz: React.FC<GrammarQuizProps> = ({ lesson, onBack, backLabel = '
                       onIncorrect={handleExerciseIncorrect}
                     />
                   ) : exerciseMode === 'translate' ? (
-                    <View style={styles.translateExerciseOffset}>
-                      <GrammarTranslateExercise
-                        key={`translate-${currentQuestionIndex}`}
-                        exercise={selectedQuestions[currentQuestionIndex]}
-                        colors={colors}
-                        isDarkMode={isDarkMode}
-                        userAnswer={userAnswer}
-                        incorrectAnswer={incorrectAnswer}
-                        optionsContainerRef={optionsContainerRef}
-                        firstOptionRef={firstOptionRef}
-                        onOptionsLayout={setOptionsContainerY}
-                        onFirstOptionLayout={setFirstOptionLocalY}
-                        onCardHeightChange={setActiveCardHeight}
-                        onCorrect={handleAnswer}
-                        onIncorrect={handleExerciseIncorrect}
-                      />
-                    </View>
+                    <GrammarTranslateExercise
+                      key={`translate-${currentQuestionIndex}`}
+                      exercise={selectedQuestions[currentQuestionIndex]}
+                      colors={colors}
+                      isDarkMode={isDarkMode}
+                      layoutHeight={practiceExerciseViewportHeight}
+                      availableHeight={fitQuizCardHeight}
+                      userAnswer={userAnswer}
+                      incorrectAnswer={incorrectAnswer}
+                      optionsContainerRef={optionsContainerRef}
+                      firstOptionRef={firstOptionRef}
+                      onOptionsLayout={setOptionsContainerY}
+                      onFirstOptionLayout={setFirstOptionLocalY}
+                      onCardHeightChange={setActiveCardHeight}
+                      onCorrect={handleAnswer}
+                      onIncorrect={handleExerciseIncorrect}
+                    />
                   ) : (
-                    <View
-                      ref={optionsContainerRef}
-                      onLayout={(e) => {
-                        // Store options container Y relative to exercise container for fallback
-                        setOptionsContainerY(e.nativeEvent.layout.y);
-                        setActiveCardHeight(e.nativeEvent.layout.height);
-                      }}
-                      style={[
-                        styles.optionsContainer,
-                        Platform.OS === 'web' && {
-                          height: currentQuizOptionsCount * quizOptionHeight
-                            + Math.max(0, currentQuizOptionsCount - 1) * quizOptionGap,
-                          gap: quizOptionGap,
-                        },
-                      ]}
-                    >
-                      {(selectedQuestions[currentQuestionIndex]?.options ?? (typeof selectedQuestions[currentQuestionIndex]?.answer === 'boolean' ? ['True','False'] : [])).map((option, index) => {
-                        const isFirst = index === 0;
-                        const isSelected = userAnswer === option;
-                        const isIncorrect = incorrectAnswer === option;
-                        const isCorrect = !isGameMode && userAnswer === selectedQuestions[currentQuestionIndex]?.answer && option === selectedQuestions[currentQuestionIndex]?.answer;
-                        return (
-                          <Animated.View
-                            key={option}
-                            style={{
-                              transform: [
-                                { translateX: getOptionShakeAnim(option) },
-                                { scale: getOptionPulseAnim(option) },
-                              ],
-                            }}
-                          >
-                          <TouchableOpacity
-                            onPress={() => handleAnswer(option)}
-                            ref={isFirst ? firstOptionRef : undefined}
-                            onLayout={isFirst ? (e) => setFirstOptionLocalY(e.nativeEvent.layout.y) : undefined}
-                            accessibilityRole="button"
-                            accessibilityLabel={option}
-                            accessibilityState={{ selected: isSelected, disabled: !!userAnswer && !isSelected }}
-                            style={[
-                              styles.optionButton,
-                              Platform.OS === 'web' && {
-                                height: quizOptionHeight,
-                                paddingVertical: scaleValue(12, webLessonScale),
-                                paddingHorizontal: scaleValue(16, webLessonScale),
-                              },
-                              {
-                                backgroundColor: grammarGame.answerSurface,
-                                borderColor: grammarGame.answerBorder,
-                                borderBottomColor: grammarGame.answerBottom,
-                                ...getSoftShadow(isDarkMode, 'soft'),
-                              },
-                              isSelected && [
-                                styles.selectedOption,
-                                {
-                                  backgroundColor: grammarGame.answerSelectedSurface,
-                                  borderColor: grammarGame.answerSelectedBorder,
-                                  borderBottomColor: grammarGame.answerSelectedBottom,
-                                  borderWidth: 1.5,
-                                },
-                              ],
-                              isIncorrect && [
-                                styles.incorrectOption,
-                                {
-                                  backgroundColor: grammarGame.incorrectSurface,
-                                  borderColor: grammarGame.incorrectBorder,
-                                  borderBottomColor: grammarGame.incorrectBottom,
-                                  borderWidth: 1.5,
-                                },
-                              ],
-                              isCorrect && [
-                                styles.correctAnswer,
-                                {
-                                  backgroundColor: grammarGame.correctSurface,
-                                  borderColor: grammarGame.correctBorder,
-                                  borderBottomColor: grammarGame.correctBottom,
-                                  borderWidth: 1.5,
-                                },
-                              ]
-                            ]}>
-                            <View
-                              style={[
-                                styles.optionLetterBadge,
-                                { backgroundColor: grammarGame.answerSelectedSurface },
-                              ]}
-                            >
-                              <Text style={[styles.optionLetterBadgeText, { color: grammarGame.answerSelectedBorder }]}>
-                                {String.fromCharCode(65 + index)}
-                              </Text>
-                            </View>
-                            <Text style={[
-                              styles.optionText,
-                              { flexShrink: 1 },
-                              isDesktopWebLayout && {
-                                fontSize: scaleValue(22, webLessonScale),
-                                lineHeight: scaleValue(28, webLessonScale),
-                                fontWeight: freshFontFamily.semibold,
-                              },
-                              { color: grammarGame.answerText },
-                              isIncorrect && [styles.incorrectOptionText, { color: grammarGame.incorrectText }],
-                              isCorrect && [styles.correctAnswerText, { color: grammarGame.correctText }]
-                            ]}>{option}</Text>
-                          </TouchableOpacity>
-                          </Animated.View>
-                        );
-                      })}
-                    </View>
+                    <GrammarQuizExercise
+                      exercise={selectedQuestions[currentQuestionIndex]}
+                      colors={colors}
+                      isDarkMode={isDarkMode}
+                      isGameMode={isGameMode}
+                      isDesktopWeb={isDesktopWebLayout}
+                      isScaledLayout={isScaledLayout}
+                      webLessonScale={webLessonScale}
+                      optionHeight={fitQuizOptionHeight}
+                      optionGap={quizOptionGap}
+                      userAnswer={userAnswer}
+                      incorrectAnswer={incorrectAnswer}
+                      optionsContainerRef={optionsContainerRef}
+                      firstOptionRef={firstOptionRef}
+                      onOptionsLayout={setOptionsContainerY}
+                      onFirstOptionLayout={setFirstOptionLocalY}
+                      onCardHeightChange={setActiveCardHeight}
+                      onAnswerPress={handleAnswer}
+                    />
                   )}
                   </View>
                 </View>
@@ -1546,71 +1396,50 @@ const GrammarQuiz: React.FC<GrammarQuizProps> = ({ lesson, onBack, backLabel = '
               <Animated.View style={[
                 styles.feedbackCard,
                 {
-                  // Position the card using the computed feedbackTop on all platforms (align with first option top)
-                  top: feedbackTop,
-                  height: activeCardHeight,
+                  padding: scaleValue(16, webLessonScale),
+                  borderRadius: scaleValue(8, webLessonScale),
+                  left: feedbackFrame.left,
+                  right: feedbackFrame.width === undefined ? 16 : undefined,
+                  top: feedbackFrame.top,
+                  width: feedbackFrame.width,
+                  height: feedbackFrame.height,
                   backgroundColor: feedbackCardBackground,
                   borderColor: grammarGame.feedbackBorder,
                   boxShadow: `0px 8px 14px ${withColorAlpha(grammarGame.feedbackSurface, 0.18)}`,
-                  // Use translateY for smooth, hardware-accelerated animations where supported
                   transform: [{ translateY: feedbackAnim }]
                 }
               ]}>
-                <Text style={[styles.feedbackText, { color: grammarGame.feedbackText }, isScaledWebLesson && { fontSize: scaleValue(32, webLessonScale) }]}>{feedback}</Text>
+                <Text style={[styles.feedbackText, { fontSize: scaleValue(32, webLessonScale), color: grammarGame.feedbackText }]}>{feedback}</Text>
               </Animated.View>
             )}
             </>
             )}
           </>
         ) : null}
+        </Pressable>
         </View>
-        </ScrollView>
-        </LessonPracticeSheet>
-        </View>
-      </ScrollView>
-    </KeyboardAvoidingView>
+        </PracticeSheet>
+      </View>
 
-    <VocabularyCompletionModal
-      visible={isComplete}
-      timerMode={false}
-      startedTimerMode={false}
-      isFirstCompletion={false}
-      isPersonalBest={false}
-      isPerfect={perfectRun}
-      wordsLength={selectedQuestions.length}
-      matchingSessionXp={grammarSessionXp}
-      statsItems={[
-        { emoji: '✨', value: grammarSessionXp, label: 'XP' },
-        { emoji: '🎯', value: `${sessionAccuracyPercent}%`, label: 'Correct' },
-      ]}
-      title={
-        perfectRun
-          ? 'Perfect Run!'
-          : startedGameMode
-            ? 'Game Complete!'
-            : 'Quiz Complete!'
-      }
-      subtitle={
-        perfectRun
-          ? 'No mistakes at all — amazing!'
-          : startedGameMode
-            ? "You've completed Game Mode!"
-            : "You've answered all the questions!"
-      }
-      image={perfectRun ? assets.comic : assets.good}
-      unlockMessage={
-        !startedGameMode && !perfectRun
-          ? 'Try answering 10 questions with only 3 lives for an extra challenge.'
-          : undefined
-      }
-      primaryActionLabel={!startedGameMode && !perfectRun ? '🎮 Try Game Mode' : 'Play Again'}
-      onPrimaryAction={startChallenge}
-      onReplay={startChallenge}
-      secondaryActionLabel={backLabel ?? 'Back'}
-      onSecondaryAction={onBack}
+      {renderPracticeDock()}
+    </View>
+
+    <GrammarQuizCompletion
+      visible={isComplete && completionUnlockResolved}
+      selectedQuestionCount={selectedQuestions.length}
+      sessionXp={displayedGrammarSessionXp}
+      bonusXp={grammarBonusXp}
+      onClaimXP={claimGrammarSessionXp}
+      mistakeCount={sessionMistakeCount}
+      startedGameMode={startedGameMode}
+      lives={lives}
+      gameModeJustUnlocked={gameModeJustUnlocked}
+      backLabel={backLabel ?? 'Back'}
+      onReplay={replayGrammarCompletion}
+      onBack={onBack}
+      onGoToAccount={handleGoToAccount}
       colors={colors}
       isDarkMode={isDarkMode}
-      onGoToAccount={handleGoToAccount}
     />
     </>
   );
@@ -1620,325 +1449,98 @@ export default GrammarQuiz;
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
-  header: {
-    flexDirection: 'column',
-    alignItems: 'flex-start',
-    padding: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: 'rgba(0,0,0,0.08)',
-  },
-  webHeader: {
-    paddingVertical: 10,
-    paddingHorizontal: 16,
-  },
-  androidTopBackButton: {
-    marginTop: 0,
-  },
-  overviewSection: {
-    paddingBottom: 18,
-  },
-  practiceDock: {
-    flexShrink: 0,
-  },
-  practiceDockDesktop: {
-    alignItems: 'center',
-    flexDirection: 'row',
-    justifyContent: 'center',
-    paddingBottom: 18,
-    paddingHorizontal: 32,
-    paddingTop: 10,
-    position: 'relative',
-  },
-  practiceDockMobile: {
-    paddingBottom: 14,
-    paddingHorizontal: 12,
-    paddingTop: 8,
-  },
-  practiceDockLabelDesktop: {
-    left: 32,
-    position: 'absolute',
-  },
-  practiceDockLabelMobile: {
-    marginBottom: 7,
-  },
-  practiceDockLabel: {
-    fontSize: 14,
-    fontWeight: freshFontFamily.extrabold,
-  },
-  practiceActions: {
-    flexDirection: 'row',
-  },
-  practiceActionsDesktop: {
-    gap: 10,
-  },
-  practiceActionsMobile: {
-    gap: 6,
-  },
-  practiceAction: {
-    alignItems: 'center',
-    borderRadius: 13,
-    borderWidth: 1,
-    flexDirection: 'row',
-    justifyContent: 'center',
-    minHeight: 44,
-  },
-  practiceActionDesktop: {
-    gap: 7,
-    minWidth: 108,
-    paddingHorizontal: 17,
-  },
-  practiceActionMobile: {
-    flex: 1,
-    gap: 3,
-    minWidth: 0,
-    paddingHorizontal: 3,
-  },
-  practiceActionText: {
-    fontWeight: freshFontFamily.bold,
-  },
-  practiceActionTextDesktop: {
-    fontSize: 14,
-  },
-  practiceActionTextMobile: {
-    flexShrink: 1,
-    fontSize: 11.5,
-  },
-  practicePanelHost: {
-    position: 'relative',
-    overflow: 'hidden',
-  },
-  practiceSheetScroll: {
+  lessonSheetHost: {
     flex: 1,
     minHeight: 0,
-  },
-  practiceSheetScrollContent: {
-    flexGrow: 1,
-    paddingBottom: 12,
-  },
-  stickyHeader: {
-    paddingTop: 10,
-    paddingBottom: 46,
-  },
-  stickyHeaderAndroid: {
-    elevation: 0,
-    paddingBottom: 14,
-  },
-  webStickyHeader: {
-    paddingTop: 4,
-    paddingBottom: 18,
-  },
-  stickyHeaderFirstView: {
-    paddingBottom: 14,
     position: 'relative',
-    zIndex: 1,
+    // Android elevation can draw outside the animated sheet; clip it above the mode dock.
+    overflow: 'hidden',
   },
-  webStickyHeaderFirstView: {
-    paddingBottom: 18,
-  },
-  firstViewSecondViewGuard: {
-    height: 44,
-  },
-  modeTabsWrap: {
-    paddingHorizontal: 16,
-  },
-  modeTabsWrapAndroid: {
-    paddingHorizontal: 12,
-  },
-  overviewModeTabsWrap: {
-    marginTop: 8,
-    marginBottom: 8,
-  },
-  modeTabsRow: {
-    width: '100%',
-    maxWidth: 560,
-    alignSelf: 'center',
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
-    position: 'relative',
-  },
-  modeTabsRowFloatingActions: {
-    minHeight: 44,
-  },
-  modeTabsContainer: {
+  contentArea: {
     flex: 1,
-    minWidth: 0,
-    width: '100%',
-    maxWidth: 460,
-    alignSelf: 'center',
-    marginBottom: 0,
+    minHeight: 0,
+    position: 'relative',
   },
-  imageShortcutButton: {
-    width: 42,
-    height: 42,
-    borderRadius: 12,
-    borderWidth: 1.5,
+  contentLayer: {
+    bottom: 0,
+    left: 0,
+    position: 'absolute',
+    right: 0,
+    top: 0,
+  },
+  lessonLayer: {
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: 0,
   },
-  headerFloatingActionButton: {
-    elevation: 4,
-    position: 'absolute',
-    top: 2,
-    zIndex: 5,
+  lessonPoster: {
+    maxWidth: '100%',
   },
-  headerFloatingBackButton: {
-    left: 0,
+  lessonTextFrame: {
+    alignSelf: 'center',
+    maxWidth: '100%',
   },
-  headerFloatingImageButton: {
-    right: 0,
-  },
-  stickyActionButtonHidden: {
-    opacity: 0,
-  },
-  title: {
-    fontWeight: freshFontFamily.extrabold,
-    fontSize: 24,
-    color: '#333',
-    marginTop: 8,
-    marginLeft: 8,
-  },
-  lessonTitleRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    gap: 12,
+  practiceLayerBody: {
+    flex: 1,
+    minHeight: 0,
     width: '100%',
   },
   lessonContentModeToggle: {
+    alignItems: 'center',
     flexDirection: 'row',
-    borderRadius: 999,
-    padding: 4,
-    gap: 4,
+    flexShrink: 0,
+    marginLeft: 'auto',
   },
   lessonContentModeButton: {
-    flexDirection: 'row',
     alignItems: 'center',
-    gap: 5,
-    paddingVertical: 7,
-    paddingHorizontal: 12,
-    borderRadius: 999,
+    flexDirection: 'row',
+    justifyContent: 'center',
   },
   lessonContentModeButtonText: {
-    fontSize: 12.5,
-    fontWeight: freshFontFamily.extrabold,
-  },
-  webTitle: {
-    fontSize: 22,
-    marginTop: 0,
-  },
-  lessonImage: {
-    width: '96%',
-    alignSelf: 'center',
-    marginTop: 10,
-    marginBottom: 8,
-    borderRadius: 18,
-  },
-  webLessonImage: {
-    marginTop: 6,
-    marginBottom: 4,
-  },
-  mixedImageCarouselWrap: {
-    alignSelf: 'center',
-    marginTop: 10,
-    marginBottom: 8,
-    position: 'relative',
-  },
-  mixedImageScroll: {
-    borderRadius: 18,
-    overflow: 'hidden',
-  },
-  mixedImageScrollContent: {
-    alignItems: 'center',
-  },
-  mixedImageSlide: {
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  mixedCarouselImage: {
-    alignSelf: 'center',
-    borderRadius: 18,
-  },
-  mixedImageCarouselOverlay: {
-    alignItems: 'center',
-    bottom: 12,
-    flexDirection: 'row',
-    gap: 8,
-    left: 12,
-    pointerEvents: 'box-none',
-    position: 'absolute',
-    right: 12,
-  },
-  mixedImageNavButton: {
-    alignItems: 'center',
-    borderRadius: 18,
-    borderWidth: 1,
-    height: 36,
-    justifyContent: 'center',
-    width: 36,
-  },
-  mixedImageNavButtonDisabled: {
-    opacity: 0.42,
-  },
-  mixedImageStatusPill: {
-    alignItems: 'center',
-    borderRadius: 18,
-    borderWidth: 1,
-    flex: 1,
-    flexDirection: 'row',
-    gap: 8,
-    justifyContent: 'center',
-    minHeight: 36,
-    minWidth: 0,
-    paddingHorizontal: 12,
-  },
-  mixedImageStatusTitle: {
-    flexShrink: 1,
-    fontSize: 12,
-    fontWeight: '800',
-    lineHeight: 15,
-  },
-  mixedImageStatusCount: {
-    fontSize: 11,
-    fontWeight: '900',
-    lineHeight: 14,
+    fontWeight: freshFontFamily.bold,
   },
   exerciseContainer: {
-    paddingHorizontal: 16,
-    paddingBottom: 18,
+    alignSelf: 'center',
+    flex: 1,
+    minHeight: 0,
+    paddingBottom: 0,
     position: 'relative',
     marginTop: 0,
+    width: '100%',
   },
   livesContainer: {
     alignSelf: 'center',
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    minHeight: 34,
+    minHeight: 30,
   },
   statusBlock: {
-    minHeight: 50,
+    gap: 6,
+    marginBottom: 10,
+    minHeight: 0,
     justifyContent: 'flex-start',
   },
   statusBlockNoLives: {
+    gap: 0,
     minHeight: 0,
   },
   statusBlockFillKeyboard: {
-    minHeight: 58,
-  },
-  livesSlot: {
-    minHeight: 38,
-    justifyContent: 'center',
-    marginBottom: 2,
-  },
-  livesSlotEmpty: {
     minHeight: 0,
   },
+  secondaryStatusRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 8,
+  },
+  livesSlot: {
+    flex: 1,
+    minHeight: 36,
+    justifyContent: 'center',
+  },
   livesPill: {
-    minHeight: 34,
-    paddingHorizontal: 4,
+    minHeight: 36,
+    paddingHorizontal: 2,
     borderRadius: 8,
     backgroundColor: 'transparent',
     borderWidth: 0,
@@ -1946,8 +1548,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   lifeSlot: {
-    width: 34,
-    height: 34,
+    width: 38,
+    height: 36,
     alignItems: 'center',
     justifyContent: 'center',
     position: 'relative',
@@ -1956,269 +1558,175 @@ const styles = StyleSheet.create({
   lostLifeOverlay: {
     position: 'absolute',
     left: 3,
-    top: 3,
+    top: 2,
   },
   progressContainer: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginTop: 0,
-    marginBottom: 10,
-    minHeight: 28,
+    marginTop: 4,
+    marginBottom: 6,
+    gap: 9,
+    minHeight: 13,
+  },
+  // The collapse button is contained by the sheet header now, so this row no longer has to
+  // reserve height or a left inset to dodge it — the dots get the full width and the row
+  // collapses to its natural size.
+  progressContainerWithCollapseMobile: {},
+  progressContainerWithCollapseDesktop: {
+    minHeight: 46,
+    paddingLeft: 60,
   },
   progressDotsRow: {
     flex: 1,
     flexDirection: 'row',
     gap: 4,
-    marginRight: 8,
   },
+  progressDotsRowDesktop: { gap: 6 },
   progressDot: {
     flex: 1,
     height: 6,
     borderRadius: 3,
   },
-  progressText: { fontWeight: freshFontFamily.bold, fontSize: 13 },
-  exercise: { marginBottom: 4, minHeight: CARD_HEIGHT + 126 },
-  exerciseCenterFill: { flex: 1, justifyContent: 'center' },
-  translateExerciseOffset: {
-    marginTop: 0,
+  progressText: { flexShrink: 0, fontWeight: freshFontFamily.extrabold, fontSize: 12.5 },
+  progressTextDesktop: { fontSize: 13 },
+  exercise: { flex: 1, minHeight: 0 },
+  answerArea: {
+    alignItems: 'center',
+    flex: 1,
+    justifyContent: 'flex-start',
+    minHeight: 0,
+    width: '100%',
   },
+  // On web, flex: 0 collapses the basis and can overflow children into the prompt.
+  answerAreaFillDesktopCompact: {
+    flexGrow: 0,
+    flexShrink: 0,
+    flexBasis: 'auto',
+  },
+  answerAreaFillMobileKeyboardTop: {
+    flexGrow: 0,
+    flexShrink: 0,
+    flexBasis: 'auto',
+    justifyContent: 'flex-start',
+  },
+  answerAreaDesktop: { paddingTop: ANSWER_AREA_PADDING.desktop.top, paddingBottom: ANSWER_AREA_PADDING.desktop.bottom },
+  answerAreaMobile: { paddingTop: ANSWER_AREA_PADDING.mobile.top, paddingBottom: ANSWER_AREA_PADDING.mobile.bottom },
+  answerAreaCenter: { justifyContent: 'center' },
   questionCard: {
-    borderRadius: 24,
-    paddingTop: 10,
-    paddingBottom: 22,
-    paddingHorizontal: 24,
-    marginBottom: 20,
-    minHeight: 92,
-    boxShadow: '0px 8px 20px rgba(0,0,0,0.16)',
-    elevation: 4,
+    padding: 0,
+    marginBottom: 0,
+    minHeight: 0,
   },
-  questionCardFillTight: {
-    paddingVertical: 8,
-    paddingHorizontal: 12,
-    marginBottom: 8,
-    minHeight: 64,
-    borderBottomWidth: 3,
+  questionCardFillDesktop: {
+    alignSelf: 'center',
+    width: '90%',
+    maxWidth: 760,
   },
-  questionCardFillAndroidRoomy: {
-    paddingVertical: 16,
-    paddingHorizontal: 18,
-    marginBottom: 12,
-    minHeight: 92,
-    borderBottomWidth: 3,
-  },
+  questionCardNoPrompt: { minHeight: 0 },
   questionHeaderRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     gap: 8,
-    marginBottom: 6,
+    position: 'relative',
+  },
+  livesCenterOverlay: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    top: 0,
+    bottom: 0,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   questionLabelRow: {
     flex: 1,
     minWidth: 0,
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 7,
+    gap: 10,
   },
   questionModeText: {
     color: '#777',
     fontWeight: freshFontFamily.extrabold,
-    fontSize: 11,
     textTransform: 'uppercase',
     letterSpacing: 0.6,
+    marginTop: 5,
   },
+  questionModeTextDesktop: { fontSize: 14 },
+  questionModeTextMobile: { fontSize: 13 },
   sourceLessonBadge: {
-    minHeight: 25,
-    maxWidth: 190,
     flexShrink: 1,
     borderRadius: 999,
-    borderWidth: 1,
-    paddingHorizontal: 8,
+    borderWidth: 0,
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 4,
+    boxShadow: '0px 1px 3px rgba(0,0,0,0.07)',
+  },
+  sourceLessonRowMobile: {
+    alignItems: 'flex-start',
+    marginTop: 15,
   },
   sourceLessonBadgeText: {
     flexShrink: 1,
     minWidth: 0,
-    fontWeight: freshFontFamily.extrabold,
-    fontSize: 12,
+    fontWeight: freshFontFamily.bold,
   },
   answerSavedBadge: {
     minHeight: 25,
-    maxWidth: 150,
     borderRadius: 999,
     borderWidth: 1,
-    paddingHorizontal: 8,
+    paddingHorizontal: 10,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     gap: 4,
+       marginTop: 5,
   },
   answerSavedText: {
     flexShrink: 1,
     minWidth: 0,
     fontWeight: freshFontFamily.extrabold,
-    fontSize: 12,
   },
-  question: { fontWeight: freshFontFamily.extrabold, fontSize: 24, lineHeight: 31 },
+  question: { letterSpacing: -0.27, textAlign: 'center' },
+  questionDesktop: {
+    fontSize: PROMPT_TYPE.desktop.fontSize,
+    fontWeight: freshFontFamily.extrabold,
+    lineHeight: PROMPT_TYPE.desktop.lineHeight,
+    marginTop: 28,
+  },
+  questionMobile: {
+    fontSize: PROMPT_TYPE.mobile.fontSize,
+    fontWeight: '800',
+    lineHeight: PROMPT_TYPE.mobile.lineHeight,
+  },
   parentheticalPromptText: {
     fontStyle: 'italic',
     opacity: 0.78,
   },
-  questionFillTight: {
-    fontSize: 18,
-    lineHeight: 23,
-  },
-  questionFillAndroidRoomy: {
-    fontSize: 21,
-    lineHeight: 27,
-  },
-  optionsContainer: {
-    flexDirection: 'column',
-    gap: 10,
-    height: CARD_HEIGHT,
-  },
-  optionButton: {
-    height: (CARD_HEIGHT - 30) / 4,
-    paddingVertical: 12,
-    paddingHorizontal: 18,
-    borderRadius: 14,
-    backgroundColor: '#fff',
-    borderWidth: 0,
-    borderColor: '#E5E5E5',
-    borderBottomColor: '#E5E5E5',
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 14,
-    boxShadow: '0px 3px 8px rgba(0,0,0,0.05)',
-    elevation: 1,
-  },
-  optionLetterBadge: {
-    width: 30,
-    height: 30,
-    borderRadius: 999,
-    alignItems: 'center',
-    justifyContent: 'center',
-    flexShrink: 0,
-  },
-  optionLetterBadgeText: {
-    fontSize: 13,
-    fontWeight: freshFontFamily.extrabold,
-  },
-  selectedOption: { borderColor: '#78CBFF', borderBottomColor: '#1396D8', backgroundColor: '#D7F0FF' },
-  incorrectOption: { backgroundColor: '#FFE8EC', borderColor: '#F06A7F', borderBottomColor: '#D94E64' },
-  optionText: { fontWeight: freshFontFamily.semibold, fontSize: 18, color: '#24313D' },
-  incorrectOptionText: { color: '#8F2234' },
-  correctAnswer: { backgroundColor: '#E9F8EF', borderColor: '#42C67A', borderBottomColor: '#28A360' },
-  correctAnswerText: { color: '#12663D' },
   gameOverText: { fontSize: 24, fontWeight: 'bold', marginBottom: 8 },
   gameOverSubText: { fontSize: 16 },
-  completionText: { fontSize: 22, lineHeight: 27, fontWeight: 'bold', marginBottom: 8, textAlign: 'center' },
   gameOverContainer: {
     alignItems: 'center',
-    padding: 24,
-    borderRadius: 16,
-    marginVertical: 16,
-    borderWidth: 1.5,
     boxShadow: '0px 6px 12px rgba(0,0,0,0.16)',
-    elevation: 5,
   },
-  completionContainer: { alignItems: 'center', padding: 24, borderRadius: 16, marginVertical: 16 },
   emptyStateCard: {
     alignItems: 'center',
-    padding: 24,
-    borderRadius: 16,
-    marginVertical: 16,
   },
   emptyStateTitle: {
-    fontSize: 22,
     fontWeight: '800',
     textAlign: 'center',
-    marginBottom: 8,
   },
   emptyStateText: {
-    fontSize: 15,
     fontWeight: '600',
     textAlign: 'center',
   },
-  feedbackCard: { position: 'absolute', left: 16, right: 16, height: CARD_HEIGHT, padding: 16, borderRadius: 8, alignItems: 'center', justifyContent: 'center', zIndex: 10, borderWidth: 1.5, borderColor: 'rgba(223,255,238,0.5)', elevation: 7 },
-  feedbackText: { color: '#fff', fontWeight: freshFontFamily.extrabold, fontSize: 32, textAlign: 'center' },
-  congratsBox: {
-    width: '100%',
-    maxWidth: 620,
-    alignSelf: 'center',
-    alignItems: 'center',
-    justifyContent: 'center',
-    padding: 24,
-    borderRadius: 18,
-    marginVertical: 16,
-    borderWidth: 1.5,
-    boxShadow: '0px 6px 12px rgba(0,0,0,0.14)',
-    elevation: 4,
-  },
-  sessionMistakeStat: {
-    fontSize: 13,
-    fontWeight: '600',
-    textAlign: 'center',
-    marginTop: 6,
-    marginBottom: 2,
-  },
-  levelUpBanner: {
-    minHeight: 40,
-    marginTop: 10,
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-    borderRadius: 999,
-    backgroundColor: '#FFE8A3',
-    borderWidth: 1,
-    borderColor: '#F4B942',
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 7,
-  },
-  levelUpBannerText: {
-    color: '#7A4B00',
-    fontSize: 14,
-    lineHeight: 17,
-    fontWeight: '900',
-    textAlign: 'center',
-  },
-  gameModeButton: { minWidth: 220, paddingVertical: 13, paddingHorizontal: 24, borderRadius: 999, marginTop: 12, alignItems: 'center', justifyContent: 'center' },
+  feedbackCard: { position: 'absolute', alignItems: 'center', justifyContent: 'center', zIndex: 10, borderWidth: 1.5, borderColor: 'rgba(223,255,238,0.5)', elevation: 7 },
+  feedbackText: { color: '#fff', fontWeight: freshFontFamily.extrabold, textAlign: 'center' },
+  gameModeButton: { borderRadius: 999, alignItems: 'center', justifyContent: 'center' },
   gameModeButtonText: { color: '#fff', fontSize: 16, fontWeight: 'bold', textAlign: 'center' },
-  completionButtonRow: { flexDirection: 'row', gap: 10, marginTop: 12, width: '100%' },
-  completionButtonFlex: { flex: 1, minWidth: 0 },
-  perfectCongratsBox: {
-    backgroundColor: '#FFF8D6',
-    borderWidth: 1.5,
-    borderColor: '#E7C566',
-    boxShadow: '0px 4px 10px rgba(212,167,44,0.50)',
-    elevation: 10,
-  },
-  perfectCompletionText: {
-    color: '#5F4A13',
-    fontSize: 24,
-    lineHeight: 29,
-    fontWeight: 'bold',
-    marginBottom: 6,
-    textAlign: 'center',
-  },
-  perfectImage: {
-    width: screenWidth * 0.25,
-    height: screenWidth * 0.25,
-    marginBottom: 20,
-  },
   gameOverImage: {
-    width: screenWidth * 0.25,
-    height: screenWidth * 0.25,
     marginBottom: 16,
-  },
-  closeButton: {
-    position: 'absolute',
-    top: 0,
-    right: 0,
-    padding: 16,
   },
 });

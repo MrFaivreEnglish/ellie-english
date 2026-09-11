@@ -2,7 +2,7 @@ const PossessivesGrammar = {
   id: '42',
   title: 'Les pronoms possessifs',
   description: 'Use possessive adjectives and possessive pronouns (my, your, his, hers, mine, yours)',
-  imageUrl: 'https://i.ibb.co/zhsFKsfS/Possessifs.png',
+  imageUrl: 'https://wretggbpaejzjdilemit.supabase.co/storage/v1/object/public/lesson-images/15274719ab/les-pronoms-possessifs.webp',
   textContent: {
     cards: [
       {
@@ -202,7 +202,7 @@ translateExercises: [
     { question: 'He brought ___ laptop. (his/him)', answer: 'his', options: ['his', 'him', 'he'] },
     { question: 'The keys on the table are ___. (ours/our)', answer: 'ours', options: ['ours', 'our', 'we'] },
     { question: 'That coat is ___. (hers/her)', answer: 'hers', options: ['hers', 'her', 'she'] },
-    { question: 'She said the victory was ___. (their/theirs)', answer: 'theirs', options: ['their', 'theirs', 'they'] },
+    { question: 'That bike is ___. (his/him)', answer: 'his', options: ['his', 'him', 'he'] },
     { question: 'Is this ___ book or mine?', answer: 'your', options: ['your', 'yours', 'you'] }
   ]
 };

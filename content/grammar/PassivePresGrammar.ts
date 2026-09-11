@@ -3,7 +3,7 @@ const PassivePresGrammar = {
   title: 'Voix passive présent',
   description: 'Learn how to use the passive voice in present tense',
   category: 'Voix passive',
-  imageUrl: 'https://i.ibb.co/mV0xzQRY/Voix-passive-pr-sent.png',
+  imageUrl: 'https://wretggbpaejzjdilemit.supabase.co/storage/v1/object/public/lesson-images/15274719ab/voix-passive-present.webp',
   textContent: {
     cards: [
       {
@@ -77,8 +77,6 @@ translateExercises: [
     answer: "The bike is fixed by my brother.",
     wordBank: ["The", "bike", "is", "fixed", "by", "my", "brother.", "are"]
   },
-  // 10 present passive sentences — negative form
-
 {
   type: 'translate',
   question: 'Translate into English.',

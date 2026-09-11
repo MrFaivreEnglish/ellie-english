@@ -1,12 +1,14 @@
-import { useEffect, useMemo, useRef, useState, type ComponentProps } from 'react';
-import { Animated, Easing, Platform, Pressable, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
+import { useCallback, useEffect, useMemo, useRef, useState, type ComponentProps } from 'react';
+import { Animated, Easing, Platform, Pressable, StyleSheet, View, useWindowDimensions } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useIsFocused } from '@react-navigation/native';
-import { MaterialIcons } from '@expo/vector-icons';
+import Text from '../../shared/ThemedText';
+import MaterialIcons from '../../shared/ThemedMaterialIcon';
 import { vocabRushColors, vocabRushColorsForTheme } from './vocabRushColors';
 import { shuffleArray } from '../vocabularyUtils';
 import { triggerSelectionHaptic, triggerSuccessHaptic, triggerWarningHaptic } from '../../shared/haptics';
-import { addXP } from '../../progress/xpStorage';
+import { awardActivityXPOnceToday, previewActivityXPOnceToday } from '../../progress/xpStorage';
+import { recordPracticeToday } from '../../progress/streakStorage';
 import { useTheme } from '../../settings/ThemeContext';
 import { getMenuCopy } from '../../shared/menuCopy';
 import { HOME_MENU_ROUTE_COLORS, SHINY_HOME_MENU_ROUTE_COLORS } from '../../shared/homeMenuColors';
@@ -16,45 +18,68 @@ import VocabRushGameOverCard from './VocabRushGameOverCard';
 import VocabularyCompletionModal from '../VocabularyCompletionModal';
 import { fontFamilyForWeight } from './vocabRushFonts';
 import type { Word } from '../../../types/VocabularyTypes';
+import {
+  DESKTOP_WEB_MIN_WIDTH,
+  getBottomSafeAreaInset,
+  getWebLessonScale,
+  LARGE_WIDTH,
+  NARROW_TRAY_WIDTH,
+} from '../../shared/responsiveLayout';
 
 const BOARD_SIZE = 6;
-// On-screen "SCORE" stat during play — independent of the XP formula below.
+
 const SCORE_PER_MATCH = 1;
-// Matches the classic matching screen's WRONG_MATCH_FEEDBACK_MS exactly.
+
+const COMBO_BONUS_STREAK_THRESHOLD = 30;
+const COMBO_BONUS_MULTIPLIER = 1.5;
+
 const WRONG_PAIR_LOCKOUT_MS = 650;
 const REFILL_DELAY_MS = 150;
 const GRID_MAX_WIDTH = 820;
 const GRID_COLUMN_GAP = 60;
-// Card enter/exit timings — same feel as the classic screen's refill animation.
-const CARD_ENTER_MS = 170;
+
+const CARD_ENTER_MS = 320;
 const CARD_EXIT_MS = 130;
-const CARD_ENTER_OFFSET = 8;
+const CARD_ENTER_OFFSET = 6;
 
 type ModeKey = 'easy' | 'normal' | 'hard' | 'impossible';
 
-// Timer scales with how many words are actually in play (secondsPerWord × totalWords)
-// rather than a fixed duration — a 3-word test session and a 30-word full session both
-// feel like "Easy" instead of one being absurdly long or the other absurdly rushed.
-// XP is a flat amount per matched pair, awarded once at the end — only when every
-// word gets matched before time runs out, never on a timeout ("game over").
+
+
+
+
+
 const MODES: { key: ModeKey; label: string; secondsPerWord: number; xpPerPair: number; emoji: string; tagline: string; accent: string }[] = [
   { key: 'easy', label: 'Easy', secondsPerWord: 3, xpPerPair: 1, emoji: '🐢', tagline: 'Chill vibes only', accent: '#3FA867' },
   { key: 'normal', label: 'Normal', secondsPerWord: 2, xpPerPair: 2, emoji: '🙂', tagline: 'Nice and steady', accent: vocabRushColors.comboValue },
   { key: 'hard', label: 'Hard', secondsPerWord: 1.5, xpPerPair: 3, emoji: '🔥', tagline: 'Getting spicy', accent: '#e8792b' },
   { key: 'impossible', label: 'Impossible', secondsPerWord: 1, xpPerPair: 5, emoji: '💀', tagline: 'Good luck with that', accent: vocabRushColors.timerRed },
 ];
-// Highest xpPerPair across all modes ('Impossible') — the ceiling shown as
-// "max XP possible" wherever we tease Vocab Rush before the mode is picked.
+
+
 export const MAX_XP_PER_PAIR = Math.max(...MODES.map((m) => m.xpPerPair));
+
+// Rush always draws from the same pool (the student's known words), so there are no
+// per-item keys to dedupe against — a cleared run is one activity, keyed by difficulty.
+// The first clear on each mode each day pays in full; clearing it again pays a fraction,
+// the same shape every other mode uses. Without this, Rush was the one earning path with
+// no ceiling at all: clear, replay, repeat, at roughly a level every couple of minutes.
+const buildRunActivityKey = (modeKey: ModeKey) => `vocabulary:vocab-rush:${modeKey}`;
+const VOCAB_RUSH_REPLAY_XP_FRACTION = 0.2;
+
 const MIN_MODE_SECONDS = 8;
 const getModeSeconds = (secondsPerWord: number, totalWords: number) =>
   Math.max(MIN_MODE_SECONDS, Math.round(secondsPerWord * Math.max(1, totalWords)));
 
-// Reference viewport height at which every element renders at its full spec size.
-// Shorter viewports (phones, APK, mobile web) scale the chrome down so the whole
-// screen — header through bottom nav — always fits without scrolling.
+
+
+
 const CHROME_REFERENCE_HEIGHT = 860;
 const MIN_CHROME_SCALE = 0.62;
+
+
+
+const MAX_CHROME_SCALE = 1.9;
 
 type BoardCard = { pairId: string; word: Word };
 type BoardColumn = (BoardCard | null)[];
@@ -97,10 +122,11 @@ export default function VocabRushGame({
 }: VocabRushGameProps) {
   const insets = useSafeAreaInsets();
   const { width: windowWidth, height: windowHeight } = useWindowDimensions();
-  const { colors: themeColors, isDarkMode, isShinyEllieMode } = useTheme();
+  const { colors: themeColors, isDarkMode, isShinyElliePresentationMode } = useTheme();
   const colors = vocabRushColorsForTheme(isDarkMode, themeColors);
+  const desktopUiScale = getWebLessonScale(windowWidth, windowHeight);
   const menuCopy = getMenuCopy();
-  // Same "wrong pair" feedback colors as the classic matching screen.
+
   const wrongBg = isDarkMode ? '#3A1512' : '#ffe0da';
   const wrongBorderColor = '#f47b74';
   const wrongTextColor = isDarkMode ? '#FFB4AE' : '#ac3031';
@@ -121,17 +147,34 @@ export default function VocabRushGame({
   const [sessionXp, setSessionXp] = useState(0);
   const [timeLeft, setTimeLeft] = useState(() => getModeSeconds(MODES[1].secondsPerWord, totalWords));
   const [gameOver, setGameOver] = useState(false);
+  // Streak-bonus: hitting the threshold makes the button available; tapping it activates
+  // the 1.5x multiplier, which stays on until the streak itself breaks.
+  const [comboBonusAvailable, setComboBonusAvailable] = useState(false);
+  const [comboBonusActive, setComboBonusActive] = useState(false);
+  // Counts matches made while the bonus was active, so endGame can add the extra XP for them.
+  const bonusMatchesRef = useRef(0);
+  // "Go to account" dismisses the completion card/modal without resetting the round, so
+  // gameOver stays true underneath — track the dismissal separately so it doesn't pop back
+  // up when the user returns from Account to this still-open screen.
+  const [completionAcknowledged, setCompletionAcknowledged] = useState(false);
   const [mode, setMode] = useState<ModeKey | null>(null);
   const [pickerVisible, setPickerVisible] = useState(true);
 
   const queueRef = useRef<Word[]>(initial.queue);
   const nextPairIdRef = useRef(initial.nextPairId);
   const gameEndedRef = useRef(false);
+  const pendingXpRef = useRef(0);
+  const pendingActivityKeyRef = useRef('');
+
+
+
+
+  const pendingRefillSlotsRef = useRef<{ enIndex: number; frIndex: number }[]>([]);
   const timerPulseAnim = useRef(new Animated.Value(1)).current;
   const timerPulseLoopRef = useRef<Animated.CompositeAnimation | null>(null);
 
-  // Per-slot (not per-card) enter/exit animation — reused across content swaps so a
-  // card fades+slides out and the next one fades+slides in at the same board position.
+
+
   type CardAnim = { opacity: Animated.Value; scale: Animated.Value; translateY: Animated.Value };
   const cardAnimsRef = useRef<Map<string, CardAnim>>(new Map());
   const prevPairIdsRef = useRef<Map<string, string | null>>(new Map());
@@ -168,12 +211,12 @@ export default function VocabRushGame({
         if (currentPairId && currentPairId !== prevPairId) {
           const anim = getCardAnim(slotKey);
           anim.opacity.setValue(0);
-          anim.scale.setValue(0.94);
+          anim.scale.setValue(0.97);
           anim.translateY.setValue(CARD_ENTER_OFFSET);
           Animated.parallel([
-            Animated.timing(anim.opacity, { toValue: 1, duration: CARD_ENTER_MS, easing: Easing.out(Easing.cubic), useNativeDriver: Platform.OS !== 'web' }),
-            Animated.timing(anim.scale, { toValue: 1, duration: CARD_ENTER_MS, easing: Easing.out(Easing.cubic), useNativeDriver: Platform.OS !== 'web' }),
-            Animated.timing(anim.translateY, { toValue: 0, duration: CARD_ENTER_MS, easing: Easing.out(Easing.cubic), useNativeDriver: Platform.OS !== 'web' }),
+            Animated.timing(anim.opacity, { toValue: 1, duration: CARD_ENTER_MS, easing: Easing.out(Easing.quad), useNativeDriver: Platform.OS !== 'web' }),
+            Animated.timing(anim.scale, { toValue: 1, duration: CARD_ENTER_MS, easing: Easing.out(Easing.quad), useNativeDriver: Platform.OS !== 'web' }),
+            Animated.timing(anim.translateY, { toValue: 0, duration: CARD_ENTER_MS, easing: Easing.out(Easing.quad), useNativeDriver: Platform.OS !== 'web' }),
           ]).start();
         }
 
@@ -184,11 +227,12 @@ export default function VocabRushGame({
 
   const startGame = (modeKey: ModeKey) => {
     const fresh = buildInitialBoard(words);
-    // Pair ids restart from w0 each game — clear anim tracking so slots replay their
-    // enter animation instead of being mistaken for "unchanged" from the last session.
+
+
     cardAnimsRef.current.clear();
     prevPairIdsRef.current.clear();
     gameEndedRef.current = false;
+    pendingRefillSlotsRef.current = [];
     setBoard({ en: fresh.en, fr: fresh.fr });
     queueRef.current = fresh.queue;
     nextPairIdRef.current = fresh.nextPairId;
@@ -200,35 +244,68 @@ export default function VocabRushGame({
     setStreak(startingStreak);
     setBestStreak(startingStreak);
     setSessionXp(0);
+    pendingXpRef.current = 0;
+    pendingActivityKeyRef.current = '';
     setTimeLeft(getModeSeconds(MODES.find((m) => m.key === modeKey)!.secondsPerWord, totalWords));
     setGameOver(false);
+    setCompletionAcknowledged(false);
+    setComboBonusAvailable(false);
+    setComboBonusActive(false);
+    bonusMatchesRef.current = 0;
     setMode(modeKey);
     setPickerVisible(false);
   };
 
-  // XP is only awarded when the round ends because every word got matched — never on
-  // a timeout ("game over"). Awarding happens (and resolves) before `gameOver` flips,
-  // so by the time the completion screen reads total XP to detect a level-up, it's in.
+
+
+
   const endGame = async (finalMatchedCount: number, modeKey: ModeKey, awardXp: boolean) => {
     if (gameEndedRef.current) return;
     gameEndedRef.current = true;
 
+    // A finished run counts toward the streak whether or not it earned XP, and
+    // independently of whether the student claims it on the game-over card.
+    void recordPracticeToday();
+
     if (awardXp) {
       const activeMode = MODES.find((m) => m.key === modeKey) ?? MODES[1];
-      const finalXp = finalMatchedCount * activeMode.xpPerPair;
-      setSessionXp(finalXp);
-      if (finalXp > 0) {
-        await addXP(finalXp);
-      }
+      const baseXp = finalMatchedCount * activeMode.xpPerPair;
+      // Matches made while the combo bonus was active earn the extra 0.5x on top of the base rate.
+      const bonusXp = Math.round(bonusMatchesRef.current * activeMode.xpPerPair * (COMBO_BONUS_MULTIPLIER - 1));
+      const finalXp = baseXp + bonusXp;
+      // Banked when the student claims it on the game-over card — see claimSessionXp.
+      pendingXpRef.current = finalXp;
+      pendingActivityKeyRef.current = buildRunActivityKey(modeKey);
+      // Clearing the same board again today is worth a fraction, so the card has to show
+      // what claiming really gives rather than the run's face value.
+      setSessionXp(
+        await previewActivityXPOnceToday(
+          pendingActivityKeyRef.current,
+          finalXp,
+          VOCAB_RUSH_REPLAY_XP_FRACTION
+        )
+      );
     }
     setGameOver(true);
   };
 
-  // Leaving this screen mid-round (tab switch, back button) used to leave the
-  // interval running or resume the stale countdown on return — the round would
-  // silently burn through the clock while the player wasn't even looking at it.
-  // Losing focus now pauses the timer; regaining focus mid-round resets it to a
-  // fresh full duration for the current mode instead of resuming where it left off.
+  const claimSessionXp = useCallback(async () => {
+    const pending = pendingXpRef.current;
+    const activityKey = pendingActivityKeyRef.current;
+    pendingXpRef.current = 0;
+    pendingActivityKeyRef.current = '';
+    if (pending <= 0 || !activityKey) return 0;
+
+    const granted = await awardActivityXPOnceToday(activityKey, pending, VOCAB_RUSH_REPLAY_XP_FRACTION);
+    setSessionXp(granted);
+    return granted;
+  }, []);
+
+
+
+
+
+
   const isFocused = useIsFocused();
   const wasFocusedRef = useRef(isFocused);
 
@@ -299,10 +376,12 @@ export default function VocabRushGame({
     if (enCard.pairId === frCard.pairId) {
       triggerSuccessHaptic();
 
-      setScore((s) => s + SCORE_PER_MATCH);
+      if (comboBonusActive) bonusMatchesRef.current += 1;
+      setScore((s) => s + Math.round(SCORE_PER_MATCH * (comboBonusActive ? COMBO_BONUS_MULTIPLIER : 1)));
       setStreak((s) => {
         const next = s + 1;
         setBestStreak((best) => Math.max(best, next));
+        if (next >= COMBO_BONUS_STREAK_THRESHOLD && !comboBonusActive) setComboBonusAvailable(true);
         return next;
       });
       setMatchedCount((c) => c + 1);
@@ -312,18 +391,39 @@ export default function VocabRushGame({
       playExitAnimation(`fr-${frIndex}`);
 
       setTimeout(() => {
-        setBoard((prev) => {
-          const nextWord = queueRef.current.shift();
-          const next = { en: [...prev.en], fr: [...prev.fr] };
+        pendingRefillSlotsRef.current.push({ enIndex, frIndex });
 
-          if (nextWord) {
-            const pairId = `w${nextPairIdRef.current++}`;
-            next.en[enIndex] = { pairId, word: nextWord };
-            next.fr[frIndex] = { pairId, word: nextWord };
-          } else {
+        if (pendingRefillSlotsRef.current.length < 2 && queueRef.current.length > 0) {
+
+
+          setBoard((prev) => {
+            const next = { en: [...prev.en], fr: [...prev.fr] };
             next.en[enIndex] = null;
             next.fr[frIndex] = null;
-          }
+            return next;
+          });
+          setInputLocked(false);
+          return;
+        }
+
+        const slotsToFill = pendingRefillSlotsRef.current;
+        pendingRefillSlotsRef.current = [];
+
+        setBoard((prev) => {
+          const next = { en: [...prev.en], fr: [...prev.fr] };
+
+          slotsToFill.forEach(({ enIndex: pendingEnIndex, frIndex: pendingFrIndex }) => {
+            const nextWord = queueRef.current.shift();
+
+            if (nextWord) {
+              const pairId = `w${nextPairIdRef.current++}`;
+              next.en[pendingEnIndex] = { pairId, word: nextWord };
+              next.fr[pendingFrIndex] = { pairId, word: nextWord };
+            } else {
+              next.en[pendingEnIndex] = null;
+              next.fr[pendingFrIndex] = null;
+            }
+          });
 
           return next;
         });
@@ -332,6 +432,8 @@ export default function VocabRushGame({
     } else {
       triggerWarningHaptic();
       setStreak(0);
+      setComboBonusAvailable(false);
+      setComboBonusActive(false);
       setInputLocked(true);
       setWrongPair({ en: enIndex, fr: frIndex });
 
@@ -341,36 +443,57 @@ export default function VocabRushGame({
         setInputLocked(false);
       }, WRONG_PAIR_LOCKOUT_MS);
     }
-  }, [selected, board]);
+  }, [selected, board, comboBonusActive]);
+
+  const activateComboBonus = () => {
+    if (!comboBonusAvailable) return;
+    triggerSelectionHaptic();
+    setComboBonusAvailable(false);
+    setComboBonusActive(true);
+  };
 
   const handleCardPress = (column: 'en' | 'fr', index: number) => {
     if (paused || inputLocked) return;
     if (!board[column][index]) return;
 
-    triggerSelectionHaptic();
+
+
+
+    const otherColumn = column === 'en' ? 'fr' : 'en';
+    if (selected[otherColumn] === null) {
+      triggerSelectionHaptic();
+    }
     setSelected((prev) => ({ ...prev, [column]: index }));
   };
 
-  // --- Bottom nav — a faithful clone of the real app tab bar (App.tsx MainTabNavigator) ---
+
   const useApkPreviewLayout = isApkLayoutPreviewEnabled();
   const isAndroidTabBarLayout = Platform.OS === 'android' || useApkPreviewLayout;
   const isWebTabBarLocal = Platform.OS === 'web' && !useApkPreviewLayout;
-  const isCompactTabBar = windowWidth < 430;
-  const isLargeTabBar = windowWidth >= 900;
-  const tabBarIconSize = isCompactTabBar ? 22 : isLargeTabBar ? 23 : 22;
-  const tabBarLabelFontSize = isCompactTabBar ? 11 : isLargeTabBar ? 12 : 11;
-  const tabBarLabelLineHeight = isCompactTabBar ? 13 : isLargeTabBar ? 14 : 13;
-  const androidSystemNavInset = isAndroidTabBarLayout ? Math.max(insets.bottom, 24) : 0;
-  const tabBarBaseHeight = isWebTabBarLocal ? (isCompactTabBar ? 58 : isLargeTabBar ? 60 : 58) : (isCompactTabBar ? 48 : isLargeTabBar ? 50 : 48);
+  const isMobileWebTabBar = isWebTabBarLocal && windowWidth < DESKTOP_WEB_MIN_WIDTH;
+  const isCompactTabBar = windowWidth < NARROW_TRAY_WIDTH;
+  const isLargeTabBar = windowWidth >= LARGE_WIDTH;
+  const tabBarScale = isWebTabBarLocal ? desktopUiScale : 1;
+  const tabBarIconSize = isMobileWebTabBar
+    ? 26
+    : Math.round((isCompactTabBar ? 22 : isLargeTabBar ? 23 : 22) * tabBarScale);
+  const tabBarLabelFontSize = Math.round((isCompactTabBar ? 11 : isLargeTabBar ? 12 : 11) * tabBarScale);
+  const tabBarLabelLineHeight = Math.round((isCompactTabBar ? 13 : isLargeTabBar ? 14 : 13) * tabBarScale);
+
+
+  const androidSystemNavInset = isAndroidTabBarLayout ? getBottomSafeAreaInset(insets.bottom, 24) : 0;
+  const tabBarBaseHeight = isWebTabBarLocal
+    ? Math.round((isCompactTabBar ? 58 : isLargeTabBar ? 60 : 58) * tabBarScale)
+    : (isCompactTabBar ? 48 : isLargeTabBar ? 50 : 48);
   const tabBarHeight = tabBarBaseHeight + androidSystemNavInset;
   const tabBarBackgroundColor = isDarkMode
     ? themeColors.card
     : isAndroidTabBarLayout
       ? getAndroidBottomBarColor(isDarkMode, themeColors)
       : 'rgba(255, 255, 255, 0.82)';
-  const tabBarBorderColor = isAndroidTabBarLayout ? 'transparent' : isDarkMode ? themeColors.border : 'rgba(0,0,0,0.08)';
+  const tabBarBorderColor = isAndroidTabBarLayout ? 'transparent' : themeColors.border;
   const tabBarTopBorderWidth = isAndroidTabBarLayout ? 0 : StyleSheet.hairlineWidth;
-  const tabRouteColors: Record<string, string> = isShinyEllieMode ? SHINY_HOME_MENU_ROUTE_COLORS : HOME_MENU_ROUTE_COLORS;
+  const tabRouteColors: Record<string, string> = isShinyElliePresentationMode ? SHINY_HOME_MENU_ROUTE_COLORS : HOME_MENU_ROUTE_COLORS;
 
   const navItems: { key: NavKey; route: string; icon: ComponentProps<typeof MaterialIcons>['name']; label: string }[] = [
     { key: 'grammar', route: 'Grammar', icon: 'edit', label: menuCopy.home.grammarTitle },
@@ -379,15 +502,16 @@ export default function VocabRushGame({
     { key: 'settings', route: 'Settings', icon: 'settings', label: menuCopy.home.settingsTitle },
   ];
 
-  // --- Horizontal fit (width-driven) ---
-  const horizontalPadding = windowWidth < 480 ? 20 : 48;
-  const columnGap = windowWidth < 480 ? Math.round(GRID_COLUMN_GAP * 0.4) : GRID_COLUMN_GAP;
-  const gridContentWidth = Math.min(windowWidth - horizontalPadding * 2, GRID_MAX_WIDTH);
+
+  const horizontalPadding = windowWidth < 480 ? 20 : Math.round(48 * desktopUiScale);
+  const columnGap = windowWidth < 480 ? Math.round(GRID_COLUMN_GAP * 0.4) : Math.round(GRID_COLUMN_GAP * desktopUiScale);
+  const gridMaxWidth = Math.round(GRID_MAX_WIDTH * desktopUiScale);
+  const gridContentWidth = Math.min(windowWidth - horizontalPadding * 2, gridMaxWidth);
   const columnWidth = Math.max(50, (gridContentWidth - columnGap) / 2);
 
-  // --- Vertical fit (height-driven) — scales chrome so header..grid always fits above the tab bar ---
+
   const availableHeight = Math.max(300, windowHeight - insets.top - tabBarHeight);
-  const chromeScale = clampNum(availableHeight / CHROME_REFERENCE_HEIGHT, MIN_CHROME_SCALE, 1);
+  const chromeScale = clampNum(availableHeight / CHROME_REFERENCE_HEIGHT, MIN_CHROME_SCALE, MAX_CHROME_SCALE);
   const sc = (base: number) => Math.round(base * chromeScale);
 
   const containerPaddingV = Math.max(10, sc(20));
@@ -397,19 +521,19 @@ export default function VocabRushGame({
   const statValueFontSize = Math.max(15, sc(26));
   const statLabelFontSize = Math.max(9, sc(12));
   const dividerHeight = Math.max(22, sc(44));
-  const statsMarginTop = Math.max(8, sc(26));
+  const statsMarginTop = Math.max(6, sc(16));
   const statsGap = Math.max(10, sc(22));
   const instructionFontSize = Math.max(11, sc(15));
-  const instructionMarginTop = Math.max(10, sc(30));
+  const instructionMarginTop = Math.max(6, sc(18));
   const gridMarginTop = Math.max(8, sc(26));
   const rowGap = Math.max(9, sc(24));
 
   const statsRowHeight = Math.max(timerFontSize, statLabelFontSize + statValueFontSize + 2);
   const instructionLineHeight = instructionFontSize + 6;
 
-  // Everything above the grid, at the sizes above (the tab bar is handled separately, at its own fixed size).
-  // No progress bar — the timer + instruction line already communicate pace, and
-  // dropping the bar frees up vertical room for shorter cards with more breathing space.
+
+
+
   const chromeHeight =
     containerPaddingV +
     backButtonSize +
@@ -417,19 +541,19 @@ export default function VocabRushGame({
     instructionMarginTop + instructionLineHeight +
     gridMarginTop;
 
-  // Small safety buffer — text line-height in real rendering runs a few px past
-  // fontSize, so this keeps the last row clear of the tab bar rather than exact-fitting.
+
+
   const chromeSafetyMargin = 20;
   const gridHeight = Math.max(boardSize * 30, availableHeight - chromeHeight - chromeSafetyMargin);
 
-  // Cards match the classic matching screen's proportions: width is a wide, fixed
-  // share of the column (not derived from height via a strict aspect ratio), and
-  // text scales with height the same way so it reads bigger and bolder.
-  // Capped shorter than before (was 130) so there's more visible gap between rows.
+
+
+
+
   const cardWidth = Math.round(columnWidth * (windowWidth < 480 ? 0.86 : 0.9));
   const cardHeightFromBudget = (gridHeight - (boardSize - 1) * rowGap) / boardSize;
-  const cardHeight = clampNum(cardHeightFromBudget, 36, 100);
-  const cardFontSize = clampNum(cardHeight * 0.38, 11, 16);
+  const cardHeight = clampNum(cardHeightFromBudget, 36, 100 * desktopUiScale);
+  const cardFontSize = clampNum(cardHeight * 0.38, 11, 16 * desktopUiScale);
 
   const renderCard = (column: 'en' | 'fr', index: number) => {
     const slot = board[column][index];
@@ -481,7 +605,7 @@ export default function VocabRushGame({
             style={[
               styles.cardText,
               { fontSize: cardFontSize, color: colors.cardText },
-              isWrong ? { color: wrongTextColor } : isSelected && styles.cardTextSelected,
+              isWrong ? { color: wrongTextColor } : isSelected && { color: colors.cardSelectedText },
             ]}
             numberOfLines={2}
             adjustsFontSizeToFit
@@ -537,11 +661,29 @@ export default function VocabRushGame({
           </View>
         </View>
 
+        {(comboBonusAvailable || comboBonusActive) && (
+          <Pressable
+            onPress={activateComboBonus}
+            disabled={!comboBonusAvailable}
+            accessibilityRole="button"
+            accessibilityLabel={comboBonusActive ? '1.5x combo bonus active' : 'Activate 1.5x combo bonus'}
+            accessibilityState={{ disabled: !comboBonusAvailable }}
+            style={[
+              styles.comboBonusButton,
+              { backgroundColor: colors.timerRed, opacity: comboBonusActive ? 0.85 : 1 },
+            ]}
+          >
+            <Text style={styles.comboBonusButtonText}>
+              {comboBonusActive ? '🔥 1.5x BONUS ACTIVE' : '🔥 30 COMBO! TAP FOR 1.5x'}
+            </Text>
+          </Pressable>
+        )}
+
         <Text style={[styles.instruction, { fontSize: instructionFontSize, marginTop: instructionMarginTop, color: colors.instructionText }]}>
           Match every English word to its French translation
         </Text>
 
-        <View style={[styles.grid, { columnGap, marginTop: gridMarginTop, maxWidth: GRID_MAX_WIDTH }]}>
+        <View style={[styles.grid, { columnGap, marginTop: gridMarginTop, maxWidth: gridMaxWidth }]}>
           <View style={[styles.column, { rowGap }]}>
             {board.en.map((_, index) => renderCard('en', index))}
           </View>
@@ -574,26 +716,28 @@ export default function VocabRushGame({
             <Pressable
               key={item.key}
               onPress={() => onNavigate(item.key)}
-              style={styles.navItem}
+              style={[styles.navItem, isMobileWebTabBar && styles.navItemMobileWeb]}
               accessibilityRole="button"
               accessibilityLabel={item.label}
             >
-              <View style={styles.tabIconPill}>
+              <View style={[styles.tabIconPill, isMobileWebTabBar && styles.tabIconPillMobileWeb]}>
                 <MaterialIcons name={item.icon} size={tabBarIconSize} color={iconColor} />
               </View>
-              <Text style={{ color: labelColor, fontSize: tabBarLabelFontSize, lineHeight: tabBarLabelLineHeight, textAlign: 'center' }}>
-                {item.label}
-              </Text>
+              {!isMobileWebTabBar && (
+                <Text style={{ color: labelColor, fontSize: tabBarLabelFontSize, lineHeight: tabBarLabelLineHeight, textAlign: 'center' }}>
+                  {item.label}
+                </Text>
+              )}
             </Pressable>
           );
         })}
       </View>
 
-      {/* Ran out of time: a Match-Madness-specific "game over" screen. */}
       <VocabRushGameOverCard
-        visible={gameOver && !pickerVisible && timeLeft === 0}
+        visible={gameOver && !pickerVisible && timeLeft === 0 && !completionAcknowledged}
         score={score}
         sessionXp={sessionXp}
+        onClaimXP={claimSessionXp}
         bestCombo={bestStreak}
         matchedCount={matchedCount}
         totalWords={totalWords}
@@ -601,12 +745,14 @@ export default function VocabRushGame({
         themeColors={themeColors}
         onPlayAgain={() => startGame(mode ?? defaultMode)}
         onBack={onBack}
-        onGoToAccount={onGoToAccount}
+        onGoToAccount={onGoToAccount ? () => {
+          setCompletionAcknowledged(true);
+          onGoToAccount();
+        } : undefined}
       />
 
-      {/* Matched everything before time ran out: the same completion screen as the rest of the app. */}
       <VocabularyCompletionModal
-        visible={gameOver && !pickerVisible && timeLeft > 0}
+        visible={gameOver && !pickerVisible && timeLeft > 0 && !completionAcknowledged}
         timerMode
         wordsLength={totalWords}
         isDarkMode={isDarkMode}
@@ -616,6 +762,7 @@ export default function VocabRushGame({
         colors={themeColors}
         startedTimerMode
         matchingSessionXp={sessionXp}
+        onClaimXP={claimSessionXp}
         statsItems={[
           { emoji: '⚡', value: sessionXp, label: 'XP' },
           { emoji: '🔥', value: bestStreak, label: 'Best combo' },
@@ -627,7 +774,10 @@ export default function VocabRushGame({
         onPrimaryAction={() => startGame(mode ?? defaultMode)}
         secondaryActionLabel="Back to Vocabulary"
         onSecondaryAction={onBack}
-        onGoToAccount={onGoToAccount}
+        onGoToAccount={onGoToAccount ? () => {
+          setCompletionAcknowledged(true);
+          onGoToAccount();
+        } : undefined}
       />
 
       {pickerVisible && (
@@ -752,6 +902,20 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     fontFamily: fontFamilyForWeight('700'),
   },
+  comboBonusButton: {
+    alignSelf: 'center',
+    marginTop: 10,
+    paddingVertical: 8,
+    paddingHorizontal: 18,
+    borderRadius: 999,
+  },
+  comboBonusButtonText: {
+    color: '#fff',
+    fontSize: 13,
+    fontWeight: '800',
+    fontFamily: fontFamilyForWeight('800'),
+    letterSpacing: 0.3,
+  },
   grid: {
     flexDirection: 'row',
     alignSelf: 'center',
@@ -769,11 +933,11 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   cardDefault: {
-    // Android's `elevation` shadow is computed from the view's layout bounds,
-    // not its rendered/transformed bitmap — it doesn't shrink in sync with the
-    // exit animation's `scale` transform, so the shadow visibly detaches from
-    // the card mid-animation. Dropping elevation (iOS's shadow* + web's
-    // boxShadow both track the transform correctly) fixes that glitch.
+
+
+
+
+
     ...Platform.select({
       web: { boxShadow: '0 4px 10px rgba(0,0,0,0.05)' } as any,
       ios: {
@@ -792,9 +956,6 @@ const styles = StyleSheet.create({
     fontWeight: '400',
     fontFamily: fontFamilyForWeight('400'),
     textAlign: 'center',
-  },
-  cardTextSelected: {
-    color: '#ffffff',
   },
   matchedCard: {
     borderWidth: 2,
@@ -815,11 +976,18 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     paddingTop: 3,
   },
+  navItemMobileWeb: {
+    paddingTop: 0,
+  },
   tabIconPill: {
     width: 44,
     height: 28,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  tabIconPillMobileWeb: {
+    width: 52,
+    height: 44,
   },
   overlay: {
     position: 'absolute',

@@ -1,7 +1,7 @@
 const ShouldGrammar = {
   id: '10',
   title: 'Should',
-  description: 'Learn how to use the modal verb should - Evaluate if these sentences are grammatically correct',  imageUrl: 'https://i.ibb.co/7tN4Cfgb/Should.png',
+  description: 'Learn how to use the modal verb should - Evaluate if these sentences are grammatically correct',  imageUrl: 'https://wretggbpaejzjdilemit.supabase.co/storage/v1/object/public/lesson-images/15274719ab/should.webp',
   textContent: {
     cards: [
       {

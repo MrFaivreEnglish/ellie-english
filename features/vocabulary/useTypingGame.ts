@@ -1,8 +1,16 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { getXP, addXP, hasWordXpAwardedToday, markWordXpAwardedToday } from '../progress/xpStorage';
+import {
+  getXP,
+  grantXP,
+  previewGrantXP,
+  hasWordXpAwardedToday,
+  markWordXpAwardedToday,
+} from '../progress/xpStorage';
+import { recordPracticeToday } from '../progress/streakStorage';
+
 import type { Word } from '../../types/VocabularyTypes';
 import { useTheme } from '../settings/ThemeContext';
-import { getTypingAnswerXP, getTypingComboReward } from '../progress/xpRewards';
+import { getTypingAnswerXP, getTypingComboReward, PERFECT_RUN_XP_MULTIPLIER, getReplayXpFraction } from '../progress/xpRewards';
 import { getLevelDisplayLabel, xpForLevel } from '../progress/xpLevels';
 
 type FeedbackType = 'correct' | 'wrong' | 'close';
@@ -15,6 +23,7 @@ type DifficultyStats = {
 
 type TypingGameOptions = {
   allowSlashAlternatives?: boolean;
+  lessonDifficulty?: number | null;
 };
 
 const CLOSE_TRIES_BEFORE_COMBO_LOSS = 2;
@@ -78,25 +87,48 @@ const isCloseMatch = (user: string, correct: string) => {
   return distance <= allowedDistance;
 };
 
+// Lessons write a free choice between synonyms two ways — "A cab / A taxi" and
+// "Trendy, Stylish" — so both separators have to open up the options. Only the slash used
+// to, which meant a comma prompt demanded every synonym at once ("trendy stylish").
+const LISTED_ALTERNATIVE_SEPARATOR = /\s*[\/,]\s*/;
+
+// A parenthetical is a gloss on the answer, not part of it: "Physical Education (PE)",
+// "A (cotton) plantation", "Prison (UK) / Jail (US)". Normalising only dropped the brackets
+// and kept their contents, so the gloss stayed compulsory.
+const PARENTHETICAL = /\([^)]*\)/;
+
 const buildCorrectAnswers = (
   answer: string,
   normalizeAnswer: (text: string) => string,
-  allowSlashAlternatives: boolean,
+  allowListedAlternatives: boolean,
   wordAlternatives: string[] = []
 ) => {
-  const fullAnswer = normalizeAnswer(answer);
-  const separatorlessAnswer = /[\/-]/.test(answer)
-    ? normalizeAnswer(answer.replace(/[\/-]+/g, ' '))
-    : '';
-  // Accept the answer without a leading article so e.g. "witch" matches "A witch"
-  const articleStripped = /^(a|an|the)\s+/i.test(answer)
-    ? normalizeAnswer(answer.replace(/^(a|an|the)\s+/i, ''))
-    : '';
-  const baseAnswers = [fullAnswer, separatorlessAnswer, articleStripped].filter(Boolean);
+  const variantsOf = (text: string) => {
+    const forms = [normalizeAnswer(text)];
 
-  const slashAlts = allowSlashAlternatives && answer.includes('/')
-    ? answer.split('/').map((part) => normalizeAnswer(part)).filter(Boolean)
-    : [];
+    if (/[\/-]/.test(text)) forms.push(normalizeAnswer(text.replace(/[\/-]+/g, ' ')));
+    if (/^(a|an|the)\s+/i.test(text)) forms.push(normalizeAnswer(text.replace(/^(a|an|the)\s+/i, '')));
+
+    if (allowListedAlternatives && /[\/,]/.test(text)) {
+      for (const part of text.split(LISTED_ALTERNATIVE_SEPARATOR)) {
+        const option = part.trim();
+        if (!option) continue;
+        forms.push(normalizeAnswer(option));
+        // Each option carries its own article ("A cab / A taxi"), so strip it per option too.
+        if (/^(a|an|the)\s+/i.test(option)) {
+          forms.push(normalizeAnswer(option.replace(/^(a|an|the)\s+/i, '')));
+        }
+      }
+    }
+
+    return forms;
+  };
+
+  const withoutGloss = PARENTHETICAL.test(answer)
+    ? answer.replace(/\([^)]*\)/g, ' ').replace(/\s+/g, ' ').trim()
+    : '';
+
+  const baseAnswers = [answer, withoutGloss].filter(Boolean).flatMap(variantsOf);
 
   const altAnswers = wordAlternatives.flatMap((alt) => {
     const altFull = normalizeAnswer(alt);
@@ -104,7 +136,7 @@ const buildCorrectAnswers = (
     return [altFull, altSep].filter(Boolean);
   });
 
-  return Array.from(new Set([...baseAnswers, ...slashAlts, ...altAnswers]));
+  return Array.from(new Set([...baseAnswers, ...altAnswers].filter(Boolean)));
 };
 
 const shuffleArray = <T,>(items: T[]) => {
@@ -135,6 +167,7 @@ const buildDifficultyQueue = (
 export function useTypingGame(words: Word[], options: TypingGameOptions = {}) {
   const { isTypingStrictMode } = useTheme();
   const allowSlashAlternatives = options.allowSlashAlternatives ?? true;
+  const replayXpFraction = getReplayXpFraction(options.lessonDifficulty);
   const [typedAnswer, setTypedAnswer] = useState('');
   const [typingIndex, setTypingIndex] = useState(0);
   const [gameWords, setGameWords] = useState<Word[]>(() => shuffleArray(words));
@@ -145,6 +178,10 @@ export function useTypingGame(words: Word[], options: TypingGameOptions = {}) {
   const [feedback, setFeedback] = useState('');
   const [xp, setXp] = useState(0);
   const [sessionXp, setSessionXp] = useState(0);
+  // The exact figure a claim is worth, once resolved at session end. Null while playing,
+  // when only the optimistic running total above is known.
+  const [resolvedSessionXp, setResolvedSessionXp] = useState<number | null>(null);
+  const [wasPerfectRun, setWasPerfectRun] = useState(false);
   const [streak, setStreak] = useState(0);
   const [maxStreak, setMaxStreak] = useState(0);
   const [answeredWords, setAnsweredWords] = useState<Set<string>>(new Set());
@@ -164,6 +201,11 @@ export function useTypingGame(words: Word[], options: TypingGameOptions = {}) {
   }>(null);
   const previousWordsRef = useRef<Word[]>(words);
   const awardedWordKeysRef = useRef<Set<string>>(new Set());
+  const pendingXpAwardsRef = useRef<{ wordKey: string; xpGain: number }[]>([]);
+  const sessionXpAwardedRef = useRef(false);
+  const perfectRunRef = useRef(false);
+  // Bridges to previewPendingTypingXp, which is declared after the effect that needs it.
+  const previewPendingTypingXpRef = useRef<(() => Promise<number>) | null>(null);
   const answerLockedRef = useRef(false);
   const pendingAdvanceTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -250,6 +292,7 @@ export function useTypingGame(words: Word[], options: TypingGameOptions = {}) {
     setCloseAttempts({});
     setHintsUsed({});
     setSessionXp(0);
+    pendingXpAwardsRef.current = [];
   }, [clearCurrentPrompt, clearPendingAdvance, words, difficultyByWord]);
 
   const advanceToNextWord = useCallback(() => {
@@ -372,14 +415,19 @@ export function useTypingGame(words: Word[], options: TypingGameOptions = {}) {
         },
       }));
 
+      // Practice counts toward the streak as soon as it happens, independently of the
+      // end-screen XP claim — the student did the work either way.
+      void recordPracticeToday();
+
       if (!alreadyAnswered) {
         awardedWordKeysRef.current.add(currentWordKey);
         const alreadyAwardedToday = await hasWordXpAwardedToday(currentWordKey);
 
         if (!alreadyAwardedToday) {
-          const newXP = await addXP(xpGain);
-          await markWordXpAwardedToday(currentWordKey);
-          setXp(newXP);
+          // XP is only persisted to the account once, at session completion (see the
+          // isSessionComplete effect below) — not per word, so quitting mid-session doesn't
+          // bank partial XP or consume the word's daily-award slot for nothing.
+          pendingXpAwardsRef.current.push({ wordKey: currentWordKey, xpGain });
           setSessionXp((prev) => prev + xpGain);
         } else {
           setInlineMessage('Already saved today');
@@ -406,9 +454,9 @@ export function useTypingGame(words: Word[], options: TypingGameOptions = {}) {
       setCloseAttempts((prev) => ({ ...prev, [currentWordKey]: closeCount }));
 
       if (shouldBreakCombo) {
-        // Repeated near-misses ultimately count as a miss — treat it the same
-        // way as a wrong answer: reveal the answer and give it the same
-        // longer, softer display time.
+
+
+
         setTypingFeedback('wrong');
         setFeedbackEvent({ type: 'wrong', text: 'Not this time.', streak: 0, answer: currentWord.english });
         setInlineMessage('');
@@ -443,9 +491,9 @@ export function useTypingGame(words: Word[], options: TypingGameOptions = {}) {
       return;
     }
 
-    // Wrong — reveal answer gently and auto-advance, with extra time to read
-    // it and a heads-up that the word isn't gone for good: it's queued for
-    // review at the end of the round (see advanceToNextWord).
+
+
+
     answerLockedRef.current = true;
     setIsAdvancing(true);
     setTypingFeedback('wrong');
@@ -495,6 +543,85 @@ export function useTypingGame(words: Word[], options: TypingGameOptions = {}) {
     }).catch(() => {});
   }, []);
 
+  // Persist the session's accumulated XP once the round is actually finished — see the
+  // pendingXpAwardsRef push above for why this isn't done per word.
+  useEffect(() => {
+    if (!isSessionComplete) {
+      sessionXpAwardedRef.current = false;
+      setWasPerfectRun(false);
+      perfectRunRef.current = false;
+      setResolvedSessionXp(null);
+      return;
+    }
+
+    const isPerfectRun = answeredWords.size > 0 && firstTryCount === answeredWords.size;
+    setWasPerfectRun(isPerfectRun);
+    perfectRunRef.current = isPerfectRun;
+    // Resolve the real figure now (read-only) so the end screen shows what claiming will
+    // actually award, rather than the optimistic running total.
+    void previewPendingTypingXpRef.current?.();
+  }, [isSessionComplete, answeredWords, firstTryCount]);
+
+  // Banked when the student claims it on the end screen — leaving without claiming
+  // forfeits the session's XP (and leaves the per-word "awarded today" marks unset).
+  // Resolves what this session is actually worth. The running sessionXp is optimistic — it
+  // ignores the perfect-run bonus and the already-earned-today discount, and it rounds the
+  // sum where awarding rounds each word, so the two can disagree. With `persist` false this
+  // only reads, letting the end screen show the true figure before anything is banked.
+  const resolvePendingTypingXp = useCallback(async (persist: boolean) => {
+    const pending = pendingXpAwardsRef.current;
+    if (pending.length === 0) {
+      setResolvedSessionXp(0);
+      return 0;
+    }
+
+    const isPerfectRun = perfectRunRef.current;
+    let total = 0;
+    for (const award of pending) {
+      const fullAmount = isPerfectRun ? Math.round(award.xpGain * PERFECT_RUN_XP_MULTIPLIER) : award.xpGain;
+      // Already earned full XP for this word today — still give a reduced replay reward
+      // instead of nothing, so redoing a word list stays worthwhile.
+      if (await hasWordXpAwardedToday(award.wordKey)) {
+        total += Math.round(fullAmount * replayXpFraction);
+        continue;
+      }
+      if (persist) await markWordXpAwardedToday(award.wordKey);
+      total += fullAmount;
+    }
+
+    // The session banks as a single award, so the day's soft cap applies to the whole
+    // total at once — resolve it here so the end screen shows what claiming really gives.
+    const granted = persist ? await grantXP(total) : await previewGrantXP(total);
+
+    setResolvedSessionXp(granted);
+    return granted;
+  }, [replayXpFraction]);
+
+  // Read-only: what claiming will give, without awarding or consuming the pending list.
+  const previewPendingTypingXp = useCallback(
+    () => resolvePendingTypingXp(false),
+    [resolvePendingTypingXp]
+  );
+  previewPendingTypingXpRef.current = previewPendingTypingXp;
+
+  const commitPendingTypingXp = useCallback(async () => {
+    if (sessionXpAwardedRef.current) return resolvedSessionXp ?? 0;
+    sessionXpAwardedRef.current = true;
+
+    if (pendingXpAwardsRef.current.length === 0) {
+      setResolvedSessionXp(0);
+      return 0;
+    }
+    // resolvePendingTypingXp banks the total itself when persisting, so this only has to
+    // refresh the displayed lifetime figure (which drives the level-up message below).
+    const total = await resolvePendingTypingXp(true);
+    pendingXpAwardsRef.current = [];
+
+    if (total > 0) setXp(await getXP());
+
+    return total;
+  }, [resolvePendingTypingXp, resolvedSessionXp]);
+
   useEffect(() => {
     if (previousWordsRef.current === words) return;
 
@@ -525,6 +652,10 @@ export function useTypingGame(words: Word[], options: TypingGameOptions = {}) {
     typingIndex,
     typingFeedback,
     firstTryCount,
+    wasPerfectRun,
+    commitPendingTypingXp,
+    previewPendingTypingXp,
+    resolvedSessionXp,
     inlineMessage,
     feedback,
     handleSubmit,

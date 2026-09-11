@@ -2,7 +2,7 @@ const PresentPerfectNIGrammar = {
   id: '35',
   title: 'Present Perfect Interrogatif',
   description: 'Learn interrogative forms in present perfect',
-  imageUrl: 'https://i.ibb.co/Z647SNz7/Present-perfect-Interrogatif.png',
+  imageUrl: 'https://wretggbpaejzjdilemit.supabase.co/storage/v1/object/public/lesson-images/15274719ab/present-perfect-interrogatif.webp',
   textContent: {
     cards: [
       {

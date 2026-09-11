@@ -2,11 +2,11 @@ const FoodVocab = {
   id: '35',
   title: 'American Dishes',
   description: 'Learn American food vocabulary: side dishes, meat-based dishes, desserts, and drinks',
-  imageUrl: 'https://i.ibb.co/xyKD8nK/American-dishes.webp',
+  imageUrl: 'https://wretggbpaejzjdilemit.supabase.co/storage/v1/object/public/lesson-images/15274719ab/american-dishes.webp',
   thumbnail: require('../../assets/thumbnails/american-dishes-thumbnail.png'),
   flashcards: [
     {
-      category: 'Vegetables and side dishes',
+      category: 'Vegetables and side dishes 🥗',
       words: [
         { english: 'French fries', french: 'Frites' },
         { english: 'Sweet potato', french: 'Patate douce' },
@@ -16,7 +16,7 @@ const FoodVocab = {
       ],
     },
     {
-      category: 'Meat-based dishes',
+      category: 'Meat-based dishes 🍗',
       words: [
         { english: 'Crab', french: 'Crabe' },
         { english: 'Chicken pot pie', french: 'Tourte au poulet' },
@@ -26,7 +26,7 @@ const FoodVocab = {
       ],
     },
     {
-      category: 'Desserts',
+      category: 'Desserts 🍰',
       words: [
         { english: 'Milkshake', french: 'Milk-shake' },
         { english: 'Apple pie', french: 'Tarte aux pommes' },
@@ -39,7 +39,7 @@ const FoodVocab = {
       ],
     },
     {
-      category: 'Drinks',
+      category: 'Drinks 🥤',
       words: [
         { english: 'Lemonade', french: 'Citronnade' },
         { english: 'Iced tea', french: 'Thé glacé' },

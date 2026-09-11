@@ -2,7 +2,7 @@ const FashionVocab = {
   id: '314',
   title: 'Fashion',
   description: 'Learn vocabulary related to fashion and clothing trends',
-  imageUrl: 'https://i.ibb.co/vCTjy8NM/Fashion-vocab.webp',
+  imageUrl: 'https://wretggbpaejzjdilemit.supabase.co/storage/v1/object/public/lesson-images/15274719ab/fashion.webp',
   thumbnail: require('../../assets/thumbnails/fashion-thumbnail.png'),
   flashcards: [
     {

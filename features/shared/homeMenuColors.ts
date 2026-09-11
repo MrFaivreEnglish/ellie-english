@@ -22,6 +22,16 @@ export const SHINY_HOME_MENU_CARD_GRADIENT_ENDS = {
 export const DEFAULT_SPLASH_BACKGROUND = '#1F7AD1';
 export const SHINY_SPLASH_BACKGROUND = '#F4B942';
 
+export const getSplashBackground = (isShinyElliePresentationMode: boolean) => (
+  isShinyElliePresentationMode ? SHINY_SPLASH_BACKGROUND : DEFAULT_SPLASH_BACKGROUND
+);
+
+export const getSplashCopy = (isShinyElliePresentationMode: boolean) => (
+  isShinyElliePresentationMode
+    ? { title: 'Shiny Ellie', subtitle: 'A Shiny Ellie appeared!' }
+    : { title: 'Ellie', subtitle: 'My English Assistant' }
+);
+
 export const SHINY_HOME_MENU_CARD_COLORS = {
   grammar: '#F46F68',
   vocabulary: '#F2BF5C',

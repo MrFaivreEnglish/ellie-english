@@ -1,7 +1,7 @@
 const MustGrammar = {
   id: '9',
   title: 'Must',
-  description: 'Learn how to use the modal verb must - Evaluate if these sentences are grammatically correct',  imageUrl: 'https://i.ibb.co/gLCNmjj6/Must.png',
+  description: 'Learn how to use the modal verb must - Evaluate if these sentences are grammatically correct',  imageUrl: 'https://wretggbpaejzjdilemit.supabase.co/storage/v1/object/public/lesson-images/15274719ab/must.webp',
   textContent: {
     cards: [
       {

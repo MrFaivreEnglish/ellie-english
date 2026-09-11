@@ -5,7 +5,7 @@ const STREAK_KEY = '@practice_streak_v2';
 export type StreakData = {
   currentStreak: number;
   longestStreak: number;
-  lastPracticeDate: string; // YYYY-MM-DD
+  lastPracticeDate: string;
 };
 
 const getLocalDateKey = () => {
@@ -47,7 +47,7 @@ export const recordPracticeToday = async (): Promise<void> => {
     const today = getLocalDateKey();
     const current = await getStreak();
 
-    // Already recorded today — no change needed
+
     if (current.lastPracticeDate === today) return;
 
     const yesterday = getYesterdayKey();

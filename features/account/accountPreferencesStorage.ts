@@ -2,6 +2,10 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { hapticsAreSupported } from '../shared/haptics';
 import { ENABLE_SHINY_ELLIE_COLOR_MODE } from '../../lib/featureFlags';
 import {
+  SHINY_ELLIE_COLOR_VARIANT_KEY,
+  type ShinyEllieColorVariant,
+} from '../progress/shinyEllieStorage';
+import {
   DEFAULT_ACCOUNT_AVATAR_COLOR_ID,
   DEFAULT_ACCOUNT_AVATAR_ID,
   isAccountAvatarColorId,
@@ -51,6 +55,7 @@ export type AccountPreferenceSnapshot = {
   todayCardOptIn: boolean;
   androidStatusBarEnabled: boolean;
   shinyEllieMode: boolean;
+  shinyEllieColorVariant: ShinyEllieColorVariant;
   accountAvatarId: AccountAvatarId;
   accountAvatarColorId: AccountAvatarColorId;
   updatedAt: string;
@@ -84,8 +89,9 @@ const normalizeSnapshot = (value: unknown): AccountPreferenceSnapshot => {
     soundEffectsEnabled: asBoolean(record.soundEffectsEnabled, true),
     todayCardEnabled: asBoolean(record.todayCardEnabled),
     todayCardOptIn: asBoolean(record.todayCardOptIn),
-    androidStatusBarEnabled: asBoolean(record.androidStatusBarEnabled),
-    shinyEllieMode: ENABLE_SHINY_ELLIE_COLOR_MODE && asBoolean(record.shinyEllieMode),
+    androidStatusBarEnabled: asBoolean(record.androidStatusBarEnabled, true),
+    shinyEllieMode: ENABLE_SHINY_ELLIE_COLOR_MODE && asBoolean(record.shinyEllieMode, true),
+    shinyEllieColorVariant: record.shinyEllieColorVariant === 'cool' ? 'cool' : 'warm',
     accountAvatarId: isAccountAvatarId(rawAvatarId) ? rawAvatarId : DEFAULT_ACCOUNT_AVATAR_ID,
     accountAvatarColorId: isAccountAvatarColorId(rawAvatarColorId)
       ? rawAvatarColorId
@@ -111,6 +117,7 @@ export const getLocalAccountPreferenceSnapshot = async (
     savedTodayCardOptIn,
     savedAndroidStatusBarEnabled,
     savedShinyEllieMode,
+    savedShinyEllieColorVariant,
     accountAvatarId,
     accountAvatarColorId,
   ] = await Promise.all([
@@ -127,6 +134,7 @@ export const getLocalAccountPreferenceSnapshot = async (
     AsyncStorage.getItem(TODAY_CARD_OPT_IN_KEY),
     AsyncStorage.getItem(ANDROID_STATUS_BAR_ENABLED_KEY),
     AsyncStorage.getItem('@shiny_ellie_mode'),
+    AsyncStorage.getItem(SHINY_ELLIE_COLOR_VARIANT_KEY),
     loadAccountAvatarId(accountId),
     loadAccountAvatarColorId(accountId),
   ]);
@@ -144,8 +152,9 @@ export const getLocalAccountPreferenceSnapshot = async (
     soundEffectsEnabled: savedSoundEffectsEnabled !== 'false',
     todayCardEnabled: savedTodayCardOptIn === 'true' && savedTodayCardEnabled === 'true',
     todayCardOptIn: savedTodayCardOptIn === 'true',
-    androidStatusBarEnabled: savedAndroidStatusBarEnabled === 'true',
-    shinyEllieMode: ENABLE_SHINY_ELLIE_COLOR_MODE && savedShinyEllieMode === 'true',
+    androidStatusBarEnabled: savedAndroidStatusBarEnabled !== 'false',
+    shinyEllieMode: ENABLE_SHINY_ELLIE_COLOR_MODE && savedShinyEllieMode !== 'false',
+    shinyEllieColorVariant: savedShinyEllieColorVariant === 'cool' ? 'cool' : 'warm',
     accountAvatarId,
     accountAvatarColorId,
     updatedAt: new Date().toISOString(),
@@ -171,6 +180,7 @@ export const saveLocalAccountPreferenceSnapshot = async (
       [TODAY_CARD_ENABLED_KEY, snapshot.todayCardEnabled ? 'true' : 'false'],
       [ANDROID_STATUS_BAR_ENABLED_KEY, snapshot.androidStatusBarEnabled ? 'true' : 'false'],
       ['@shiny_ellie_mode', snapshot.shinyEllieMode ? 'true' : 'false'],
+      [SHINY_ELLIE_COLOR_VARIANT_KEY, snapshot.shinyEllieColorVariant],
     ]),
     saveAccountAvatarId(accountId, snapshot.accountAvatarId),
     saveAccountAvatarColorId(accountId, snapshot.accountAvatarColorId),

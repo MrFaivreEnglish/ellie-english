@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useMemo, useRef } from 'react';
 import { Animated, Pressable, StyleSheet } from 'react-native';
 
 const TRACK_WIDTH = 38;
@@ -12,6 +12,10 @@ type PillToggleProps = {
   activeColor: string;
   trackOffColor?: string;
   accessibilityLabel?: string;
+
+
+
+  scale?: number;
 };
 
 export default function PillToggle({
@@ -20,6 +24,7 @@ export default function PillToggle({
   activeColor,
   trackOffColor = '#D9D2C4',
   accessibilityLabel,
+  scale = 1,
 }: PillToggleProps) {
   const knobPosition = useRef(new Animated.Value(value ? 1 : 0)).current;
 
@@ -27,14 +32,24 @@ export default function PillToggle({
     Animated.timing(knobPosition, {
       toValue: value ? 1 : 0,
       duration: 160,
-      useNativeDriver: false,
+      // translateX (below) is native-drivable, unlike the `left` this used to animate —
+      // the knob now slides on the UI thread instead of per-frame JS layout work.
+      useNativeDriver: true,
     }).start();
   }, [value, knobPosition]);
 
-  const knobLeft = knobPosition.interpolate({
-    inputRange: [0, 1],
-    outputRange: [KNOB_INSET, TRACK_WIDTH - KNOB_SIZE - KNOB_INSET],
-  });
+  const trackWidth = Math.round(TRACK_WIDTH * scale);
+  const trackHeight = Math.round(TRACK_HEIGHT * scale);
+  const knobSize = Math.round(KNOB_SIZE * scale);
+  const knobInset = Math.round(KNOB_INSET * scale);
+
+  const knobTranslateX = useMemo(
+    () => knobPosition.interpolate({
+      inputRange: [0, 1],
+      outputRange: [0, trackWidth - knobSize - knobInset * 2],
+    }),
+    [knobPosition, knobInset, trackWidth, knobSize]
+  );
 
   return (
     <Pressable
@@ -47,10 +62,26 @@ export default function PillToggle({
       <Animated.View
         style={[
           styles.track,
-          { backgroundColor: value ? activeColor : trackOffColor },
+          {
+            width: trackWidth,
+            height: trackHeight,
+            borderRadius: trackHeight / 2,
+            backgroundColor: value ? activeColor : trackOffColor,
+          },
         ]}
       >
-        <Animated.View style={[styles.knob, { left: knobLeft }]} />
+        <Animated.View
+          style={[
+            styles.knob,
+            {
+              width: knobSize,
+              height: knobSize,
+              borderRadius: knobSize / 2,
+              left: knobInset,
+              transform: [{ translateX: knobTranslateX }],
+            },
+          ]}
+        />
       </Animated.View>
     </Pressable>
   );
@@ -58,18 +89,11 @@ export default function PillToggle({
 
 const styles = StyleSheet.create({
   track: {
-    width: TRACK_WIDTH,
-    height: TRACK_HEIGHT,
-    borderRadius: TRACK_HEIGHT / 2,
     justifyContent: 'center',
   },
   knob: {
     position: 'absolute',
-    width: KNOB_SIZE,
-    height: KNOB_SIZE,
-    borderRadius: KNOB_SIZE / 2,
     backgroundColor: '#FFFFFF',
     boxShadow: '0px 1px 2px rgba(0,0,0,0.20)',
-    elevation: 2,
   },
 });

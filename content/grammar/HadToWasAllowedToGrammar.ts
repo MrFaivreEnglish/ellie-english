@@ -2,7 +2,7 @@ const HadToWasAllowedToGrammar = {
   id: '34',
   title: 'Had to / Was Allowed To',
   description: 'Practice past obligations and permissions using had to and was allowed to',
-  imageUrl: 'https://i.ibb.co/hR1QLZJ3/Had-to-was-allowed-to.png',
+  imageUrl: 'https://wretggbpaejzjdilemit.supabase.co/storage/v1/object/public/lesson-images/15274719ab/had-to-was-allowed-to.webp',
   textContent: {
     cards: [
       {
@@ -102,8 +102,6 @@ translateExercises: [
     answer: "We didn't have to submit the project yesterday.",
     wordBank: ["We", "didn't", "have", "to", "submit", "the project", "yesterday."]
   },
-
-  // SEGREGATION EXAMPLES
 
   {
     type: 'translate',

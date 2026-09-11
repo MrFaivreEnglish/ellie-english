@@ -12,6 +12,7 @@ export const sixthGradeChapters: ChapterCategory = {
         { label: 'Classroom English', target: 'vocabulary', lessonTitle: 'Classroom English' },
         { label: 'Instructions', target: 'vocabulary', lessonTitle: 'Instructions' },
         { label: 'Ask for help', target: 'pronunciation', lessonTitle: 'Ask for help' },
+        { label: 'Weather', target: 'vocabulary', lessonTitle: 'Weather' },
       ],
     },
     {

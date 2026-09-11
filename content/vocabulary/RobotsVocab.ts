@@ -1,7 +1,7 @@
 const RobotsVocab = {
   id: '315',
   title: 'Robots',
-  description: 'Learn vocabulary related to robotics and automation',  imageUrl: 'https://i.ibb.co/d0dYkWz2/Robots.webp',
+  description: 'Learn vocabulary related to robotics and automation',  imageUrl: 'https://wretggbpaejzjdilemit.supabase.co/storage/v1/object/public/lesson-images/15274719ab/robots.webp',
   thumbnail: require('../../assets/thumbnails/robot-thumbnail.png'),
   flashcards: [
      { english: `Tall`, french: `Grand` },

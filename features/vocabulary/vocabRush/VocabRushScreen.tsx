@@ -27,8 +27,8 @@ export default function VocabRushScreen({ navigation }: any) {
 
   const [words, setWords] = useState<Word[] | null>(null);
 
-  // The real tab bar is hidden centrally in App.tsx (MainTabNavigator) based on
-  // nested route state — not here — so its height computation is never clobbered.
+
+
 
   useEffect(() => {
     let active = true;
@@ -60,7 +60,7 @@ export default function VocabRushScreen({ navigation }: any) {
 
   const handleGoToAccount = () => {
     const rootNav = navigation?.getParent?.()?.getParent?.();
-    rootNav?.navigate?.('Account');
+    rootNav?.navigate?.('Account', { openAvatarPicker: true });
   };
 
   if (!fontsLoaded || !words) {

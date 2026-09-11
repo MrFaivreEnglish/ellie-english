@@ -1,7 +1,7 @@
 const AnimalsVocab = {
   id: '29',
   title: 'Animals',
-  description: 'Learn vocabulary related to animals and their characteristics',  imageUrl: 'https://i.ibb.co/QysFz7W/animals-vocab.webp',
+  description: 'Learn vocabulary related to animals and their characteristics',  imageUrl: 'https://wretggbpaejzjdilemit.supabase.co/storage/v1/object/public/lesson-images/15274719ab/animals.webp',
   thumbnail: require('../../assets/thumbnails/animals-thumbnail.png'),
   flashcards: [
     {

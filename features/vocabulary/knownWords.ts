@@ -1,6 +1,10 @@
 import { vocabularyCategories } from '../../content/lessons/vocabularyRegistry';
 import { getCustomVocabularyLessons } from '../lessons/customLessonStorage';
-import { getLearnedFlashcardKeysByLesson, normalizeFlashcardLessonKey } from './flashcardProgressStorage';
+import {
+  getLearnedFlashcardKeysByLesson,
+  getLearnedFlashcardRecencyByActivityKey,
+  normalizeFlashcardLessonKey,
+} from './flashcardProgressStorage';
 import { shuffleArray } from './vocabularyUtils';
 import type { Word } from '../../types/VocabularyTypes';
 
@@ -26,12 +30,12 @@ const getLessonWords = (lesson: any): Word[] => {
     .filter((word: Word) => word.english && word.french);
 };
 
-// Vocab Rush's own session cap — a round only ever plays this many words
-// regardless of how many the player has actually learnt, so any XP estimate
-// shown before starting a round must be capped the same way.
+
+
+
 export const MAX_VOCAB_RUSH_WORDS = 30;
 
-/** Words the user has marked "learnt" across all lessons, shuffled and capped at `limit`. */
+
 export const getKnownVocabularyWords = async (limit = MAX_VOCAB_RUSH_WORDS): Promise<Word[]> => {
   const customLessons = await getCustomVocabularyLessons().catch(() => []);
   const allLessons = [
@@ -40,12 +44,16 @@ export const getKnownVocabularyWords = async (limit = MAX_VOCAB_RUSH_WORDS): Pro
     ...vocabularyCategories.flatMap((category) => category.lessons),
   ];
 
-  const learnedByLesson = await getLearnedFlashcardKeysByLesson();
+  const [learnedByLesson, recencyByActivityKey] = await Promise.all([
+    getLearnedFlashcardKeysByLesson(),
+    getLearnedFlashcardRecencyByActivityKey(),
+  ]);
   const seenWords = new Set<string>();
-  const knownWords: Word[] = [];
+  const knownWords: { word: Word; recencyDate: string }[] = [];
 
   allLessons.forEach((lesson) => {
-    const learnedKeys = learnedByLesson.get(getLessonProgressKey(lesson));
+    const lessonKey = getLessonProgressKey(lesson);
+    const learnedKeys = learnedByLesson.get(lessonKey);
     if (!learnedKeys?.size) return;
 
     getLessonWords(lesson).forEach((word) => {
@@ -53,9 +61,37 @@ export const getKnownVocabularyWords = async (limit = MAX_VOCAB_RUSH_WORDS): Pro
       if (!learnedKeys.has(wordKey) || seenWords.has(wordKey)) return;
 
       seenWords.add(wordKey);
-      knownWords.push(word);
+
+
+      const recencyDate = recencyByActivityKey.get(`${lessonKey}:${wordKey}`) ?? '';
+      knownWords.push({ word, recencyDate });
     });
   });
 
-  return shuffleArray(knownWords).slice(0, limit);
+  if (knownWords.length <= limit) {
+    return shuffleArray(knownWords.map((entry) => entry.word));
+  }
+
+
+
+
+
+
+  const sortedByRecency = [...knownWords].sort((a, b) =>
+    b.recencyDate > a.recencyDate ? 1 : b.recencyDate < a.recencyDate ? -1 : 0
+  );
+  const recentPoolSize = Math.max(limit, Math.ceil(sortedByRecency.length * 0.5));
+  const recentPool = shuffleArray(sortedByRecency.slice(0, recentPoolSize));
+  const olderPool = shuffleArray(sortedByRecency.slice(recentPoolSize));
+
+  const recentCount = Math.min(recentPool.length, Math.ceil(limit * 0.7));
+  const olderCount = Math.min(olderPool.length, limit - recentCount);
+  const selected = [...recentPool.slice(0, recentCount), ...olderPool.slice(0, olderCount)];
+
+  if (selected.length < limit) {
+    const leftover = [...recentPool.slice(recentCount), ...olderPool.slice(olderCount)];
+    selected.push(...leftover.slice(0, limit - selected.length));
+  }
+
+  return shuffleArray(selected.map((entry) => entry.word)).slice(0, limit);
 };

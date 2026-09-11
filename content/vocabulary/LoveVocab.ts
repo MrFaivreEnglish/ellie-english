@@ -1,7 +1,7 @@
 const LoveVocab = {
   id: '28',
   title: 'Love',
-  description: 'Learn vocabulary related to romance and relationships',  imageUrl: 'https://i.ibb.co/whdz6Gmj/Vocab-Love-3e.webp', // Updated inside image
+  description: 'Learn vocabulary related to romance and relationships',  imageUrl: 'https://wretggbpaejzjdilemit.supabase.co/storage/v1/object/public/lesson-images/15274719ab/love.webp',
   thumbnail: require('../../assets/thumbnails/love-thumbnail.png'),
   flashcards: [
         { english: 'To get along', french: 'S\'entendre' },

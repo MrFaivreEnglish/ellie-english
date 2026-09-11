@@ -2,7 +2,7 @@ const DescribingPictureVocab = {
   id: '307',
   title: 'Describing a picture',
   description: "Useful phrases to describe images",
-  imageUrl: 'https://i.ibb.co/wGd14gf/Describing-a-picture.webp',
+  imageUrl: 'https://wretggbpaejzjdilemit.supabase.co/storage/v1/object/public/lesson-images/15274719ab/describing-a-picture.webp',
   thumbnail: require('../../assets/thumbnails/describing-thumbnail.png'),
   flashcards: [
   { "english": "At the top", "french": "En haut" },

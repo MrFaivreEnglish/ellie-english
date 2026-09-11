@@ -17,6 +17,7 @@ export const good: LocalAsset = require('./good.png');
 export const shootingStar: LocalAsset = require('./shooting-star.png');
 export const timerFire: LocalAsset = require('./timerfire.png');
 export const comic: LocalAsset = require('./comic.png');
+export const levelUp: LocalAsset = require('./level-up.png');
 
 // Lesson thumbnails
 export const lessonThumbnails: Record<string, AssetValue> = (() => {
@@ -83,6 +84,10 @@ export const lessonThumbnails: Record<string, AssetValue> = (() => {
     Internet: require('./thumbnails/the-internet-thumbnail.png'),
     Opinion: require('./thumbnails/opinion-level-1-thumbnail.png'),
     Fashion: require('./thumbnails/fashion-thumbnail.png'),
+    Feminism: require('./thumbnails/feminism-thumbnail.png'),
+    Slavery: require('./thumbnails/slavery-thumbnail.png'),
+    Sports: require('./thumbnails/sports-thumbnail.png'),
+    Weather: require('./thumbnails/weather-thumbnail.png'),
 
     'Types of documents': require('./thumbnails/typesdocs-thumbnail.png'),
     'Types of Documents': require('./thumbnails/typesdocs-thumbnail.png'),
@@ -120,6 +125,7 @@ const Assets = {
   shootingStar,
   timerFire,
   comic,
+  levelUp,
   lessonThumbnails,
 };
 

@@ -2,7 +2,7 @@ const AtSchoolVocab = {
   id: '44',
   title: 'School Basics',
   description: 'Learn vocabulary related to school supplies and subjects',
-  imageUrl: 'https://i.ibb.co/XxcW0g8y/School-basics.webp',
+  imageUrl: 'https://wretggbpaejzjdilemit.supabase.co/storage/v1/object/public/lesson-images/15274719ab/school-basics.webp',
   thumbnail: require('../../assets/thumbnails/school-basics-thumbnail.png'),
   flashcards: [
     {
@@ -17,7 +17,7 @@ const AtSchoolVocab = {
         { english: 'An eraser', french: 'Une gomme' },
         { english: 'A pen', french: 'Un stylo' },
         { english: 'Scissors', french: 'Des ciseaux' },
-        { english: 'A pencil', french: 'Un crayon' },
+        { english: 'A pencil', french: 'Un crayon de papier' },
         { english: 'A pencil sharpener', french: 'Un taille-crayon' },
         { english: 'A highlighter', french: 'Un surligneur' },
         { english: 'Coloured pencils', french: 'Des crayons de couleur' },
@@ -37,11 +37,11 @@ const AtSchoolVocab = {
         { english: 'Biology', french: 'La biologie' },
         { english: 'Physics', french: 'La physique' },
         { english: 'Chemistry', french: 'La chimie' },
-        { english: 'Information Technology', french: 'L\'informatique' },
-        { english: 'Design Technology', french: 'La technologie' },
+        { english: 'Computing', french: 'L\'informatique' },
+        { english: 'Design and Technology', french: 'La technologie' },
         { english: 'Music', french: 'La musique' },
-        { english: 'Physical Education', french: 'L\'éducation physique' },
-        { english: 'Arts', french: 'Les arts plastiques' },
+        { english: 'Physical Education (PE)', alternatives: ['PE'], french: "L'EPS (Éducation physique et sportive)" },
+        { english: 'Art', french: 'Les arts plastiques' },
         { english: 'Drama', french: 'Le théâtre' }
       ]
     }

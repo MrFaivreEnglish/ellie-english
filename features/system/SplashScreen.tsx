@@ -1,22 +1,40 @@
 import { useEffect, useRef, useState } from 'react';
-import { View, Text, Image, StyleSheet, Animated, ActivityIndicator, Platform, useWindowDimensions } from 'react-native';
+import { View, Image, StyleSheet, Animated, ActivityIndicator, Platform, useWindowDimensions } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import * as Font from 'expo-font';
 import { enterImmersive, exitImmersiveOpaque } from '../../lib/immersive';
 import { useTheme } from '../settings/ThemeContext';
 import { getAndroidBottomBarButtonStyle, getAndroidBottomBarColor } from '../shared/appChromeColors';
-import { DEFAULT_SPLASH_BACKGROUND, SHINY_SPLASH_BACKGROUND } from '../shared/homeMenuColors';
+import { getSplashBackground, getSplashCopy } from '../shared/homeMenuColors';
 import { freshFontFamily } from '../shared/freshDirection';
+import Text from '../shared/ThemedText';
+import { getDesktopTypographyScale, isDesktopWebWidth } from '../shared/responsiveLayout';
 
 export default function SplashScreen() {
   const navigation = useNavigation<any>();
-  const { isShinyEllieMode, unlockShinyEllie, isAndroidStatusBarEnabled, isDarkMode, colors } = useTheme();
-  const { width } = useWindowDimensions();
+  const { isShinyEllieMode, isShinyElliePresentationMode, unlockShinyEllie, isAndroidStatusBarEnabled, isDarkMode, colors } = useTheme();
+  const { width, height } = useWindowDimensions();
+  const isDesktopWeb = isDesktopWebWidth(width);
+  const desktopScale = getDesktopTypographyScale(width, height, 'fit');
+  // Tablet keeps the mobile structural layout (isDesktopWeb stays false)
+  // but still gets a real desktopScale > 1 — numeric-only scale call sites
+  // gate on this instead of isDesktopWeb alone, which used to leave tablet
+  // at the flat phone size even though its own scale was already correct.
+  const isScaledLayout = isDesktopWeb || desktopScale > 1;
   const appNavigationBarColor = getAndroidBottomBarColor(isDarkMode, colors);
   const appNavigationBarButtonStyle = getAndroidBottomBarButtonStyle(isDarkMode);
-  const [isShiny, setIsShiny] = useState(isShinyEllieMode);
-  const splashBackground = isShiny ? SHINY_SPLASH_BACKGROUND : DEFAULT_SPLASH_BACKGROUND;
-  const shinyLogoFontSize = Math.round(Math.min(64, Math.max(34, (width - 48) / 6.6)));
+  const [isShiny, setIsShiny] = useState(isShinyElliePresentationMode);
+  const splashBackground = getSplashBackground(isShinyElliePresentationMode);
+  const splashCopy = getSplashCopy(isShiny);
+  const logoFontSize = Math.round(
+    isShiny
+      ? isScaledLayout
+        ? 64 * desktopScale
+        : Math.min(54, Math.max(34, (width - 48) / 6.6))
+      : isScaledLayout
+        ? 72 * desktopScale
+        : Math.min(64, Math.max(42, (width - 48) / 4.4))
+  );
 
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const appChromeRef = useRef<{
@@ -41,11 +59,11 @@ export default function SplashScreen() {
   }, [splashBackground]);
 
   useEffect(() => {
-    // Shiny roll: 1 / 4096.
+
     const roll = Math.floor(Math.random() * 4096);
     const foundShiny = roll === 0;
 
-    if (isShinyEllieMode || foundShiny) {
+    if (isShinyElliePresentationMode || foundShiny) {
       setIsShiny(true);
     }
 
@@ -97,37 +115,87 @@ export default function SplashScreen() {
         { backgroundColor: splashBackground },
       ]}
     >
-      <View style={[styles.decorativeCircle, styles.decorativeCircleTopRight, { pointerEvents: 'none' }]} />
-      <View style={[styles.decorativeCircle, styles.decorativeCircleBottomLeft, { pointerEvents: 'none' }]} />
+      <View
+        style={[
+          styles.decorativeCircle,
+          styles.decorativeCircleTopRight,
+          isScaledLayout && {
+            width: Math.round(220 * desktopScale),
+            height: Math.round(220 * desktopScale),
+            top: Math.round(-60 * desktopScale),
+            right: Math.round(-60 * desktopScale),
+          },
+          { pointerEvents: 'none' },
+        ]}
+      />
+      <View
+        style={[
+          styles.decorativeCircle,
+          styles.decorativeCircleBottomLeft,
+          isScaledLayout && {
+            width: Math.round(260 * desktopScale),
+            height: Math.round(260 * desktopScale),
+            bottom: Math.round(-80 * desktopScale),
+            left: Math.round(-60 * desktopScale),
+          },
+          { pointerEvents: 'none' },
+        ]}
+      />
 
       <Animated.View style={[styles.logoContainer, { opacity: fadeAnim }]}>
-        <View style={styles.mark}>
-          {isShiny ? (
-            <Text style={styles.markEmoji}>{'\u2728'}</Text>
-          ) : (
-            <Image
-              source={require('../../assets/icony.png')}
-              style={styles.markImage}
-              resizeMode="contain"
-            />
-          )}
+        <View style={[
+          styles.mark,
+          isScaledLayout && {
+            width: Math.round(108 * desktopScale),
+            height: Math.round(108 * desktopScale),
+            borderRadius: Math.round(28 * desktopScale),
+            marginBottom: Math.round(22 * desktopScale),
+          },
+          isShinyEllieMode && styles.pixelMark,
+        ]}>
+          <Image
+            source={require('../../assets/icony.png')}
+            style={styles.markImage}
+            resizeMode="contain"
+          />
         </View>
 
         <Text
-          style={[styles.logoText, isShiny && { fontSize: shinyLogoFontSize }]}
+          style={[
+            styles.logoText,
+            { fontSize: logoFontSize },
+            isDesktopWeb && styles.logoTextDesktop,
+            isScaledLayout && { lineHeight: Math.round((isShiny ? 82 : 102) * desktopScale) },
+          ]}
           numberOfLines={1}
           adjustsFontSizeToFit
           minimumFontScale={0.72}
           allowFontScaling={false}
         >
-          {isShiny ? 'Shiny Ellie' : 'Ellie'}
+          {splashCopy.title}
         </Text>
 
-        <Text style={styles.logoSubText}>{isShiny ? 'A Shiny Ellie appeared!' : 'My English Assistant'}</Text>
+        <Text
+          style={[
+            styles.logoSubText,
+            isDesktopWeb && styles.logoSubTextDesktop,
+            isScaledLayout && { fontSize: Math.round(28 * desktopScale), lineHeight: Math.round(36 * desktopScale) },
+          ]}
+          numberOfLines={1}
+          adjustsFontSizeToFit
+          minimumFontScale={0.5}
+          allowFontScaling={false}
+        >
+          {splashCopy.subtitle}
+        </Text>
       </Animated.View>
 
       <Animated.View style={[styles.creditRow, { opacity: fadeAnim }]}>
-        <Text style={styles.logoSubSubText}>By Mr Faivre</Text>
+        <Text style={[
+          styles.logoSubSubText,
+          isDesktopWeb && styles.logoSubSubTextDesktop,
+          isScaledLayout && { fontSize: Math.round(18 * desktopScale), lineHeight: Math.round(24 * desktopScale) },
+        ]}>By Mr Faivre</Text>
         <ActivityIndicator size="small" color="white" style={styles.loader} />
       </Animated.View>
     </View>
@@ -178,6 +246,10 @@ const styles = StyleSheet.create({
     width: '72%',
     height: '72%',
   },
+  pixelMark: {
+    borderRadius: 2,
+    boxShadow: '8px 8px 0 rgba(122,75,0,0.45)',
+  },
   markEmoji: {
     fontSize: 46,
   },
@@ -189,6 +261,10 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     width: '100%',
   },
+  logoTextDesktop: {
+    lineHeight: 102,
+    letterSpacing: -1,
+  },
   logoSubText: {
     fontWeight: freshFontFamily.semibold,
     fontSize: 22,
@@ -196,6 +272,12 @@ const styles = StyleSheet.create({
     marginTop: 10,
     opacity: 0.85,
     textAlign: 'center',
+    width: '100%',
+  },
+  logoSubTextDesktop: {
+    fontSize: 28,
+    lineHeight: 36,
+    marginTop: 12,
   },
   creditRow: {
     position: 'absolute',
@@ -211,6 +293,10 @@ const styles = StyleSheet.create({
     color: 'white',
     opacity: 0.6,
     textAlign: 'center',
+  },
+  logoSubSubTextDesktop: {
+    fontSize: 18,
+    lineHeight: 24,
   },
   loader: {
     marginTop: 2,

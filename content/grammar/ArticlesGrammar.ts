@@ -2,7 +2,7 @@ const ArticlesGrammar = {
   id: '40',
   title: 'Les articles',
   description: 'Definite and indefinite articles: a, an, the and when to omit them',
-  imageUrl: 'https://i.ibb.co/6RKTZVzq/Articles.png',
+  imageUrl: 'https://wretggbpaejzjdilemit.supabase.co/storage/v1/object/public/lesson-images/15274719ab/les-articles.webp',
   textContent: {
     cards: [
       {

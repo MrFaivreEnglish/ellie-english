@@ -54,6 +54,13 @@ export const usePersistentExerciseKeyboard = ({
           return;
         }
 
+        // These retries exist to recover focus that was actually lost (a sheet or keyboard
+        // transition dropping it). Re-focusing an input that never lost it makes Android
+        // hide and reshow the keyboard, which reads as a flash on every exercise change.
+        if (inputRef.current?.isFocused()) {
+          return;
+        }
+
         inputRef.current?.focus();
       });
     };
@@ -86,6 +93,7 @@ export const usePersistentExerciseKeyboard = ({
 
     focusInput(60);
     if (androidFocusRetries) {
+      // Android can drop focus while a sheet or keyboard transition is still settling.
       focusInput(220);
       focusInput(420);
     }

@@ -2,7 +2,7 @@ const MustHaveToGrammar = {
   id: '27',
   title: 'Must et Have to',
   description: 'Comprendre la différence entre must et have to',
-  imageUrl: 'https://i.ibb.co/FbpBmQ8H/Must-Have-to.png',
+  imageUrl: 'https://wretggbpaejzjdilemit.supabase.co/storage/v1/object/public/lesson-images/15274719ab/must-et-have-to.webp',
   textContent: {
     cards: [
       {

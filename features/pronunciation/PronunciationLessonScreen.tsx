@@ -1,20 +1,22 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import {
   Platform,
   ScrollView,
   StyleSheet,
-  Text,
   TouchableOpacity,
   useWindowDimensions,
   View,
 } from 'react-native';
-import { MaterialIcons } from '@expo/vector-icons';
+import Text from '../shared/ThemedText';
+import MaterialIcons from '../shared/ThemedMaterialIcon';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import BackButton from '../shared/BackButton';
 import ImageWithCredit from '../shared/ImageWithCredit';
 import { useTheme } from '../settings/ThemeContext';
 import { pronunciationCategories, type PronunciationLesson } from '../../content/pronunciationLessons';
 import { markPracticeActivityToday } from '../progress/xpStorage';
+import { DesktopTypographyProvider } from '../shared/DesktopTypography';
+import { getDesktopContentMaxWidth, getDesktopTypographyScale, getTopSafeAreaInset, isDesktopWebWidth } from '../shared/responsiveLayout';
 
 const fallbackLesson = pronunciationCategories[0].lessons[0];
 
@@ -39,13 +41,17 @@ export default function PronunciationLessonScreen({
   navigation,
 }: PronunciationLessonScreenProps) {
   const insets = useSafeAreaInsets();
-  const { height: windowHeight } = useWindowDimensions();
+  const { width: windowWidth, height: windowHeight } = useWindowDimensions();
+  const isDesktopWeb = isDesktopWebWidth(windowWidth, undefined, windowHeight);
+  const desktopContentMaxWidth = getDesktopContentMaxWidth(windowWidth, 'scroll', windowHeight);
+
+
+
+
+
+  const desktopScale = getDesktopTypographyScale(windowWidth, windowHeight, 'scroll');
   const { colors, isDarkMode, isAndroidStatusBarEnabled } = useTheme();
-  const topContentInset = Platform.OS === 'ios'
-    ? insets.top
-    : Platform.OS === 'android' && isAndroidStatusBarEnabled
-      ? insets.top
-      : 0;
+  const topContentInset = getTopSafeAreaInset(Platform.OS, insets.top, isAndroidStatusBarEnabled);
   const lesson = route.params?.lesson ?? fallbackLesson;
   const accentColor = route.params?.categoryColor ?? '#EF6F6C';
   const [speakingText, setSpeakingText] = useState<string | null>(null);
@@ -188,12 +194,17 @@ export default function PronunciationLessonScreen({
   };
 
   return (
+    <DesktopTypographyProvider mode="scroll">
     <ScrollView
       style={[styles.container, { backgroundColor: colors.background }]}
-      contentContainerStyle={{
-        paddingTop: topContentInset,
-        paddingBottom: insets.bottom + 24,
-      }}
+      contentContainerStyle={[
+        {
+          paddingTop: topContentInset,
+          paddingBottom: insets.bottom + 24,
+        },
+        isDesktopWeb && styles.desktopContentWrap,
+        isDesktopWeb && { maxWidth: desktopContentMaxWidth },
+      ]}
     >
       <BackButton label="Back to Pronunciation" onPress={() => navigation.goBack()} />
 
@@ -216,7 +227,7 @@ export default function PronunciationLessonScreen({
             </Text>
           </View>
           <View style={[styles.soundBadge, { backgroundColor: accentColor }]}>
-            <MaterialIcons name="volume-up" size={24} color="#ffffff" />
+            <MaterialIcons name="volume-up" size={Math.round(24 * desktopScale)} color="#ffffff" />
           </View>
         </View>
 
@@ -247,7 +258,7 @@ export default function PronunciationLessonScreen({
             },
           ]}
         >
-          <MaterialIcons name="flag" size={21} color={isDarkMode ? colors.success : '#31A87C'} />
+          <MaterialIcons name="flag" size={Math.round(21 * desktopScale)} color={isDarkMode ? colors.success : '#31A87C'} />
           <View style={styles.goalContent}>
             <Text style={[styles.goalLabel, { color: isDarkMode ? colors.success : '#31A87C' }]}>Today I can</Text>
             <Text style={[styles.goalText, { color: colors.text }]}>{lesson.goal}</Text>
@@ -291,7 +302,7 @@ export default function PronunciationLessonScreen({
               >
                 <MaterialIcons
                   name={speakingText === phrase ? 'volume-up' : 'play-arrow'}
-                  size={20}
+                  size={Math.round(20 * desktopScale)}
                   color={speakingText === phrase ? '#ffffff' : colors.primary}
                 />
                 <Text
@@ -353,7 +364,7 @@ export default function PronunciationLessonScreen({
                       >
                         <MaterialIcons
                           name={speakingText === word ? 'volume-up' : 'play-arrow'}
-                          size={16}
+                          size={Math.round(16 * desktopScale)}
                           color={speakingText === word ? '#ffffff' : colors.primary}
                         />
                         <Text
@@ -384,7 +395,7 @@ export default function PronunciationLessonScreen({
               },
             ]}
           >
-            <MaterialIcons name="error-outline" size={21} color={isDarkMode ? colors.danger : '#EF6F6C'} />
+            <MaterialIcons name="error-outline" size={Math.round(21 * desktopScale)} color={isDarkMode ? colors.danger : '#EF6F6C'} />
             <Text style={[styles.mistakeText, { color: colors.text }]}>
               {lesson.commonMistake}
             </Text>
@@ -420,7 +431,7 @@ export default function PronunciationLessonScreen({
               >
                 <MaterialIcons
                   name={speakingText === word ? 'volume-up' : 'play-arrow'}
-                  size={18}
+                  size={Math.round(18 * desktopScale)}
                   color={speakingText === word ? '#ffffff' : colors.primary}
                 />
                 <Text
@@ -459,7 +470,7 @@ export default function PronunciationLessonScreen({
               onPress={() => selectPracticeItem(selectedPracticeIndex - 1)}
               activeOpacity={0.86}
             >
-              <MaterialIcons name="chevron-left" size={22} color={accentColor} />
+              <MaterialIcons name="chevron-left" size={Math.round(22 * desktopScale)} color={accentColor} />
               <Text style={[styles.practiceSwitchText, { color: accentColor }]}>Previous</Text>
             </TouchableOpacity>
             <Text style={[styles.practiceCounter, { color: colors.secondaryText }]}>
@@ -474,7 +485,7 @@ export default function PronunciationLessonScreen({
               activeOpacity={0.86}
             >
               <Text style={[styles.practiceSwitchText, { color: accentColor }]}>Next</Text>
-              <MaterialIcons name="chevron-right" size={22} color={accentColor} />
+              <MaterialIcons name="chevron-right" size={Math.round(22 * desktopScale)} color={accentColor} />
             </TouchableOpacity>
           </View>
           <TouchableOpacity
@@ -490,7 +501,7 @@ export default function PronunciationLessonScreen({
           >
             <MaterialIcons
               name={speakingText === practiceStarter ? 'volume-up' : 'play-arrow'}
-              size={20}
+              size={Math.round(20 * desktopScale)}
               color={speakingText === practiceStarter ? '#ffffff' : accentColor}
             />
             <Text
@@ -518,11 +529,13 @@ export default function PronunciationLessonScreen({
 
       </View>
     </ScrollView>
+    </DesktopTypographyProvider>
   );
 }
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
+  desktopContentWrap: { width: '100%', alignSelf: 'center' },
   practicePanel: {
     borderRadius: 16,
     borderWidth: 2,

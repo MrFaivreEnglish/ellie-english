@@ -2,7 +2,7 @@ const CanBeAbleToGrammar = {
   id: '31',
   title: 'Can & Be Able To',
   description: 'Express ability in present and past using can, be able to, could, and was able to',
-  imageUrl: 'https://i.ibb.co/twmDg3pV/Can-Be-able-to.png',
+  imageUrl: 'https://wretggbpaejzjdilemit.supabase.co/storage/v1/object/public/lesson-images/15274719ab/can-and-be-able-to.webp',
   textContent: {
     cards: [
       {

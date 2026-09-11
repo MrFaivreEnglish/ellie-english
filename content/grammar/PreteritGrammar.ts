@@ -2,7 +2,7 @@ const PreteritGrammar = {
   id: '3',
   title: 'Prétérit',
   description: 'Learn how to use the past simple tense',
-  imageUrl: 'https://i.ibb.co/7hwDYYS/Pr-t-rit-simple.png',
+  imageUrl: 'https://wretggbpaejzjdilemit.supabase.co/storage/v1/object/public/lesson-images/15274719ab/preterit.webp',
   textContent: {
     cards: [
       {

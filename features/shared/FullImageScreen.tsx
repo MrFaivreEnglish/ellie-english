@@ -1,4 +1,3 @@
-import React from 'react';
 import { View, StyleSheet, Platform } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -14,7 +13,6 @@ export default function FullImageScreen({ route, navigation }: Props) {
 
   const content = (
     <View style={styles.container}>
-      {/* Backdrop is handled by PinchZoomImage's container; ensure we respect safe-area for close button */}
       <PinchZoomImage
         source={source}
         uri={uri}
@@ -23,7 +21,6 @@ export default function FullImageScreen({ route, navigation }: Props) {
         doubleTapZoom={2.5}
         maxScale={5}
       />
-      {/* small spacer to ensure bottom insets don't hide content on some devices */}
       <View style={{ height: insets.bottom }} />
     </View>
   );

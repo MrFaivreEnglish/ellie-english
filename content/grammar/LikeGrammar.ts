@@ -3,7 +3,7 @@ const LikeGrammar = {
   title: 'Like',
   description: 'Learn how to express likes and preferences',
   category: 'Verbs',
-  imageUrl: 'https://i.ibb.co/KxkTWKBq/Like.png',
+  imageUrl: 'https://wretggbpaejzjdilemit.supabase.co/storage/v1/object/public/lesson-images/15274719ab/like.webp',
   textContent: {
     cards: [
       {

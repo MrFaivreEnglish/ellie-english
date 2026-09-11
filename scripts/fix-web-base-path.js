@@ -24,9 +24,37 @@ const withBasePath = (absolutePath) => (
     : `${basePath}${absolutePath}`
 );
 
-const rewriteText = (text) => text
-  .replace(/(["'`])\/(_expo|assets)\//g, (_match, quote, folder) => `${quote}${withBasePath(`/${folder}/`)}`)
-  .replace(/(["'`])\/favicon\.ico/g, (_match, quote) => `${quote}${withBasePath('/favicon.ico')}`);
+// iOS Safari's "Add to Home Screen" ignores favicon.ico and needs apple-touch-icon
+// specifically — without it, iOS screenshots the page itself as the icon. Expo's Metro web
+// export has no built-in step for this (unlike the favicon, which it does generate), so it's
+// injected here alongside the same base-path rewriting the rest of this script already does.
+// theme-color is already injected by Expo itself from app.json's web.themeColor.
+//
+// The manifest is the same story for Chrome/Android: the Metro web export emits none, so
+// app.json's web.name / shortName / display never reach an installed shortcut. public/
+// is copied into dist verbatim, so both the manifest and its icons ship from there.
+const HOME_SCREEN_TAGS = [
+  '<link rel="apple-touch-icon" href="APPLE_TOUCH_ICON_HREF"/>',
+  '<meta name="apple-mobile-web-app-title" content="Ellie"/>',
+  '<meta name="apple-mobile-web-app-capable" content="yes"/>',
+  '<meta name="mobile-web-app-capable" content="yes"/>',
+  '<link rel="manifest" href="MANIFEST_HREF"/>',
+].join('');
+
+const injectHomeScreenTags = (text) => {
+  if (!text.includes('</head>') || text.includes('apple-touch-icon')) return text;
+
+  const tags = HOME_SCREEN_TAGS
+    .replace('APPLE_TOUCH_ICON_HREF', withBasePath('/apple-touch-icon.png'))
+    .replace('MANIFEST_HREF', withBasePath('/manifest.json'));
+  return text.replace('</head>', `${tags}</head>`);
+};
+
+const rewriteText = (text) => injectHomeScreenTags(
+  text
+    .replace(/(["'`])\/(_expo|assets)\//g, (_match, quote, folder) => `${quote}${withBasePath(`/${folder}/`)}`)
+    .replace(/(["'`])\/favicon\.ico/g, (_match, quote) => `${quote}${withBasePath('/favicon.ico')}`)
+);
 
 const walk = (entryPath, files = []) => {
   if (!fs.existsSync(entryPath)) return files;

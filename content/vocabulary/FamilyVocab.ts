@@ -2,7 +2,7 @@ const FamilyVocab = {
   id: '310',
   title: 'Family',
   description: 'Family members',
-  imageUrl: 'https://i.ibb.co/8gkbjjjq/Family.webp',
+  imageUrl: 'https://wretggbpaejzjdilemit.supabase.co/storage/v1/object/public/lesson-images/15274719ab/family.webp',
   thumbnail: require('../../assets/thumbnails/family-thumbnail.png'),
   flashcards: [
          { english: 'Father', french: 'Père' },

@@ -1,6 +1,6 @@
 const BodyVocab = {
   id: '22',
-  title: 'Body',  description: 'Learn vocabulary related to human body parts',  imageUrl: 'https://i.ibb.co/1fBZmGFm/Body.webp',
+  title: 'Body',  description: 'Learn vocabulary related to human body parts',  imageUrl: 'https://wretggbpaejzjdilemit.supabase.co/storage/v1/object/public/lesson-images/15274719ab/body.webp',
   thumbnail: require('../../assets/thumbnails/body-thumbnail.png'),
   flashcards:[
     {

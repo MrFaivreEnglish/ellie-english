@@ -1,4 +1,5 @@
 import {
+  groupNounPhraseTokens,
   normalizeAnswer,
   tokenizeTranslateAnswer,
   isFillExercise,
@@ -51,6 +52,16 @@ describe('tokenizeTranslateAnswer', () => {
 
   it('groups possessive determiners', () => {
     expect(tokenizeTranslateAnswer('I see my friend')).toEqual(['I', 'see', 'my friend']);
+  });
+
+  it('groups split article and noun chips from configured word banks', () => {
+    expect(groupNounPhraseTokens(['He', 'can', 'become', 'a', 'doctor.', "can't"])).toEqual([
+      'He',
+      'can',
+      'become',
+      'a doctor.',
+      "can't",
+    ]);
   });
 
   it('handles a trailing article gracefully (no crash)', () => {

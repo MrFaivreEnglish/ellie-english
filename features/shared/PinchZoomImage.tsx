@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { StyleSheet, TouchableOpacity, Platform, View, LayoutChangeEvent, Text, Image } from 'react-native';
+import { StyleSheet, TouchableOpacity, Platform, View, LayoutChangeEvent, Image } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import Animated, {
@@ -7,25 +7,26 @@ import Animated, {
   useSharedValue,
   withTiming,
 } from 'react-native-reanimated';
-import { MaterialIcons } from '@expo/vector-icons';
+import Text from './ThemedText';
+import MaterialIcons from './ThemedMaterialIcon';
 import { useWindowDimensions } from 'react-native';
 
 
 interface Props {
-  /** Remote uri string (fallback if `source` not provided) */
+
   uri?: string;
-  /** Local or remote image source (preferred) */
+
   source?: any;
   onClose: () => void;
-  // Optional props kept for compatibility
+
   panSensitivity?: number;
   maxScale?: number;
   doubleTapZoom?: number;
   wheelZoomSpeed?: number;
   speedPreset?: 'slow' | 'balanced' | 'fast';
-  /** Show a small credit badge over the image (bottom-right) */
+
   showCredit?: boolean;
-  /** Custom label for the credit badge */
+
   creditLabel?: string;
   accessibilityLabel?: string;
 }
@@ -42,7 +43,7 @@ const PinchZoomImage: React.FC<Props> = ({
   accessibilityLabel = 'Full screen image',
 }) => {
   const insets = useSafeAreaInsets();
-  // Shared values for transform and layout
+
   const scale = useSharedValue(1);
   const translateX = useSharedValue(0);
   const translateY = useSharedValue(0);
@@ -52,7 +53,7 @@ const PinchZoomImage: React.FC<Props> = ({
   const contentW = useSharedValue(0);
   const contentH = useSharedValue(0);
 
-  // Local state to compute fitted image box that will be transformed alongside the image
+
   const [containerSize, setContainerSize] = useState({ width: 0, height: 0 });
   const [naturalSize, setNaturalSize] = useState<{ width: number; height: number } | null>(null);
   const [hasImageError, setHasImageError] = useState(false);
@@ -70,7 +71,7 @@ const PinchZoomImage: React.FC<Props> = ({
 
   const closeSize = Math.max(32, Math.min(44, width * 0.08));
 
-  // Resolve natural image size once (handles local require and remote URIs)
+
   useEffect(() => {
     let cancelled = false;
     setHasImageError(!source && !uri);
@@ -115,7 +116,7 @@ const PinchZoomImage: React.FC<Props> = ({
           );
           return;
         }
-        // Fallback
+
         if (!cancelled) setNaturalSize(null);
       } catch (e) {
         if (!cancelled) setNaturalSize(null);
@@ -127,7 +128,7 @@ const PinchZoomImage: React.FC<Props> = ({
     };
   }, [source, uri]);
 
-  // Compute fitted content box size that matches how the image is displayed with `contain`
+
   const fittedBox = useMemo(() => {
     const cw = containerSize.width;
     const ch = containerSize.height;
@@ -141,7 +142,7 @@ const PinchZoomImage: React.FC<Props> = ({
     return { width, height };
   }, [containerSize, naturalSize]);
 
-  // Keep shared values in sync for clamping math on the UI thread
+
   useEffect(() => {
     contentW.value = fittedBox.width;
     contentH.value = fittedBox.height;
@@ -154,21 +155,21 @@ const PinchZoomImage: React.FC<Props> = ({
     const w = contentW.value > 0 ? contentW.value : cw;
     const h = contentH.value > 0 ? contentH.value : ch;
     if (cw <= 0 || ch <= 0) return;
-    // How far we can move from center before edges leave the viewport
+
     const maxX = Math.max(0, (w * scale.value - cw) / 2);
     const maxY = Math.max(0, (h * scale.value - ch) / 2);
-    // inline clamp to keep this worklet pure
+
     translateX.value = Math.min(Math.max(translateX.value, -maxX), maxX);
     translateY.value = Math.min(Math.max(translateY.value, -maxY), maxY);
   };
 
-  // PINCH gesture
+
   const pinch = Gesture.Pinch()
     .onStart(() => {
       pinchStartScale.value = scale.value;
     })
     .onChange((e) => {
-      // inline clamp to avoid capturing non-worklet helpers
+
       const unclamped = pinchStartScale.value * e.scale;
       const next = Math.min(Math.max(unclamped, 1), maxScale);
       scale.value = next;
@@ -178,7 +179,7 @@ const PinchZoomImage: React.FC<Props> = ({
       if (scale.value < 1) {
         scale.value = withTiming(1);
       }
-      // When returning to 1x, also reset translations
+
       if (scale.value === 1) {
         translateX.value = withTiming(0);
         translateY.value = withTiming(0);
@@ -189,7 +190,7 @@ const PinchZoomImage: React.FC<Props> = ({
     .enabled(true)
     .runOnJS(false);
 
-  // PAN gesture (only meaningful when zoomed in)
+
   const pan = Gesture.Pan()
     .minDistance(0)
     .onChange((e) => {
@@ -203,7 +204,7 @@ const PinchZoomImage: React.FC<Props> = ({
     })
     .runOnJS(false);
 
-  // DOUBLE TAP to toggle zoom 1x <-> doubleTapZoom
+
   const doubleTap = Gesture.Tap()
     .numberOfTaps(2)
     .maxDelay(180)
@@ -223,7 +224,7 @@ const PinchZoomImage: React.FC<Props> = ({
 
   const composed = Gesture.Simultaneous(pinch, pan, doubleTap);
 
-  // Animated style applies translate first, then scale (scale about center)
+
   const animatedContentStyle = useAnimatedStyle(() => {
     return {
       transform: [
@@ -234,7 +235,7 @@ const PinchZoomImage: React.FC<Props> = ({
     };
   });
 
-  // Web-only: wheel zoom + double click
+
   const handleWheel = (e: any) => {
     if (Platform.OS !== 'web') return;
     try { if (e?.preventDefault) e.preventDefault(); } catch {}
@@ -243,7 +244,7 @@ const PinchZoomImage: React.FC<Props> = ({
     const raw = scale.value * (isFinite(factor) ? factor : 1);
     const next = Math.min(Math.max(raw, 1), maxScale);
     scale.value = next;
-    // Clamp pan for new scale
+
     clampTranslations();
   };
 
@@ -270,7 +271,6 @@ const PinchZoomImage: React.FC<Props> = ({
       ]}
     >
       <GestureDetector gesture={composed}>
-        {/* Wrapper that receives gestures; centers the fitted content box */}
         <Animated.View
           collapsable={false as any}
           style={styles.imageWrapper}
@@ -278,7 +278,6 @@ const PinchZoomImage: React.FC<Props> = ({
             ? ({ onWheel: handleWheel, onDoubleClick: handleDoubleClick } as any)
             : {})}
         >
-          {/* Transformed content box sized to the contained image; badge sits inside so it follows pan/zoom */}
           <Animated.View style={[{ width: fittedBox.width, height: fittedBox.height }, animatedContentStyle]}>
             {!!imgSource && !hasImageError ? (
               <Animated.Image

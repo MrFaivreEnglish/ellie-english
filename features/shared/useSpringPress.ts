@@ -1,7 +1,7 @@
 import { useAnimatedStyle, useSharedValue, withSpring } from 'react-native-reanimated';
 
-// Same spring tuning as DraggableWordChip's drag-lift scale, applied here as
-// static press-in/press-out feedback for tappable list rows and cards.
+
+
 const PRESS_SPRING = { damping: 22, stiffness: 260 };
 
 export function useSpringPress(scaleTo: number = 0.97) {

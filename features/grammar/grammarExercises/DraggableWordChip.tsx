@@ -11,6 +11,14 @@ import { triggerSelectionHaptic } from '../../shared/haptics';
 
 export type DragGestureState = { dx: number; dy: number };
 
+
+
+
+
+
+
+export const CHIP_DRAG_COMMIT_THRESHOLD_DY = 64;
+
 interface DraggableWordChipProps {
   position: number;
   disabled: boolean;
@@ -22,9 +30,9 @@ interface DraggableWordChipProps {
   children: React.ReactNode;
 }
 
-// Drives the drag-to-reorder chip via react-native-gesture-handler + Reanimated so the
-// per-frame position/scale updates run on the UI thread instead of being gated behind
-// the JS thread (the limitation of the PanResponder + Animated.Value approach this replaces).
+
+
+
 const DraggableWordChip: React.FC<DraggableWordChipProps> = ({
   position,
   disabled,
@@ -47,12 +55,18 @@ const DraggableWordChip: React.FC<DraggableWordChipProps> = ({
     .onBegin(() => {
       hasDragged.value = false;
       isActive.value = true;
-      runOnJS(triggerSelectionHaptic)();
       runOnJS(onDragStart)(position);
       scale.value = withSpring(1.15, { velocity: 0, damping: 20, stiffness: 260 });
     })
     .onUpdate((e) => {
-      hasDragged.value = true;
+      // Fires on the first real movement, not on touch-down. onBegin runs the moment a
+      // finger lands, so a plain tap buzzed here and again in the chip's press handler on
+      // release. A drag still gets exactly one buzz, and the press handler suppresses its
+      // own once a drag has happened (see useSelectedWordDrag's shouldIgnorePress).
+      if (!hasDragged.value) {
+        hasDragged.value = true;
+        runOnJS(triggerSelectionHaptic)();
+      }
       translateX.value = e.translationX;
       translateY.value = e.translationY;
       runOnJS(onDragMove)(position, { dx: e.translationX, dy: e.translationY });
@@ -61,27 +75,37 @@ const DraggableWordChip: React.FC<DraggableWordChipProps> = ({
       runOnJS(onDragEnd)(position, hasDragged.value, { dx: e.translationX, dy: e.translationY });
     })
     .onFinalize(() => {
-      // Snap the position back instantly rather than animating it: onDragEnd reorders the
-      // list on drop, which reflows this chip into its new slot on the same frame. Animating
-      // the offset back to 0 at the same time races that reflow and reads as a glitchy
-      // double-motion (slide one way while the layout jumps another). Scale has no such
-      // conflict, so it's still free to ease back smoothly.
+      // Reset on the UI thread even when the JS drop handler does not rerender the chip.
       translateX.value = 0;
       translateY.value = 0;
       scale.value = withSpring(1, { damping: 26, stiffness: 260 });
       isActive.value = false;
     });
 
-  const animatedStyle = useAnimatedStyle(() => ({
-    transform: [
-      { translateX: translateX.value },
-      { translateY: translateY.value },
-      { scale: scale.value },
-    ],
-    zIndex: isActive.value ? 20 : 0,
-    elevation: isActive.value ? 14 : 0,
-    boxShadow: isActive.value ? '0px 6px 10px rgba(0,0,0,0.28)' : 'none',
-  }));
+  const animatedStyle = useAnimatedStyle(() => {
+
+
+
+
+
+    const dragOpacity = 1 - Math.min(1, Math.abs(translateY.value) / CHIP_DRAG_COMMIT_THRESHOLD_DY) * 0.65;
+
+    return {
+      opacity: dragOpacity,
+      transform: [
+        { translateX: translateX.value },
+        { translateY: translateY.value },
+        { scale: scale.value },
+      ],
+      zIndex: isActive.value ? 20 : 0,
+      elevation: isActive.value ? 14 : 0,
+      boxShadow: isActive.value ? '0px 6px 10px rgba(0,0,0,0.28)' : 'none',
+      // Android draws the elevation shadow against this view's own corners, not the rounded
+      // chip inside it — without a matching radius here, lifting the chip showed a square
+      // shadow poking out from behind its rounded edges. Matches wordChip's own radius.
+      borderRadius: 11,
+    };
+  });
 
   return (
     <GestureDetector gesture={pan}>

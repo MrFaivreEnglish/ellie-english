@@ -9,6 +9,7 @@ import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import type { TabParamList, RootStackParamList } from '../../types/navigationTypes';
 import type { GrammarLesson, VocabularyLesson } from '../../types/lessonTypes';
 import { getSerializableVocabularyLesson } from '../vocabulary/vocabularyUtils';
+import { DesktopTypographyProvider } from '../shared/DesktopTypography';
 
 type GrammarScreenProps = CompositeScreenProps<
   BottomTabScreenProps<TabParamList, 'Grammar'>,
@@ -91,7 +92,9 @@ const GrammarScreen = ({ route, navigation }: GrammarScreenProps) => {
       />
     </ErrorBoundary>
   ) : (
-    <GrammarCategoryList onSelectLesson={handleSelectLesson} />
+    <DesktopTypographyProvider mode="scroll">
+        <GrammarCategoryList onSelectLesson={handleSelectLesson} />
+    </DesktopTypographyProvider>
   );
 };
 

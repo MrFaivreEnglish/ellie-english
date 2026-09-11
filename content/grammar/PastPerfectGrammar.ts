@@ -2,7 +2,7 @@ const PastPerfectGrammar = {
   id: '5',
   title: 'Past Perfect',
   description: 'Learn how to use the past perfect tense',
-  imageUrl: 'https://i.ibb.co/3yQ0FHPW/Past-Perfect.png',
+  imageUrl: 'https://wretggbpaejzjdilemit.supabase.co/storage/v1/object/public/lesson-images/15274719ab/past-perfect.webp',
   textContent: {
     cards: [
       {
@@ -200,7 +200,6 @@ translateExercises: [
     { question: "She ___ never ___ to Paris before that trip. (be)", answer: "had been", options: ["had been", "has been", "have been", "was been"] },
     { question: "We ___ ___ for hours before taking a break. (work)", answer: "had worked", options: ["had worked", "has worked", "have worked", "was worked"] },
     { question: "By the time he graduated, he ___ ___ three languages. (learn)", answer: "had learned", options: ["had learned", "has learned", "have learned", "was learned"] },
-    // Adding 10 more exercises
     { question: "Before the party, they ___ ___ all the decorations. (put up)", answer: "had put up", options: ["had put up", "has put up", "have put up", "was put up"] },
     { question: "The movie ___ already ___ by the time we arrived. (begin)", answer: "had begun", options: ["had begun", "has begun", "have begun", "was begun"] },
     { question: "She ___ ___ the letter before sending it. (check)", answer: "had checked", options: ["had checked", "has checked", "have checked", "was checked"] },

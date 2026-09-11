@@ -1,7 +1,7 @@
 const GeographyVocab = {
   id: '17',
   title: 'Geography',
-  description: 'Learn vocabulary related to geographical features',  imageUrl: 'https://i.ibb.co/V0RM676M/geography-vocab.webp',
+  description: 'Learn vocabulary related to geographical features',  imageUrl: 'https://wretggbpaejzjdilemit.supabase.co/storage/v1/object/public/lesson-images/15274719ab/geography.webp',
   thumbnail: require('../../assets/thumbnails/geography-thumbnail.png'),
   flashcards: [
     {

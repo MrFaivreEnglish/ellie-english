@@ -1,17 +1,41 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { View, Text, Pressable, Modal, StyleSheet, Platform, Animated } from 'react-native';
-import { MaterialIcons } from '@expo/vector-icons';
-import { GameState, Word } from '../../types/VocabularyTypes';
+import {
+  Animated,
+  Easing,
+  Modal,
+  Platform,
+  StyleSheet,
+  useWindowDimensions,
+  View,
+} from 'react-native';
 import { useAudioPlayer } from 'expo-audio';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import Assets from '../../assets/index';
-import { SOUND_EFFECT_OPTIONS, replaySoundEffect } from '../shared/soundEffects';
-import { getXP } from '../progress/xpStorage';
-import { getStreak } from '../progress/streakStorage';
-import { getXPLevel, getXPLevelStats } from '../progress/xpLevels';
+import type { GameState, Word } from '../../types/VocabularyTypes';
 import LevelUpModal from '../progress/LevelUpModal';
+import SessionResultCard, {
+  SessionResultActions,
+  SessionResultStats,
+  type SessionResultStat,
+} from '../progress/SessionResultCard';
+import { getXP } from '../progress/xpStorage';
+import { getXPLevel, getXPLevelStats } from '../progress/xpLevels';
 import type { ThemeColors } from '../settings/ThemeContext';
+import { freshFontFamily } from '../shared/freshDirection';
+import { SOUND_EFFECT_OPTIONS, replaySoundEffect } from '../shared/soundEffects';
+import Text from '../shared/ThemedText';
+import { DesktopTypographyProvider } from '../shared/DesktopTypography';
+import { getDesktopTypographyScale, getSheetDensity, isDesktopWebWidth } from '../shared/responsiveLayout';
+import useReducedMotion from '../shared/useReducedMotion';
+
+export type SessionResultBanner = {
+  kind: 'unlock' | 'record';
+  emoji: string;
+  label: string;
+  message: string;
+  kicker?: string;
+};
 
 interface CompletionModalProps {
   visible: boolean;
@@ -21,10 +45,16 @@ interface CompletionModalProps {
   isDarkMode: boolean;
   onReplay: (activateTimerMode?: boolean) => void;
   isFirstCompletion: boolean;
+  timerModeUnlocked?: boolean;
+  timerModeAvailable?: boolean;
   isPersonalBest: boolean;
   startedTimerMode: boolean;
   bestTimeForActiveCategory?: number | null;
   matchingSessionXp?: number;
+  bonusXp?: number;
+  // Claiming is what actually banks the session's XP. The screen supplies the
+  // persistence call; nothing is written until the student presses Claim.
+  onClaimXP?: () => Promise<unknown> | void;
   colors: ThemeColors;
   primaryActionLabel?: string;
   onPrimaryAction?: () => void;
@@ -37,144 +67,194 @@ interface CompletionModalProps {
   subtitle?: string;
   image?: any;
   isPerfect?: boolean;
-  unlockMessage?: string;
+  banner?: SessionResultBanner | null;
   statsItems?: Array<{ emoji: string; value: string | number; label: string }>;
+  sectionLabel?: string;
 }
-
-// Cycled per stat tile — teal (XP-like), coral (accuracy-like), blue, amber.
-const STAT_TILE_PALETTE_LIGHT = [
-  { bg: '#d0fdf0', label: '#007560', valueColor: '#006b51' },
-  { bg: '#ffedea', label: '#a04034', valueColor: '#97271b' },
-  { bg: '#e5f0fc', label: '#32669a', valueColor: '#00579a' },
-  { bg: '#fff0cc', label: '#825c00', valueColor: '#784b00' },
-];
-const STAT_TILE_PALETTE_DARK = [
-  { bg: '#0E2E28', label: '#6FE3C4', valueColor: '#6FE3C4' },
-  { bg: '#491513', label: '#febab4', valueColor: '#febab4' },
-  { bg: '#132A42', label: '#7FC4EE', valueColor: '#7FC4EE' },
-  { bg: '#2D284F', label: '#D5C7FF', valueColor: '#D5C7FF' },
-];
-
-const Sparkle = ({ style, delay = 0, size = 12 }: { style: any; delay?: number; size?: number }) => {
-  const anim = useRef(new Animated.Value(0)).current;
-
-  useEffect(() => {
-    const loop = Animated.loop(
-      Animated.sequence([
-        Animated.timing(anim, { toValue: 1, duration: 900, delay, useNativeDriver: Platform.OS !== 'web' }),
-        Animated.timing(anim, { toValue: 0, duration: 900, useNativeDriver: Platform.OS !== 'web' }),
-      ])
-    );
-    loop.start();
-    return () => loop.stop();
-  }, [anim, delay]);
-
-  const opacity = anim.interpolate({ inputRange: [0, 1], outputRange: [0.4, 1] });
-  const scale = anim.interpolate({ inputRange: [0, 1], outputRange: [0.8, 1.1] });
-
-  return (
-    <Animated.Text style={[styles.sparkle, style, { fontSize: size, opacity, transform: [{ scale }] }]}>
-      ✨
-    </Animated.Text>
-  );
-};
 
 const normalizeXP = (value: number) => (Number.isFinite(value) ? Math.max(0, Math.floor(value)) : 0);
 
 export default function VocabularyCompletionModal({
   visible,
-  gameState,
   timerMode,
   wordsLength,
   isDarkMode,
   onReplay,
+  isFirstCompletion,
+  timerModeUnlocked: timerModeUnlockedProp,
+  timerModeAvailable: timerModeAvailableProp,
   isPersonalBest,
   colors,
   startedTimerMode,
   matchingSessionXp = 0,
+  bonusXp = 0,
+  onClaimXP,
   primaryActionLabel,
   onPrimaryAction,
-  secondaryActionLabel,
   onSecondaryAction,
-  reviewWords = [],
   onGoToAccount,
   title,
   subtitle,
+  image,
   isPerfect,
-  unlockMessage,
+  banner,
   statsItems,
+  sectionLabel = 'Vocabulary',
 }: CompletionModalProps) {
   const bigSuccessPlayer = useAudioPlayer(Assets.bigsuccess, SOUND_EFFECT_OPTIONS);
   const bestSuccessPlayer = useAudioPlayer(Assets.bestsuccess, SOUND_EFFECT_OPTIONS);
+  const claimPlayer = useAudioPlayer(Assets.success, SOUND_EFFECT_OPTIONS);
   const insets = useSafeAreaInsets();
+  const reducedMotion = useReducedMotion();
+  const animationsEnabled = !reducedMotion;
+  const { width: viewportWidth, height: viewportHeight } = useWindowDimensions();
+  const desktopScale = getDesktopTypographyScale(viewportWidth, viewportHeight, 'fit');
+  const { dense: denseLayout, veryShort: veryDenseLayout } = getSheetDensity(viewportWidth, viewportHeight, desktopScale);
 
   const backdropOpacity = useRef(new Animated.Value(0)).current;
-  const contentScale = useRef(new Animated.Value(0.85)).current;
-  const checkScale = useRef(new Animated.Value(0)).current;
+  const firstCardAnim = useRef(new Animated.Value(0)).current;
+  const unlockCardAnim = useRef(new Animated.Value(0)).current;
+  const xpCardAnim = useRef(new Animated.Value(0)).current;
+  const actionAnim = useRef(new Animated.Value(0)).current;
   const barFillAnim = useRef(new Animated.Value(0)).current;
-  const xpCountAnim = useRef(new Animated.Value(0)).current;
-  const statsCardAnim = useRef(new Animated.Value(0)).current;
-  const unlockRowAnim = useRef(new Animated.Value(0)).current;
-  const reviewRowAnim = useRef(new Animated.Value(0)).current;
-  const buttonsAnim = useRef(new Animated.Value(0)).current;
-
-  const riseIn = (anim: Animated.Value) => ({
-    opacity: anim,
-    transform: [{ translateY: anim.interpolate({ inputRange: [0, 1], outputRange: [10, 0] }) }],
-  });
-  const hasPlayedOpenSoundRef = useRef(false);
-  const [displayedPersonalBest, setDisplayedPersonalBest] = useState(isPersonalBest);
-  const [currentXP, setCurrentXP] = useState(0);
-  const [displayedXP, setDisplayedXP] = useState(0);
-  const [streakDays, setStreakDays] = useState(0);
-  const [showLevelUp, setShowLevelUp] = useState(false);
-  const [xpReady, setXpReady] = useState(false);
-  const hasShownLevelUpRef = useRef(false);
+  const revealTimersRef = useRef<Array<ReturnType<typeof setTimeout>>>([]);
   const pendingActionRef = useRef<(() => void) | null>(null);
-  const timerModeUnlocked = !timerMode && !startedTimerMode && (gameState?.hasCompletedOnce ?? false);
-  const continueButtonLabel = primaryActionLabel ?? (
-    timerModeUnlocked ? 'Try Timer Mode!' : timerMode ? 'Beat Your Time!' : 'Play Again'
-  );
+  const flowActiveRef = useRef(visible);
+  const claimStartedRef = useRef(false);
+  const hasPlayedOpenSoundRef = useRef(false);
+
+  const [revealStage, setRevealStage] = useState(0);
+  const [currentXP, setCurrentXP] = useState(0);
+  const [xpReady, setXpReady] = useState(false);
+  const [xpClaimed, setXpClaimed] = useState(false);
+  const [claimingXP, setClaimingXP] = useState(false);
+  const [showLevelUp, setShowLevelUp] = useState(false);
+  const [flowFinished, setFlowFinished] = useState(false);
+  const [displayedPersonalBest, setDisplayedPersonalBest] = useState(isPersonalBest);
+
+  const timerModeUnlocked = timerModeUnlockedProp
+    ?? (!timerMode && !startedTimerMode && isFirstCompletion);
+
+
+  const timerModeAvailable = timerModeAvailableProp ?? timerModeUnlocked;
   const earnedThisSessionXP = normalizeXP(matchingSessionXp);
-  const previousXPBeforeSession = Math.max(0, currentXP - earnedThisSessionXP);
-  const didLevelUpThisSession = earnedThisSessionXP > 0 && getXPLevel(previousXPBeforeSession) < getXPLevel(currentXP);
+  // XP is banked on claim, so the stored total read on open is the pre-session one —
+  // the post-session total is that plus what's about to be claimed.
+  const previousXPBeforeSession = currentXP;
+  const totalAfterSessionXP = currentXP + earnedThisSessionXP;
   const previousStats = React.useMemo(() => getXPLevelStats(previousXPBeforeSession), [previousXPBeforeSession]);
-  const currentStats = React.useMemo(() => getXPLevelStats(currentXP), [currentXP]);
-  // If a level-up happened, the "before" bar reads as this level's own start (0%) —
-  // the previous level's percentage isn't on the same scale as the new level's bar.
-  const barFromPercent = didLevelUpThisSession ? 0 : previousStats.progressPercent;
-  const barToPercent = currentStats.progressPercent;
+  const currentStats = React.useMemo(() => getXPLevelStats(totalAfterSessionXP), [totalAfterSessionXP]);
+  const didLevelUpThisSession = earnedThisSessionXP > 0
+    && getXPLevel(previousXPBeforeSession) < getXPLevel(totalAfterSessionXP);
+  const barFromPercent = previousStats.progressPercent;
+  const barToPercent = didLevelUpThisSession ? 100 : currentStats.progressPercent;
+  const barFromXP = previousStats.progressXP;
+  const barToXP = didLevelUpThisSession ? previousStats.neededXP : currentStats.progressXP;
+  const barNeededXP = didLevelUpThisSession ? previousStats.neededXP : currentStats.neededXP;
+  const displayedCurrentLevel = didLevelUpThisSession ? previousStats.level : currentStats.level;
+  const displayedNextLevel = displayedCurrentLevel + 1;
+  const [displayedBarXP, setDisplayedBarXP] = useState(barFromXP);
+
+
+
 
   useEffect(() => {
-    if (!visible) {
-      hasShownLevelUpRef.current = false;
-      pendingActionRef.current = null;
-      setXpReady(false);
-      setShowLevelUp(false);
-    }
-  }, [visible]);
+    setDisplayedBarXP(barFromXP);
+    const listenerId = barFillAnim.addListener(({ value }) => {
+      const progress = Math.max(0, Math.min(1, value));
+      const nextXP = Math.round(barFromXP + (barToXP - barFromXP) * progress);
+      setDisplayedBarXP((current) => current === nextXP ? current : nextXP);
+    });
 
-  const defaultContinueAction = () => {
-    if (onPrimaryAction) { onPrimaryAction(); return; }
-    onReplay(timerModeUnlocked || timerMode);
+    return () => barFillAnim.removeListener(listenerId);
+  }, [barFillAnim, barFromXP, barToXP]);
+
+  const resultBanner: SessionResultBanner | null = banner !== undefined
+    ? banner
+    : (timerModeUnlocked
+      ? {
+          kind: 'unlock',
+          emoji: '🏅',
+          label: 'Timer Mode',
+          message: 'Race the clock on this lesson for bonus XP.',
+        }
+      : null);
+
+  const unlockBanner = resultBanner?.kind === 'unlock' ? resultBanner : null;
+  const recordBanner = resultBanner?.kind === 'record' ? resultBanner : null;
+  const hasUnlockCard = !!unlockBanner;
+  const xpRevealStage = hasUnlockCard ? 3 : 2;
+  const actionRevealStage = hasUnlockCard ? 4 : 3;
+  const continueButtonLabel = primaryActionLabel
+    ?? (timerMode && displayedPersonalBest
+      ? 'Beat your time!'
+      : !timerMode && timerModeAvailable
+        ? 'Try Timer Mode!'
+        : 'Try Again');
+
+  const defaultTitle = displayedPersonalBest ? 'New Best Time!' : 'Great job!';
+  const defaultSubtitle = displayedPersonalBest
+    ? 'Your fastest time yet.'
+    : `You completed all ${wordsLength} items. Nice work!`;
+  const firstCardTitle = recordBanner?.label ?? title ?? defaultTitle;
+  const firstCardSubtitle = recordBanner?.message ?? subtitle ?? defaultSubtitle;
+  const firstCardEyebrow = recordBanner?.kicker
+    ?? (displayedPersonalBest
+      ? 'New record'
+      : isPerfect
+        ? 'Perfect session'
+        : 'You did it!');
+  const firstCardTone = recordBanner
+    ? (isPerfect ? 'perfect' : 'celebration')
+    : isPerfect
+      ? 'perfect'
+      : 'success';
+
+  // Only the first 2 non-XP stats are shown to keep this row compact — but the perfect-run
+  // bonus indicator (when present) always gets one of those 2 slots instead of being pushed
+  // out by whichever other stats happen to come first in the caller's array.
+  // Memoised so the array keeps a stable identity across the many re-renders this screen
+  // does while the XP counter runs — a fresh array each time restarted the stats reveal.
+  const supportingStats: SessionResultStat[] = React.useMemo(() => {
+    const nonXpStats = (statsItems ?? []).filter((item) => !/xp/i.test(item.label));
+    const perfectBonusStat = nonXpStats.find((item) => item.label === 'Perfect bonus');
+    return perfectBonusStat
+      ? [...nonXpStats.filter((item) => item.label !== 'Perfect bonus').slice(0, 1), perfectBonusStat]
+      : nonXpStats.slice(0, 2);
+  }, [statsItems]);
+
+  const clearRevealTimers = () => {
+    revealTimersRef.current.forEach(clearTimeout);
+    revealTimersRef.current = [];
   };
 
-  const runAfterLevelUpCheck = (action: () => void) => {
-    if (didLevelUpThisSession && !hasShownLevelUpRef.current) {
-      hasShownLevelUpRef.current = true;
-      pendingActionRef.current = action;
-      setShowLevelUp(true);
-      return;
-    }
-    action();
-  };
-
-  const handleLevelUpDismiss = () => {
+  const resetFlow = () => {
+    flowActiveRef.current = false;
+    clearRevealTimers();
+    barFillAnim.stopAnimation();
+    setRevealStage(0);
+    setXpReady(false);
+    setXpClaimed(false);
+    setClaimingXP(false);
     setShowLevelUp(false);
-    const action = pendingActionRef.current;
+    setFlowFinished(false);
+    claimStartedRef.current = false;
     pendingActionRef.current = null;
-    action?.();
   };
+
+  useEffect(() => {
+    if (visible) {
+      flowActiveRef.current = true;
+    } else {
+      resetFlow();
+    }
+    return () => {
+      clearRevealTimers();
+      barFillAnim.stopAnimation();
+    };
+
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [visible]);
 
   useEffect(() => {
     if (visible) setDisplayedPersonalBest(isPersonalBest);
@@ -185,506 +265,790 @@ export default function VocabularyCompletionModal({
     let active = true;
     getXP().then((xp) => {
       if (!active) return;
-      // Decide level-up vs. normal completion atomically with the XP read —
-      // a level-up should be the ONLY screen shown, never a flash of
-      // Exercise Complete before switching over.
-      const earned = normalizeXP(matchingSessionXp);
-      const before = Math.max(0, xp - earned);
-      const leveledUp = earned > 0 && getXPLevel(before) < getXPLevel(xp);
       setCurrentXP(xp);
-      if (leveledUp && !hasShownLevelUpRef.current) {
-        hasShownLevelUpRef.current = true;
-        pendingActionRef.current = defaultContinueAction;
-        setShowLevelUp(true);
-      }
       setXpReady(true);
-    }).catch(() => { if (active) setXpReady(true); });
-    getStreak().then((streak) => { if (active) setStreakDays(streak.currentStreak); }).catch(() => {});
+    }).catch(() => {
+      if (active) setXpReady(true);
+    });
     return () => { active = false; };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [matchingSessionXp, visible]);
 
   useEffect(() => {
-    if (!visible) { hasPlayedOpenSoundRef.current = false; return; }
-    // Wait until we know whether this completion is actually a level-up —
-    // that plays its own music in LevelUpModal instead of this one.
-    if (!xpReady || showLevelUp || didLevelUpThisSession) return;
-    if (hasPlayedOpenSoundRef.current) return;
-    hasPlayedOpenSoundRef.current = true;
-    const player = (timerMode && isPersonalBest) || isPerfect ? bestSuccessPlayer : bigSuccessPlayer;
-    replaySoundEffect(player);
-  }, [bigSuccessPlayer, bestSuccessPlayer, isPersonalBest, visible, timerMode, isPerfect, xpReady, showLevelUp, didLevelUpThisSession]);
+    if (!visible || !xpReady) return;
 
-  useEffect(() => {
-    if (!visible) return;
-
-    backdropOpacity.setValue(0);
-    contentScale.setValue(0.85);
-    checkScale.setValue(0);
+    clearRevealTimers();
+    setRevealStage(1);
+    setXpClaimed(false);
+    setClaimingXP(false);
+    backdropOpacity.setValue(animationsEnabled ? 0 : 1);
+    firstCardAnim.setValue(animationsEnabled ? 0 : 1);
+    unlockCardAnim.setValue(animationsEnabled ? 0 : 1);
+    xpCardAnim.setValue(animationsEnabled ? 0 : 1);
+    actionAnim.setValue(animationsEnabled ? 0 : 1);
     barFillAnim.setValue(0);
-    xpCountAnim.setValue(0);
-    statsCardAnim.setValue(0);
-    unlockRowAnim.setValue(0);
-    reviewRowAnim.setValue(0);
-    buttonsAnim.setValue(0);
-    setDisplayedXP(0);
+
+    if (!animationsEnabled) {
+      setRevealStage(actionRevealStage);
+      return;
+    }
 
     Animated.parallel([
-      Animated.timing(backdropOpacity, { toValue: 1, duration: 300, useNativeDriver: Platform.OS !== 'web' }),
-      Animated.timing(contentScale, { toValue: 1, duration: 350, useNativeDriver: Platform.OS !== 'web' }),
-      Animated.spring(checkScale, { toValue: 1, friction: 6, tension: 200, delay: 100, useNativeDriver: Platform.OS !== 'web' }),
-      Animated.timing(statsCardAnim, { toValue: 1, duration: 350, delay: 250, useNativeDriver: Platform.OS !== 'web' }),
-      Animated.timing(unlockRowAnim, { toValue: 1, duration: 350, delay: 400, useNativeDriver: Platform.OS !== 'web' }),
-      Animated.timing(reviewRowAnim, { toValue: 1, duration: 350, delay: 500, useNativeDriver: Platform.OS !== 'web' }),
-      Animated.timing(buttonsAnim, { toValue: 1, duration: 350, delay: 600, useNativeDriver: Platform.OS !== 'web' }),
+      Animated.timing(backdropOpacity, {
+        toValue: 1,
+        duration: 460,
+        useNativeDriver: Platform.OS !== 'web',
+      }),
+      Animated.spring(firstCardAnim, {
+        toValue: 1,
+        friction: 10,
+        tension: 60,
+        delay: 100,
+        useNativeDriver: Platform.OS !== 'web',
+      }),
     ]).start();
 
-    const xpListener = xpCountAnim.addListener(({ value }) => {
-      setDisplayedXP(Math.round(value * earnedThisSessionXP));
-    });
-    Animated.timing(xpCountAnim, { toValue: 1, duration: 700, delay: 400, useNativeDriver: false }).start();
-    Animated.timing(barFillAnim, { toValue: 1, duration: 1000, delay: 600, useNativeDriver: false }).start();
+    if (hasUnlockCard) {
+      revealTimersRef.current.push(setTimeout(() => {
+        setRevealStage(2);
+        Animated.spring(unlockCardAnim, {
+          toValue: 1,
+          friction: 10,
+          tension: 60,
+          useNativeDriver: Platform.OS !== 'web',
+        }).start();
+      }, 480));
+    }
 
-    return () => { xpCountAnim.removeListener(xpListener); };
+    revealTimersRef.current.push(setTimeout(() => {
+      setRevealStage(xpRevealStage);
+      Animated.spring(xpCardAnim, {
+        toValue: 1,
+        friction: 10,
+        tension: 60,
+        useNativeDriver: Platform.OS !== 'web',
+      }).start();
+    }, hasUnlockCard ? 940 : 520));
+
+    revealTimersRef.current.push(setTimeout(() => {
+      setRevealStage(actionRevealStage);
+      Animated.spring(actionAnim, {
+        toValue: 1,
+        friction: 10,
+        tension: 62,
+        useNativeDriver: Platform.OS !== 'web',
+      }).start();
+    }, hasUnlockCard ? 1420 : 1020));
+
+    return clearRevealTimers;
   }, [
-    visible, backdropOpacity, contentScale, checkScale, barFillAnim, xpCountAnim, earnedThisSessionXP,
-    statsCardAnim, unlockRowAnim, reviewRowAnim, buttonsAnim,
+    actionAnim,
+    actionRevealStage,
+    animationsEnabled,
+    backdropOpacity,
+    barFillAnim,
+    firstCardAnim,
+    hasUnlockCard,
+    unlockCardAnim,
+    visible,
+    xpCardAnim,
+    xpRevealStage,
+    xpReady,
   ]);
 
-  const isGolden = isPerfect || displayedPersonalBest;
-  const defaultTitle = displayedPersonalBest ? 'New Best Time!' : 'Nice work!';
-  const defaultSubtitle = displayedPersonalBest
-    ? 'Your fastest match yet.'
-    : `Matched all ${wordsLength} words`;
+  useEffect(() => {
+    if (!visible) {
+      hasPlayedOpenSoundRef.current = false;
+      return;
+    }
+    if (!xpReady || showLevelUp || hasPlayedOpenSoundRef.current) return;
+    hasPlayedOpenSoundRef.current = true;
+    replaySoundEffect((timerMode && displayedPersonalBest) || isPerfect ? bestSuccessPlayer : bigSuccessPlayer);
+  }, [
+    bestSuccessPlayer,
+    bigSuccessPlayer,
+    displayedPersonalBest,
+    isPerfect,
+    showLevelUp,
+    timerMode,
+    visible,
+    xpReady,
+  ]);
 
-  const topPad = Platform.OS === 'web' ? 18 : Math.max(insets.top, 20) + 8;
-  const botPad = Platform.OS === 'web' ? 18 : Math.max(insets.bottom, 12) + 4;
+  const revealStyle = (animation: Animated.Value, distance = 12) => ({
+    opacity: animation,
+    transform: [
+      {
+        translateY: animation.interpolate({
+          inputRange: [0, 1],
+          outputRange: [distance, 0],
+        }),
+      },
+      {
+        scale: animation.interpolate({
+          inputRange: [0, 1],
+          outputRange: [0.97, 1],
+        }),
+      },
+    ],
+  });
+
+  const defaultContinueAction = () => {
+    if (onPrimaryAction) {
+      onPrimaryAction();
+      return;
+    }
+    onReplay(timerMode || timerModeAvailable);
+  };
+
+  const revealPostClaimAction = () => {
+    setClaimingXP(false);
+    setXpClaimed(true);
+    if (!animationsEnabled) {
+      actionAnim.setValue(1);
+      return;
+    }
+    actionAnim.setValue(0);
+    Animated.spring(actionAnim, {
+      toValue: 1,
+      friction: 10,
+      tension: 62,
+      useNativeDriver: Platform.OS !== 'web',
+    }).start();
+  };
+
+  const finishXPClaim = () => {
+    if (!flowActiveRef.current) return;
+
+    if (!didLevelUpThisSession) {
+      revealPostClaimAction();
+      return;
+    }
+
+    setClaimingXP(false);
+    setXpClaimed(true);
+    pendingActionRef.current = defaultContinueAction;
+    setShowLevelUp(true);
+  };
+
+  const handleClaimXP = () => {
+    if (!flowActiveRef.current || claimStartedRef.current || claimingXP || xpClaimed) return;
+    claimStartedRef.current = true;
+    setClaimingXP(true);
+    replaySoundEffect(claimPlayer);
+
+    // This is the moment the session's XP is actually banked — the bar animation below
+    // is just the visual for it, so kick off the write here rather than waiting on it.
+    void Promise.resolve(onClaimXP?.()).catch(() => {});
+
+    if (!animationsEnabled) {
+      barFillAnim.setValue(1);
+      finishXPClaim();
+      return;
+    }
+
+    // Animating width can't use the native driver, so this single value drives both the
+    // bar and the number that counts with it.
+    Animated.timing(barFillAnim, {
+      toValue: 1,
+      duration: earnedThisSessionXP > 0 ? 1650 : 600,
+      easing: Easing.out(Easing.cubic),
+      useNativeDriver: false,
+    }).start(({ finished }) => {
+      if (finished && flowActiveRef.current) finishXPClaim();
+    });
+  };
+
+  const handleLevelUpDismiss = () => {
+    flowActiveRef.current = false;
+    setFlowFinished(true);
+    setShowLevelUp(false);
+    const action = pendingActionRef.current;
+    pendingActionRef.current = null;
+    action?.();
+  };
+
+  const handlePostClaimAction = () => {
+    if (!flowActiveRef.current) return;
+    flowActiveRef.current = false;
+    setFlowFinished(true);
+    defaultContinueAction();
+  };
+
+  // Enter activates the same primary action the "Claim XP"/"Continue" button does —
+  // without this, a browser's default Enter behavior on a still-focused exercise
+  // input (e.g. Fill/Write's) could fire instead and exit the screen entirely. The
+  // exercise's hidden input can still be focused underneath this overlay, so blur it
+  // first — otherwise its own onSubmitEditing could react to the same keypress before
+  // this listener gets a chance to.
+  useEffect(() => {
+    if (Platform.OS !== 'web' || typeof window === 'undefined' || typeof document === 'undefined') return undefined;
+    if (!visible || showLevelUp || flowFinished) return undefined;
+
+    (document.activeElement as HTMLElement | null)?.blur?.();
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key !== 'Enter') return;
+      // Mirror the button exactly: it only exists once the reveal reaches its stage,
+      // and it's disabled mid-claim. Without these guards Enter could fire the action
+      // while the card was still animating in, before the button was even on screen.
+      if (revealStage < actionRevealStage || claimingXP) return;
+      event.preventDefault();
+      if (earnedThisSessionXP === 0 || xpClaimed) {
+        handlePostClaimAction();
+      } else {
+        handleClaimXP();
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [visible, showLevelUp, flowFinished, revealStage, actionRevealStage, claimingXP, earnedThisSessionXP, xpClaimed]);
+
+  const handleGoToAccountFromReward = () => {
+    flowActiveRef.current = false;
+    setFlowFinished(true);
+    setShowLevelUp(false);
+    pendingActionRef.current = null;
+
+
+
+
+
+
+
+
+    // Let the nested native modal dismiss before navigation presents another screen.
+    setTimeout(() => onGoToAccount?.(), 220);
+  };
+
+  const closeEndScreen = () => {
+    flowActiveRef.current = false;
+    barFillAnim.stopAnimation();
+    setFlowFinished(true);
+    if (onSecondaryAction) {
+      onSecondaryAction();
+      return;
+    }
+    defaultContinueAction();
+  };
+
+  const topPad = denseLayout
+    ? Platform.OS === 'web' ? 8 * desktopScale : Math.max(insets.top, 8)
+    : Platform.OS === 'web' ? 18 * desktopScale : Math.max(insets.top, 20) + 8;
+  const bottomPad = denseLayout
+    ? Platform.OS === 'web' ? 8 * desktopScale : Math.max(insets.bottom, 6)
+    : Platform.OS === 'web' ? 18 * desktopScale : Math.max(insets.bottom, 12) + 4;
+  const availableEndCardHeight = Math.max(320, viewportHeight - topPad - bottomPad);
+
+
+
+
+
+
+
+  const isTabletDevice = Platform.OS === 'web'
+    ? !isDesktopWebWidth(viewportWidth, undefined, viewportHeight) && Math.min(viewportWidth, viewportHeight) >= 600
+    : Math.min(viewportWidth, viewportHeight) >= 600;
+  const tabletCardBoost = isTabletDevice ? 1.2 : 1;
+  const preferredEndCardHeight = (hasUnlockCard
+    ? veryDenseLayout ? 550 : denseLayout ? 600 : 720
+    : veryDenseLayout ? 470 : denseLayout ? 525 : 600) * desktopScale * tabletCardBoost;
+  const endCardHeight = Math.min(availableEndCardHeight, preferredEndCardHeight);
 
   return (
-    <>
-    <Modal
-      visible={visible && xpReady && !showLevelUp}
-      transparent={true}
-      animationType="fade"
-      statusBarTranslucent={true}
-      presentationStyle="overFullScreen"
-      hardwareAccelerated
-    >
-      <Animated.View
-        style={[
-          StyleSheet.absoluteFill,
-          styles.backdrop,
-          {
-            backgroundColor: isDarkMode ? 'rgba(7,15,28,0.44)' : 'rgba(20,20,25,0.55)',
-            opacity: backdropOpacity,
-            pointerEvents: visible ? 'auto' : 'none',
-          },
-        ]}
+    <DesktopTypographyProvider mode="fit">
+      <>
+      <Modal
+        visible={visible && xpReady && !flowFinished}
+        transparent
+        animationType="none"
+        statusBarTranslucent
+        presentationStyle="overFullScreen"
+        hardwareAccelerated
+        onRequestClose={closeEndScreen}
       >
         <Animated.View
           style={[
-            styles.shell,
+            StyleSheet.absoluteFill,
+            styles.backdrop,
             {
-              transform: [{ scale: contentScale }],
-              paddingTop: topPad,
-              paddingBottom: botPad,
+              backgroundColor: isDarkMode ? 'rgba(7,15,28,0.54)' : 'rgba(20,20,25,0.55)',
+              opacity: backdropOpacity,
             },
-            Platform.OS === 'web' && styles.shellWeb,
           ]}
         >
-          {/* Banner */}
-          <View style={[styles.banner, { backgroundColor: isGolden ? (isDarkMode ? '#44346B' : '#dca331') : (isDarkMode ? '#075A49' : '#1f9b82') }]}>
-            <Sparkle style={{ top: 10, left: 80 }} size={12} delay={0} />
-            <Sparkle style={{ bottom: 12, right: 24 }} size={10} delay={500} />
-            <Sparkle style={{ top: 16, right: 70 }} size={9} delay={1000} />
+          {!showLevelUp && (
+            <View style={[styles.viewport, { paddingTop: topPad, paddingBottom: bottomPad }]}>
+            <View style={[styles.shell, { height: endCardHeight, maxWidth: Math.round(570 * desktopScale) }]}>
+              <SessionResultCard
+                  colors={colors}
+                  isDarkMode={isDarkMode}
+                  tone={firstCardTone}
+                  eyebrow={firstCardEyebrow}
+                  title={firstCardTitle}
+                  subtitle={firstCardSubtitle}
+                  image={recordBanner ? undefined : image}
+                  heroEmoji={recordBanner?.emoji ?? (image ? undefined : isPerfect ? '\u{1F31F}' : '\u2728')}
+                  heroVisualStyle={[
+                    styles.completionHeroVisual,
+                    denseLayout && styles.completionHeroVisualCompact,
+                    desktopScale > 1 && {
+                      width: Math.round((denseLayout ? 62 : 76) * desktopScale),
+                      height: Math.round((denseLayout ? 62 : 76) * desktopScale),
+                      borderRadius: Math.round((denseLayout ? 19 : 22) * desktopScale),
+                    },
+                    {
+                      transform: [{
+                        scale: firstCardAnim.interpolate({ inputRange: [0, 1], outputRange: [0.72, 1] }),
+                      }],
+                    },
+                  ]}
+                  heroContainerStyle={[
+                    styles.completionHero,
+                    denseLayout && styles.completionHeroCompact,
+                    veryDenseLayout && styles.completionHeroVeryCompact,
+                    desktopScale > 1 && {
+                      minHeight: Math.round((veryDenseLayout ? 108 : denseLayout ? 118 : 150) * desktopScale),
+                      paddingVertical: Math.round((veryDenseLayout ? 14 : denseLayout ? 17 : 28) * desktopScale),
+                    },
+                    revealStyle(firstCardAnim, 10),
+                  ]}
+                  sectionLabel={sectionLabel}
+                  onBack={onSecondaryAction ? closeEndScreen : undefined}
+                  fillContainer
+                  showHero={revealStage >= 1}
+                  showBody={revealStage >= 2}
+                  forceDense={denseLayout}
+                >
+                  {unlockBanner && revealStage >= 2 && (
+                    <Animated.View
+                      style={[
+                        styles.unlockCard,
+                        denseLayout && styles.unlockCardCompact,
+                        desktopScale > 1 && {
+                          minHeight: Math.round((denseLayout ? 82 : 94) * desktopScale),
+                          gap: Math.round((denseLayout ? 12 : 15) * desktopScale),
+                          borderRadius: Math.round((denseLayout ? 16 : 18) * desktopScale),
+                          paddingVertical: Math.round((denseLayout ? 11 : 15) * desktopScale),
+                          paddingHorizontal: Math.round((denseLayout ? 13 : 18) * desktopScale),
+                        },
+                        {
+                          backgroundColor: isDarkMode ? '#392B0E' : '#FFF4CE',
+                          borderColor: isDarkMode ? '#D49A24' : '#E2A51D',
+                        },
+                        revealStyle(unlockCardAnim, 14),
+                      ]}
+                    >
+                      <View style={[
+                        styles.unlockIcon,
+                        desktopScale > 1 && {
+                          width: Math.round(52 * desktopScale),
+                          height: Math.round(52 * desktopScale),
+                          borderRadius: Math.round(17 * desktopScale),
+                        },
+                        { backgroundColor: isDarkMode ? '#584016' : '#FFE38A' },
+                      ]}>
+                        <Text style={styles.unlockEmoji}>{unlockBanner.emoji}</Text>
+                      </View>
+                      <View style={styles.unlockCopy}>
+                        <Text style={[styles.unlockKicker, { color: isDarkMode ? '#FFD46E' : '#A66500' }]}>New mode</Text>
+                        <Text style={[styles.unlockTitle, denseLayout && styles.unlockTitleCompact, { color: isDarkMode ? '#FFE5A2' : '#704600' }]}>
+                          {unlockBanner.label} Unlocked!
+                        </Text>
+                        <Text style={[styles.unlockMessage, { color: isDarkMode ? '#E5C77D' : '#87621B' }]}>
+                          {unlockBanner.message}
+                        </Text>
+                      </View>
+                    </Animated.View>
+                  )}
 
-            <Animated.View style={[styles.checkCircle, { transform: [{ scale: checkScale }] }]}>
-              <MaterialIcons name="check" size={26} color="#FFFFFF" />
-            </Animated.View>
-            <View style={styles.bannerText}>
-              <Text style={styles.bannerTitle} numberOfLines={1}>
-                {title ?? defaultTitle}
-              </Text>
-              <Text style={styles.bannerSub} numberOfLines={2}>
-                {subtitle ?? defaultSubtitle}
-              </Text>
-            </View>
-          </View>
+                  {revealStage >= xpRevealStage && (
+                    <View style={styles.xpRewardWrap}>
+                      {bonusXp > 0 && (
+                        <Animated.View
+                          style={[
+                            styles.perfectBonusPill,
+                            { backgroundColor: '#D63B55', borderColor: isDarkMode ? '#3A1218' : '#FFE0E5' },
+                            revealStyle(xpCardAnim, 8),
+                          ]}
+                        >
+                          <Text style={styles.perfectBonusPillText}>Perfect! Bonus ×1.5</Text>
+                        </Animated.View>
+                      )}
+                      <Animated.View
+                        style={[
+                          styles.xpRewardCard,
+                          denseLayout && styles.xpRewardCardCompact,
+                          desktopScale > 1 && {
+                            gap: Math.round((denseLayout ? 12 : 18) * desktopScale),
+                            borderRadius: Math.round((denseLayout ? 16 : 20) * desktopScale),
+                            padding: Math.round((denseLayout ? 14 : 22) * desktopScale),
+                          },
+                          {
+                            backgroundColor: isDarkMode ? colors.surface : colors.card,
+                            borderColor: colors.border,
+                          },
+                          revealStyle(xpCardAnim, 14),
+                        ]}
+                      >
+                        <View style={styles.xpRewardHeading}>
+                          <View style={[
+                            styles.xpRewardIcon,
+                            desktopScale > 1 && {
+                              width: Math.round(48 * desktopScale),
+                              height: Math.round(48 * desktopScale),
+                              borderRadius: Math.round(16 * desktopScale),
+                            },
+                            { backgroundColor: colors.primarySoft },
+                          ]}>
+                            <Text style={styles.xpRewardEmoji}>✨</Text>
+                          </View>
+                          <View style={styles.xpRewardCopy}>
+                            <Text style={[styles.xpRewardKicker, { color: colors.secondaryText }]}>XP reward</Text>
+                            <Text
+                              style={[
+                                styles.xpRewardTitle,
+                                denseLayout && styles.xpRewardTitleCompact,
+                                { color: colors.text },
+                              ]}
+                            >
+                              You&apos;ve earned {earnedThisSessionXP} XP
+                            </Text>
+                          </View>
+                        </View>
 
-          {/* Stats card */}
-          <Animated.View
-            style={[
-              styles.statsCard,
-              riseIn(statsCardAnim),
-              {
-                backgroundColor: isDarkMode ? colors.surface : colors.card,
-                boxShadow: `2px 4px 0 ${isDarkMode ? '#08131F' : '#d5cdb8'}, 0px 8px 20px rgba(0,0,0,${isDarkMode ? 0.3 : 0.08})`,
-              } as any,
-            ]}
-          >
-            {statsItems && statsItems.length > 0 && (
-              <View style={styles.statsRow}>
-                {statsItems.map((item, i) => {
-                  const tilePalette = isDarkMode ? STAT_TILE_PALETTE_DARK : STAT_TILE_PALETTE_LIGHT;
-                  const palette = tilePalette[i % tilePalette.length];
-                  const isXpTile = i === 0;
-                  return (
-                    <View key={item.label} style={[styles.statTile, { backgroundColor: palette.bg }]}>
-                      <Text style={[styles.statLabel, { color: palette.label }]} numberOfLines={1}>
-                        {item.label}
-                      </Text>
-                      <Text style={[styles.statValue, { color: palette.valueColor }]} numberOfLines={1}>
-                        {isXpTile && typeof item.value === 'number' ? `+${displayedXP}` : item.value}
-                      </Text>
+                      {supportingStats.length > 0 && !veryDenseLayout && !(hasUnlockCard && denseLayout) && (
+                        <SessionResultStats
+                          colors={colors}
+                          isDarkMode={isDarkMode}
+                          items={supportingStats}
+                          reveal={revealStage >= xpRevealStage}
+                          animationsEnabled={animationsEnabled}
+                          revealDelay={80}
+                          forceDense={denseLayout}
+                        />
+                      )}
+
+                      <View style={styles.xpProgressRow}>
+                        <View style={[
+                          styles.levelCircle,
+                          desktopScale > 1 && {
+                            width: Math.round(36 * desktopScale),
+                            height: Math.round(36 * desktopScale),
+                            borderRadius: Math.round(18 * desktopScale),
+                          },
+                          { backgroundColor: colors.primary },
+                        ]}>
+                          <Text style={[styles.levelCircleText, { color: colors.buttonText }]}>{displayedCurrentLevel}</Text>
+                        </View>
+                        <View style={styles.xpBarCenter}>
+                          <View style={[
+                            styles.xpBarTrack,
+                            desktopScale > 1 && { height: Math.round(13 * desktopScale) },
+                            { backgroundColor: colors.progressTrack },
+                          ]}>
+                            <Animated.View
+                              style={[
+                                styles.xpBarFill,
+                                {
+                                  width: barFillAnim.interpolate({
+                                    inputRange: [0, 1],
+                                    outputRange: [`${barFromPercent}%`, `${barToPercent}%`],
+                                  }),
+                                  backgroundColor: colors.primary,
+                                },
+                              ]}
+                            />
+                          </View>
+                          <Text style={[styles.xpBarLabel, { color: colors.secondaryText }]}>
+                            {displayedBarXP} / {barNeededXP} XP
+                          </Text>
+                        </View>
+                        <View style={[
+                          styles.levelCircle,
+                          styles.nextLevelCircle,
+                          desktopScale > 1 && {
+                            width: Math.round(36 * desktopScale),
+                            height: Math.round(36 * desktopScale),
+                            borderRadius: Math.round(18 * desktopScale),
+                          },
+                          { backgroundColor: colors.progressTrack },
+                        ]}>
+                          <Text style={[styles.levelCircleText, { color: colors.secondaryText }]}>{displayedNextLevel}</Text>
+                        </View>
+                      </View>
+                      </Animated.View>
                     </View>
-                  );
-                })}
-              </View>
-            )}
+                  )}
 
-            {earnedThisSessionXP > 0 && (
-              <View style={styles.xpBarBlock}>
-                <View style={styles.xpBarRow}>
-                  <Text style={[styles.xpBarLabel, { color: colors.secondaryText }]}>
-                    Level {currentStats.level}
-                  </Text>
-                  <Text style={[styles.xpBarLabel, { color: colors.secondaryText }]}>
-                    {currentStats.remainingXP} XP to level {currentStats.level + 1}
-                  </Text>
-                </View>
-                <View style={[styles.xpBarTrack, { backgroundColor: colors.border }]}>
-                  <Animated.View
-                    style={[
-                      styles.xpBarFill,
-                      {
-                        width: barFillAnim.interpolate({
-                          inputRange: [0, 1],
-                          outputRange: [`${barFromPercent}%`, `${barToPercent}%`],
-                        }),
-                        backgroundColor: colors.primary,
-                      },
-                    ]}
-                  />
-                </View>
-              </View>
-            )}
-
-            {streakDays > 0 && (
-              <View style={[styles.streakFooter, { borderTopColor: colors.border }]}>
-                <Sparkle style={styles.streakSparkleAnchor} size={18} delay={1000} />
-                <Text style={[styles.streakText, { color: colors.text }]}>
-                  {streakDays}-day streak — keep it going!
-                </Text>
-              </View>
-            )}
-          </Animated.View>
-
-          {/* Unlock hint */}
-          {(timerModeUnlocked || unlockMessage) && (
-            <Animated.View
-              style={[
-                styles.unlockRow,
-                riseIn(unlockRowAnim),
-                { borderColor: '#E8B923', backgroundColor: isDarkMode ? 'rgba(232,185,35,0.12)' : '#FFF7DD' },
-              ]}
-            >
-              <Text style={styles.unlockEmoji}>
-                {timerModeUnlocked ? '🏅' : '🎮'}
-              </Text>
-              <Text style={[styles.unlockText, { color: colors.text }]} numberOfLines={2}>
-                <Text style={[styles.unlockBold, styles.unlockBoldGold]}>
-                  {timerModeUnlocked ? 'Timer Mode Unlocked! ' : 'Game Mode Unlocked! '}
-                </Text>
-                {unlockMessage ?? 'Try it for an extra challenge.'}
-              </Text>
-            </Animated.View>
+                  {revealStage >= actionRevealStage && (
+                    <Animated.View style={[styles.actionBlock, revealStyle(actionAnim, 10)]}>
+                      <SessionResultActions
+                        colors={colors}
+                        isDarkMode={isDarkMode}
+                        primaryLabel={earnedThisSessionXP === 0
+                          ? 'Try Again'
+                          : xpClaimed
+                            ? continueButtonLabel
+                            : claimingXP
+                              ? 'Claiming XP…'
+                              : `Claim ${earnedThisSessionXP} XP`}
+                        onPrimary={earnedThisSessionXP === 0 || xpClaimed ? handlePostClaimAction : handleClaimXP}
+                        primaryDisabled={claimingXP}
+                        forceDense={denseLayout}
+                      />
+                    </Animated.View>
+                  )}
+              </SessionResultCard>
+            </View>
+            </View>
           )}
-
-          {/* Review words */}
-          {reviewWords.length > 0 && (
-            <Animated.View style={[styles.reviewRow, riseIn(reviewRowAnim), { backgroundColor: isDarkMode ? colors.surface : colors.card, borderColor: colors.border }]}>
-              <MaterialIcons name="rate-review" size={14} color={colors?.primary ?? '#0D7DD4'} />
-              <View style={styles.reviewChips}>
-                {reviewWords.slice(0, 4).map((word) => (
-                  <View
-                    key={`${word.english}-${word.french}`}
-                    style={[styles.chip, { borderColor: colors.border }]}
-                  >
-                    <Text style={[styles.chipText, { color: colors.text }]} numberOfLines={1}>
-                      {word.english}
-                    </Text>
-                  </View>
-                ))}
-                {reviewWords.length > 4 && (
-                  <Text style={[styles.chipMore, { color: colors.secondaryText }]}>
-                    +{reviewWords.length - 4}
-                  </Text>
-                )}
-              </View>
-            </Animated.View>
-          )}
-
-          {/* Buttons */}
-          <Animated.View style={[onSecondaryAction ? styles.buttonRow : styles.buttonSingle, riseIn(buttonsAnim)]}>
-            {onSecondaryAction && (
-              <Pressable
-                style={({ pressed }) => [
-                  styles.btn,
-                  styles.btnSecondary,
-                  styles.btnFlex,
-                  { borderColor: isDarkMode ? colors.border : '#d3cdbf', backgroundColor: isDarkMode ? colors.surface : colors.card },
-                  pressed && { opacity: 0.8 },
-                ]}
-                onPress={() => runAfterLevelUpCheck(onSecondaryAction)}
-              >
-                <Text style={[styles.btnText, { color: isDarkMode ? colors.text : '#3e3a2f' }]}>
-                  {secondaryActionLabel ?? 'Back'}
-                </Text>
-              </Pressable>
-            )}
-            <Pressable
-              style={({ pressed }) => [
-                styles.btn,
-                onSecondaryAction ? styles.btnFlex : styles.btnFull,
-                {
-                  backgroundColor: colors.buttonBackground ?? colors.primary,
-                  boxShadow: `1px 2px 0 ${isDarkMode ? '#08131F' : '#0055A9'}`,
-                } as any,
-                pressed && { opacity: 0.85 },
-              ]}
-              onPress={() => runAfterLevelUpCheck(defaultContinueAction)}
-            >
-              <Text style={[styles.btnText, { color: colors.buttonText }]}>
-                {continueButtonLabel}
-              </Text>
-            </Pressable>
-          </Animated.View>
         </Animated.View>
-      </Animated.View>
-    </Modal>
+      </Modal>
 
       <LevelUpModal
-        visible={showLevelUp}
-        totalXP={currentXP}
-        sessionXP={matchingSessionXp}
+        visible={visible && showLevelUp && !flowFinished}
+        totalXP={totalAfterSessionXP}
+        sessionXP={earnedThisSessionXP}
         colors={colors}
         isDarkMode={isDarkMode}
         onDismiss={handleLevelUpDismiss}
         dismissLabel={continueButtonLabel}
-        onGoToAccount={onGoToAccount}
+        onGoToAccount={onGoToAccount ? handleGoToAccountFromReward : undefined}
+        hasBackdropUnderlay
       />
-    </>
+      </>
+    </DesktopTypographyProvider>
   );
 }
 
 const styles = StyleSheet.create({
   backdrop: {
-    backgroundColor: 'rgba(20,20,25,0.55)',
-    zIndex: 99999,
-    elevation: 99999,
+    // No zIndex/elevation needed: this View lives inside RN's own <Modal>, which already
+    // renders in its own top-level native window/Android Activity above everything else.
+    // The old elevation:99999 here was pure leftover and, since this backdrop's own
+    // background is intentionally translucent (and animates through opacity), Android
+    // rendered that huge elevation as an opaque white plate with a thick grey shadow ring
+    // instead of the intended see-through scrim.
   },
-  shell: {
+  viewport: {
     flex: 1,
+    width: '100%',
+    alignItems: 'center',
     justifyContent: 'center',
     paddingHorizontal: 16,
-    gap: 14,
-    maxWidth: Platform.OS === 'web' ? 480 : undefined,
+  },
+  shell: {
+    minHeight: 0,
     width: '100%',
+    maxWidth: 570,
     alignSelf: 'center',
+    position: 'relative',
   },
-  shellWeb: {
-    maxWidth: 400,
+  completionHero: {
+    minHeight: 150,
+    paddingVertical: 28,
   },
-
-  sparkle: {
-    position: 'absolute',
+  completionHeroCompact: {
+    minHeight: 118,
+    paddingVertical: 17,
   },
-
-  /* Banner */
-  banner: {
+  completionHeroVeryCompact: {
+    minHeight: 108,
+    paddingVertical: 14,
+  },
+  completionHeroVisual: {
+    width: 76,
+    height: 76,
+    borderRadius: 22,
+  },
+  completionHeroVisualCompact: {
+    width: 62,
+    height: 62,
+    borderRadius: 19,
+  },
+  unlockCard: {
+    width: '100%',
+    minHeight: 94,
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 16,
-    borderRadius: 20,
-    padding: 22,
-    overflow: 'hidden',
-    boxShadow: '0px 8px 20px rgba(0,0,0,0.15)',
-    elevation: 6,
+    gap: 15,
+    borderRadius: 18,
+    borderWidth: 2,
+    paddingVertical: 15,
+    paddingHorizontal: 18,
+    // boxShadow only — a native elevation shadow composites separately from this card's
+    // reveal fade, showing through the half-transparent card as a grey plate with a hard edge.
+    boxShadow: '0px 6px 16px rgba(151,105,15,0.16)',
   },
-  checkCircle: {
+  unlockCardCompact: {
+    minHeight: 82,
+    gap: 12,
+    borderRadius: 16,
+    paddingVertical: 11,
+    paddingHorizontal: 13,
+  },
+  unlockIcon: {
     width: 52,
     height: 52,
-    borderRadius: 26,
-    backgroundColor: 'rgba(255,255,255,0.2)',
+    borderRadius: 17,
     alignItems: 'center',
     justifyContent: 'center',
-    zIndex: 1,
+    flexShrink: 0,
   },
-  bannerText: {
+  unlockEmoji: {
+    fontSize: 27,
+    lineHeight: 32,
+  },
+  unlockCopy: {
     flex: 1,
+    minWidth: 0,
     gap: 2,
-    zIndex: 1,
   },
-  bannerTitle: {
-    fontSize: 20,
-    fontWeight: '800',
-    color: '#fff',
-  },
-  bannerSub: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: 'rgba(255,255,255,0.85)',
-  },
-
-  /* Stats card */
-  statsCard: {
-    borderRadius: 20,
-    padding: 22,
-  },
-  statsRow: {
-    flexDirection: 'row',
-    gap: 10,
-  },
-  statTile: {
-    flex: 1,
-    borderRadius: 12,
-    paddingVertical: 12,
-    alignItems: 'center',
-  },
-  statLabel: {
+  unlockKicker: {
     fontSize: 10,
-    fontWeight: '700',
-    letterSpacing: 0.5,
+    lineHeight: 13,
+    fontWeight: freshFontFamily.extrabold,
+    letterSpacing: 1.1,
     textTransform: 'uppercase',
   },
-  statValue: {
-    fontSize: 19,
-    fontWeight: '800',
-    marginTop: 2,
+  unlockTitle: {
+    fontSize: 21,
+    lineHeight: 25,
+    fontWeight: freshFontFamily.extrabold,
+    letterSpacing: -0.2,
   },
-  xpBarBlock: {
-    marginTop: 18,
+  unlockTitleCompact: {
+    fontSize: 18,
+    lineHeight: 22,
   },
-  xpBarRow: {
+  unlockMessage: {
+    fontSize: 13,
+    lineHeight: 17,
+    fontWeight: freshFontFamily.medium,
+  },
+  xpRewardCard: {
+    width: '100%',
+    gap: 18,
+    borderRadius: 20,
+    borderWidth: 1,
+    padding: 22,
+    boxShadow: '0px 7px 20px rgba(40,60,110,0.10)',
+  },
+  xpRewardCardCompact: {
+    gap: 12,
+    borderRadius: 16,
+    padding: 14,
+  },
+  xpRewardHeading: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
+    alignItems: 'center',
+    gap: 14,
   },
-  xpBarLabel: {
-    fontSize: 11,
-    fontWeight: '700',
+  xpRewardIcon: {
+    width: 48,
+    height: 48,
+    borderRadius: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+    flexShrink: 0,
+  },
+  xpRewardEmoji: {
+    fontSize: 25,
+    lineHeight: 30,
+  },
+  xpRewardCopy: {
+    flex: 1,
+    minWidth: 0,
+    gap: 2,
+  },
+  xpRewardKicker: {
+    fontSize: 10,
+    lineHeight: 13,
+    fontWeight: freshFontFamily.extrabold,
+    letterSpacing: 1.1,
+    textTransform: 'uppercase',
+  },
+  xpRewardTitle: {
+    fontSize: 24,
+    lineHeight: 29,
+    fontWeight: freshFontFamily.extrabold,
+    letterSpacing: -0.2,
+  },
+  xpRewardTitleCompact: {
+    fontSize: 19,
+    lineHeight: 24,
+  },
+  xpRewardWrap: {
+    width: '100%',
+    alignItems: 'center',
+  },
+  perfectBonusPill: {
+    borderRadius: 999,
+    borderWidth: 2,
+    paddingVertical: 6,
+    paddingHorizontal: 16,
+    marginBottom: -12,
+    zIndex: 1,
+    boxShadow: '0px 2px 6px rgba(0,0,0,0.18)',
+  },
+  perfectBonusPillText: {
+    color: '#FFFFFF',
+    fontSize: 12.5,
+    fontWeight: freshFontFamily.extrabold,
+    letterSpacing: 0.2,
+  },
+  xpProgressRow: {
+    width: '100%',
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  levelCircle: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    alignItems: 'center',
+    justifyContent: 'center',
+    flexShrink: 0,
+  },
+  nextLevelCircle: {
+    opacity: 0.82,
+  },
+  levelCircleText: {
+    width: '100%',
+    fontSize: 14,
+    lineHeight: 36,
+    fontWeight: freshFontFamily.extrabold,
+    textAlign: 'center',
+    textAlignVertical: 'center',
+    includeFontPadding: false,
+  },
+  xpBarCenter: {
+    flex: 1,
+    minWidth: 0,
+    alignItems: 'center',
   },
   xpBarTrack: {
-    height: 8,
+    width: '100%',
+    height: 13,
     borderRadius: 999,
-    marginTop: 6,
     overflow: 'hidden',
   },
   xpBarFill: {
     height: '100%',
     borderRadius: 999,
   },
-  streakFooter: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    marginTop: 16,
-    paddingTop: 16,
-    borderTopWidth: 1,
-  },
-  streakSparkleAnchor: {
-    position: 'relative',
-    top: 0,
-    left: 0,
-  },
-  streakText: {
-    fontSize: 13,
-    fontWeight: '700',
-  },
-
-  /* Unlock hint */
-  unlockRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-    borderRadius: 14,
-    borderWidth: 1.5,
-    paddingVertical: 9,
-    paddingHorizontal: 12,
-  },
-  unlockEmoji: {
-    fontSize: 20,
-    flexShrink: 0,
-  },
-  unlockText: {
-    flex: 1,
-    fontSize: 13,
-    lineHeight: 18,
-  },
-  unlockBold: {
-    fontWeight: '800',
-  },
-  unlockBoldGold: {
-    color: '#B8860B',
-  },
-
-  /* Review words */
-  reviewRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    borderRadius: 14,
-    borderWidth: 1,
-    paddingVertical: 9,
-    paddingHorizontal: 12,
-  },
-  reviewChips: {
-    flex: 1,
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 6,
-    alignItems: 'center',
-  },
-  chip: {
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: 6,
-    borderWidth: 1,
-    backgroundColor: 'rgba(127,127,127,0.08)',
-  },
-  chipText: {
-    fontSize: 12,
-    fontWeight: '700',
-  },
-  chipMore: {
-    fontSize: 12,
-    fontWeight: '700',
-  },
-
-  /* Buttons */
-  buttonRow: {
-    flexDirection: 'row',
-    gap: 10,
-  },
-  buttonSingle: {},
-  btn: {
-    paddingVertical: 14,
-    paddingHorizontal: 20,
-    borderRadius: 999,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  btnSecondary: {
-    borderWidth: 1.5,
-  },
-  btnFlex: {
-    flex: 1,
-  },
-  btnFull: {
-    width: '100%',
-  },
-  btnText: {
-    fontSize: 15,
-    fontWeight: '800',
+  xpBarLabel: {
+    marginTop: 5,
+    fontSize: 11,
+    lineHeight: 14,
+    fontWeight: freshFontFamily.bold,
     textAlign: 'center',
+  },
+  actionBlock: {
+    width: '100%',
+    marginTop: 'auto',
   },
 });

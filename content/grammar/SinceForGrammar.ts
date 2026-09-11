@@ -2,7 +2,7 @@ const SinceForGrammar = {
   id: '30',
   title: 'Since et For',
   description: 'Use since and for to talk about time durations',
-  imageUrl: 'https://i.ibb.co/ZzBLNz2m/Since-et-For.png',
+  imageUrl: 'https://wretggbpaejzjdilemit.supabase.co/storage/v1/object/public/lesson-images/15274719ab/since-et-for.webp',
   textContent: {
     cards: [
       {

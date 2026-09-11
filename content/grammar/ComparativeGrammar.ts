@@ -2,7 +2,7 @@ const ComparativeGrammar = {
   id: '7',
   title: 'Comparatif',
   description: 'Learn how to make comparisons in English',
-  imageUrl: 'https://i.ibb.co/q3NwPRgG/Comparatif-sup-riorit.png',
+  imageUrl: 'https://wretggbpaejzjdilemit.supabase.co/storage/v1/object/public/lesson-images/15274719ab/comparatif.webp',
   textContent: {
     cards: [
       {
@@ -115,8 +115,6 @@ const ComparativeGrammar = {
     answer: "The movie is less bad than the series.",
     wordBank: ["The movie", "is", "less bad than", "worse than", "the series."]
   },
-
-  // SHORTER SENTENCES
 
   {
     type: 'translate',

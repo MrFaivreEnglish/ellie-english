@@ -2,7 +2,7 @@ const GenitiveGrammar = {
   id: '44',
   title: 'Le génitif',
   description: 'Use of the genitive (possessive) in English: "\'s" and "of" constructions',
-  imageUrl: 'https://i.ibb.co/VWt6yvhs/G-nitif.png',
+  imageUrl: 'https://wretggbpaejzjdilemit.supabase.co/storage/v1/object/public/lesson-images/15274719ab/le-genitif.webp',
   textContent: {
     cards: [
       {

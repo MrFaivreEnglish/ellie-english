@@ -2,7 +2,7 @@ const BePreteritGrammar = {
   id: 'BePreterit',
   title: 'Be au prétérit',
   description: 'Questions au prétérit avec le verbe "to be" — complétez avec was / were.',
-  imageUrl: 'https://i.ibb.co/dyGHTby/Pr-t-rit-BE.png',
+  imageUrl: 'https://wretggbpaejzjdilemit.supabase.co/storage/v1/object/public/lesson-images/15274719ab/be-au-preterit.webp',
   textContent: {
     cards: [
       {
@@ -201,7 +201,6 @@ translateExercises: [
     { question: "The weather ___ terrible yesterday.", answer: "was", options: ["was", "were"] },
     { question: "The shops ___ open on Monday.", answer: "were", options: ["was", "were"] },
 
-    // Interrogatives: students must pick both was/were and the correct word order.
     { question: "___ at the party yesterday?", answer: "Was he", options: ["Was he", "Were he", "He was", "He were"] },
     { question: "___ in the garden this morning?", answer: "Were they", options: ["Was they", "Were they", "They was", "They were"] },
     { question: "___ the manager then?", answer: "Was he", options: ["Was he", "Were he", "He was", "He were"] },
@@ -210,7 +209,6 @@ translateExercises: [
     { question: "___ on the bus when it started?", answer: "Were you", options: ["Was you", "Were you", "You was", "You were"] },
     { question: "___ ready on time?", answer: "Was it", options: ["Was it", "Were it", "It was", "It were"] },
     { question: "___ at the cinema last night?", answer: "Were they", options: ["Was they", "Were they", "They was", "They were"] },
-    // Interrogative negatives (contracted)
     { question: "___ at the meeting yesterday?", answer: "Wasn't she", options: ["Wasn't she", "Weren't she", "She wasn't", "She weren't"] },
     { question: "___ responsible for the mistake?", answer: "Weren't you", options: ["Wasn't you", "Weren't you", "You wasn't", "You weren't"] },
 

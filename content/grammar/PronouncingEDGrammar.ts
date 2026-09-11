@@ -2,7 +2,7 @@ const PronouncingEDGrammar = {
   id: 'ED-1',
   title: 'Pronouncing ED',
   description: 'Master the pronunciation of -ed endings: /t/, /d/, /ɪd/ with clear examples.',
-  imageUrl: 'https://i.ibb.co/5g87gJJy/Prononcer-ED.png',
+  imageUrl: 'https://wretggbpaejzjdilemit.supabase.co/storage/v1/object/public/lesson-images/15274719ab/pronouncing-ed.webp',
   textContent: {
     cards: [
       {
@@ -45,7 +45,6 @@ const PronouncingEDGrammar = {
   },
 
   exercises: [
-    // /t/ sound
     { question: "How do you pronounce the -ed in 'worked'?", answer: "/t/", options: ["/t/", "/d/", "/ɪd/"] },
     { question: "How do you pronounce the -ed in 'watched'?", answer: "/t/", options: ["/t/", "/d/", "/ɪd/"] },
     { question: "How do you pronounce the -ed in 'helped'?", answer: "/t/", options: ["/t/", "/d/", "/ɪd/"] },
@@ -67,7 +66,6 @@ const PronouncingEDGrammar = {
     { question: "How do you pronounce the -ed in 'kicked'?", answer: "/t/", options: ["/t/", "/d/", "/ɪd/"] },
     { question: "How do you pronounce the -ed in 'snapped'?", answer: "/t/", options: ["/t/", "/d/", "/ɪd/"] },
 
-    // /d/ sound
     { question: "How do you pronounce the -ed in 'played'?", answer: "/d/", options: ["/t/", "/d/", "/ɪd/"] },
     { question: "How do you pronounce the -ed in 'loved'?", answer: "/d/", options: ["/t/", "/d/", "/ɪd/"] },
     { question: "How do you pronounce the -ed in 'cleaned'?", answer: "/d/", options: ["/t/", "/d/", "/ɪd/"] },
@@ -85,11 +83,10 @@ const PronouncingEDGrammar = {
     { question: "How do you pronounce the -ed in 'moved'?", answer: "/d/", options: ["/t/", "/d/", "/ɪd/"] },
     { question: "How do you pronounce the -ed in 'joined'?", answer: "/d/", options: ["/t/", "/d/", "/ɪd/"] },
     { question: "How do you pronounce the -ed in 'learned'?", answer: "/d/", options: ["/t/", "/d/", "/ɪd/"] },
-    { question: "How do you pronounce the -ed in 'played'?", answer: "/d/", options: ["/t/", "/d/", "/ɪd/"] }, // duplicate word allowed across contexts
+    { question: "How do you pronounce the -ed in 'played'?", answer: "/d/", options: ["/t/", "/d/", "/ɪd/"] }, // Intentional repetition for spaced practice.
     { question: "How do you pronounce the -ed in 'answered'?", answer: "/d/", options: ["/t/", "/d/", "/ɪd/"] },
     { question: "How do you pronounce the -ed in 'followed'?", answer: "/d/", options: ["/t/", "/d/", "/ɪd/"] },
 
-    // /ɪd/ sound
     { question: "How do you pronounce the -ed in 'wanted'?", answer: "/ɪd/", options: ["/t/", "/d/", "/ɪd/"] },
     { question: "How do you pronounce the -ed in 'needed'?", answer: "/ɪd/", options: ["/t/", "/d/", "/ɪd/"] },
     { question: "How do you pronounce the -ed in 'decided'?", answer: "/ɪd/", options: ["/t/", "/d/", "/ɪd/"] },

@@ -6,14 +6,14 @@ export const fourthGradeChapters: ChapterCategory = {
   color: '#A9A2FF',
   lessons: [
     {
-      title: 'Chapter 1: Eating American Style!',
-      url: 'https://digipad.app/p/837534/5a2b877226b53',
+      title: 'Chapter 1 : Fashion the world!',
+      url: 'https://digipad.app/p/1274380/77e7923aa1453',
       appLinks: [
-        { label: 'American dishes', target: 'vocabulary', lessonTitle: 'American Dishes' },
-        { label: 'Food basics', target: 'vocabulary', lessonTitle: 'Food Basics' },
-        { label: 'Food +', target: 'vocabulary', lessonTitle: 'Food +' },
-        { label: 'Would like', target: 'grammar', lessonTitle: 'Would Like' },
-        { label: 'Likes', target: 'pronunciation', lessonTitle: 'Talk about likes' },
+        { label: 'Fashion', target: 'vocabulary', lessonTitle: 'Fashion' },
+        { label: 'Clothes', target: 'vocabulary', lessonTitle: 'Clothes' },
+        { label: 'Comparative', target: 'grammar', lessonTitle: 'Comparatif' },
+        { label: 'Conseils', target: 'grammar', lessonTitle: 'Should' },
+        { label: 'Opinions', target: 'pronunciation', lessonTitle: 'Say your opinion' },
       ],
     },
     {
@@ -27,7 +27,14 @@ export const fourthGradeChapters: ChapterCategory = {
       ],
     },
     {
-      title: "Chapter 3: Who's the culprit?",
+      title: "Chapter 3: We are the Champions!",
+      url: 'https://digipad.app/p/1802514/a91247029b424',
+      appLinks: [
+        { label: 'Sports', target: 'vocabulary', lessonTitle: 'Sports' },
+      ],
+    },
+    {
+      title: "Chapter 4: Who's the culprit?",
       url: 'https://digipad.app/p/639127/54ba8570d288c',
       appLinks: [
         { label: 'Detective', target: 'vocabulary', lessonTitle: 'Detective' },
@@ -35,17 +42,7 @@ export const fourthGradeChapters: ChapterCategory = {
         { label: 'Hypotheses', target: 'grammar', lessonTitle: 'Hypothèses' },
       ],
     },
-    {
-      title: 'Chapter 4 : Fashion the world!',
-      url: 'https://digipad.app/p/1274380/77e7923aa1453',
-      appLinks: [
-        { label: 'Fashion', target: 'vocabulary', lessonTitle: 'Fashion' },
-        { label: 'Clothes', target: 'vocabulary', lessonTitle: 'Clothes' },
-        { label: 'Comparative', target: 'grammar', lessonTitle: 'Comparatif' },
-        { label: 'Conseils', target: 'grammar', lessonTitle: 'Should' },
-        { label: 'Opinions', target: 'pronunciation', lessonTitle: 'Say your opinion' },
-      ],
-    },
+
     {
       title: 'Chapter 5 : Welcome to the Garden City',
       url: 'https://digipad.app/p/1604872/2e14a5a24ca0c',

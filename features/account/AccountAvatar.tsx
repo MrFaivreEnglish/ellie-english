@@ -1,6 +1,6 @@
 import React from 'react';
 import { Image, StyleSheet, View, type ViewStyle } from 'react-native';
-import { MaterialIcons } from '@expo/vector-icons';
+import MaterialIcons from '../shared/ThemedMaterialIcon';
 import { getAccountAvatarColorPreset, getAccountAvatarPreset } from './accountAvatarStorage';
 
 type AccountAvatarProps = {
@@ -84,8 +84,7 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
   },
   premiumAvatar: {
-    boxShadow: '0px 2px 5px rgba(196,139,0,0.22)',
-    elevation: 3,
+    boxShadow: '0px 2px 5px rgba(196,139,0,0.22)',
   },
   thumbnail: {
     flexShrink: 0,

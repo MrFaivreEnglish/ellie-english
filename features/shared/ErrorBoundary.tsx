@@ -1,6 +1,7 @@
 import React from 'react';
-import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
-import { MaterialIcons } from '@expo/vector-icons';
+import { StyleSheet, TouchableOpacity, View } from 'react-native';
+import Text from './ThemedText';
+import MaterialIcons from './ThemedMaterialIcon';
 import { useTheme } from '../settings/ThemeContext';
 
 type ErrorBoundaryProps = {

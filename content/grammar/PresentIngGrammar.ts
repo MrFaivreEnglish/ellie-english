@@ -2,7 +2,7 @@ const PresentIngGrammar = {
   id: '4',
   title: 'Present ING',
   description: 'Learn how to use the present continuous tense',
-  imageUrl: 'https://i.ibb.co/hxp1J2W9/Pr-sent-ING.png',
+  imageUrl: 'https://wretggbpaejzjdilemit.supabase.co/storage/v1/object/public/lesson-images/15274719ab/present-ing.webp',
   textContent: {
     cards: [
       {

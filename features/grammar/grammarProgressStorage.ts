@@ -105,10 +105,15 @@ export const getGrammarLessonProgressCounts = async (lessonKeys: string[]): Prom
   }
 };
 
-export const recordGrammarCorrectAnswer = async (lessonKey: string, answerKey: string): Promise<boolean> => {
+export type GrammarAnswerSaveResult = 'saved' | 'reviewed' | 'unsaved';
+
+export const recordGrammarCorrectAnswer = async (
+  lessonKey: string,
+  answerKey: string,
+): Promise<GrammarAnswerSaveResult> => {
   const normalizedLessonKey = lessonKey.trim();
   const normalizedAnswerKey = answerKey.trim();
-  if (!normalizedLessonKey || !normalizedAnswerKey) return false;
+  if (!normalizedLessonKey || !normalizedAnswerKey) return 'unsaved';
 
   try {
     const storageKey = getStorageKey(normalizedLessonKey);
@@ -131,9 +136,10 @@ export const recordGrammarCorrectAnswer = async (lessonKey: string, answerKey: s
     void syncProgressItemToCloudIfSignedIn(
       buildCloudItem(normalizedLessonKey, normalizedAnswerKey, { savedOn: getLocalDateKey() })
     );
-    return isNewCorrectAnswer;
-  } catch {
-    return false;
+    return isNewCorrectAnswer ? 'saved' : 'reviewed';
+  } catch (error) {
+    console.warn('Failed to save grammar answer progress', error);
+    return 'unsaved';
   }
 };
 

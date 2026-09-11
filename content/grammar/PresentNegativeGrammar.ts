@@ -2,7 +2,7 @@ const PresentNegativeGrammar = {
   id: '2',
   title: 'Present Simple Négatif',
   description: 'Learn how to make negative sentences in present simple',
-  imageUrl: 'https://i.ibb.co/69pyGYT/Present-n-gtaif-et-interrogatif.png',
+  imageUrl: 'https://wretggbpaejzjdilemit.supabase.co/storage/v1/object/public/lesson-images/15274719ab/present-simple-negatif.webp',
   textContent: {
     cards: [
       {

@@ -2,7 +2,7 @@ const JobsVocab = {
   id: '30',
   title: 'Jobs',
   description: 'Learn vocabulary related to different professions and careers',
-  imageUrl: 'https://i.ibb.co/mCxpWP39/Jobs-examples.webp',
+  imageUrl: 'https://wretggbpaejzjdilemit.supabase.co/storage/v1/object/public/lesson-images/15274719ab/jobs.webp',
   thumbnail: require('../../assets/thumbnails/job-examples-thumbnail.png'),
   flashcards: [
     {

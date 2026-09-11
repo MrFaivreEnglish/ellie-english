@@ -7,11 +7,18 @@ jest.mock('../features/account/accountStorage', () => ({
 import {
   getXP,
   addXP,
+  grantXP,
+  previewGrantXP,
+  getGrantedXPToday,
   awardActivityXPOnceToday,
+  previewActivityXPOnceToday,
   hasWordXpAwardedToday,
   markWordXpAwardedToday,
   clearLocalXPProgress,
 } from '../features/progress/xpStorage';
+import { applyDailyXpTaper, DAILY_XP_BANDS } from '../features/progress/xpRewards';
+
+const FULL_RATE_LIMIT = DAILY_XP_BANDS[0].upTo;
 
 // Wire AsyncStorage mocks to an actual in-memory store so reads reflect prior writes.
 const store: Record<string, string> = {};
@@ -85,11 +92,13 @@ describe('awardActivityXPOnceToday', () => {
     expect(await getXP()).toBe(20);
   });
 
-  it('returns 0 and does not add XP on a duplicate call same day', async () => {
+  it('gives a reduced replay reward on a duplicate call same day', async () => {
     await awardActivityXPOnceToday('grammar:lesson-1', 20);
     const second = await awardActivityXPOnceToday('grammar:lesson-1', 20);
-    expect(second).toBe(0);
-    expect(await getXP()).toBe(20);
+    // Repeating an activity the same day is deliberately still worth something, at
+    // REPLAY_XP_FRACTION (0.25) of the full amount, rather than nothing.
+    expect(second).toBe(5);
+    expect(await getXP()).toBe(25);
   });
 
   it('awards XP for different activity keys independently', async () => {
@@ -113,6 +122,107 @@ describe('awardActivityXPOnceToday', () => {
     const awarded = await awardActivityXPOnceToday('   ', 20);
     expect(awarded).toBe(0);
     expect(await getXP()).toBe(0);
+  });
+});
+
+describe('applyDailyXpTaper', () => {
+  it('leaves a normal session untouched', () => {
+    expect(applyDailyXpTaper(200, 0)).toBe(200);
+    expect(applyDailyXpTaper(200, 400)).toBe(200);
+  });
+
+  it('splits an award that crosses a band boundary instead of pushing it wholly into one', () => {
+    // 100 XP short of the full-rate limit: 100 at full, the remaining 100 at half.
+    expect(applyDailyXpTaper(200, FULL_RATE_LIMIT - 100)).toBe(150);
+  });
+
+  it('halves XP earned past the first band', () => {
+    expect(applyDailyXpTaper(100, FULL_RATE_LIMIT)).toBe(50);
+  });
+
+  it('quarters XP once past the second band', () => {
+    expect(applyDailyXpTaper(100, DAILY_XP_BANDS[1].upTo)).toBe(25);
+  });
+
+  it('never returns more than it was asked for', () => {
+    for (const banked of [0, 300, 700, 1400, 5000]) {
+      expect(applyDailyXpTaper(250, banked)).toBeLessThanOrEqual(250);
+    }
+  });
+
+  it('makes grinding strictly worse than stopping — a long tail keeps paying, but less', () => {
+    // 20 identical 150 XP runs in one day: the total has to stay well under 20 x 150,
+    // while every individual run still pays something.
+    let banked = 0;
+    for (let run = 0; run < 20; run += 1) {
+      const granted = applyDailyXpTaper(150, banked);
+      expect(granted).toBeGreaterThan(0);
+      banked += granted;
+    }
+
+    expect(banked).toBeLessThan(20 * 150);
+  });
+
+  it('handles junk input', () => {
+    expect(applyDailyXpTaper(NaN, 0)).toBe(0);
+    expect(applyDailyXpTaper(-50, 0)).toBe(0);
+    expect(applyDailyXpTaper(100, NaN)).toBe(100);
+  });
+});
+
+describe('grantXP', () => {
+  it('banks the full amount while under the day’s limit', async () => {
+    expect(await grantXP(120)).toBe(120);
+    expect(await getXP()).toBe(120);
+    expect(await getGrantedXPToday()).toBe(120);
+  });
+
+  it('tapers once the day’s full-rate limit is passed', async () => {
+    await grantXP(FULL_RATE_LIMIT);
+    expect(await grantXP(100)).toBe(50);
+    expect(await getXP()).toBe(FULL_RATE_LIMIT + 50);
+  });
+
+  it('tracks only what was actually banked, not what was requested', async () => {
+    await grantXP(FULL_RATE_LIMIT + 200);
+    expect(await getGrantedXPToday()).toBe(await getXP());
+  });
+
+  it('ignores non-positive and junk amounts', async () => {
+    expect(await grantXP(0)).toBe(0);
+    expect(await grantXP(-10)).toBe(0);
+    expect(await grantXP(NaN)).toBe(0);
+    expect(await getXP()).toBe(0);
+  });
+});
+
+describe('previewGrantXP', () => {
+  it('reports what grantXP would give without banking it', async () => {
+    await grantXP(FULL_RATE_LIMIT);
+    expect(await previewGrantXP(100)).toBe(50);
+    expect(await getXP()).toBe(FULL_RATE_LIMIT);
+    expect(await grantXP(100)).toBe(50);
+  });
+
+  it('carries a pending amount so a batch is tapered as one', async () => {
+    await grantXP(FULL_RATE_LIMIT - 100);
+    // Previewing 100 + 100 item by item without the offset would report 100 + 100;
+    // the second half actually lands in the reduced band.
+    expect(await previewGrantXP(100, 0)).toBe(100);
+    expect(await previewGrantXP(100, 100)).toBe(50);
+  });
+});
+
+describe('awardActivityXPOnceToday with the daily cap', () => {
+  it('tapers activity awards too, so no mode escapes the day’s limit', async () => {
+    await grantXP(FULL_RATE_LIMIT);
+    expect(await awardActivityXPOnceToday('vocabulary:vocab-rush:impossible', 100)).toBe(50);
+  });
+
+  it('previewing matches what awarding then gives', async () => {
+    await grantXP(FULL_RATE_LIMIT - 40);
+    const preview = await previewActivityXPOnceToday('grammar:lesson-1', 100);
+    expect(await awardActivityXPOnceToday('grammar:lesson-1', 100)).toBe(preview);
   });
 });
 

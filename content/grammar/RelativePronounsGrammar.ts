@@ -2,7 +2,7 @@ const RelativePronounsGrammar = {
   id: '39',
   title: 'Les pronoms relatifs',
   description: 'Use relative pronouns (who, which, that, whose, where) to connect clauses',
-  imageUrl: 'https://i.ibb.co/hFx8bVrJ/Pronoms-relatifs.png',
+  imageUrl: 'https://wretggbpaejzjdilemit.supabase.co/storage/v1/object/public/lesson-images/15274719ab/les-pronoms-relatifs.webp',
   textContent: {
     cards: [
       {

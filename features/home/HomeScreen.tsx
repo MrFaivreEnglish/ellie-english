@@ -1,12 +1,12 @@
 import React from 'react';
 import {
   View,
-  Text,
   StyleSheet,
   TouchableOpacity,
   Pressable,
   ScrollView,
   Platform,
+  Image,
   InteractionManager,
   useWindowDimensions,
 } from 'react-native';
@@ -72,7 +72,8 @@ function TodayProgressRing({
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import type { RootStackParamList, TabParamList } from '../../types/navigationTypes';
-import { MaterialIcons } from '@expo/vector-icons';
+import Text from '../shared/ThemedText';
+import MaterialIcons from '../shared/ThemedMaterialIcon';
 import { useTheme } from '../settings/ThemeContext';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { exitImmersiveOpaque } from '../../lib/immersive';
@@ -94,8 +95,8 @@ import { checkAndMarkFirstVisit } from './firstVisitStorage';
 import FirstVisitModal from './FirstVisitModal';
 import { grammarLessons } from '../../content/lessons/grammarRegistry';
 import { vocabularyLessons } from '../../content/lessons/vocabularyRegistry';
-import { DESIGN_ACCENTS, getSoftShadow, getStudySurfaceColors, uiRadii } from '../shared/uiPrimitives';
-import { freshFontFamily, freshRadii, freshSmallPillShadow, freshTileShadow } from '../shared/freshDirection';
+import { DESIGN_ACCENTS, getPixelSurfaceStyle, getSoftShadow, getStudySurfaceColors, uiRadii } from '../shared/uiPrimitives';
+import { freshFontFamily, freshSmallPillShadow, freshTileShadow } from '../shared/freshDirection';
 import {
   HOME_MENU_CARD_COLORS,
   HOME_MENU_CARD_GRADIENT_ENDS,
@@ -106,8 +107,22 @@ import {
   TODAY_CARD_COLORS,
 } from '../shared/homeMenuColors';
 import { getAndroidBottomBarButtonStyle, getAndroidBottomBarColor } from '../shared/appChromeColors';
+import { getDesktopContentMaxWidth, getDesktopTypographyScale, isDesktopWebWidth } from '../shared/responsiveLayout';
+import { DesktopTypographyProvider } from '../shared/DesktopTypography';
 
 type MaterialIconName = React.ComponentProps<typeof MaterialIcons>['name'];
+const GRAMMAR_ICON_SOURCE = require('../../assets/navigation/grammar.png');
+const VOCABULARY_ICON_SOURCE = require('../../assets/navigation/vocabulary.png');
+const CHAPTERS_ICON_SOURCE = require('../../assets/navigation/chapters.png');
+const SETTINGS_ICON_SOURCE = require('../../assets/navigation/settings.png');
+
+
+
+
+
+
+const HOME_MAX_DESKTOP_SCALE = 1.7;
+const HOME_MAX_CONTENT_WIDTH = 1400;
 
 const cleanDisplayName = (value: string) => value.trim().replace(/\s+/g, ' ');
 
@@ -151,9 +166,25 @@ const findLastLessonTarget = (entry: LastLessonEntry | null) => {
 
 export default function HomeScreen() {
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
-  const { colors, isDarkMode, isTodayCardEnabled, isAndroidStatusBarEnabled, isShinyEllieMode } = useTheme();
-  const { width: windowWidth } = useWindowDimensions();
-  const isDesktopWeb = Platform.OS === 'web' && windowWidth >= 768;
+  const { colors, isDarkMode, isTodayCardEnabled, isAndroidStatusBarEnabled, isShinyElliePresentationMode } = useTheme();
+  const { width: windowWidth, height: windowHeight } = useWindowDimensions();
+
+
+
+
+  const isDesktopWeb = isDesktopWebWidth(windowWidth, undefined, windowHeight);
+
+
+
+
+  const isTabletDevice = !isDesktopWeb && Math.min(windowWidth, windowHeight) >= 600;
+  const isScaledWeb = isDesktopWeb || isTabletDevice;
+  const desktopScale = Math.min(getDesktopTypographyScale(windowWidth, windowHeight, 'fit'), HOME_MAX_DESKTOP_SCALE);
+  const desktopContentMaxWidth = Math.min(getDesktopContentMaxWidth(windowWidth, 'fit', windowHeight), HOME_MAX_CONTENT_WIDTH);
+
+
+
+  const todayRingSize = isScaledWeb ? 44 : 42;
   const {
     isLoading: isAccountLoading,
     lastSyncAt,
@@ -164,6 +195,10 @@ export default function HomeScreen() {
   const copy = getMenuCopy().home;
   const insets = useSafeAreaInsets();
   const studySurface = React.useMemo(() => getStudySurfaceColors(colors, isDarkMode), [colors, isDarkMode]);
+  const pixelSurfaceStyle = React.useMemo(
+    () => getPixelSurfaceStyle(colors, isDarkMode, 'raised'),
+    [colors, isDarkMode]
+  );
   const homeHeaderTopPadding = Platform.OS === 'ios'
     ? (insets.top > 0 ? insets.top : 24)
     : Platform.OS === 'android' && isAndroidStatusBarEnabled
@@ -179,10 +214,10 @@ export default function HomeScreen() {
   const dailyPracticeGoal = 15;
   const todaySavedProgressCount = todayGrammarAnswerCount + todayLearntCount;
   const todayProgress = Math.min(100, Math.round((todaySavedProgressCount / dailyPracticeGoal) * 100));
-  const homeMenuCardColors = isShinyEllieMode ? SHINY_HOME_MENU_CARD_COLORS : HOME_MENU_CARD_COLORS;
-  const homeMenuCardGradientEnds = isShinyEllieMode ? SHINY_HOME_MENU_CARD_GRADIENT_ENDS : HOME_MENU_CARD_GRADIENT_ENDS;
-  const homeMenuTextColor = isShinyEllieMode ? SHINY_HOME_MENU_TEXT_COLOR : HOME_MENU_TEXT_COLOR;
-  const todayCardColors = isShinyEllieMode ? TODAY_CARD_COLORS.shiny : TODAY_CARD_COLORS.normal;
+  const homeMenuCardColors = isShinyElliePresentationMode ? SHINY_HOME_MENU_CARD_COLORS : HOME_MENU_CARD_COLORS;
+  const homeMenuCardGradientEnds = isShinyElliePresentationMode ? SHINY_HOME_MENU_CARD_GRADIENT_ENDS : HOME_MENU_CARD_GRADIENT_ENDS;
+  const homeMenuTextColor = isShinyElliePresentationMode ? SHINY_HOME_MENU_TEXT_COLOR : HOME_MENU_TEXT_COLOR;
+  const todayCardColors = isShinyElliePresentationMode ? TODAY_CARD_COLORS.shiny : TODAY_CARD_COLORS.normal;
   const continueCardPress = useSpringPress();
   const localizedCategories = React.useMemo(() => [
     {
@@ -202,7 +237,7 @@ export default function HomeScreen() {
       route: 'Vocabulary'
     },
     {
-      title: copy.lessonsTitle,
+      title: isScaledWeb ? copy.lessonsTitle : copy.lessonsTitleCompact,
       icon: 'menu-book' as MaterialIconName,
       description: copy.lessonsDescription,
       color: homeMenuCardColors.lessons,
@@ -329,11 +364,12 @@ export default function HomeScreen() {
   }, [continueLessonTarget, navigation]);
 
   return (
+    <DesktopTypographyProvider mode="fit" maxScale={HOME_MAX_DESKTOP_SCALE}>
     <ScrollView
       style={[styles.container, { backgroundColor: colors.background }]}
       contentContainerStyle={{ paddingBottom: insets.bottom + 24 }}
     >
-      <View style={isDesktopWeb && styles.desktopContentWrap}>
+      <View style={isDesktopWeb && [styles.desktopContentWrap, { maxWidth: desktopContentMaxWidth }]}>
       <View
         style={[
           styles.header,
@@ -349,7 +385,7 @@ export default function HomeScreen() {
               style={[
                 styles.headerTitle,
                 { color: colors.text },
-                isDesktopWeb ? styles.headerTitleDesktop : styles.headerTitleMobile,
+                isScaledWeb ? styles.headerTitleDesktop : styles.headerTitleMobile,
               ]}
               numberOfLines={1}
             >
@@ -364,11 +400,15 @@ export default function HomeScreen() {
             accessibilityLabel="Open account"
           >
             {!isAccountLoading ? (
-              <AccountAvatar avatarId={unlockedAccountAvatarId} colorId={unlockedAccountAvatarColorId} size={isDesktopWeb ? 64 : 60} />
+              <AccountAvatar
+                avatarId={unlockedAccountAvatarId}
+                colorId={unlockedAccountAvatarColorId}
+                size={isScaledWeb ? Math.round(64 * desktopScale) : 60}
+              />
             ) : (
               <MaterialIcons
                 name="account-circle"
-                size={isDesktopWeb ? 64 : 48}
+                size={isScaledWeb ? Math.round(64 * desktopScale) : 48}
                 color={accountPillAccent}
               />
             )}
@@ -395,65 +435,80 @@ export default function HomeScreen() {
         <View
           style={[
             styles.todayCard,
+            isScaledWeb && styles.todayCardDesktop,
+            isScaledWeb && { padding: Math.round(18 * desktopScale) },
             { backgroundColor: todayCardColors.solid },
             freshTileShadow(todayCardColors.shadow, true),
+            pixelSurfaceStyle,
           ]}
         >
           <View style={[styles.todayDecorCircle, { backgroundColor: todayCardColors.decoration, pointerEvents: 'none' }]} />
           <View style={styles.todayHeaderRow}>
             <View style={styles.todayLeftBlock}>
               <View style={styles.todayTitleRow}>
-                <Text style={[styles.todayTitle, { color: todayCardColors.text }]}>{copy.today}</Text>
+                <Text style={[styles.todayTitle, isScaledWeb && styles.todayTitleDesktop, { color: todayCardColors.text }]}>{copy.today}</Text>
                 {streak.currentStreak >= 2 && (
                   <Animated.View
                     entering={ZoomIn.springify().damping(14)}
                     style={[styles.todayStreakChip, { backgroundColor: todayCardColors.strongSurface }]}
                   >
-                    <Text style={styles.streakFlame}>🔥</Text>
-                    <Text style={[styles.todayStreakText, { color: todayCardColors.text }]}>
+                    <Text style={[styles.streakFlame, isScaledWeb && styles.streakFlameDesktop]}>🔥</Text>
+                    <Text style={[styles.todayStreakText, isScaledWeb && styles.todayStreakTextDesktop, { color: todayCardColors.text }]}>
                       {streak.currentStreak}-day streak
                     </Text>
                   </Animated.View>
                 )}
               </View>
-              <Text style={[styles.todaySubtitle, { color: todayCardColors.mutedText }]} numberOfLines={2}>
+              <Text style={[styles.todaySubtitle, isScaledWeb && styles.todaySubtitleDesktop, { color: todayCardColors.mutedText }]} numberOfLines={2}>
                 {todaySavedProgressCount > 0 ? copy.todayLogged : copy.todayStart}
               </Text>
             </View>
-            <View style={styles.todayRingWrap}>
+            <View style={[styles.todayRingWrap, isScaledWeb && styles.todayRingWrapDesktop, isScaledWeb && { width: todayRingSize, height: todayRingSize }]}>
               <TodayProgressRing
                 progress={todayProgress}
-                size={42}
-                strokeWidth={4}
+                size={todayRingSize}
+                strokeWidth={isScaledWeb ? Math.max(5, Math.round(5 * desktopScale)) : 4}
                 trackColor={todayCardColors.ringTrack}
                 fillColor={todayCardColors.text}
               />
               <View style={[styles.todayRingCenter, { pointerEvents: 'none' }]}>
-                <Text style={[styles.todayRingValue, { color: todayCardColors.text, fontSize: 14, lineHeight: 17 }]}>{todaySavedProgressCount}</Text>
-                <Text style={[styles.todayRingGoal, { color: todayCardColors.faintText, fontSize: 9, lineHeight: 11 }]}>/{dailyPracticeGoal}</Text>
+                <Text style={[styles.todayRingValue, isScaledWeb && styles.todayRingValueDesktop, { color: todayCardColors.text }]}>{todaySavedProgressCount}</Text>
+                <Text style={[styles.todayRingGoal, isScaledWeb && styles.todayRingGoalDesktop, { color: todayCardColors.faintText }]}>/{dailyPracticeGoal}</Text>
               </View>
             </View>
           </View>
 
           <View style={styles.todayRows}>
             <View style={[styles.todayMetricRow, { backgroundColor: todayCardColors.surface }]}>
-              <View style={[styles.todayMetricIcon, { backgroundColor: todayCardColors.strongSurface }]}>
-                <MaterialIcons name="edit" size={20} color={todayCardColors.text} />
+              <View
+                style={[
+                  styles.todayMetricIcon,
+                  isScaledWeb && { width: Math.round(36 * desktopScale), height: Math.round(36 * desktopScale) },
+                  { backgroundColor: todayCardColors.strongSurface },
+                ]}
+              >
+                <MaterialIcons name="edit" size={isScaledWeb ? Math.round(20 * desktopScale) : 20} color={todayCardColors.text} />
               </View>
               <View style={styles.todayMetricCopy}>
-                <Text style={[styles.todayMetricLabel, { color: todayCardColors.subtleText }]} numberOfLines={2}>{copy.itemsToday}</Text>
-                <Text style={[styles.todayMetricValue, { color: todayCardColors.text }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.7}>
+                <Text style={[styles.todayMetricLabel, isScaledWeb && styles.todayMetricLabelDesktop, { color: todayCardColors.subtleText }]} numberOfLines={2}>{copy.itemsToday}</Text>
+                <Text style={[styles.todayMetricValue, isScaledWeb && styles.todayMetricValueDesktop, { color: todayCardColors.text }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.7}>
                   {todayGrammarAnswerCount} {todayGrammarAnswerCount === 1 ? copy.practiceItemSingular : copy.practiceItemPlural}
                 </Text>
               </View>
             </View>
             <View style={[styles.todayMetricRow, { backgroundColor: todayCardColors.surface }]}>
-              <View style={[styles.todayMetricIcon, { backgroundColor: todayCardColors.strongSurface }]}>
-                <MaterialIcons name="style" size={20} color={todayCardColors.text} />
+              <View
+                style={[
+                  styles.todayMetricIcon,
+                  isScaledWeb && { width: Math.round(36 * desktopScale), height: Math.round(36 * desktopScale) },
+                  { backgroundColor: todayCardColors.strongSurface },
+                ]}
+              >
+                <MaterialIcons name="style" size={isScaledWeb ? Math.round(20 * desktopScale) : 20} color={todayCardColors.text} />
               </View>
               <View style={styles.todayMetricCopy}>
-                <Text style={[styles.todayMetricLabel, { color: todayCardColors.subtleText }]} numberOfLines={2}>{copy.learntToday}</Text>
-                <Text style={[styles.todayMetricValue, { color: todayCardColors.text }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.7}>
+                <Text style={[styles.todayMetricLabel, isScaledWeb && styles.todayMetricLabelDesktop, { color: todayCardColors.subtleText }]} numberOfLines={2}>{copy.learntToday}</Text>
+                <Text style={[styles.todayMetricValue, isScaledWeb && styles.todayMetricValueDesktop, { color: todayCardColors.text }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.7}>
                   {todayLearntCount} {todayLearntCount === 1 ? copy.wordSingular : copy.wordPlural}
                 </Text>
               </View>
@@ -467,8 +522,15 @@ export default function HomeScreen() {
           <TouchableOpacity
             style={[
               styles.continueCard,
+              isScaledWeb && styles.continueCardDesktop,
+              isScaledWeb && {
+                minHeight: Math.round(100 * desktopScale),
+                paddingHorizontal: Math.round(20 * desktopScale),
+                paddingVertical: Math.round(16 * desktopScale),
+              },
               { backgroundColor: colors.card },
-              getSoftShadow(isDarkMode, 'soft'),
+              getSoftShadow(isDarkMode, 'soft', colors.shadow, colors.visualStyle === 'pixel'),
+              pixelSurfaceStyle,
             ]}
             onPress={openContinueLesson}
             onPressIn={continueCardPress.onPressIn}
@@ -476,43 +538,47 @@ export default function HomeScreen() {
             accessibilityRole="button"
             accessibilityLabel={`Continue ${continueLessonTarget.title}`}
           >
-            <View style={[styles.continueIcon, { backgroundColor: isDarkMode ? studySurface.control : '#DDF4FF', borderColor: isDarkMode ? colors.border : 'transparent' }]}>
+            <View style={[styles.continueIcon, isScaledWeb && { width: Math.round(48 * desktopScale), height: Math.round(48 * desktopScale) }, { backgroundColor: isDarkMode ? studySurface.control : '#DDF4FF', borderColor: isDarkMode ? colors.border : 'transparent' }]}>
               <MaterialIcons
                 name={continueLessonTarget.type === 'grammar' ? 'edit' : 'style'}
-                size={24}
+                size={isScaledWeb ? Math.round(28 * desktopScale) : 24}
                 color={colors.primary}
               />
             </View>
             <View style={styles.continueCopy}>
-              <Text style={[styles.continueLabel, { color: colors.primary }]}>Continue</Text>
-              <Text style={[styles.continueTitle, { color: colors.text }]} numberOfLines={1}>
+              <Text style={[styles.continueLabel, isScaledWeb && styles.continueLabelDesktop, { color: colors.primary }]}>Continue</Text>
+              <Text style={[styles.continueTitle, isScaledWeb && styles.continueTitleDesktop, { color: colors.text }]} numberOfLines={1}>
                 {continueLessonTarget.title}
               </Text>
-              <Text style={[styles.continueMeta, { color: colors.secondaryText }]}>
+              <Text style={[styles.continueMeta, isScaledWeb && styles.continueMetaDesktop, { color: colors.secondaryText }]}>
                 {continueLessonTarget.type === 'grammar' ? 'Grammar' : 'Vocabulary'}
               </Text>
             </View>
-            <MaterialIcons name="arrow-forward" size={24} color={colors.secondaryText} />
+            <MaterialIcons name="arrow-forward" size={isScaledWeb ? Math.round(24 * desktopScale) : 24} color={colors.secondaryText} />
           </TouchableOpacity>
         </Animated.View>
       )}
-
-      <Text style={[styles.pickCategoryLabel, { color: colors.secondaryText }]}>✨ pick a category ✨</Text>
 
       <View style={[styles.categoriesContainer, styles.categoriesContainerDesktop]}>
         {localizedCategories.map((category, index) => (
           <Animated.View
             key={category.route}
             entering={FadeInDown.delay(index * 60).duration(320)}
-            style={isTodayCardEnabled ? styles.categoryCardDesktop : styles.categoryCardFullRow}
+            style={(isTodayCardEnabled || isScaledWeb) ? styles.categoryCardDesktop : styles.categoryCardFullRow}
           >
             <Pressable
               style={({ pressed }) => [
                 styles.categoryCard,
                 styles.categoryCardGrid,
+                isScaledWeb && styles.categoryCardGridDesktop,
+                isScaledWeb && {
+                  minHeight: Math.round(136 * desktopScale),
+                  padding: Math.round(24 * desktopScale),
+                },
                 pressed && styles.categoryCardPressed,
                 { backgroundColor: category.color, width: '100%' },
                 freshTileShadow(category.gradientEnd, true, pressed),
+                pixelSurfaceStyle,
               ]}
               android_ripple={{ color: 'rgba(255,255,255,0.26)' }}
               unstable_pressDelay={0}
@@ -521,14 +587,66 @@ export default function HomeScreen() {
               accessibilityLabel={category.title}
             >
               <View style={[styles.categoryTitleRow, styles.categoryTitleRowCentered]}>
-                <MaterialIcons name={category.icon} size={22} color={homeMenuTextColor} />
-                <Text style={[styles.categoryTitle, { color: homeMenuTextColor }]}>{category.title}</Text>
+                {category.route === 'Grammar' ? (
+                  <Image
+                    source={GRAMMAR_ICON_SOURCE}
+                    style={{
+                      width: isScaledWeb ? Math.round(27 * desktopScale) : 26,
+                      height: isScaledWeb ? Math.round(27 * desktopScale) : 26,
+                    }}
+                    resizeMode="contain"
+                    fadeDuration={0}
+                    accessibilityIgnoresInvertColors
+                  />
+                ) : category.route === 'Vocabulary' ? (
+                  <Image
+                    source={VOCABULARY_ICON_SOURCE}
+                    style={{
+                      width: isScaledWeb ? Math.round(27 * desktopScale) : 26,
+                      height: isScaledWeb ? Math.round(27 * desktopScale) : 26,
+                    }}
+                    resizeMode="contain"
+                    fadeDuration={0}
+                    accessibilityIgnoresInvertColors
+                  />
+                ) : category.route === 'Lessons' ? (
+                  <Image
+                    source={CHAPTERS_ICON_SOURCE}
+                    style={{
+                      width: isScaledWeb ? Math.round(27 * desktopScale) : 26,
+                      height: isScaledWeb ? Math.round(27 * desktopScale) : 26,
+                      // This artwork has more baked-in transparent padding than the other nav
+                      // icons, which otherwise reads as a bigger gap before the title text.
+                      marginRight: isScaledWeb ? -Math.round(4 * desktopScale) : -4,
+                    }}
+                    resizeMode="contain"
+                    fadeDuration={0}
+                    accessibilityIgnoresInvertColors
+                  />
+                ) : category.route === 'Settings' ? (
+                  <Image
+                    source={SETTINGS_ICON_SOURCE}
+                    style={{
+                      width: isScaledWeb ? Math.round(27 * desktopScale) : 26,
+                      height: isScaledWeb ? Math.round(27 * desktopScale) : 26,
+                      // Same baked-in transparent padding as the chapters icon.
+                      marginRight: isScaledWeb ? -Math.round(3 * desktopScale) : -3,
+                    }}
+                    resizeMode="contain"
+                    fadeDuration={0}
+                    accessibilityIgnoresInvertColors
+                  />
+                ) : (
+                  <MaterialIcons name={category.icon} size={isScaledWeb ? Math.round(27 * desktopScale) : 22} color={homeMenuTextColor} />
+                )}
+                <Text style={[styles.categoryTitle, isScaledWeb && styles.categoryTitleDesktop, { color: homeMenuTextColor }]}>{category.title}</Text>
               </View>
               <Text
                 style={[
                   styles.categoryDescription,
                   { color: homeMenuTextColor },
                   styles.categoryDescriptionCentered,
+                  isScaledWeb && styles.categoryDescriptionDesktop,
                 ]}
               >
                 {category.description}
@@ -548,6 +666,7 @@ export default function HomeScreen() {
         }}
       />
     </ScrollView>
+    </DesktopTypographyProvider>
   );
 }
 
@@ -556,8 +675,9 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   desktopContentWrap: {
+
+
     width: '100%',
-    maxWidth: 760,
     alignSelf: 'center',
   },
   header: {
@@ -600,6 +720,10 @@ const styles = StyleSheet.create({
     fontSize: 10,
     lineHeight: 13,
   },
+  todayStreakTextDesktop: {
+    fontSize: 12,
+    lineHeight: 16,
+  },
   headerRightGroup: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -637,6 +761,11 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
     position: 'relative',
   },
+  todayCardDesktop: {
+    padding: 14,
+    marginHorizontal: 22,
+    marginTop: 10,
+  },
   todayDecorCircle: {
     position: 'absolute',
     top: -24,
@@ -668,14 +797,26 @@ const styles = StyleSheet.create({
     fontSize: 17,
     lineHeight: 20,
   },
+  todayTitleDesktop: {
+    fontSize: 19,
+    lineHeight: 23,
+  },
   streakFlame: {
     fontSize: 11,
     lineHeight: 13,
+  },
+  streakFlameDesktop: {
+    fontSize: 14,
+    lineHeight: 17,
   },
   todaySubtitle: {
     fontWeight: freshFontFamily.bold,
     fontSize: 11.5,
     lineHeight: 15,
+  },
+  todaySubtitleDesktop: {
+    fontSize: 12.5,
+    lineHeight: 16,
   },
   todayRingWrap: {
     width: 42,
@@ -683,6 +824,10 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     flexShrink: 0,
+  },
+  todayRingWrapDesktop: {
+    width: 44,
+    height: 44,
   },
   todayRingCenter: {
     position: 'absolute',
@@ -693,14 +838,22 @@ const styles = StyleSheet.create({
   },
   todayRingValue: {
     fontWeight: freshFontFamily.extrabold,
-    fontSize: 17,
-    lineHeight: 20,
+    fontSize: 14,
+    lineHeight: 17,
+  },
+  todayRingValueDesktop: {
+    fontSize: 15,
+    lineHeight: 18,
   },
   todayRingGoal: {
     fontWeight: freshFontFamily.extrabold,
-    fontSize: 10,
-    lineHeight: 12,
+    fontSize: 9,
+    lineHeight: 11,
     marginTop: 4,
+  },
+  todayRingGoalDesktop: {
+    fontSize: 9,
+    lineHeight: 12,
   },
   todayRows: {
     flexDirection: 'row',
@@ -719,11 +872,12 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
   },
   todayMetricIcon: {
-    width: 30,
-    height: 30,
-    borderRadius: 11,
+    width: 36,
+    height: 36,
+    borderRadius: 13,
     alignItems: 'center',
     justifyContent: 'center',
+    overflow: 'hidden',
   },
   todayMetricCopy: {
     alignItems: 'center',
@@ -738,11 +892,19 @@ const styles = StyleSheet.create({
     marginBottom: 2,
     textAlign: 'center',
   },
+  todayMetricLabelDesktop: {
+    fontSize: 10.5,
+    lineHeight: 13,
+  },
   todayMetricValue: {
     fontWeight: freshFontFamily.extrabold,
     fontSize: 16,
     lineHeight: 20,
     textAlign: 'center',
+  },
+  todayMetricValueDesktop: {
+    fontSize: 16,
+    lineHeight: 20,
   },
   continueCard: {
     minHeight: 84,
@@ -775,11 +937,24 @@ const styles = StyleSheet.create({
     textTransform: 'uppercase',
     letterSpacing: 0.6,
   },
+  continueCardDesktop: {
+    minHeight: 100,
+    paddingHorizontal: 20,
+    paddingVertical: 16,
+  },
+  continueLabelDesktop: {
+    fontSize: 12,
+    lineHeight: 15,
+  },
   continueTitle: {
     fontWeight: freshFontFamily.extrabold,
     fontSize: 16,
     lineHeight: 20,
     marginTop: 2,
+  },
+  continueTitleDesktop: {
+    fontSize: 20,
+    lineHeight: 25,
   },
   continueMeta: {
     fontWeight: freshFontFamily.semibold,
@@ -787,8 +962,15 @@ const styles = StyleSheet.create({
     lineHeight: 16,
     marginTop: 1,
   },
+  continueMetaDesktop: {
+    fontSize: 14,
+    lineHeight: 18,
+  },
   categoriesContainer: {
     padding: 16,
+
+
+    paddingTop: 28,
     paddingBottom: 8,
   },
   categoriesContainerDesktop: {
@@ -798,7 +980,7 @@ const styles = StyleSheet.create({
   },
   categoryCard: {
     padding: 20,
-    borderRadius: freshRadii.largeTile,
+    borderRadius: uiRadii.largeTile,
     marginBottom: 16,
   },
   categoryCardGrid: {
@@ -806,13 +988,9 @@ const styles = StyleSheet.create({
     padding: 16,
     justifyContent: 'center',
   },
-  pickCategoryLabel: {
-    textAlign: 'center',
-    fontWeight: freshFontFamily.bold,
-    fontSize: 12,
-    letterSpacing: 0.8,
-    marginTop: 22,
-    marginBottom: 2,
+  categoryCardGridDesktop: {
+    minHeight: 116,
+    padding: 20,
   },
   categoryCardPressed: {
     transform: [{ translateX: 1 }, { translateY: 1 }],
@@ -832,12 +1010,19 @@ const styles = StyleSheet.create({
   },
   categoryTitleRowCentered: {
     justifyContent: 'center',
+    // Without this, a wrapped (2-line) title claims the row's full width and the icon
+    // ends up pinned to the left instead of staying centered next to the title as a unit.
+    alignSelf: 'center',
   },
   categoryTitle: {
     fontWeight: freshFontFamily.extrabold,
     fontSize: 21,
     color: 'white',
     textAlign: 'center',
+  },
+  categoryTitleDesktop: {
+    fontSize: 21,
+    lineHeight: 26,
   },
   categoryDescription: {
     fontWeight: freshFontFamily.semibold,
@@ -849,5 +1034,9 @@ const styles = StyleSheet.create({
   categoryDescriptionCentered: {
     textAlign: 'center',
     fontSize: 12.5,
+  },
+  categoryDescriptionDesktop: {
+    fontSize: 13.5,
+    lineHeight: 18,
   },
 });

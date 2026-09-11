@@ -5,6 +5,7 @@ import type {
   ResolvedChapterAppLink,
 } from './lessonTypes';
 import { vocabularyLessons } from './vocabularyRegistry';
+import type { GrammarLesson, VocabularyLesson } from '../../types/lessonTypes';
 
 const normalizeTitle = (title: string) =>
   title
@@ -21,12 +22,17 @@ const defaultIconByTarget: Record<ChapterAppLinkDefinition['target'], MaterialIc
 };
 
 export const resolveChapterAppLink = (
-  appLink: ChapterAppLinkDefinition
+  appLink: ChapterAppLinkDefinition,
+  options: { vocabularyLessons?: VocabularyLesson[]; grammarLessons?: GrammarLesson[] } = {}
 ): ResolvedChapterAppLink | null => {
   const wantedTitle = normalizeTitle(appLink.lessonTitle);
 
   if (appLink.target === 'vocabulary') {
-    const lesson = vocabularyLessons.find((item) => normalizeTitle(item.title) === wantedTitle);
+    const pool = [...(options.vocabularyLessons ?? []), ...vocabularyLessons];
+    const wantedId = appLink.lessonId?.trim();
+    const lesson = (wantedId
+      ? pool.find((item) => String(item.id ?? '') === wantedId)
+      : null) ?? pool.find((item) => normalizeTitle(item.title) === wantedTitle);
     if (!lesson) return null;
 
     return {
@@ -38,7 +44,11 @@ export const resolveChapterAppLink = (
   }
 
   if (appLink.target === 'grammar') {
-    const lesson = grammarLessons.find((item) => normalizeTitle(item.title) === wantedTitle);
+    const pool = [...(options.grammarLessons ?? []), ...grammarLessons];
+    const wantedId = appLink.lessonId?.trim();
+    const lesson = (wantedId
+      ? pool.find((item) => String(item.id ?? '') === wantedId)
+      : null) ?? pool.find((item) => normalizeTitle(item.title) === wantedTitle);
     if (!lesson) return null;
 
     return {

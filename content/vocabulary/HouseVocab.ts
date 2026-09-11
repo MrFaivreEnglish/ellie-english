@@ -2,7 +2,7 @@ const HouseVocab = {
   id: '304',
   title: 'House',
   description: 'Rooms and parts of a house',
-  imageUrl: 'https://i.ibb.co/7J2Cp3J1/House.webp',
+  imageUrl: 'https://wretggbpaejzjdilemit.supabase.co/storage/v1/object/public/lesson-images/15274719ab/house.webp',
   thumbnail: require('../../assets/thumbnails/house-thumbnail.png'),
   flashcards:[
 { english: 'Living room', french: 'Salon' },

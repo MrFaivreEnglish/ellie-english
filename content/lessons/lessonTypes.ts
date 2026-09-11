@@ -10,6 +10,7 @@ export type ChapterAppLinkDefinition = {
   label: string;
   target: AppLessonTarget;
   lessonTitle: string;
+  lessonId?: string;
   icon?: MaterialIconName;
 };
 
@@ -19,9 +20,12 @@ export type ResolvedChapterAppLink =
   | { label: string; icon: MaterialIconName; target: 'pronunciation'; lesson: PronunciationLesson; categoryColor?: string };
 
 export type ChapterLesson = {
+  id?: string;
   title: string;
   url: string;
   appLinks?: ChapterAppLinkDefinition[];
+  liveAppLink?: ChapterAppLinkDefinition;
+  isCustom?: boolean;
 };
 
 export type ChapterCategory = {

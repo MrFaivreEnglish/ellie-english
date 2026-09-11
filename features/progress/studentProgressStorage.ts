@@ -21,6 +21,12 @@ import {
   mergeShinyEllieCloudItems,
   type ShinyEllieProgress,
 } from './shinyEllieStorage';
+import {
+  MODE_UNLOCKS_KEY,
+  clearModeUnlocks,
+  getModeUnlockCloudItems,
+  mergeModeUnlockCloudItems,
+} from './modeUnlockStorage';
 import { clearLocalXPProgress, setLocalXP } from './xpStorage';
 
 export type LocalStudentProgressSnapshot = {
@@ -32,6 +38,9 @@ const LOCAL_PROGRESS_KEYS = new Set([
   '@vocabulary_timer_bests_v1',
   '@shiny_ellie_unlocked',
   '@shiny_ellie_mode',
+  '@shiny_ellie_color_variant',
+  '@shiny_ellie_presentation_mode',
+  MODE_UNLOCKS_KEY,
 ]);
 
 const LOCAL_PROGRESS_PREFIXES = [
@@ -54,6 +63,7 @@ export const clearLocalStudentProgress = async () => {
     clearGrammarProgress(),
     clearVocabularyTimerBests(),
     clearShinyEllieProgress(),
+    clearModeUnlocks(),
   ]);
 };
 
@@ -89,11 +99,12 @@ export const replaceLocalStudentXP = async (xp: number) => {
 };
 
 export const getLocalStudentProgressCloudItems = async (): Promise<CloudProgressItem[]> => {
-  const [learnedFlashcards, grammarProgress, timerBests, shinyEllie] = await Promise.all([
+  const [learnedFlashcards, grammarProgress, timerBests, shinyEllie, modeUnlocks] = await Promise.all([
     getLearnedFlashcardCloudItems(),
     getGrammarProgressCloudItems(),
     getVocabularyTimerBestCloudItems(),
     getShinyEllieCloudItems(),
+    getModeUnlockCloudItems(),
   ]);
 
   return [
@@ -101,6 +112,7 @@ export const getLocalStudentProgressCloudItems = async (): Promise<CloudProgress
     ...grammarProgress,
     ...timerBests,
     ...shinyEllie,
+    ...modeUnlocks,
   ];
 };
 
@@ -112,6 +124,7 @@ export const mergeCloudStudentProgressItems = async (
     mergeLearnedFlashcardCloudItems(items),
     mergeGrammarProgressCloudItems(items),
     mergeVocabularyTimerBestCloudItems(items),
+    mergeModeUnlockCloudItems(items),
   ]);
 
   const shinyEllie = await mergeShinyEllieCloudItems(items, {

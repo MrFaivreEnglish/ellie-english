@@ -17,15 +17,23 @@ jest.mock('expo-haptics', () => ({
   NotificationFeedbackType: { Success: 'success', Warning: 'warning', Error: 'error' },
 }));
 
-jest.mock('expo-audio', () => ({
-  useAudioPlayer: jest.fn(() => ({
+jest.mock('expo-audio', () => {
+  const makePlayer = () => ({
     play: jest.fn(),
     pause: jest.fn(),
     isPlaying: false,
     remove: jest.fn(),
-    seekTo: jest.fn(),
-  })),
-}));
+    seekTo: jest.fn(() => Promise.resolve()),
+  });
+
+  return {
+    useAudioPlayer: jest.fn(makePlayer),
+    createAudioPlayer: jest.fn(makePlayer),
+    preload: jest.fn(() => Promise.resolve()),
+    setAudioModeAsync: jest.fn(() => Promise.resolve()),
+    setIsAudioActiveAsync: jest.fn(() => Promise.resolve()),
+  };
+});
 
 jest.mock('expo-speech', () => ({
   speak: jest.fn(),
@@ -91,9 +99,12 @@ jest.mock('react-native-gesture-handler', () => ({
   Gesture: {
     Pan: () => {
       const gesture = {
+        enabled: () => gesture,
         minDistance: () => gesture,
+        onBegin: () => gesture,
         onUpdate: () => gesture,
         onEnd: () => gesture,
+        onFinalize: () => gesture,
       };
       return gesture;
     },
@@ -124,6 +135,12 @@ jest.mock('react-native-gesture-handler', () => ({
 jest.mock('react-native-reanimated', () => {
   const React = require('react');
   const { ScrollView, Text, View } = require('react-native');
+  const enteringTransition: any = {
+    delay: jest.fn(() => enteringTransition),
+    duration: jest.fn(() => enteringTransition),
+    springify: jest.fn(() => enteringTransition),
+    damping: jest.fn(() => enteringTransition),
+  };
   const AnimatedMock = {
     createAnimatedComponent: (Component: any) => Component,
     Value: jest.fn(),
@@ -148,7 +165,22 @@ jest.mock('react-native-reanimated', () => {
     withSpring: jest.fn((value: number) => value),
     withTiming: jest.fn((value: number) => value),
     runOnJS: jest.fn((fn: Function) => fn),
-    Easing: { out: jest.fn(), in: jest.fn(), inOut: jest.fn(), linear: jest.fn((t: number) => t) },
+    // Reanimated's babel plugin injects a call to this next to inline style
+    // arrays, so the mock has to answer it or those components fail to render.
+    getUseOfValueInStyleWarning: () => '',
+    FadeIn: enteringTransition,
+    FadeInDown: enteringTransition,
+    FadeOut: enteringTransition,
+    ZoomIn: enteringTransition,
+    Easing: {
+      out: jest.fn(),
+      in: jest.fn(),
+      inOut: jest.fn(),
+      linear: jest.fn((t: number) => t),
+      bezier: jest.fn(() => jest.fn((t: number) => t)),
+      ease: jest.fn((t: number) => t),
+    },
+    Extrapolation: { CLAMP: 'clamp' },
   };
 });
 
@@ -169,3 +201,20 @@ const imageLoaderMock = {
 
 Object.defineProperty(mockNativeModules, 'ImageLoader', imageLoaderMock);
 Object.defineProperty(mockNativeModules, 'ImageViewManager', imageLoaderMock);
+
+jest.mock('expo-updates', () => ({
+  isEnabled: false,
+  useUpdates: () => ({
+    isUpdatePending: false,
+    isUpdateAvailable: false,
+    currentlyRunning: {
+      isEmbeddedLaunch: true,
+      createdAt: null,
+      channel: 'test',
+      runtimeVersion: '1',
+    },
+  }),
+  checkForUpdateAsync: jest.fn(async () => ({ isAvailable: false })),
+  fetchUpdateAsync: jest.fn(),
+  reloadAsync: jest.fn(),
+}));

@@ -1,80 +1,132 @@
-// "Fresh Direction" design tokens — single source of truth for the visual
-// redesign spec (see project README handoff doc). Every hex value here is a
-// precise sRGB conversion of the spec's oklch() source value (Björn
-// Ottosson's OKLab matrices), not an eyeballed approximation — keep it that
-// way when adding new tokens: convert from the oklch source, don't guess.
+
+
+
+
+
 import { Platform, type ViewStyle } from 'react-native';
 
-// ---------------------------------------------------------------------------
-// Color — oklch() source values are noted in comments for future edits.
-// ---------------------------------------------------------------------------
-export const FRESH_COLORS = {
-  // Surfaces
-  pageBackground: '#F9F5EB', // oklch(0.97 0.014 90)
-  pageBackgroundOuter: '#F7F2E3', // oklch(0.96 0.02 90) — desk bg, prototypes only
-  cardSurface: '#FFFDF9', // oklch(0.995 0.006 90)
-  hairline: '#E3DECF', // oklch(0.9 0.02 90)
-  divider: '#EAE8E0', // oklch(0.93 0.01 90)
 
-  // Ink
-  inkPrimary: '#1E1A10', // oklch(0.22 0.02 90)
-  inkSecondary: '#686357', // oklch(0.5 0.02 90)
-  inkTertiary: '#767165', // oklch(0.55-0.62 0.02 90), low end
-  inkTertiaryHi: '#8B8679', // high end
 
-  // Primary blue
-  primaryBlue: '#0D7DD4', // oklch(0.58 0.16 250)
-  primaryBluePressed: '#0055A9', // oklch(0.45 0.16 250)
-  primaryBlueShadow: '#005EB3', // same hue, L-0.10 (hard-offset shade)
 
-  // Exercise blue (quiz/fill/reorder/translate chrome)
-  exerciseBlue: '#4AA3D2', // oklch(0.68 0.11 235)
-  exerciseBlueLabel: '#007CB7', // oklch(0.55 0.14 235)
-  exerciseBlueTint: '#D6ECF9', // oklch(0.93 0.03 235)
-  exerciseBlueShadow: '#2584B2', // L-0.10
-
-  // Vocabulary coral
-  vocabCoralSolid: '#CA5747', // oklch(0.6 0.15 30)
-  vocabCoralShadow: '#A8372A', // L-0.10
-  vocabCoralChipFill: '#FFEDEA', // oklch(0.96 0.02 30)
-  vocabCoralChipBorder: '#F8D5CF', // oklch(0.9 0.04 30)
-  vocabCoralChipText: '#562E27', // oklch(0.35 0.06 30)
-
-  // Grammar lavender (chips)
-  grammarLavenderFill: '#EBF2FF', // oklch(0.96 0.02 265)
-  grammarLavenderBorder: '#D1DEF9', // oklch(0.9 0.04 265)
-  grammarLavenderText: '#2A4072', // oklch(0.38 0.09 265)
-
-  // Streak / danger / hearts
-  streakDanger: '#D64938', // oklch(0.6 0.18 30)
-  streakDangerShadow: '#B32517', // L-0.10
-  heartFilled: '#CC272E', // oklch(0.55 0.2 25)
-  heartEmpty: '#D0CEC7', // oklch(0.85 0.01 90)
-
-  // Goal card purple
-  goalCardPurple: '#7541B8', // oklch(0.5 0.18 300)
-  goalCardPurpleShadow: '#591F97', // L-0.10
-
-  // Home category tiles
-  tileGrammar: '#73A9E1', // oklch(0.72 0.1 250)
-  tileGrammarShadow: '#558AC0',
-  tileVocabulary: '#66C4BE', // oklch(0.76 0.09 190)
-  tileVocabularyShadow: '#44A49E',
-  tileChapters: '#D8A4CC', // oklch(0.78 0.08 335)
-  tileChaptersShadow: '#B886AC',
-  tileSettings: '#A8AFB8', // oklch(0.75 0.015 255)
-  tileSettingsShadow: '#899098',
-
-  // Shadow offset shades for neutral surfaces
-  whiteCardShadow: '#E3DECF', // oklch(0.9 0.02 90)
-  pillWarmShadow: '#D5CDB8', // oklch(0.85 0.03 90)
-  progressTodo: '#DCD7C9', // oklch(0.88 0.02 90)
+export const APP_LIGHT_COLORWAYS = {
+  standard: {
+    background: '#F1F5FE',
+    outerBackground: '#E7ECF6',
+    border: '#D7DEEB',
+    surface: '#FFFFFF',
+    surfaceAlt: '#E8EEFA',
+    exerciseSurface: '#E8EEF8',
+    controlSurface: '#E7ECF7',
+    controlText: '#3D485C',
+    text: '#202838',
+    secondaryText: '#616C80',
+    tertiaryText: '#7E899C',
+    breadcrumbLink: '#566A8A',
+    breadcrumbSeparator: '#97A1B2',
+    cardShadow: '#D8DFEA',
+    pillShadow: '#CBD3E0',
+    progressTrack: '#D7DEEB',
+  },
+  shinyEllie: {
+    background: '#FFF7EC',
+    outerBackground: '#F3ECE3',
+    border: '#E6DED3',
+    surface: '#FAF3EA',
+    surfaceAlt: '#F2EAE0',
+    exerciseSurface: '#F2EAE0',
+    controlSurface: '#F7EFE5',
+    controlText: '#4E4A44',
+    text: '#2B2925',
+    secondaryText: '#69645D',
+    tertiaryText: '#888178',
+    breadcrumbLink: '#665F57',
+    breadcrumbSeparator: '#A69E94',
+    cardShadow: '#E3DBD0',
+    pillShadow: '#D8CFC3',
+    progressTrack: '#E8E0D5',
+  },
 } as const;
 
-// Chapter level colors — each level gets: solid, shadow (hard-offset, L-0.10),
-// border (expanded-panel border, L 0.8), wash (expanded-panel bg, L 0.965 /
-// C~0.015), tint (chapter badge / "Open chapter" pill bg, L 0.97), textDark
-// (that pill's text, L 0.42-0.45).
+
+
+
+export const FRESH_COLORS = {
+
+  pageBackground: APP_LIGHT_COLORWAYS.standard.background,
+  pageBackgroundOuter: APP_LIGHT_COLORWAYS.standard.outerBackground,
+  cardSurface: '#FFFFFF',
+  surfaceAlt: APP_LIGHT_COLORWAYS.standard.surfaceAlt,
+  controlSurface: APP_LIGHT_COLORWAYS.standard.controlSurface,
+  controlText: APP_LIGHT_COLORWAYS.standard.controlText,
+  hairline: APP_LIGHT_COLORWAYS.standard.border,
+  divider: APP_LIGHT_COLORWAYS.standard.border,
+
+
+  inkPrimary: APP_LIGHT_COLORWAYS.standard.text,
+  inkSecondary: APP_LIGHT_COLORWAYS.standard.secondaryText,
+  inkTertiary: APP_LIGHT_COLORWAYS.standard.tertiaryText,
+  inkTertiaryHi: APP_LIGHT_COLORWAYS.standard.tertiaryText,
+  breadcrumbLink: APP_LIGHT_COLORWAYS.standard.breadcrumbLink,
+  breadcrumbSeparator: APP_LIGHT_COLORWAYS.standard.breadcrumbSeparator,
+
+
+  primaryBlue: '#0D7DD4',
+  primaryBluePressed: '#0055A9',
+  primaryBlueShadow: '#005EB3',
+
+
+
+
+
+
+  exerciseBlue: '#7692FF',
+  exerciseBlueLabel: '#3D64FF',
+  exerciseBlueTint: '#E6ECFF',
+  exerciseBlueShadow: '#3D64FF',
+  exerciseBlueInkOnFill: '#101B5C',
+
+
+  vocabCoralSolid: '#CA5747',
+  vocabCoralShadow: '#A8372A',
+  vocabCoralChipFill: '#FFEDEA',
+  vocabCoralChipBorder: '#F8D5CF',
+  vocabCoralChipText: '#562E27',
+
+
+  grammarLavenderFill: '#EBF2FF',
+  grammarLavenderBorder: '#D1DEF9',
+  grammarLavenderText: '#2A4072',
+
+
+  streakDanger: '#D64938',
+  streakDangerShadow: '#B32517',
+  heartFilled: '#CC272E',
+  heartEmpty: '#D0CEC7',
+
+
+  goalCardPurple: '#7541B8',
+  goalCardPurpleShadow: '#591F97',
+
+
+  tileGrammar: '#73A9E1',
+  tileGrammarShadow: '#558AC0',
+  tileVocabulary: '#66C4BE',
+  tileVocabularyShadow: '#44A49E',
+  tileChapters: '#D8A4CC',
+  tileChaptersShadow: '#B886AC',
+  tileSettings: '#A8AFB8',
+  tileSettingsShadow: '#899098',
+
+
+  whiteCardShadow: APP_LIGHT_COLORWAYS.standard.cardShadow,
+  pillWarmShadow: APP_LIGHT_COLORWAYS.standard.pillShadow,
+  progressTodo: APP_LIGHT_COLORWAYS.standard.progressTrack,
+} as const;
+
+
+
+
+
 export const CHAPTER_LEVEL_COLORS = {
   '6e': {
     solid: '#EB9191', shadow: '#C97273', border: '#EBAAA9',
@@ -102,12 +154,12 @@ export const CHAPTER_LEVEL_COLORS = {
   },
 } as const;
 
-// ---------------------------------------------------------------------------
-// Dark mode — token-swap per spec §2b: surfaces invert to dark warm
-// neutrals, hard-offset shadow survives with a darker-neutral offset instead
-// of a lighter one, accent hues keep hue/chroma and gain lightness, tints
-// become low-lightness/low-chroma washes.
-// ---------------------------------------------------------------------------
+
+
+
+
+
+
 export const FRESH_COLORS_DARK = {
   pageBackground: '#070F1C',
   cardSurface: '#0D1A2E',
@@ -120,7 +172,7 @@ export const FRESH_COLORS_DARK = {
 
   primaryBlue: '#5AA8F5',
   primaryBluePressed: '#3D8FE0',
-  primaryBlueShadow: '#08131F', // darker-neutral offset, not a lighter blue
+  primaryBlueShadow: '#08131F',
 
   exerciseBlue: '#3FA0DB',
   exerciseBlueLabel: '#7FC4EE',
@@ -158,12 +210,12 @@ export const FRESH_COLORS_DARK = {
   progressTodo: '#16233A',
 } as const;
 
-// ---------------------------------------------------------------------------
-// Type — system default font (no custom family loaded), weights only.
-// Kept as `freshFontFamily` for call-site compatibility even though it now
-// holds `fontWeight` values, not family names — spread as
-// `{ fontWeight: freshFontFamily.extrabold }` at each call site.
-// ---------------------------------------------------------------------------
+
+
+
+
+
+
 export const freshFontFamily = {
   regular: '400',
   medium: '500',
@@ -174,8 +226,8 @@ export const freshFontFamily = {
 
 export type FreshFontWeight = keyof typeof freshFontFamily;
 
-// Type scale from spec §1 (size/weight pairs). Values are the RN style
-// fragment — spread into a component's text style.
+
+
 export const freshType = {
   screenTitle: { fontWeight: freshFontFamily.extrabold, fontSize: 29 },
   cardTitle: { fontWeight: freshFontFamily.extrabold, fontSize: 17 },
@@ -186,25 +238,18 @@ export const freshType = {
   overline: {
     fontWeight: freshFontFamily.bold,
     fontSize: 10.5,
-    letterSpacing: 0.7, // ~0.06em at 11px
+    letterSpacing: 0.7,
     textTransform: 'uppercase' as const,
   },
 } as const;
 
-// ---------------------------------------------------------------------------
-// Radii
-// ---------------------------------------------------------------------------
-export const freshRadii = {
-  pill: 999,
-  card: 15,
-  largeTile: 19,
-  iconButton: 11,
-  chapterBadge: 11,
-} as const;
 
-// ---------------------------------------------------------------------------
-// Spacing
-// ---------------------------------------------------------------------------
+
+
+
+
+
+
 export const freshSpacing = {
   gutterPhone: 22,
   gutterDesktop: 36,
@@ -212,12 +257,12 @@ export const freshSpacing = {
   exerciseMaxWidth: 640,
 };
 
-// ---------------------------------------------------------------------------
-// Shadows — "hard offset + soft ambient". RN 0.83 (New Architecture) and
-// react-native-web both accept a CSS-syntax `boxShadow` string, so we can
-// express the spec's two-part recipe exactly instead of approximating it
-// with a single native shadow + colored border.
-// ---------------------------------------------------------------------------
+
+
+
+
+
+
 const rgba = (hex: string, alpha: number) => {
   const h = hex.replace('#', '');
   const r = parseInt(h.substring(0, 2), 16);
@@ -226,7 +271,7 @@ const rgba = (hex: string, alpha: number) => {
   return `rgba(${r},${g},${b},${alpha})`;
 };
 
-/** White card: 2px 3px 0 hairline, 0 4px 12px rgba(0,0,0,0.04) */
+
 export const freshCardShadow = (isDarkMode: boolean, pressed = false): ViewStyle => {
   const offset = isDarkMode ? FRESH_COLORS_DARK.whiteCardShadow : FRESH_COLORS.whiteCardShadow;
   const hard = pressed ? '1px 2px 0' : '2px 3px 0';
@@ -234,7 +279,7 @@ export const freshCardShadow = (isDarkMode: boolean, pressed = false): ViewStyle
   return { boxShadow: `${hard} ${offset}, 0px 4px 12px ${rgba('#000000', ambientAlpha)}` } as ViewStyle;
 };
 
-/** White card / control pill sitting on the warm page ground. */
+
 export const freshPillShadow = (isDarkMode: boolean, pressed = false): ViewStyle => {
   const offset = isDarkMode ? FRESH_COLORS_DARK.pillWarmShadow : FRESH_COLORS.pillWarmShadow;
   const hard = pressed ? '1px 2px 0' : '2px 3px 0';
@@ -242,24 +287,24 @@ export const freshPillShadow = (isDarkMode: boolean, pressed = false): ViewStyle
   return { boxShadow: `${hard} ${offset}, 0px 4px 12px ${rgba('#000000', ambientAlpha)}` } as ViewStyle;
 };
 
-/** Colored tile/card: 2px 3px 0 <same hue, L-0.10>, 0 4px 12px rgba(0,0,0,0.05). Large tiles use 2px 4px 0. */
+
 export const freshTileShadow = (shadowHex: string, large = false, pressed = false): ViewStyle => {
   const hard = pressed ? '1px 2px 0' : large ? '2px 4px 0' : '2px 3px 0';
   return { boxShadow: `${hard} ${shadowHex}, 0px 4px 12px ${rgba('#000000', 0.05)}` } as ViewStyle;
 };
 
-/** Small colored pill (streak badge, level badge): 1px 1px 0 <darker hue>, 0 4px 12px rgba(0,0,0,0.05) */
+
 export const freshSmallPillShadow = (shadowHex: string): ViewStyle =>
   ({ boxShadow: `1px 1px 0 ${shadowHex}, 0px 4px 12px ${rgba('#000000', 0.05)}` } as ViewStyle);
 
-/** Primary CTA glow — no hard offset. */
+
 export const freshGlowShadow = (glowHex: string = FRESH_COLORS.exerciseBlue): ViewStyle =>
   ({ boxShadow: `0px 6px 14px ${rgba(glowHex, 0.3)}` } as ViewStyle);
 
-// ---------------------------------------------------------------------------
-// Interaction rules (§3): card/tile press = translate 1px toward the shadow
-// + shrink the hard offset. Spread onto a Pressable's style callback.
-// ---------------------------------------------------------------------------
+
+
+
+
 export const freshPressTransform = (pressed: boolean): ViewStyle =>
   pressed ? { transform: [{ translateX: 1 }, { translateY: 1 }] } : {};
 

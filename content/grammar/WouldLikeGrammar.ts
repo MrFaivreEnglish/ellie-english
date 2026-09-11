@@ -1,7 +1,7 @@
 const WouldLikeGrammar = {
   id: '11',
   title: 'Would Like',
-  description: 'Learn how to use would like - Evaluate if these sentences are grammatically correct',  imageUrl: 'https://i.ibb.co/ZzXpFqXm/Would-like.png',
+  description: 'Learn how to use would like - Evaluate if these sentences are grammatically correct',  imageUrl: 'https://wretggbpaejzjdilemit.supabase.co/storage/v1/object/public/lesson-images/15274719ab/would-like.webp',
   textContent: {
     cards: [
       {

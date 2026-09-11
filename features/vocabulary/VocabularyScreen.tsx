@@ -1,23 +1,33 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   View,
-  Text,
   StyleSheet,
   SectionList,
   TouchableOpacity,
   Image,
-  TextInput,
+  AppState,
   Platform,
   Pressable,
   useWindowDimensions,
 } from 'react-native';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
-import { MaterialIcons } from '@expo/vector-icons';
+import Text, { ThemedTextInput as TextInput } from '../shared/ThemedText';
+import MaterialIcons from '../shared/ThemedMaterialIcon';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Animated, { FadeIn, FadeOut } from 'react-native-reanimated';
 import { useTheme } from '../settings/ThemeContext';
 import BackButton from '../shared/BackButton';
 import { useSearchFocusAnimation } from '../shared/useSearchFocusAnimation';
+import {
+  DESKTOP_WEB_MIN_WIDTH,
+  getBottomSafeAreaInset,
+  getDesktopContentMaxWidth,
+  getDesktopTypographyScale,
+  getTopSafeAreaInset,
+  isDesktopWebWidth,
+  NARROW_TRAY_WIDTH,
+} from '../shared/responsiveLayout';
+import { DesktopTypographyProvider } from '../shared/DesktopTypography';
 import { getLessonImage, getLessonThumbnailSource, getSerializableVocabularyLesson, shuffleArray } from './vocabularyUtils';
 import { vocabularyCategories } from '../../content/lessons/vocabularyRegistry';
 import { getCustomVocabularyLessons } from '../lessons/customLessonStorage';
@@ -60,7 +70,9 @@ const CATEGORY_EMOJI_MAP: Record<string, string> = {
   Custom: '\u{1F4DA}',
 };
 
-const difficultyMap: Record<string, number> = {
+// Exported for XP scaling (see xpRewards.getReplayXpFraction) — kept in this file so
+// scripts/validate-content.js's AST scan (which looks for `difficultyMap` here) still finds it.
+export const difficultyMap: Record<string, number> = {
   Activities: 1,
   Animals: 1,
   'American Dishes': 2,
@@ -120,6 +132,10 @@ const difficultyMap: Record<string, number> = {
   'Video Games': 2,
   'The Blitz': 3,
   Fashion: 2,
+  Feminism: 3,
+  Slavery: 3,
+  Sports: 2,
+  Weather: 1,
 };
 
 const normalizeCustomLesson = (lesson: any) => {
@@ -227,14 +243,35 @@ export default function VocabularyScreen() {
   const copy = appCopy.vocabulary;
   const commonCopy = appCopy.common;
   const insets = useSafeAreaInsets();
-  const { width: windowWidth } = useWindowDimensions();
-  const isDesktopWeb = Platform.OS === 'web' && windowWidth >= 768;
-  const topContentInset = Platform.OS === 'ios'
-    ? insets.top
-    : Platform.OS === 'android' && isAndroidStatusBarEnabled
-      ? insets.top
-      : 0;
-  const isPortraitTight = windowWidth < 430;
+  const { width: windowWidth, height: windowHeight } = useWindowDimensions();
+
+
+
+
+  const isDesktopWeb = isDesktopWebWidth(windowWidth, undefined, windowHeight);
+  const desktopContentMaxWidth = getDesktopContentMaxWidth(windowWidth, 'scroll', windowHeight);
+
+
+
+
+
+
+
+
+
+
+  const desktopScale = getDesktopTypographyScale(windowWidth, windowHeight, 'scroll');
+  // Tablet keeps the mobile structural layout (isDesktopWeb stays false)
+  // but still gets a real desktopScale > 1 from getDesktopTypographyScale's
+  // own tablet branch — numeric-only scale call sites gate on this instead
+  // of isDesktopWeb alone, which used to leave tablet at the flat phone
+  // size even though its own scale was already correct.
+  const isScaledLayout = isDesktopWeb || desktopScale > 1;
+  // Growing 1:1 with desktopScale makes the "Select lessons" button dominate the header on
+  // wide screens, so its whole box (and the text inside it) scales at a gentler rate instead.
+  const selectButtonScale = 1 + (desktopScale - 1) * 0.5;
+  const topContentInset = getTopSafeAreaInset(Platform.OS, insets.top, isAndroidStatusBarEnabled);
+  const isPortraitTight = windowWidth < NARROW_TRAY_WIDTH;
 
   const bundledCustomLessons = useMemo(
     () => bundledCustomVocabularyLessons.map(normalizeCustomLesson).filter(Boolean),
@@ -279,7 +316,34 @@ export default function VocabularyScreen() {
     });
 
     if (!mergedCustomLessons.length) return vocabularyCategories;
-    return [{ title: 'Custom', lessons: mergedCustomLessons }, ...vocabularyCategories];
+
+
+
+
+    const customByCategory = new Map<string, any[]>();
+    mergedCustomLessons.forEach((lesson: any) => {
+      const categoryTitle = (typeof lesson.category === 'string' && lesson.category.trim()) || 'Custom';
+      const group = customByCategory.get(categoryTitle) ?? [];
+      group.push(lesson);
+      customByCategory.set(categoryTitle, group);
+    });
+
+    const usedCategoryTitles = new Set<string>();
+    const mergedBundledCategories = vocabularyCategories.map((category) => {
+      const matchKey = [...customByCategory.keys()].find(
+        (title) => title.toLowerCase() === category.title.toLowerCase()
+      );
+      if (!matchKey) return category;
+
+      usedCategoryTitles.add(matchKey);
+      return { ...category, lessons: [...(customByCategory.get(matchKey) ?? []), ...category.lessons] };
+    });
+
+    const newCustomCategories = [...customByCategory.entries()]
+      .filter(([title]) => !usedCategoryTitles.has(title))
+      .map(([title, lessons]) => ({ title, lessons }));
+
+    return [...newCustomCategories, ...mergedBundledCategories];
   }, [bundledCustomLessons, customLessons]);
 
   const allLessons = useMemo(() => {
@@ -292,15 +356,23 @@ export default function VocabularyScreen() {
     [allLessons, selectedLessonKeys]
   );
 
+  const refreshCustomLessons = useCallback(async () => {
+    setCustomLessons(await getCustomVocabularyLessons({ forceRefresh: true }));
+  }, []);
+
   useFocusEffect(
     React.useCallback(() => {
-      let active = true;
-      getCustomVocabularyLessons().then((lessons) => {
-        if (active) setCustomLessons(lessons);
-      });
-      return () => { active = false; };
-    }, [])
+      void refreshCustomLessons();
+      return undefined;
+    }, [refreshCustomLessons])
   );
+
+  useEffect(() => {
+    const subscription = AppState.addEventListener('change', (state) => {
+      if (state === 'active') void refreshCustomLessons();
+    });
+    return () => subscription.remove();
+  }, [refreshCustomLessons]);
 
   useFocusEffect(
     React.useCallback(() => {
@@ -460,7 +532,7 @@ export default function VocabularyScreen() {
     [allLessons, categories, filterLessons, viewMode]
   );
   const knownWordsAvailable = learnedMixWords.length > 0;
-  const selectionTrayBottomPadding = Platform.OS === 'web' ? 16 : Math.max(insets.bottom, 12);
+  const selectionTrayBottomPadding = getBottomSafeAreaInset(insets.bottom);
   const studySurface = useMemo(() => getStudySurfaceColors(colors, isDarkMode), [colors, isDarkMode]);
   const trayColors = useMemo(() => getSelectionTrayColors(colors, isDarkMode), [colors, isDarkMode]);
   const traySurfaceColor = trayColors.surface;
@@ -549,7 +621,7 @@ export default function VocabularyScreen() {
               lesson={lesson}
               rowIndex={i}
               cardView={cardView}
-              compactTile={windowWidth < 768}
+              compactTile={windowWidth < DESKTOP_WEB_MIN_WIDTH}
               selectionMode={selectionMode}
               selected={selectedLessonKeys.has(lessonProgressKey)}
               imageFailed={failedLessonImageKeys.has(lessonImageKey)}
@@ -565,7 +637,7 @@ export default function VocabularyScreen() {
             />
           );
         })}
-        {isTile && item.lessons.length === 1 && <View style={{ width: windowWidth < 768 ? '46%' : '48%' }} />}
+        {isTile && item.lessons.length === 1 && <View style={{ width: windowWidth < DESKTOP_WEB_MIN_WIDTH ? '46%' : '48%' }} />}
       </View>
     );
   }, [
@@ -574,6 +646,7 @@ export default function VocabularyScreen() {
   ]);
 
   return (
+    <DesktopTypographyProvider mode="scroll">
     <View style={[styles.container, { backgroundColor: colors.background }]}>
       <SectionList
         sections={sectionListData}
@@ -583,7 +656,7 @@ export default function VocabularyScreen() {
         renderSectionFooter={renderSectionFooter}
         contentContainerStyle={[
           { paddingTop: topContentInset, paddingBottom: selectionScrollPadding },
-          isDesktopWeb && styles.desktopContentWrap,
+          isDesktopWeb && [styles.desktopContentWrap, { maxWidth: desktopContentMaxWidth }],
         ]}
         onScrollBeginDrag={() => { setShowDifficultyMenu(false); setShowSortMenu(false); }}
         keyboardShouldPersistTaps="handled"
@@ -592,7 +665,16 @@ export default function VocabularyScreen() {
         <BackButton label={commonCopy.backToHome} onPress={() => navigation.navigate('Home')} />
 
         <View style={styles.headerRow}>
-          <Text style={[styles.headerTitle, { color: colors.text }]}>
+          <Text
+            style={[
+              styles.headerTitle,
+              isPortraitTight && styles.headerTitleCompact,
+              { color: colors.text },
+            ]}
+            numberOfLines={1}
+            adjustsFontSizeToFit
+            minimumFontScale={0.7}
+          >
             {copy.header}
           </Text>
           <TouchableOpacity
@@ -600,6 +682,13 @@ export default function VocabularyScreen() {
             onPress={toggleSelectionMode}
             style={[
               styles.headerSelectButton,
+              isPortraitTight && styles.headerSelectButtonCompact,
+              isScaledLayout && {
+                minHeight: Math.round(42 * selectButtonScale),
+                maxWidth: Math.round(174 * selectButtonScale),
+                paddingHorizontal: Math.round(12 * selectButtonScale),
+                gap: Math.round(7 * selectButtonScale),
+              },
               {
                 backgroundColor: selectionMode ? colors.primarySoft : studySurface.control,
                 borderColor: selectionMode ? colors.primary : studySurface.controlBorder,
@@ -610,11 +699,16 @@ export default function VocabularyScreen() {
           >
             <MaterialIcons
               name={selectionMode ? 'close' : 'checklist'}
-              size={18}
+              size={Math.round(18 * selectButtonScale)}
               color={selectionMode ? colors.primary : colors.secondaryText}
             />
             <Text
-              style={[styles.headerSelectText, { color: selectionMode ? colors.primary : colors.text }]}
+              style={[
+                styles.headerSelectText,
+                isPortraitTight && styles.headerSelectTextCompact,
+                isScaledLayout && { fontSize: Math.round(14 * selectButtonScale) },
+                { color: selectionMode ? colors.primary : colors.text },
+              ]}
               numberOfLines={1}
             >
               {selectionMode ? copy.cancelSelection : copy.selectLessons}
@@ -630,6 +724,10 @@ export default function VocabularyScreen() {
               backgroundColor: searchSurfaceColor,
               borderRadius: uiRadii.control,
             },
+
+
+
+            { borderRadius: Math.round(uiRadii.control * desktopScale) },
             searchFocusAnim.animatedStyle,
           ]}
         >
@@ -651,22 +749,42 @@ export default function VocabularyScreen() {
                 paddingVertical: 14,
                 fontSize: 16,
               },
+
+
+              {
+                minHeight: Math.round(46 * desktopScale),
+                paddingRight: Math.round(45 * desktopScale),
+                paddingLeft: Math.round(44 * desktopScale),
+                paddingVertical: Math.round(14 * desktopScale),
+              },
             ]}
           />
 
-          <View style={styles.searchIconWrap}>
-            <MaterialIcons name="search" size={20} color={searchActiveColor} />
+          <View
+            style={[
+              styles.searchIconWrap,
+              { left: Math.round(16 * desktopScale), width: Math.round(24 * desktopScale) },
+            ]}
+          >
+            <MaterialIcons name="search" size={Math.round(20 * desktopScale)} color={searchActiveColor} />
           </View>
 
           {searchText.length > 0 && (
-            <Animated.View entering={FadeIn.duration(140)} exiting={FadeOut.duration(110)} style={styles.searchClearButton}>
+            <Animated.View
+              entering={FadeIn.duration(140)}
+              exiting={FadeOut.duration(110)}
+              style={[
+                styles.searchClearButton,
+                { right: Math.round(18 * desktopScale), width: Math.round(40 * desktopScale) },
+              ]}
+            >
               <TouchableOpacity
                 onPress={() => setSearchText('')}
                 hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
                 accessibilityRole="button"
                 accessibilityLabel={copy.clearSearch}
               >
-                <MaterialIcons name="close" size={20} color={searchActiveColor} />
+                <MaterialIcons name="close" size={Math.round(20 * desktopScale)} color={searchActiveColor} />
               </TouchableOpacity>
             </Animated.View>
           )}
@@ -692,7 +810,7 @@ export default function VocabularyScreen() {
           </TouchableOpacity>
           </View>
 
-          <Text style={[styles.newFilterDivider, { color: isDarkMode ? colors.border : '#D9D3C7' }]}>·</Text>
+          <Text style={[styles.newFilterDivider, { color: colors.border }]}>·</Text>
 
           <View ref={difficultyAnchorRef}>
             <TouchableOpacity
@@ -736,7 +854,7 @@ export default function VocabularyScreen() {
             >
               <MaterialIcons
                 name="view-list"
-                size={17}
+                size={Math.round(17 * desktopScale)}
                 color={cardView === 'list' ? colors.primary : colors.text}
               />
             </TouchableOpacity>
@@ -754,7 +872,7 @@ export default function VocabularyScreen() {
             >
               <MaterialIcons
                 name="grid-view"
-                size={17}
+                size={Math.round(17 * desktopScale)}
                 color={cardView === 'tile' ? colors.primary : colors.text}
               />
             </TouchableOpacity>
@@ -789,7 +907,7 @@ export default function VocabularyScreen() {
           <View
             style={[
               styles.selectionControls,
-              getSoftShadow(isDarkMode, 'raised'),
+              getSoftShadow(isDarkMode, 'raised', colors.shadow, colors.visualStyle === 'pixel'),
               {
                 backgroundColor: traySurfaceColor,
                 borderColor: trayBorderColor,
@@ -816,12 +934,12 @@ export default function VocabularyScreen() {
               >
                 <MaterialIcons
                   name="delete-sweep"
-                  size={19}
+                  size={Math.round(19 * desktopScale)}
                   color={selectedLessons.length > 0 ? trayActionColor : trayMutedColor}
                 />
               </TouchableOpacity>
               <View style={styles.selectionCountPill}>
-                <MaterialIcons name="view-carousel" size={19} color={trayActionColor} />
+                <MaterialIcons name="view-carousel" size={Math.round(19 * desktopScale)} color={trayActionColor} />
                 <View style={styles.selectionDeckCopy}>
                   <Text style={[styles.selectionDeckTitle, { color: trayTextColor }]} numberOfLines={1}>
                     {copy.selectedMixTitle}
@@ -845,7 +963,7 @@ export default function VocabularyScreen() {
                 accessibilityRole="button"
                 accessibilityLabel={copy.cancelSelection}
               >
-                <MaterialIcons name="close" size={19} color={trayActionColor} />
+                <MaterialIcons name="close" size={Math.round(19 * desktopScale)} color={trayActionColor} />
               </TouchableOpacity>
             </View>
 
@@ -873,11 +991,11 @@ export default function VocabularyScreen() {
                         {selectedLessonImageSource ? (
                           <Image
                             source={selectedLessonImageSource}
-                            style={[styles.selectedMixStackImage, { backgroundColor: isDarkMode ? colors.surfaceAlt : '#DCEAF3' }]}
+                            style={[styles.selectedMixStackImage, { backgroundColor: colors.surfaceAlt }]}
                             resizeMode="cover"
                           />
                         ) : (
-                          <MaterialIcons name="image-not-supported" size={19} color={trayMutedColor} />
+                          <MaterialIcons name="image-not-supported" size={Math.round(19 * desktopScale)} color={trayMutedColor} />
                         )}
                       </View>
                     );
@@ -922,7 +1040,7 @@ export default function VocabularyScreen() {
                 >
                   <MaterialIcons
                     name="shuffle"
-                    size={18}
+                    size={Math.round(18 * desktopScale)}
                     color={selectedLessons.length >= 2 ? trayStartEnabledText : trayMutedColor}
                   />
                   {!isPortraitTight && (
@@ -949,7 +1067,7 @@ export default function VocabularyScreen() {
             style={[
               styles.dropdownMenu,
               styles.sortMenu,
-              getSoftShadow(isDarkMode, 'strong'),
+              getSoftShadow(isDarkMode, 'strong', colors.shadow, colors.visualStyle === 'pixel'),
               {
                 backgroundColor: colors.card,
                 borderColor: colors.border,
@@ -961,6 +1079,7 @@ export default function VocabularyScreen() {
             <TouchableOpacity
               style={[
                 styles.difficultyMenuItem,
+                { borderBottomColor: colors.border },
                 viewMode === 'category' && { backgroundColor: colors.primarySoft },
               ]}
               onPress={() => { setViewMode('category'); setShowSortMenu(false); }}
@@ -975,6 +1094,7 @@ export default function VocabularyScreen() {
             <TouchableOpacity
               style={[
                 styles.difficultyMenuItem,
+                { borderBottomColor: colors.border },
                 viewMode === 'abc' && { backgroundColor: colors.primarySoft },
               ]}
               onPress={() => { setViewMode('abc'); setShowSortMenu(false); }}
@@ -996,7 +1116,7 @@ export default function VocabularyScreen() {
             style={[
               styles.dropdownMenu,
               styles.difficultyMenu,
-              getSoftShadow(isDarkMode, 'strong'),
+              getSoftShadow(isDarkMode, 'strong', colors.shadow, colors.visualStyle === 'pixel'),
               {
                 backgroundColor: colors.card,
                 borderColor: colors.border,
@@ -1010,6 +1130,7 @@ export default function VocabularyScreen() {
                 key={i}
                 style={[
                   styles.difficultyMenuItem,
+                  { borderBottomColor: colors.border },
                   selectedDifficulty === lvl && { backgroundColor: colors.primarySoft },
                 ]}
                 onPress={() => handleDifficultySelect(lvl)}
@@ -1041,9 +1162,10 @@ export default function VocabularyScreen() {
           onPress={startLearnedMix}
           style={[
             styles.vocabRushFab,
-            getSoftShadow(isDarkMode, 'strong'),
+            getSoftShadow(isDarkMode, 'strong', colors.shadow, colors.visualStyle === 'pixel'),
             {
-              bottom: Math.max(insets.bottom, 16) + 24,
+              bottom: getBottomSafeAreaInset(insets.bottom) + 24,
+              right: isDesktopWeb ? 40 : 16,
               backgroundColor: isDarkMode ? '#b3282c' : '#d73337',
               borderColor: '#ffffff',
             },
@@ -1063,14 +1185,16 @@ export default function VocabularyScreen() {
         </TouchableOpacity>
       )}
     </View>
+    </DesktopTypographyProvider>
   );
 }
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
   desktopContentWrap: {
+
+
     width: '100%',
-    maxWidth: 1000,
     alignSelf: 'center',
   },
   headerRow: {
@@ -1086,6 +1210,13 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     minWidth: 0,
   },
+
+
+
+
+  headerTitleCompact: {
+    fontSize: 26,
+  },
   headerSelectButton: {
     alignItems: 'center',
     borderRadius: uiRadii.control,
@@ -1096,10 +1227,18 @@ const styles = StyleSheet.create({
     maxWidth: 174,
     paddingHorizontal: 12,
   },
+  headerSelectButtonCompact: {
+    maxWidth: 132,
+    paddingHorizontal: 9,
+    gap: 5,
+  },
   headerSelectText: {
     flexShrink: 1,
     fontSize: 14,
     fontWeight: '800',
+  },
+  headerSelectTextCompact: {
+    fontSize: 12.5,
   },
   newFilterSpacer: {
     flex: 1,
@@ -1190,8 +1329,8 @@ const styles = StyleSheet.create({
   newFilterRowSpacing: {
     paddingHorizontal: 16,
   },
-  // ABC (alphabetical) mode has no category section header below this row to
-  // provide breathing room before the first lesson card, unlike category mode.
+
+
   newFilterRowSpacingAbc: {
     marginBottom: 28,
   },
@@ -1279,7 +1418,11 @@ const styles = StyleSheet.create({
   selectionTrayWrap: {
     backgroundColor: 'transparent',
     bottom: 0,
+    // Keep elevation (it's what puts the tray above the tab bar on Android), but this
+    // wrapper is explicitly transparent — the shadow it casts is a rectangular grey halo
+    // around the rounded tray inside it, drawn from this view's own outline.
     elevation: 20,
+    shadowColor: 'transparent',
     left: 0,
     paddingTop: 10,
     position: 'absolute',
@@ -1370,8 +1513,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     borderColor: '#FFFFFF',
     borderRadius: 12,
-    borderWidth: 2.5,
-    elevation: 3,
+    borderWidth: 2.5,
     height: 90,
     justifyContent: 'center',
     overflow: 'hidden',

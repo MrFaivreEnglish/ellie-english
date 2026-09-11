@@ -2,7 +2,7 @@ const ComparativeInferiorityEqualityGrammar = {
   id: '32',
   title: "Comparatif d'infériorité et d'égalité",
   description: "Practice making comparisons of inferiority (less...than) and equality (as...as)",
-  imageUrl: 'https://i.ibb.co/0jTN4jQT/Comparatif-inf-riorit.png',
+  imageUrl: 'https://wretggbpaejzjdilemit.supabase.co/storage/v1/object/public/lesson-images/15274719ab/comparatif-d-inferiorite-et-d-egalite.webp',
   textContent: {
     cards: [
       {

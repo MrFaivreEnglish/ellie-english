@@ -25,6 +25,7 @@ import EmotionsVocab from '../vocabulary/EmotionsVocab';
 import ExtremeSportsVocab from '../vocabulary/ExtremeSportsVocab';
 import FamilyVocab from '../vocabulary/FamilyVocab';
 import FashionVocab from '../vocabulary/FashionVocab';
+import FeminismVocab from '../vocabulary/FeminismVocab';
 import FoodVocab from '../vocabulary/FoodVocab';
 import FrequencyAdverbsVocab from '../vocabulary/FrequencyAdverbsVocab';
 import FurnitureVocab from '../vocabulary/FurnitureVocab';
@@ -49,7 +50,9 @@ import QuestionWordsVocab from '../vocabulary/QuestionWordsVocab';
 import RobotsVocab from '../vocabulary/RobotsVocab';
 import SchoolLvl2Vocab from '../vocabulary/SchoolLvl2Vocab';
 import SegregationVocab from '../vocabulary/SegregationVocab';
+import SlaveryVocab from '../vocabulary/SlaveryVocab';
 import SpaceVocab from '../vocabulary/SpaceVocab';
+import SportsVocab from '../vocabulary/SportsVocab';
 import TastesVocab from '../vocabulary/TastesVocab';
 import TheBlitzVocab from '../vocabulary/TheBlitzVocab';
 import TimeVocab from '../vocabulary/TimeVocab';
@@ -57,6 +60,7 @@ import TypesOfDocumentsVocab from '../vocabulary/TypesOfDocumentsVocab';
 import UKVocab from '../vocabulary/UKVocab';
 import VideoGamePowersVocab from '../vocabulary/VideoGamePowersVocab';
 import VideoGamesVocab from '../vocabulary/VideoGamesVocab';
+import WeatherVocab from '../vocabulary/WeatherVocab';
 
 const withDescription = (lesson: any, description: string) => ({
   ...lesson,
@@ -137,6 +141,7 @@ export const vocabularyCategories: Array<{ title: string; lessons: any[] }> = [
       withDescription(CinemaVocab, 'Talk about films and the cinema.'),
       withDescription(VideoGamesVocab, 'Use words for video games.'),
       withDescription(VideoGamePowersVocab, 'Talk about powers and game skills.'),
+      withDescription(SportsVocab, 'Talk about people, actions, events, and skills in sports.'),
       withDescription(ExtremeSportsVocab, 'Talk about exciting sports.'),
       withDescription(LegendsVocab, 'Read and talk about legends.'),
       withDescription(UKVocab, 'Learn key words about the UK.'),
@@ -158,6 +163,7 @@ export const vocabularyCategories: Array<{ title: string; lessons: any[] }> = [
       withDescription(EcologyVocab, 'Talk about nature and the planet.'),
       withDescription(SpaceVocab, 'Talk about space.'),
       withDescription(RobotsVocab, 'Talk about robots and technology.'),
+      withDescription(WeatherVocab, 'Talk about the weather.'),
     ],
   },
   {
@@ -166,6 +172,8 @@ export const vocabularyCategories: Array<{ title: string; lessons: any[] }> = [
       withDescription(DetectiveVocab, 'Use words from detective stories.'),
       withDescription(DystopiaVocab, 'Talk about control, freedom, and rebellion in dystopian stories.'),
       withDescription(TheBlitzVocab, 'Talk about the Blitz.'),
+      withDescription(SlaveryVocab, 'Use words about slavery, the triangular trade, and abolition.'),
+      withDescription(FeminismVocab, 'Use words about the Suffragettes, voting rights, and equality.'),
       withDescription(SegregationVocab, 'Use words about segregation and rights.'),
       withDescription(BullyingVocab, 'Talk about bullying.'),
       withDescription(InternetVocab, 'Talk about the internet and online life.'),

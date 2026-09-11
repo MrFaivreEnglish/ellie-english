@@ -2,7 +2,7 @@ const HaveHaveGotGrammar = {
   id: '88',
   title: 'Have / Have got',
   description: "Using 'have' and 'have got' for possession: affirmative and negative forms (present tense)",
-  imageUrl: 'https://i.ibb.co/rKDdd054/Have-Have-got.png',
+  imageUrl: 'https://wretggbpaejzjdilemit.supabase.co/storage/v1/object/public/lesson-images/15274719ab/have-have-got.webp',
   textContent: {
     cards: [
       {
@@ -136,9 +136,9 @@ translateExercises: [
   {
     type: 'translate',
     question: 'Translate into English.',
-    prompt: "Nous avons le temps dont nous avons besoin.",
-    answer: "We have the time we need.",
-    wordBank: ["We", "have", "has", "the time", "we", "need."]
+    prompt: "Nous avons beaucoup de temps.",
+    answer: "We have a lot of time.",
+    wordBank: ["We", "have", "has", "a lot of", "time."]
   },
   {
     type: 'translate',
@@ -213,7 +213,7 @@ translateExercises: [
     { question: 'He ___ any brothers.', answer: "hasn't got", options: ["haven't got", "hasn't got"] },
     { question: 'She ___ a twin.', answer: "hasn't got", options: ["haven't got", "hasn't got"] },
     { question: 'The garden ___ many flowers.', answer: 'has', options: ['have', 'has'] },
-    { question: 'We ___ the time we need.', answer: 'have', options: ['have', 'has'] },
+    { question: 'We ___ a lot of time.', answer: 'have', options: ['have', 'has'] },
     { question: 'You ___ the correct ticket.', answer: 'have', options: ['have', 'has'] },
     { question: 'The shop ___ many toys.', answer: 'has', options: ['have', 'has'] },
     { question: 'I ___ a cold.', answer: "haven't got", options: ["haven't got", "hasn't got"] }

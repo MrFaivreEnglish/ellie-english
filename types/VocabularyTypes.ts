@@ -26,13 +26,16 @@ export type GameState = {
   selectedCard: GameCard | null;
   totalScore: number;
   timer: number;
-  // Per-category best times for the current lesson session; keys are category names (use 'All' when no selection)
+
   bestTimeByCategory: Record<string, number>;
   hasCompletedOnce: boolean;
   consecutiveCorrect: number;
   incorrectPair: string[] | null;
   hasAdvancedSet: boolean;
-  // When true, taps are temporarily disabled (e.g., after an incorrect pair) for a short lockout window
+
   isInputLocked?: boolean;
   lastCompletionWasPersonalBest?: boolean;
+
+
+  lastCompletionPreviousBest?: number | null;
 };

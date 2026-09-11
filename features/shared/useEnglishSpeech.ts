@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 
-// Lazy-load so the app doesn't crash if the native module isn't compiled into
-// the build yet.
+
+
+// Keep speech optional so unsupported builds can load without the native module.
 const Speech = (() => {
   try { return require('expo-speech') as typeof import('expo-speech'); } catch { return null; }
 })();
@@ -11,9 +12,9 @@ type SpeakOptions = {
   pitch?: number;
 };
 
-// Picks the best available English voice on the device instead of whatever
-// the OS defaults to — prefers British, "enhanced"/neural voices, and avoids
-// novelty voices (Bells, Zarvox, etc.) that read badly for language learners.
+
+
+
 const scoreVoice = (voice: import('expo-speech').Voice) => {
   const language = voice.language?.toLowerCase() ?? '';
   if (!language.startsWith('en')) return -1;
@@ -33,11 +34,11 @@ const scoreVoice = (voice: import('expo-speech').Voice) => {
   return score;
 };
 
-/**
- * Shared "read this English word/sentence aloud" hook. Selects the best
- * available English voice once, then exposes a simple speak/stop API with
- * per-call rate/pitch overrides.
- */
+
+
+
+
+
 export function useEnglishSpeech() {
   const [preferredVoice, setPreferredVoice] = useState<string | undefined>(undefined);
   const [isSpeaking, setIsSpeaking] = useState(false);

@@ -2,7 +2,7 @@ const Conditional2Grammar = {
   id: '13',
   title: 'Conditionnel 2',
   description: 'Learn how to use the second conditional',
-  imageUrl: 'https://i.ibb.co/NdJ7KZyS/Conditionnel-2.png',
+  imageUrl: 'https://wretggbpaejzjdilemit.supabase.co/storage/v1/object/public/lesson-images/15274719ab/conditionnel-2.webp',
   textContent: {
     cards: [
       {

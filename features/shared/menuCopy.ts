@@ -4,6 +4,7 @@ type HomeCategoryCopy = {
   vocabularyTitle: string;
   vocabularyDescription: string;
   lessonsTitle: string;
+  lessonsTitleCompact: string;
   lessonsDescription: string;
   settingsTitle: string;
   settingsDescription: string;
@@ -85,6 +86,12 @@ type MenuCopy = {
     hapticsWebDescription: string;
     shinyEllieTitle: string;
     shinyEllieDescription: string;
+    shinyElliePresentationTitle: string;
+    shinyElliePresentationDescription: string;
+    shinyEllieLookTitle: string;
+    shinyEllieLookDescription: string;
+    shinyElliePaletteTitle: string;
+    shinyElliePaletteDescription: string;
     creditsConcept: string;
     creditsImages: string;
     creditsBuiltWith: string;
@@ -204,7 +211,10 @@ const englishCopy: MenuCopy = {
     grammarDescription: 'Sharpen your grammar skills',
     vocabularyTitle: 'Vocabulary',
     vocabularyDescription: 'Build your word bank',
-    lessonsTitle: 'Chapters & Resources',
+    lessonsTitle: 'Chapters & Links',
+    // Narrow layouts use the short form — the full name wraps to two lines on a phone,
+    // which knocks the card's icon off-centre.
+    lessonsTitleCompact: 'Chapters',
     lessonsDescription: 'Everything from class',
     settingsTitle: 'Settings',
     settingsDescription: 'Make Ellie yours',
@@ -253,11 +263,17 @@ const englishCopy: MenuCopy = {
     hapticsDescription: 'Use small vibrations when you tap or answer.',
     hapticsWebDescription: 'Use small vibrations if your browser allows it.',
     shinyEllieTitle: 'Shiny Ellie',
-    shinyEllieDescription: 'A Shiny Ellie appeared!',
+    shinyEllieDescription: 'A Shiny Ellie appeared! Mix any presentation, style, and palette.',
+    shinyElliePresentationTitle: 'Ellie mode',
+    shinyElliePresentationDescription: 'Choose classic or Shiny Home cards and splash.',
+    shinyEllieLookTitle: 'Visual style',
+    shinyEllieLookDescription: 'Swap the finish without changing the layout.',
+    shinyElliePaletteTitle: 'Color variant',
+    shinyElliePaletteDescription: 'Choose the cool blue or warm beige palette.',
     creditsConcept: 'Application concept & development: Mr Faivre',
     creditsImages: 'Images: Mr Faivre with icons from Flaticon',
     creditsBuiltWith: 'Built with React Native & Expo',
-    version: 'Ellie Version 2.4',
+    version: 'Ellie Version 2.8',
     creditsSchool: 'Mr Faivre - Collège Jean Jacques Rousseau - Voujeaucourt',
     adminAccessTitle: 'Teacher Area',
     adminAccessDescription: 'Enter the teacher PIN to open Lesson Studio.',
@@ -266,11 +282,11 @@ const englishCopy: MenuCopy = {
     openAdmin: 'Open',
   },
   lessons: {
-    header: 'Chapters & Resources',
+    header: 'Chapters & Links',
     chapters: 'Chapters',
-    resources: 'Resources',
+    resources: 'Links',
     showChapters: 'Show chapters',
-    showResources: 'Show resources',
+    showResources: 'Show links',
     chapterSingular: 'chapter',
     chapterPlural: 'chapters',
     linkSingular: 'link',
@@ -329,7 +345,7 @@ const englishCopy: MenuCopy = {
     mixedPracticeTitle: 'Mixed practice',
     mixedPracticeSubtitle: '{count} lessons together',
     selectLessons: 'Select lessons',
-    cancelSelection: 'Cancel selection',
+    cancelSelection: 'Cancel',
     selectionCount: '{count} selected',
     startMixedPractice: 'Start mix',
     selectedMixTitle: 'Selected lessons',

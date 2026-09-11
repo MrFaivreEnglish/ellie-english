@@ -5,9 +5,9 @@ type SoundWaveIconProps = {
   color?: string;
 };
 
-// Duolingo-style "speaker + sound waves" glyph — a filled speaker body plus
-// two open arcs, rather than a speaker emoji (renders identically across
-// platforms/fonts and can take an arbitrary accent color).
+
+
+
 export default function SoundWaveIcon({ size = 20, color = '#4BBAF4' }: SoundWaveIconProps) {
   return (
     <Svg width={size} height={size} viewBox="0 0 24 24">

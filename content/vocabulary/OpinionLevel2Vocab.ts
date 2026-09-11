@@ -2,7 +2,7 @@ const OpinionLevel2Vocab = {
   id: '209',
   title: 'Opinion +',
   description: 'Expand your ability to express opinions with linking phrases and justifications',
-  imageUrl: 'https://i.ibb.co/jNHrhBy/Opinion-Level-2.webp',
+  imageUrl: 'https://wretggbpaejzjdilemit.supabase.co/storage/v1/object/public/lesson-images/15274719ab/opinion-plus.webp',
   thumbnail: require('../../assets/thumbnails/opinion-level-2-thumbnail.png'),
   flashcards: [
     { english: 'Perfect', french: 'Parfait' },
@@ -12,7 +12,7 @@ const OpinionLevel2Vocab = {
     { english: 'Breathtaking', french: 'À couper le souffle' },
     { english: 'Great', french: 'Génial' },
     { english: 'Extraordinary', french: 'Extraordinaire' },
-    { english: 'Awesome', french: 'Génial' },
+    { english: 'Awesome', french: 'Super' },
     { english: 'Nice', french: 'Sympa' },
     { english: 'Pleasant', french: 'Agréable' },
     { english: 'Interesting', french: 'Intéressant' },

@@ -2,7 +2,7 @@ const PresentSimpleGrammar = {
   id: '1',
   title: 'Present Simple',
   description: 'Learn how to use the present simple tense',
-  imageUrl: 'https://i.ibb.co/WNS3Tfgm/Present-simple.png',
+  imageUrl: 'https://wretggbpaejzjdilemit.supabase.co/storage/v1/object/public/lesson-images/15274719ab/present-simple.webp',
   textContent: {
     cards: [
       {

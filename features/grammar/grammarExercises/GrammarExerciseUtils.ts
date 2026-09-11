@@ -67,8 +67,7 @@ const NOUN_PHRASE_STARTERS = new Set([
 
 const stripEdgePunctuation = (value: string) => value.replace(/^[^\w']+|[^\w']+$/g, '');
 
-export const tokenizeTranslateAnswer = (answer: string) => {
-  const rawTokens = answer.trim().split(/\s+/).filter(Boolean);
+export const groupNounPhraseTokens = (rawTokens: string[]) => {
   const groupedTokens: string[] = [];
 
   for (let index = 0; index < rawTokens.length; index += 1) {
@@ -86,6 +85,9 @@ export const tokenizeTranslateAnswer = (answer: string) => {
 
   return groupedTokens;
 };
+
+export const tokenizeTranslateAnswer = (answer: string) =>
+  groupNounPhraseTokens(answer.trim().split(/\s+/).filter(Boolean));
 
 const buildTranslateWordBank = (exercise: Exercise) => {
   if (typeof exercise.answer !== 'string') return exercise.wordBank;
@@ -147,12 +149,12 @@ export const normalizeAnswer = (value: string) =>
     .replace(/\s+([.,!?;:])/g, '$1')
     .replace(/[.!?]+$/g, '');
 
-// Which word-bank chips (each possibly spanning multiple words, e.g. "to the
-// left") are actually needed to reconstruct the answer sentence, ignoring
-// distractor chips. Greedily matches the longest available chip at each
-// position in the answer so a multi-word chip isn't miscounted as several
-// single-word slots. Returns both the count and the matched chip text (the
-// text is used to reserve accurate layout space before anything is selected).
+
+
+
+
+
+
 export const matchAnswerChips = (answer: string, bankWords: string[]): { count: number; matchedWords: string[] } => {
   const answerWords = answer.trim().split(/\s+/).filter(Boolean);
   if (answerWords.length === 0) return { count: 0, matchedWords: [] };

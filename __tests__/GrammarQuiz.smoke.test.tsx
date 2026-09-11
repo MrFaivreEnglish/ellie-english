@@ -2,7 +2,7 @@ import { act, fireEvent, render, waitFor } from '@testing-library/react-native';
 
 jest.mock('../features/grammar/grammarProgressStorage', () => ({
   getGrammarLessonProgressKey: jest.fn(() => 'test-key'),
-  recordGrammarCorrectAnswer: jest.fn(() => Promise.resolve()),
+  recordGrammarCorrectAnswer: jest.fn(() => Promise.resolve('reviewed')),
   getGrammarProgressSummary: jest.fn(() => Promise.resolve({ totalCorrectAnswers: 0, lessonCount: 0, correctToday: 0 })),
 }));
 
@@ -21,6 +21,9 @@ jest.mock('../features/shared/soundEffects', () => ({
   BIG_SUCCESS_SOUND: null,
   SOUND_EFFECT_OPTIONS: {},
   SUCCESS_SOUND: null,
+  preloadSoundEffects: jest.fn(),
+  warmUpSoundEffect: jest.fn(),
+  replayPooledSoundEffect: jest.fn(),
   replaySoundEffect: jest.fn(),
 }));
 
@@ -28,13 +31,9 @@ jest.mock('../features/shared/useEnglishSpeech', () => ({
   useEnglishSpeech: () => ({ speak: jest.fn(), stop: jest.fn() }),
 }));
 
-jest.mock('../features/progress/LevelProgressSummary', () => {
-  const React = require('react');
-  const { View } = require('react-native');
-  return () => React.createElement(View, null);
-});
-
 import GrammarQuiz from '../features/grammar/GrammarQuiz';
+import { recordGrammarCorrectAnswer } from '../features/grammar/grammarProgressStorage';
+import { addXP } from '../features/progress/xpStorage';
 
 const mockLesson = {
   id: 'test-grammar',
@@ -54,6 +53,10 @@ const mockLesson = {
 };
 
 describe('GrammarQuiz', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+
   it('opens the selected practice mode directly from the lesson', async () => {
     const screen = render(
       <GrammarQuiz lesson={mockLesson} onBack={jest.fn()} backLabel="Back" />
@@ -71,8 +74,55 @@ describe('GrammarQuiz', () => {
     fireEvent.press(screen.getByLabelText('Open Translate'));
 
     await waitFor(() => {
-      expect(screen.getByLabelText('Back to lesson')).toBeTruthy();
-      expect(screen.getByLabelText('Switch to Translate').props.accessibilityState).toEqual({ selected: true });
+      expect(screen.getByLabelText('Close Translate').props.accessibilityState).toEqual({ selected: true });
+    });
+  });
+
+  it('records a correct answer and exposes its session XP feedback', async () => {
+    jest.mocked(recordGrammarCorrectAnswer).mockResolvedValueOnce('saved');
+    jest.mocked(addXP).mockResolvedValueOnce(10);
+    const screen = render(
+      <GrammarQuiz lesson={mockLesson} onBack={jest.fn()} backLabel="Back" />
+    );
+
+    await act(async () => {
+      await Promise.resolve();
+    });
+    fireEvent.press(screen.getByLabelText('Open Quiz'));
+    fireEvent.press(await screen.findByLabelText('an'));
+
+    expect(recordGrammarCorrectAnswer).toHaveBeenCalledWith(
+      'test-key',
+      'quiz:Choose the correct article: ___ apple.:an',
+    );
+
+    // The success-feedback card holds the answer for ~1.4s (see useGrammarFeedback) before
+    // dispatching FINISH_CORRECT_ANSWER, which completes the session — comfortably past
+    // waitFor's default timeout. Completing no longer banks the XP: that happens only when
+    // the student presses Claim on the end screen, so nothing is persisted here.
+    await waitFor(() => {
+      expect(addXP).not.toHaveBeenCalled();
+      expect(screen.getByText('+7 XP')).toBeTruthy();
+      expect(screen.getByText('Well done! 🎉')).toBeTruthy();
+    }, { timeout: 3000 });
+  });
+
+  it('keeps the answer flow usable while reporting an unsaved progress write', async () => {
+    jest.mocked(recordGrammarCorrectAnswer).mockResolvedValueOnce('unsaved');
+    const screen = render(
+      <GrammarQuiz lesson={mockLesson} onBack={jest.fn()} backLabel="Back" />
+    );
+
+    await act(async () => {
+      await Promise.resolve();
+    });
+    fireEvent.press(screen.getByLabelText('Open Quiz'));
+    fireEvent.press(await screen.findByLabelText('an'));
+
+    await waitFor(() => {
+      expect(screen.getByText('Progress not saved')).toBeTruthy();
+      expect(screen.getByText('Well done! 🎉')).toBeTruthy();
+      expect(addXP).not.toHaveBeenCalled();
     });
   });
 });
