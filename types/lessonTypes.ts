@@ -84,6 +84,8 @@ export interface VocabularyLesson {
   createdAt?: string;
   updatedAt?: string;
   isLearnedMix?: boolean;
+  // Built on the fly from Words to review (see features/vocabulary/wordReviewLesson.ts).
+  isWordReview?: boolean;
   isVocabularyMix?: boolean;
   useRefillMatching?: boolean;
   sourceLessonCount?: number;

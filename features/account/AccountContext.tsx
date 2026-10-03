@@ -1,6 +1,7 @@
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { AppState } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { bilingual } from '../shared/bilingual';
 import {
   AccountSession,
   clearAccountSession,
@@ -52,18 +53,19 @@ import {
 } from './accountPreferencesStorage';
 
 const GUEST_PROGRESS_SNAPSHOT_KEY = '@ellie_guest_progress_snapshot';
+const PREFERENCE_SYNC_DELAY_MS = 1000;
 
 const friendlyErrorMessage = (error: unknown): string => {
   const raw = error instanceof Error ? error.message : '';
   const lower = raw.toLowerCase();
-  if (lower.includes('invalid login credentials') || lower.includes('invalid credentials')) return 'Incorrect username or password.';
-  if (lower.includes('email not confirmed')) return 'Please confirm your email address before logging in.';
-  if (lower.includes('duplicate key') || lower.includes('already registered') || lower.includes('already exists')) return 'That username is already taken.';
-  if (lower.includes('user not found') || lower.includes('no user found')) return 'No account found with that username.';
-  if (lower.includes('failed to fetch') || lower.includes('network request failed') || lower.includes('networkerror')) return 'Connection failed. Check your internet and try again.';
-  if (lower.includes('jwt expired') || lower.includes('session expired')) return 'Your session has expired. Please log in again.';
-  if (lower.includes('password') && lower.includes('weak')) return 'Password is too weak. Use at least 6 characters.';
-  return raw || 'Something went wrong. Please try again.';
+  if (lower.includes('invalid login credentials') || lower.includes('invalid credentials')) return bilingual('Incorrect username or password.', 'Nom d’utilisateur ou mot de passe incorrect.');
+  if (lower.includes('email not confirmed')) return bilingual('Please confirm your email address before logging in.', 'Confirme ton adresse e-mail avant de te connecter.');
+  if (lower.includes('duplicate key') || lower.includes('already registered') || lower.includes('already exists')) return bilingual('That username is already taken.', 'Ce nom d’utilisateur est déjà pris.');
+  if (lower.includes('user not found') || lower.includes('no user found')) return bilingual('No account found with that username.', 'Aucun compte ne porte ce nom d’utilisateur.');
+  if (lower.includes('failed to fetch') || lower.includes('network request failed') || lower.includes('networkerror')) return bilingual('Connection failed. Check your internet and try again.', 'La connexion a échoué. Vérifie ton accès à Internet et réessaie.');
+  if (lower.includes('jwt expired') || lower.includes('session expired')) return bilingual('Your session has expired. Please log in again.', 'Ta session a expiré. Reconnecte-toi.');
+  if (lower.includes('password') && lower.includes('weak')) return bilingual('Password is too weak. Use at least 6 characters.', 'Mot de passe trop faible. Utilise au moins 6 caractères.');
+  return raw || bilingual('Something went wrong. Please try again.', 'Un problème est survenu. Réessaie.');
 };
 
 type AccountSyncStatus = 'local' | 'waiting' | 'syncing' | 'synced' | 'failed';
@@ -243,7 +245,7 @@ const AccountProviderInner = ({ children }: { children: React.ReactNode }) => {
     setSyncStatus(progressSyncFailed ? 'failed' : 'synced');
 
     if (progressSyncFailed) {
-      setError('Some work could not be saved online. Tap Try again.');
+      setError(bilingual('Some work could not be saved online. Tap Retry.', 'Une partie de ton travail n’a pas pu être sauvegardée en ligne. Appuie sur « Retry ».'));
     }
   }, [applyAccountPreferences, updateShinyEllieProgress]);
 
@@ -377,20 +379,40 @@ const AccountProviderInner = ({ children }: { children: React.ReactNode }) => {
       });
   }, [mergeSessionWithLocalXP, runWithSyncState, session]);
 
+  const preferenceSyncTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Students tap through several avatars and colours in a row, and each tap used to start
+  // its own upload, so an early pick could land online after a later one. Waiting until
+  // they stop sends one upload with the final choice. Nothing is lost if the app closes
+  // inside the wait: going to the background runs autoSyncQuietly, which uploads
+  // preferences too.
   const syncPreferencesQuietly = useCallback(() => {
     if (!session) return;
 
-    syncAccountPreferencesToCloudIfSignedIn()
-      .then(() => {
-        setLastSyncAt(new Date());
-        setSyncStatus('synced');
-        setError('');
-      })
-      .catch(() => {
-        setSyncStatus('failed');
-        setError('Profile changes are saved on this device. Tap Retry to save them online.');
-      });
+    if (preferenceSyncTimerRef.current) clearTimeout(preferenceSyncTimerRef.current);
+    preferenceSyncTimerRef.current = setTimeout(() => {
+      preferenceSyncTimerRef.current = null;
+      syncAccountPreferencesToCloudIfSignedIn()
+        .then(() => {
+          setLastSyncAt(new Date());
+          setSyncStatus('synced');
+          setError('');
+        })
+        .catch(() => {
+          setSyncStatus('failed');
+          setError(bilingual('Profile changes are saved on this device. Tap Retry to save them online.', 'Tes changements de profil sont enregistrés sur cet appareil. Appuie sur « Retry » pour les sauvegarder en ligne.'));
+        });
+    }, PREFERENCE_SYNC_DELAY_MS);
   }, [session]);
+
+  const sessionUserId = session?.user.id;
+  useEffect(() => () => {
+    // A pending upload belongs to the account that scheduled it; drop it on sign-out or switch.
+    if (preferenceSyncTimerRef.current) {
+      clearTimeout(preferenceSyncTimerRef.current);
+      preferenceSyncTimerRef.current = null;
+    }
+  }, [sessionUserId]);
 
   const autoSyncInFlightRef = useRef(false);
 

@@ -6,7 +6,7 @@ const GettingAJobVocab = {
   thumbnail: require('../../assets/thumbnails/getting-a-job-thumbnail.png'),
   flashcards: [
     {
-      category: 'Personal Qualities & Skills 💼',
+      category: 'Qualities 💼',
       words: [
         { english: 'Great at...', french: 'Fort en...' },
         { english: 'Clever', french: 'Malin' },
@@ -34,7 +34,7 @@ const GettingAJobVocab = {
       ]
     },
     {
-      category: 'Job related vocabulary 📄',
+      category: 'Specific vocabulary 📄',
       words: [
         { english: 'A job', french: 'Un emploi' },
         { english: 'Work', french: 'Le travail' },

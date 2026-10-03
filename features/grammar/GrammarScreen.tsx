@@ -10,6 +10,7 @@ import type { TabParamList, RootStackParamList } from '../../types/navigationTyp
 import type { GrammarLesson, VocabularyLesson } from '../../types/lessonTypes';
 import { getSerializableVocabularyLesson } from '../vocabulary/vocabularyUtils';
 import { DesktopTypographyProvider } from '../shared/DesktopTypography';
+import { markLessonHighlightSeen } from '../shared/lessonHighlights';
 
 type GrammarScreenProps = CompositeScreenProps<
   BottomTabScreenProps<TabParamList, 'Grammar'>,
@@ -31,6 +32,8 @@ const GrammarScreen = ({ route, navigation }: GrammarScreenProps) => {
   const [selectedLessonBack, setSelectedLessonBack] = useState<SelectedLessonBack>(defaultLessonBack);
 
   const openVocabularyPracticeLesson = useCallback((lesson: VocabularyLesson, back: SelectedLessonBack) => {
+    // Listed under Grammar, so its badge lives in the grammar section.
+    markLessonHighlightSeen('grammar', lesson);
     navigation.navigate('Vocabulary', {
       screen: 'VocabularyLesson',
       params: {
@@ -72,6 +75,10 @@ const GrammarScreen = ({ route, navigation }: GrammarScreenProps) => {
     setSelectedLessonBack(defaultLessonBack);
     setSelectedLesson(lesson);
   }, [openVocabularyPracticeLesson, commonCopy.backToGrammar, defaultLessonBack]);
+
+  useEffect(() => {
+    markLessonHighlightSeen('grammar', selectedLesson);
+  }, [selectedLesson]);
 
   const handleQuizBack = useCallback(() => {
     const backTarget = selectedLessonBack.target;

@@ -1,7 +1,7 @@
 const BeVerbGrammar = {
   id: '43',
   title: 'Le verbe BE',
-  description: 'Present and past forms of the verb to be: am/is/are, was/were',
+  description: 'Le verbe "to be" au présent : am / is / are.',
   imageUrl: 'https://wretggbpaejzjdilemit.supabase.co/storage/v1/object/public/lesson-images/15274719ab/le-verbe-be.webp',
   textContent: {
     cards: [

@@ -268,6 +268,22 @@ export const getGrammarLessonKeysPracticedToday = async (): Promise<Set<string>>
   }
 };
 
+// Only today's set is ever read (today's count and lessons practised today); past days
+// were never deleted, so each practice day left one behind for good.
+export const pruneOldGrammarDays = async () => {
+  try {
+    const currentDayKey = todayKey(GRAMMAR_PROGRESS_TODAY_PREFIX);
+    const allKeys = await AsyncStorage.getAllKeys();
+    const pastDayKeys = allKeys.filter(
+      (key) => key.startsWith(`${GRAMMAR_PROGRESS_TODAY_PREFIX}:`) && key !== currentDayKey
+    );
+
+    if (pastDayKeys.length > 0) {
+      await AsyncStorage.multiRemove(pastDayKeys);
+    }
+  } catch {}
+};
+
 export const clearGrammarProgress = async () => {
   try {
     const allKeys = await AsyncStorage.getAllKeys();

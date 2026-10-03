@@ -2,7 +2,7 @@ const NationalityVocab = {
   id: '301',
   title: 'Nationality',
   description: 'Basic nationalities and countries',
-  imageUrl: 'https://wretggbpaejzjdilemit.supabase.co/storage/v1/object/public/lesson-images/15274719ab/nationality.webp',
+  imageUrl: 'https://wretggbpaejzjdilemit.supabase.co/storage/v1/object/public/lesson-images/15274719ab/nationality.webp?v=2',
   thumbnail: require('../../assets/thumbnails/nationality-thumbnail.png'),
   flashcards: [
     { "english": "British", "french": "Britannique" },

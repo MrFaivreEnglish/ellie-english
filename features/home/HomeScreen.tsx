@@ -78,6 +78,8 @@ import { useTheme } from '../settings/ThemeContext';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { exitImmersiveOpaque } from '../../lib/immersive';
 import { getStreak, type StreakData } from '../progress/streakStorage';
+import { getDueReviewWords, type ReviewWord } from '../vocabulary/reviewWordsStorage';
+import { openWordReview } from '../vocabulary/wordReviewLesson';
 import { getLearnedFlashcardSummary } from '../vocabulary/flashcardProgressStorage';
 import { getGrammarProgressSummary } from '../grammar/grammarProgressStorage';
 import { getMenuCopy } from '../shared/menuCopy';
@@ -109,6 +111,8 @@ import {
 import { getAndroidBottomBarButtonStyle, getAndroidBottomBarColor } from '../shared/appChromeColors';
 import { getDesktopContentMaxWidth, getDesktopTypographyScale, isDesktopWebWidth } from '../shared/responsiveLayout';
 import { DesktopTypographyProvider } from '../shared/DesktopTypography';
+import LessonHighlightBadge from '../shared/LessonHighlightBadge';
+import { getSectionHighlightKind, useSeenLessonHighlights, type LessonHighlightKind } from '../shared/lessonHighlights';
 
 type MaterialIconName = React.ComponentProps<typeof MaterialIcons>['name'];
 const GRAMMAR_ICON_SOURCE = require('../../assets/navigation/grammar.png');
@@ -219,6 +223,13 @@ export default function HomeScreen() {
   const homeMenuTextColor = isShinyElliePresentationMode ? SHINY_HOME_MENU_TEXT_COLOR : HOME_MENU_TEXT_COLOR;
   const todayCardColors = isShinyElliePresentationMode ? TODAY_CARD_COLORS.shiny : TODAY_CARD_COLORS.normal;
   const continueCardPress = useSpringPress();
+  const reviewCardPress = useSpringPress();
+  const [dueReviewWords, setDueReviewWords] = React.useState<ReviewWord[]>([]);
+  const seenLessonHighlights = useSeenLessonHighlights();
+  const tileHighlights: Record<string, LessonHighlightKind | undefined> = {
+    Grammar: getSectionHighlightKind('grammar', seenLessonHighlights),
+    Vocabulary: getSectionHighlightKind('vocabulary', seenLessonHighlights),
+  };
   const localizedCategories = React.useMemo(() => [
     {
       title: copy.grammarTitle,
@@ -302,6 +313,10 @@ export default function HomeScreen() {
       getStreak().then((s) => {
         if (!active) return;
         setStreak(s);
+      }).catch(() => {});
+      getDueReviewWords().then((words) => {
+        if (!active) return;
+        setDueReviewWords(words);
       }).catch(() => {});
 
       if (!isTodayCardEnabled) {
@@ -517,6 +532,46 @@ export default function HomeScreen() {
         </View>
       )}
 
+      {/* Mistakes from typing, due for review today. Above "Continue" because this is the
+          practice that most helps words stick. */}
+      {dueReviewWords.length > 0 && (
+        <Animated.View style={reviewCardPress.animatedStyle}>
+          <TouchableOpacity
+            style={[
+              styles.continueCard,
+              isScaledWeb && styles.continueCardDesktop,
+              isScaledWeb && {
+                minHeight: Math.round(100 * desktopScale),
+                paddingHorizontal: Math.round(20 * desktopScale),
+                paddingVertical: Math.round(16 * desktopScale),
+              },
+              { backgroundColor: colors.card },
+              getSoftShadow(isDarkMode, 'soft', colors.shadow, colors.visualStyle === 'pixel'),
+              pixelSurfaceStyle,
+            ]}
+            onPress={() => openWordReview(navigation, dueReviewWords)}
+            onPressIn={reviewCardPress.onPressIn}
+            onPressOut={reviewCardPress.onPressOut}
+            accessibilityRole="button"
+            accessibilityLabel={`Review ${dueReviewWords.length} ${dueReviewWords.length === 1 ? 'word' : 'words'}`}
+          >
+            <View style={[styles.continueIcon, isScaledWeb && { width: Math.round(48 * desktopScale), height: Math.round(48 * desktopScale) }, { backgroundColor: isDarkMode ? studySurface.control : '#FFF1D6', borderColor: isDarkMode ? colors.border : 'transparent' }]}>
+              <MaterialIcons name="replay" size={isScaledWeb ? Math.round(28 * desktopScale) : 24} color={colors.warning} />
+            </View>
+            <View style={styles.continueCopy}>
+              <Text style={[styles.continueLabel, isScaledWeb && styles.continueLabelDesktop, { color: colors.warning }]}>Words to review</Text>
+              <Text style={[styles.continueTitle, isScaledWeb && styles.continueTitleDesktop, { color: colors.text }]} numberOfLines={1}>
+                {dueReviewWords.length === 1 ? '1 word is ready' : `${dueReviewWords.length} words are ready`}
+              </Text>
+              <Text style={[styles.continueMeta, isScaledWeb && styles.continueMetaDesktop, { color: colors.secondaryText }]}>
+                From your typing mistakes
+              </Text>
+            </View>
+            <MaterialIcons name="arrow-forward" size={isScaledWeb ? Math.round(24 * desktopScale) : 24} color={colors.secondaryText} />
+          </TouchableOpacity>
+        </Animated.View>
+      )}
+
       {continueLessonTarget && (
         <Animated.View style={continueCardPress.animatedStyle}>
           <TouchableOpacity
@@ -651,6 +706,7 @@ export default function HomeScreen() {
               >
                 {category.description}
               </Text>
+              {!!tileHighlights[category.route] && <LessonHighlightBadge kind={tileHighlights[category.route]!} />}
             </Pressable>
           </Animated.View>
         ))}

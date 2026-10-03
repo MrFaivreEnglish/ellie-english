@@ -1,4 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { Platform } from 'react-native';
+import { toast } from 'sonner-native';
 
 
 
@@ -39,10 +41,27 @@ const scoreVoice = (voice: import('expo-speech').Voice) => {
 
 
 
+// Once per app session is enough to explain it; the student may not be able to fix it.
+let hasShownMissingVoiceTip = false;
+
+const showMissingVoiceTipOnce = () => {
+  if (hasShownMissingVoiceTip) return;
+  hasShownMissingVoiceTip = true;
+  // English as the title, French as the toast's lighter description line.
+  toast(
+    "No English voice on this phone, so words may be read with a French accent. Add one in your phone's text-to-speech settings.",
+    {
+      description: 'Pas de voix anglaise sur ce téléphone : les mots risquent d’être lus avec un accent français. Ajoute-en une dans les réglages de synthèse vocale du téléphone.',
+      duration: 10000,
+    }
+  );
+};
+
 export function useEnglishSpeech() {
   const [preferredVoice, setPreferredVoice] = useState<string | undefined>(undefined);
   const [isSpeaking, setIsSpeaking] = useState(false);
   const preferredVoiceRef = useRef<string | undefined>(undefined);
+  const hasNoEnglishVoiceRef = useRef(false);
 
   useEffect(() => {
     let mounted = true;
@@ -58,6 +77,9 @@ export function useEnglishSpeech() {
 
         preferredVoiceRef.current = bestVoice?.identifier;
         setPreferredVoice(bestVoice?.identifier);
+        // Only when the phone lists voices and none is English. An empty list can just
+        // mean Android's speech engine hasn't started yet, and browsers load voices late.
+        hasNoEnglishVoiceRef.current = Platform.OS !== 'web' && voices.length > 0 && !bestVoice;
       })
       .catch(() => {
         if (mounted) setPreferredVoice(undefined);
@@ -77,6 +99,8 @@ export function useEnglishSpeech() {
   const speak = useCallback((text?: string | null, options?: SpeakOptions) => {
     const trimmed = text?.trim();
     if (!trimmed) return;
+
+    if (hasNoEnglishVoiceRef.current) showMissingVoiceTipOnce();
 
     Speech?.stop();
     setIsSpeaking(true);

@@ -5,21 +5,12 @@ const ActivityVocab = {
   thumbnail: require('../../assets/thumbnails/activities-thumbnail.png'),
   flashcards: [
     {
-      category: 'Sports & Fitness 🏃‍♂️',
+      category: 'Hobbies 🎨',
       words: [
         { english: 'To play football', french: 'Jouer au football' },
         { english: 'To do sports', french: 'Faire du sport' },
-        { english: 'To do karate', french: 'Faire du karaté' },
-        { english: 'To surf', french: 'Surfer' },
-        { english: 'To skate', french: 'Faire du skate' },
-        { english: 'To swim', french: 'Nager' },
-        { english: 'To ice skate', french: 'Faire du patin à glace' }
-      ]
-    },
-    {
-      category: 'Arts & Media 🎨',
-      words: [
         { english: 'To dance', french: 'Danser' },
+        { english: 'To do karate', french: 'Faire du karaté' },
         { english: 'To draw', french: 'Dessiner' },
         { english: 'To take photos', french: 'Prendre des photos' },
         { english: 'To shoot a video', french: 'Tourner une vidéo' },
@@ -27,27 +18,26 @@ const ActivityVocab = {
         { english: 'To watch films', french: 'Regarder des films' },
         { english: 'To listen to music', french: 'Écouter de la musique' },
         { english: 'To sing', french: 'Chanter' },
-        { english: 'To look at paintings', french: 'Regarder des peintures' }
-      ]
-    },
-    {
-      category: 'Food & Leisure 🍽️',
-      words: [
         { english: 'To eat', french: 'Manger' },
         { english: 'To go to the restaurant', french: 'Aller au restaurant' },
-        { english: 'To have a barbecue', french: 'Faire un barbecue' },
         { english: 'To shop', french: 'Faire du shopping' },
         { english: 'To hang out with friends', french: 'Sortir avec des amis' }
       ]
     },
     {
-      category: 'Travel & Outdoors ✈️',
+      category: 'On holidays ✈️',
       words: [
         { english: 'To take the plane', french: "Prendre l'avion" },
         { english: 'To go to the beach', french: 'Aller à la plage' },
         { english: 'To visit', french: 'Visiter' },
         { english: 'To travel', french: 'Voyager' },
-        { english: 'To take a walk', french: 'Faire une promenade' }
+        { english: 'To take a walk', french: 'Faire une promenade' },
+        { english: 'To look at paintings', french: 'Regarder des peintures' },
+        { english: 'To surf', french: 'Surfer' },
+        { english: 'To skate', french: 'Faire du skate' },
+        { english: 'To swim', french: 'Nager' },
+        { english: 'To ice skate', french: 'Faire du patin à glace' },
+        { english: 'To have a barbecue', french: 'Faire un barbecue' }
       ]
     }
   ]

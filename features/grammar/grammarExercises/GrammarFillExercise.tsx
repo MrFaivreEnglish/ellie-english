@@ -219,6 +219,8 @@ const GrammarFillExercise: React.FC<GrammarFillExerciseProps> = ({
   const clearButton = canClear && (
     <TouchableOpacity
       onPress={handleClear}
+      accessibilityRole="button"
+      accessibilityLabel="Clear answer"
       style={[
         styles.clearInputButton,
 
@@ -283,6 +285,7 @@ const GrammarFillExercise: React.FC<GrammarFillExerciseProps> = ({
         >
           <Pressable
             onPress={handleInputPress}
+            accessible={false}
             style={[
               styles.inputShell,
               styles.inputShellDesktopWeb,
@@ -335,6 +338,8 @@ const GrammarFillExercise: React.FC<GrammarFillExerciseProps> = ({
           <TouchableOpacity
             onPress={handleSubmit}
             disabled={disabled}
+            accessibilityRole="button"
+            accessibilityState={{ disabled }}
             style={[
               styles.checkAnswerButton,
               styles.checkAnswerButtonDesktopWeb,
@@ -424,6 +429,7 @@ const GrammarFillExercise: React.FC<GrammarFillExerciseProps> = ({
         >
           <Pressable
             onPress={handleInputPress}
+            accessible={false}
             style={[
               styles.inputShell,
               { height: inputHeight },
@@ -458,6 +464,8 @@ const GrammarFillExercise: React.FC<GrammarFillExerciseProps> = ({
           <TouchableOpacity
             onPress={handleSubmit}
             disabled={disabled}
+            accessibilityRole="button"
+            accessibilityState={{ disabled }}
             style={[
               styles.checkAnswerButton,
               { height: buttonHeight, minHeight: buttonHeight, marginTop: buttonMarginTop },

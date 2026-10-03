@@ -9,10 +9,12 @@ export const sixthGradeChapters: ChapterCategory = {
       title: "Chapter 0 : Welcome to the English Class",
       url: 'https://digipad.app/p/1212467/6b87b8ceeec43',
       appLinks: [
-        { label: 'Classroom English', target: 'vocabulary', lessonTitle: 'Classroom English' },
-        { label: 'Instructions', target: 'vocabulary', lessonTitle: 'Instructions' },
-        { label: 'Ask for help', target: 'pronunciation', lessonTitle: 'Ask for help' },
         { label: 'Weather', target: 'vocabulary', lessonTitle: 'Weather' },
+        { label: 'Date', target: 'vocabulary', lessonTitle: 'Date' },
+        { label: 'Numbers', target: 'vocabulary', lessonTitle: 'Numbers' },
+        { label: 'Emotions', target: 'vocabulary', lessonTitle: 'Emotions' },
+        { label: 'Be au présent', target: 'grammar', lessonTitle: 'Le verbe BE' },
+        { label: 'Ask for help', target: 'pronunciation', lessonTitle: 'Ask for help' },
       ],
     },
     {

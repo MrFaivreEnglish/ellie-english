@@ -6,7 +6,7 @@ const ExtremeSportsVocab = {
   thumbnail: require('../../assets/thumbnails/extreme-sports-thumbnail.png'),
   flashcards: [
     {
-      category: 'Water Sports 🌊',
+      category: 'In the water 🌊',
       words: [
         { english: '(to) surf', french: 'Surfer' },
         { english: '(to) kayak', french: 'Faire du kayak' },
@@ -15,7 +15,7 @@ const ExtremeSportsVocab = {
       ]
     },
     {
-      category: 'Air & Heights 🪂',
+      category: 'In the air 🪂',
       words: [
         { english: '(to) sky dive', french: 'Faire du parachutisme' },
         { english: '(to) paraglide', french: 'Faire du parapente' },
@@ -24,7 +24,7 @@ const ExtremeSportsVocab = {
       ]
     },
     {
-      category: 'Land & Outdoor 🧗',
+      category: 'On land 🧗',
       words: [
         { english: '(to) ski', french: 'Faire du ski' },
         { english: '(to) cave', french: 'Faire de la spéléologie' },

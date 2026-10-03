@@ -98,8 +98,12 @@ export default function FirstVisitModal({ visible, onDismiss, onSetupAccount }: 
       hardwareAccelerated
       onRequestClose={onDismiss}
     >
-      <Pressable style={styles.backdrop} onPress={onDismiss}>
+      {/* Pressables are accessible by default, which made screen readers treat the whole
+          modal as one element and never reach the buttons inside. "Passer" and Android's
+          back button still close it. */}
+      <Pressable style={styles.backdrop} onPress={onDismiss} accessible={false}>
         <Pressable
+          accessible={false}
           style={[
             styles.sheet,
             desktopScale > 1 && {
@@ -132,7 +136,14 @@ export default function FirstVisitModal({ visible, onDismiss, onSetupAccount }: 
 
           <View style={styles.dots}>
             {SLIDES.map((_s, i) => (
-              <Pressable key={i} onPress={() => goToSlide(i)} hitSlop={10}>
+              <Pressable
+                key={i}
+                onPress={() => goToSlide(i)}
+                hitSlop={10}
+                accessibilityRole="button"
+                accessibilityLabel={`Page ${i + 1} sur ${SLIDES.length}`}
+                accessibilityState={{ selected: i === slide }}
+              >
                 <View
                   style={[
                     styles.dot,
@@ -152,17 +163,18 @@ export default function FirstVisitModal({ visible, onDismiss, onSetupAccount }: 
               { backgroundColor: isLast ? current.color : colors.primary, opacity: pressed ? 0.85 : 1 },
             ]}
             onPress={handleNext}
+            accessibilityRole="button"
           >
             <Text style={styles.buttonText}>{isLast ? "C'est parti !" : 'Suivant'}</Text>
             {!isLast && <MaterialIcons name="arrow-forward" size={Math.round(18 * desktopScale)} color="#fff" />}
           </Pressable>
 
           {isLast ? (
-            <Pressable onPress={handleSetupAccount} hitSlop={12} style={styles.secondaryWrap}>
+            <Pressable onPress={handleSetupAccount} hitSlop={12} style={styles.secondaryWrap} accessibilityRole="button">
               <Text style={[styles.secondaryText, { color: colors.primary }]}>Créer un compte →</Text>
             </Pressable>
           ) : (
-            <Pressable onPress={onDismiss} hitSlop={12} style={styles.secondaryWrap}>
+            <Pressable onPress={onDismiss} hitSlop={12} style={styles.secondaryWrap} accessibilityRole="button">
               <Text style={[styles.secondaryText, { color: colors.secondaryText }]}>Passer</Text>
             </Pressable>
           )}
@@ -189,7 +201,7 @@ const styles = StyleSheet.create({
     paddingBottom: 24,
     paddingHorizontal: 28,
     alignItems: 'center',
-    boxShadow: '0px 10px 24px rgba(0,0,0,0.22)',
+    boxShadow: '0px 10px 24px rgba(0,0,0,0.22)',
   },
   slideContent: {
     alignItems: 'center',

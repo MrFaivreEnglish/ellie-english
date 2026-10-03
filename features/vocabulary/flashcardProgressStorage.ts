@@ -8,6 +8,9 @@ import { recordPracticeToday } from '../progress/streakStorage';
 
 const LEARNED_FLASHCARDS_PREFIX = '@learned_flashcards';
 const LEARNED_FLASHCARDS_TODAY_PREFIX = '@learned_flashcards_today';
+// Past days' "learned today" sets, folded into one { activityKey: latest date } map so they
+// stop piling up as one record per practice day. See condenseOldLearnedFlashcardDays.
+export const LEARNED_FLASHCARDS_RECENCY_KEY = '@learned_flashcards_recency';
 
 export type LearnedFlashcardSummary = {
   totalLearned: number;
@@ -126,29 +129,72 @@ export const getLearnedFlashcardKeysByLesson = async (): Promise<Map<string, Set
 
 
 
+const parseRecencyMap = (raw: string | null) => {
+  const recency = new Map<string, string>();
+
+  try {
+    const parsed = raw ? JSON.parse(raw) : null;
+    if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+      Object.entries(parsed).forEach(([activityKey, dateKey]) => {
+        if (typeof dateKey === 'string') recency.set(activityKey, dateKey);
+      });
+    }
+  } catch {}
+
+  return recency;
+};
+
+// Reads the condensed map plus every remaining per-day set, keeping the latest date per word.
+const readRecencyByActivityKey = async (dayStorageKeys: string[]) => {
+  const [condensedRaw, dayEntries] = await Promise.all([
+    AsyncStorage.getItem(LEARNED_FLASHCARDS_RECENCY_KEY),
+    AsyncStorage.multiGet(dayStorageKeys),
+  ]);
+  const recencyByActivityKey = parseRecencyMap(condensedRaw);
+
+  dayEntries.forEach(([storageKey, raw]) => {
+    const dateKey = storageKey.replace(`${LEARNED_FLASHCARDS_TODAY_PREFIX}:`, '');
+    const activityKeys = parseStringSet(raw);
+
+    activityKeys.forEach((activityKey) => {
+      const existing = recencyByActivityKey.get(activityKey);
+      if (!existing || dateKey > existing) {
+        recencyByActivityKey.set(activityKey, dateKey);
+      }
+    });
+  });
+
+  return recencyByActivityKey;
+};
+
 export const getLearnedFlashcardRecencyByActivityKey = async (): Promise<Map<string, string>> => {
   try {
     const allKeys = await AsyncStorage.getAllKeys();
-    const todayStorageKeys = allKeys.filter((key) => key.startsWith(`${LEARNED_FLASHCARDS_TODAY_PREFIX}:`));
-    const entries = await AsyncStorage.multiGet(todayStorageKeys);
-    const recencyByActivityKey = new Map<string, string>();
-
-    entries.forEach(([storageKey, raw]) => {
-      const dateKey = storageKey.replace(`${LEARNED_FLASHCARDS_TODAY_PREFIX}:`, '');
-      const activityKeys = parseStringSet(raw);
-
-      activityKeys.forEach((activityKey) => {
-        const existing = recencyByActivityKey.get(activityKey);
-        if (!existing || dateKey > existing) {
-          recencyByActivityKey.set(activityKey, dateKey);
-        }
-      });
-    });
-
-    return recencyByActivityKey;
+    const dayStorageKeys = allKeys.filter((key) => key.startsWith(`${LEARNED_FLASHCARDS_TODAY_PREFIX}:`));
+    return await readRecencyByActivityKey(dayStorageKeys);
   } catch {
     return new Map<string, string>();
   }
+};
+
+/**
+ * Folds every past day's "learned today" set into the single recency map, then deletes
+ * those day records. Today's set stays, since it also drives today's count. The map is
+ * written before anything is removed, so an interruption only leaves a harmless duplicate.
+ */
+export const condenseOldLearnedFlashcardDays = async () => {
+  try {
+    const currentDayKey = todayKey(LEARNED_FLASHCARDS_TODAY_PREFIX);
+    const allKeys = await AsyncStorage.getAllKeys();
+    const pastDayKeys = allKeys.filter(
+      (key) => key.startsWith(`${LEARNED_FLASHCARDS_TODAY_PREFIX}:`) && key !== currentDayKey
+    );
+    if (pastDayKeys.length === 0) return;
+
+    const recency = await readRecencyByActivityKey(pastDayKeys);
+    await AsyncStorage.setItem(LEARNED_FLASHCARDS_RECENCY_KEY, JSON.stringify(Object.fromEntries(recency)));
+    await AsyncStorage.multiRemove(pastDayKeys);
+  } catch {}
 };
 
 export const saveLearnedFlashcardKeys = async (lessonKey: string, keys: Set<string>) => {
@@ -286,7 +332,8 @@ export const clearLearnedFlashcardProgress = async () => {
     const progressKeys = allKeys.filter(
       (key) =>
         key.startsWith(`${LEARNED_FLASHCARDS_PREFIX}:`) ||
-        key.startsWith(`${LEARNED_FLASHCARDS_TODAY_PREFIX}:`)
+        key.startsWith(`${LEARNED_FLASHCARDS_TODAY_PREFIX}:`) ||
+        key === LEARNED_FLASHCARDS_RECENCY_KEY
     );
 
     if (progressKeys.length > 0) {

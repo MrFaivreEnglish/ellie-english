@@ -19,68 +19,6 @@ const cleanLessonTitle = (title: string) => title.replace(/\s*\d+/, '').trim();
 
 const DEFAULT_LESSON_IMAGE_URL = 'https://wretggbpaejzjdilemit.supabase.co/storage/v1/object/public/lesson-images/15274719ab/_default.png';
 
-const REMOTE_LESSON_IMAGE_MAP: Record<string, string> = {
-  'Breakfast': 'https://i.ibb.co/ccHn7jd6/Breakfast-vocab-full-1.png',
-  'School Life': 'https://i.ibb.co/bgbqVH2x/School-lvl-2-1.png',
-  'Activities': 'https://i.ibb.co/84QWpWQP/Activities-vocab-1.png',
-  'Classroom English': 'https://i.ibb.co/p6sZrdq5/Classroom-English-1.png',
-  'Animals': 'https://i.ibb.co/XZ31xVNX/Animals-1.png',
-  'Bullying': 'https://i.ibb.co/hxZ10K6L/Bullying-1.png',
-  'Cinema': 'https://i.ibb.co/Z6zDCY6j/cinema-1.png',
-  'City Travel': 'https://i.ibb.co/YT4vs9wz/City-Travel-vocab-1.png',
-  'Clothes': 'https://i.ibb.co/ZRyWgvpd/clothes-vocab-1.png',
-  'Detective': 'https://i.ibb.co/DPMqZP1s/detective-vocab.png',
-  'Dystopia': 'https://wretggbpaejzjdilemit.supabase.co/storage/v1/object/public/lesson-images/15274719ab/dystopia.webp',
-  'Emotions': 'https://i.ibb.co/2Y6s2xj9/emotions.png',
-  'Emotions +': 'https://wretggbpaejzjdilemit.supabase.co/storage/v1/object/public/lesson-images/15274719ab/emotions-plus.webp',
-  'Emotions Plus': 'https://wretggbpaejzjdilemit.supabase.co/storage/v1/object/public/lesson-images/15274719ab/emotions-plus.webp',
-  'More Emotions': 'https://wretggbpaejzjdilemit.supabase.co/storage/v1/object/public/lesson-images/15274719ab/emotions-plus.webp',
-
-  'Legends': 'https://i.ibb.co/MxL8yr1M/Legends-1.png',
-  'American Dishes': 'https://i.ibb.co/G4XBTJqc/American-dishes-1.png',
-  'Furniture': 'https://i.ibb.co/GQcCgKJP/Furniture-1.png',
-  'Geography': 'https://i.ibb.co/9kYG43Mb/Geography-1.png',
-  'Internet': 'https://i.ibb.co/FkY9x5xz/internet-vocab-1.png',
-  'Jobs': 'https://i.ibb.co/7xxYM1RG/Getting-a-job-1.png',
-  'Opinion': 'https://i.ibb.co/vKCrpvZ/Opinion-Vocabulary-Level-1-1.png',
-  'Physical Description': 'https://i.ibb.co/GvT9F0C5/physical-description-1.png',
-  'Question Words': 'https://i.ibb.co/wZHLqrft/Question-Words.png',
-  'The UK': 'https://i.ibb.co/LhbXVsBd/The-United-Kingdom-and-Ireland.png',
-  'Video Games': 'https://i.ibb.co/dwrBYJ6w/Video-games-1.png',
-  'Love': 'https://i.ibb.co/bj4j7Z1M/Love-1.png',
-  'Robots': 'https://i.ibb.co/LDCw0bfw/Robots-1.png',
-  'Body': 'https://i.ibb.co/G3tT2nRx/Body-1.png',
-  'Ecology': 'https://i.ibb.co/Rp03r932/Ecology-1.png',
-  'Video game actions / Superpowers': 'https://i.ibb.co/JWkDKwqh/vocabulary-superpowers.png',
-  'Space': 'https://i.ibb.co/pjrn98PB/Space-1.png',
-  'Food Basics': 'https://i.ibb.co/ZRJb70VG/Food-basics-1.png',
-  'Frequency Adverbs': 'https://wretggbpaejzjdilemit.supabase.co/storage/v1/object/public/lesson-images/15274719ab/frequency-adverbs.png',
-  'School Basics': 'https://i.ibb.co/QjH4wXwB/School-basics-1.png',
-  'Instructions': 'https://i.ibb.co/yFRkjChy/Instructions-1.png',
-  'Colours': 'https://i.ibb.co/SD63ymQ6/Colours-21-x-29-7-cm-1.png',
-  'Nationality': 'https://i.ibb.co/3m3S215g/nationality-1.png',
-  'Personality (Easy)': 'https://i.ibb.co/jvksTHBV/personality-Level-1-1.png',
-  'Opinion (Easy)': 'https://i.ibb.co/vKCrpvZ/Opinion-Vocabulary-Level-1-1.png',
-  'Emotions (Easy)': 'https://i.ibb.co/jvsJNkT7/emotions-level-1-1.png',
-  'Daily Routine': 'https://i.ibb.co/WbXV0WN/daily-routine-1.png',
-  'Date': 'https://i.ibb.co/svMJrpHK/date-vocab-1.png',
-  'House': 'https://i.ibb.co/fzKsmjj1/House-1.png',
-  'Describing a picture': 'https://i.ibb.co/1YgLG27F/Describing-a-picture.png',
-  'Location': 'https://i.ibb.co/h5Nz2XP/Location-1.png',
-  'Time': 'https://i.ibb.co/LdCCZ0Px/Time.png',
-  'Family': 'https://i.ibb.co/vCMp3b90/Family-Vocab.png',
-  'Video Game Actions': 'https://i.ibb.co/NgCRZLJP/video-game-actions.png',
-  'Daily Questions': 'https://i.ibb.co/PZ16zHh2/Daily-questions-1.png',
-  'Alphabet': 'https://i.ibb.co/Y7Bqg8LK/alphabet-1.png',
-  'Superpowers': 'https://i.ibb.co/JWkDKwqh/vocabulary-superpowers.png',
-  Camelot: 'https://i.ibb.co/whw9Gx7S/fiche-vocabulaire-camelot-v2.png',
-  'The Blitz': 'https://i.ibb.co/wZCFydXd/Blitz-1.png',
-};
-
-const NORMALIZED_REMOTE_LESSON_IMAGE_MAP: Record<string, string> = {};
-Object.keys(REMOTE_LESSON_IMAGE_MAP).forEach(k => {
-  NORMALIZED_REMOTE_LESSON_IMAGE_MAP[normalizeKey(k)] = REMOTE_LESSON_IMAGE_MAP[k];
-});
 
 export const shuffleArray = <T,>(array: T[], random: () => number = Math.random): T[] => {
   const shuffled = [...array];
@@ -151,13 +89,11 @@ export const shuffleMatchingPairColumns = <T,>(
   return { left, right: bestRight };
 };
 
-export const getLessonImage = (title: string): string => {
-  if (REMOTE_LESSON_IMAGE_MAP[title]) return REMOTE_LESSON_IMAGE_MAP[title];
-
-  const cleanTitle = cleanLessonTitle(title);
-  const lookupKey = normalizeKey(cleanTitle);
-  return NORMALIZED_REMOTE_LESSON_IMAGE_MAP[lookupKey] || REMOTE_LESSON_IMAGE_MAP[cleanTitle] || DEFAULT_LESSON_IMAGE_URL;
-};
+// Every lesson now carries its own imageUrl (see scripts/remap-lesson-images.js), so this
+// is only reached by a lesson without one. It used to look the title up in a map of old
+// imgbb links; imgbb had already deleted some of them, and renaming a lesson broke the
+// match anyway. __tests__/lessonSheetImages.test.ts checks no bundled lesson lands here.
+export const getLessonImage = (_title: string): string => DEFAULT_LESSON_IMAGE_URL;
 
 export const PAIRS_PER_SET = 5;
 export const DESKTOP_PAIRS_PER_SET = 6;
@@ -246,4 +182,36 @@ export const getSerializableVocabularyLesson = <T extends { thumbnail?: any }>(l
   const serializableLesson = { ...lesson };
   delete serializableLesson.thumbnail;
   return serializableLesson;
+};
+
+const asRemoteImageUri = (value: unknown) =>
+  typeof value === 'string' && /^https?:\/\//i.test(value.trim()) ? value.trim() : null;
+
+/**
+ * Every hosted sheet a vocabulary lesson can show: each category's own sheet, then the
+ * whole-lesson sheet picked the same way as useVocabularyLessonContent (the lesson's own
+ * image, else a bundled thumbnail, else the hosted image for its title). Used to download
+ * a year's sheets before class; bundled thumbnails need no download and add nothing.
+ */
+export const getLessonSheetImageUris = (lesson: any): string[] => {
+  if (!lesson) return [];
+
+  const uris = new Set<string>();
+
+  if (Array.isArray(lesson.flashcards)) {
+    lesson.flashcards.forEach((group: any) => {
+      const uri = asRemoteImageUri(group?.imageUrl ?? group?.image);
+      if (uri) uris.add(uri);
+    });
+  }
+
+  const ownImage = lesson.imageUrl ?? lesson.image;
+  if (ownImage) {
+    const uri = asRemoteImageUri(ownImage);
+    if (uri) uris.add(uri);
+  } else if (lesson.title && !getLessonThumbnailSource(lesson)) {
+    uris.add(getLessonImage(lesson.title));
+  }
+
+  return [...uris];
 };

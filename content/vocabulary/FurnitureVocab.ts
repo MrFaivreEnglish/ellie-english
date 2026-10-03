@@ -5,31 +5,16 @@ const FurnitureVocab = {
   thumbnail: require('../../assets/thumbnails/furniture-thumbnail.png'),
   flashcards: [
     {
-      category: 'Living & Bedroom 🛏️',
+      category: 'In the bedroom 🛏️',
       words: [
         { english: 'Bed', french: 'Lit' },
-        { english: 'Sofa', french: 'Canapé' },
-        { english: 'Armchair', french: 'Fauteuil' },
         { english: 'Lamp', french: 'Lampe' },
         { english: 'Wardrobe', french: 'Armoire' },
-        { english: 'Desk', french: 'Bureau' },
-        { english: 'Bookcase', french: 'Bibliothèque' },
-        { english: 'TV stand', french: 'Meuble TV' },
-        { english: 'Carpet', french: 'Tapis' },
-        { english: 'Chair', french: 'Chaise' },
-        { english: 'Table', french: 'Table' }
+        { english: 'Desk', french: 'Bureau' }
       ]
     },
     {
-      category: 'Kitchen & Storage 🍽️',
-      words: [
-        { english: 'Fridge', french: 'Réfrigérateur' },
-        { english: 'Oven', french: 'Four' },
-        { english: 'Cupboard', french: 'Placard' }
-      ]
-    },
-    {
-      category: 'Bathroom & Laundry 🛁',
+      category: 'In the bathroom 🛁',
       words: [
         { english: 'Shower', french: 'Douche' },
         { english: 'Bathtub', french: 'Baignoire' },
@@ -38,11 +23,36 @@ const FurnitureVocab = {
       ]
     },
     {
-      category: 'Outdoors & Home Features 🏡',
+      category: 'In the kitchen 🍽️',
+      words: [
+        { english: 'Fridge', french: 'Réfrigérateur' },
+        { english: 'Oven', french: 'Four' },
+        { english: 'Cupboard', french: 'Placard' },
+        { english: 'Table', french: 'Table' },
+        { english: 'Chair', french: 'Chaise' }
+      ]
+    },
+    {
+      category: 'In the living room 🛋️',
+      words: [
+        { english: 'Sofa', french: 'Canapé' },
+        { english: 'Armchair', french: 'Fauteuil' },
+        { english: 'Carpet', french: 'Tapis' },
+        { english: 'Bookcase', french: 'Bibliothèque' },
+        { english: 'TV stand', french: 'Meuble TV' }
+      ]
+    },
+    {
+      category: 'Around the house 🏡',
       words: [
         { english: 'Swimming pool', french: 'Piscine' },
         { english: 'Garden', french: 'Jardin' },
-        { english: 'Car', french: 'Voiture' },
+        { english: 'Car', french: 'Voiture' }
+      ]
+    },
+    {
+      category: 'House elements 🚪',
+      words: [
         { english: 'Staircase', french: 'Escalier' },
         { english: 'Door', french: 'Porte' },
         { english: 'Window', french: 'Fenêtre' }

@@ -49,6 +49,8 @@ export default function SettingsScreen() {
     toggleHaptics,
     isSoundEffectsEnabled,
     toggleSoundEffects,
+    isReduceAnimationsEnabled,
+    toggleReduceAnimations,
     isTodayCardEnabled,
     toggleTodayCard,
     isAndroidStatusBarEnabled,
@@ -370,6 +372,14 @@ export default function SettingsScreen() {
             description: copy.soundEffectsDescription,
             value: isSoundEffectsEnabled,
             onValueChange: toggleSoundEffects,
+            activeColor: colors.primary,
+          })}
+          {renderSetting({
+            icon: 'animation',
+            title: copy.reduceAnimationsTitle,
+            description: copy.reduceAnimationsDescription,
+            value: isReduceAnimationsEnabled,
+            onValueChange: toggleReduceAnimations,
             activeColor: colors.primary,
           })}
           {hapticsAreSupported && renderSetting({

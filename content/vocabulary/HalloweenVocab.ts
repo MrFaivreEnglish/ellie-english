@@ -44,7 +44,7 @@ const HalloweenVocab = {
       ],
     },
     {
-      category: 'Adjectives 👻',
+      category: 'Trick (Adjectives) 👻',
       words: [
         { english: 'Scary', french: 'Effrayant' },
         { english: 'Haunted', french: 'Hanté' },
@@ -53,7 +53,7 @@ const HalloweenVocab = {
       ],
     },
     {
-      category: 'Treats 🍬',
+      category: 'Or treats! 🍬',
       words: [
         { english: 'Candy', french: 'Des bonbons' },
         { english: 'Chocolate', french: 'Du chocolat' },

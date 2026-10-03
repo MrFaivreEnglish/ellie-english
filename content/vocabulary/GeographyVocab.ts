@@ -5,7 +5,7 @@ const GeographyVocab = {
   thumbnail: require('../../assets/thumbnails/geography-thumbnail.png'),
   flashcards: [
     {
-      category: 'Landforms & Terrain ⛰️',
+      category: 'The ground ⛰️',
       words: [
         { english: 'Landscape', french: 'Paysage' },
         { english: 'Cliff', french: 'Falaise' },
@@ -18,7 +18,7 @@ const GeographyVocab = {
       ]
     },
     {
-      category: 'Water Bodies 🌊',
+      category: 'Water 🌊',
       words: [
         { english: 'Ocean', french: 'Océan' },
         { english: 'Sea', french: 'Mer' },
@@ -31,7 +31,7 @@ const GeographyVocab = {
       ]
     },
     {
-      category: 'Sky & Celestial ☀️',
+      category: 'The sky ☀️',
       words: [
         { english: 'Sky', french: 'Ciel' },
         { english: 'Sun', french: 'Soleil' },
@@ -41,7 +41,7 @@ const GeographyVocab = {
       ]
     },
     {
-      category: 'Human Geography 🏘️',
+      category: 'Human-made 🏘️',
       words: [
         { english: 'Country', french: 'Pays' },
         { english: 'City', french: 'Ville' },

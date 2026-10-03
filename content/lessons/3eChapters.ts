@@ -10,9 +10,10 @@ export const thirdGradeChapters: ChapterCategory = {
       url: 'https://digipad.app/p/837442/f004b8c5852b4',
       appLinks: [
         { label: 'Cinema', target: 'vocabulary', lessonTitle: 'Cinema' },
+        { label: 'Presenting a film', target: 'vocabulary', lessonTitle: 'Presenting a film' },
         { label: 'Opinion', target: 'vocabulary', lessonTitle: 'Opinion +' },
         { label: 'Présent Simple', target: 'grammar', lessonTitle: 'Present simple' },
-        { label: 'Preterit', target: 'grammar', lessonTitle: 'Prétérit' },
+        { label: 'Be au prétérit', target: 'grammar', lessonTitle: 'Be au prétérit' },
         { label: 'Past story', target: 'pronunciation', lessonTitle: 'Tell a past story' },
       ],
     },

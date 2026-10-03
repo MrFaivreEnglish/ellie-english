@@ -20,6 +20,7 @@ import {
   GRAMMAR_SPEECH_ENABLED_KEY,
   HAPTICS_ENABLED_KEY,
   SOUND_EFFECTS_ENABLED_KEY,
+  REDUCE_ANIMATIONS_KEY,
   THEME_STORAGE_KEY,
   TODAY_CARD_ENABLED_KEY,
   TODAY_CARD_OPT_IN_KEY,
@@ -108,6 +109,8 @@ isTypingStrictMode: boolean;
   isSoundEffectsEnabled: boolean;
   toggleSoundEffects: () => void;
   updateSoundEffects: (value: boolean) => void;
+  isReduceAnimationsEnabled: boolean;
+  toggleReduceAnimations: () => void;
   isTodayCardEnabled: boolean;
   toggleTodayCard: () => void;
   updateTodayCard: (value: boolean) => void;
@@ -248,6 +251,8 @@ isTypingStrictMode: false,
   isSoundEffectsEnabled: true,
   toggleSoundEffects: () => {},
   updateSoundEffects: () => {},
+  isReduceAnimationsEnabled: false,
+  toggleReduceAnimations: () => {},
   isTodayCardEnabled: false,
   toggleTodayCard: () => {},
   updateTodayCard: () => {},
@@ -286,6 +291,7 @@ export const ThemeProvider = ({ children }: { children: React.ReactNode }) => {
 const [isTypingStrictMode, setIsTypingStrictMode] = useState(false);
   const [isHapticsEnabled, setIsHapticsEnabled] = useState(hapticsAreSupported);
   const [isSoundEffectsEnabled, setIsSoundEffectsEnabled] = useState(true);
+  const [isReduceAnimationsEnabled, setIsReduceAnimationsEnabled] = useState(false);
   const [isTodayCardEnabled, setIsTodayCardEnabled] = useState(false);
   const [isAndroidStatusBarEnabled, setIsAndroidStatusBarEnabled] = useState(true);
   const [isShinyEllieUnlocked, setIsShinyEllieUnlocked] = useState(false);
@@ -307,6 +313,7 @@ const [isTypingStrictMode, setIsTypingStrictMode] = useState(false);
           savedTypingStrictMode,
           savedHapticsEnabled,
           savedSoundEffectsEnabled,
+          savedReduceAnimations,
           savedWebHapticsRestored,
           savedTodayCardEnabled,
           savedTodayCardOptIn,
@@ -327,6 +334,7 @@ const [isTypingStrictMode, setIsTypingStrictMode] = useState(false);
           AsyncStorage.getItem(TYPING_STRICT_MODE_KEY),
           AsyncStorage.getItem(HAPTICS_ENABLED_KEY),
           AsyncStorage.getItem(SOUND_EFFECTS_ENABLED_KEY),
+          AsyncStorage.getItem(REDUCE_ANIMATIONS_KEY),
           AsyncStorage.getItem(WEB_HAPTICS_RESTORED_KEY),
           AsyncStorage.getItem(TODAY_CARD_ENABLED_KEY),
           AsyncStorage.getItem(TODAY_CARD_OPT_IN_KEY),
@@ -404,6 +412,7 @@ const [isTypingStrictMode, setIsTypingStrictMode] = useState(false);
         const nextSoundEffectsEnabled = savedSoundEffectsEnabled !== 'false';
         setIsSoundEffectsEnabled(nextSoundEffectsEnabled);
         setSoundEffectsEnabled(nextSoundEffectsEnabled);
+        setIsReduceAnimationsEnabled(savedReduceAnimations === 'true');
 
         if (savedTodayCardOptIn === 'true' && savedTodayCardEnabled !== null) {
           setIsTodayCardEnabled(savedTodayCardEnabled === 'true');
@@ -464,8 +473,9 @@ const [isTypingStrictMode, setIsTypingStrictMode] = useState(false);
   }, [systemColorScheme, hasExplicitThemeChoice]);
 
 
+  // Best effort: a failed upload here is retried by the account's background sync.
   const syncAccountPreferences = () => {
-    void syncAccountPreferencesToCloudIfSignedIn();
+    syncAccountPreferencesToCloudIfSignedIn().catch(() => {});
   };
 
   const persistBoolean = async (
@@ -625,6 +635,14 @@ const [isTypingStrictMode, setIsTypingStrictMode] = useState(false);
     persistBoolean(SOUND_EFFECTS_ENABLED_KEY, value);
   }, []);
 
+  const toggleReduceAnimations = useCallback(() => {
+    setIsReduceAnimationsEnabled(prev => {
+      const next = !prev;
+      persistBoolean(REDUCE_ANIMATIONS_KEY, next);
+      return next;
+    });
+  }, []);
+
   const toggleTodayCard = useCallback(() => {
     setIsTodayCardEnabled(prev => {
       const next = !prev;
@@ -771,6 +789,7 @@ const [isTypingStrictMode, setIsTypingStrictMode] = useState(false);
     setHapticsEnabled(nextHapticsEnabled);
     setIsSoundEffectsEnabled(snapshot.soundEffectsEnabled);
     setSoundEffectsEnabled(snapshot.soundEffectsEnabled);
+    setIsReduceAnimationsEnabled(snapshot.reduceAnimations);
     setIsTodayCardEnabled(snapshot.todayCardOptIn && snapshot.todayCardEnabled);
     setIsAndroidStatusBarEnabled(snapshot.androidStatusBarEnabled);
 
@@ -843,6 +862,8 @@ const [isTypingStrictMode, setIsTypingStrictMode] = useState(false);
       isSoundEffectsEnabled,
       toggleSoundEffects,
       updateSoundEffects,
+      isReduceAnimationsEnabled,
+      toggleReduceAnimations,
       isTodayCardEnabled,
       toggleTodayCard,
       updateTodayCard,

@@ -14,6 +14,8 @@ type MenuCopy = {
   common: {
     back: string;
     backToHome: string;
+    newBadge: string;
+    updatedBadge: string;
     backToSettings: string;
     backToGrammar: string;
     backToVocabulary: string;
@@ -81,6 +83,8 @@ type MenuCopy = {
     grammarSpeechDescription: string;
     soundEffectsTitle: string;
     soundEffectsDescription: string;
+    reduceAnimationsTitle: string;
+    reduceAnimationsDescription: string;
     hapticsTitle: string;
     hapticsDescription: string;
     hapticsWebDescription: string;
@@ -179,6 +183,8 @@ const englishCopy: MenuCopy = {
   common: {
     back: 'Back',
     backToHome: 'Back to Home',
+    newBadge: 'New',
+    updatedBadge: 'Updated',
     backToSettings: 'Back to Settings',
     backToGrammar: 'Back to Grammar',
     backToVocabulary: 'Back to Vocabulary',
@@ -259,6 +265,8 @@ const englishCopy: MenuCopy = {
     grammarSpeechDescription: 'Speak correct answers after you submit them.',
     soundEffectsTitle: 'Sounds',
     soundEffectsDescription: 'Play sounds for correct answers and finished lessons.',
+    reduceAnimationsTitle: 'Fewer Animations',
+    reduceAnimationsDescription: 'Turn off bouncing, shaking, and moving effects.',
     hapticsTitle: 'Vibrations',
     hapticsDescription: 'Use small vibrations when you tap or answer.',
     hapticsWebDescription: 'Use small vibrations if your browser allows it.',
@@ -273,7 +281,7 @@ const englishCopy: MenuCopy = {
     creditsConcept: 'Application concept & development: Mr Faivre',
     creditsImages: 'Images: Mr Faivre with icons from Flaticon',
     creditsBuiltWith: 'Built with React Native & Expo',
-    version: 'Ellie Version 2.8',
+    version: 'Ellie Version 3.0',
     creditsSchool: 'Mr Faivre - Collège Jean Jacques Rousseau - Voujeaucourt',
     adminAccessTitle: 'Teacher Area',
     adminAccessDescription: 'Enter the teacher PIN to open Lesson Studio.',

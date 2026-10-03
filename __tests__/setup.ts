@@ -9,6 +9,19 @@ jest.mock('@react-native-async-storage/async-storage', () => ({
   clear: jest.fn(() => Promise.resolve()),
 }));
 
+// The real library builds its animations from Reanimated at import time, which the
+// Reanimated mock below can't provide.
+jest.mock('sonner-native', () => ({
+  toast: Object.assign(jest.fn(), {
+    success: jest.fn(),
+    info: jest.fn(),
+    warning: jest.fn(),
+    error: jest.fn(),
+    dismiss: jest.fn(),
+  }),
+  Toaster: () => null,
+}));
+
 jest.mock('expo-haptics', () => ({
   impactAsync: jest.fn(() => Promise.resolve()),
   notificationAsync: jest.fn(() => Promise.resolve()),

@@ -5,10 +5,11 @@ const SpaceVocab = {
   thumbnail: require('../../assets/thumbnails/space-thumbnail.png'),
   flashcards: [
     {
-      category: 'Celestial Bodies 🌌',
+      category: 'Space objects 🌌',
       words: [
         { english: 'An asteroid', french: 'Un astéroïde' },
         { english: 'Stars', french: 'Des étoiles' },
+        { english: 'Space', french: "L'espace" },
         { english: 'A planet', french: 'Une planète' },
         { english: 'A meteorite', french: 'Une météorite' },
         { english: 'The Earth', french: 'La Terre' },
@@ -17,23 +18,18 @@ const SpaceVocab = {
       ]
     },
     {
-      category: 'Spacecraft & Equipment 🚀',
+      // Orbit, gravity and weightlessness sit in this block on the sheet, next to the
+      // hardware, rather than in a concepts block of their own.
+      category: 'Science and inventions 🚀',
       words: [
         { english: 'A rocket', french: 'Une fusée' },
         { english: 'A spaceship', french: 'Un vaisseau spatial' },
         { english: 'A space station', french: 'Une station spatiale' },
         { english: 'A spacesuit', french: 'Une combinaison spatiale' },
-        { english: 'A satellite', french: 'Un satellite' }
-      ]
-    },
-    {
-      category: 'Concepts & Phenomena 🌀',
-      words: [
-        { english: 'Space', french: "L'espace" },
+        { english: 'A satellite', french: 'Un satellite' },
         { english: 'Orbit', french: 'Une orbite' },
         { english: 'Gravity', french: 'La gravité' },
-        { english: 'Weightlessness', french: "L'apesanteur" },
-        { english: 'A UFO', french: 'Un OVNI' }
+        { english: 'Weightlessness', french: "L'apesanteur" }
       ]
     },
     {
@@ -47,14 +43,20 @@ const SpaceVocab = {
       ]
     },
     {
-      category: 'People & Beings 👨‍🚀',
+      category: 'People 👨‍🚀',
       words: [
         { english: 'An astronaut', french: 'Un astronaute' },
-        { english: 'A crew', french: 'Un équipage' },
+        { english: 'A crew', french: 'Un équipage' }
+      ]
+    },
+    {
+      category: 'Science-Fiction 🛸',
+      words: [
+        { english: 'A UFO', french: 'Un OVNI' },
         { english: 'An alien', french: 'Un extraterrestre' }
       ]
     }
-      ]
-    };
+  ]
+};
 
 export default SpaceVocab;

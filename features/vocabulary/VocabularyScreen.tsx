@@ -49,6 +49,7 @@ import {
   uiRadii,
 } from '../shared/uiPrimitives';
 import VocabularyLessonCard from './VocabularyLessonCard';
+import { getLessonHighlightKind, useSeenLessonHighlights } from '../shared/lessonHighlights';
 import { freshFontFamily } from '../shared/freshDirection';
 
 const bundledCustomVocabularyLessons = require('../../content/lessons/customVocabularyLessons.json') as any[];
@@ -109,12 +110,15 @@ export const difficultyMap: Record<string, number> = {
   Legends: 2,
   Location: 1,
   Love: 3,
+  'Months and Seasons': 1,
   Nationality: 1,
+  Numbers: 1,
   'Opinion Basics': 1,
   'Opinion +': 3,
   'Personality Basics': 1,
   'Personality +': 3,
   'Physical Description': 1,
+  'Presenting a film': 3,
   'Question Words': 1,
   Robots: 2,
   'School Subjects': 1,
@@ -293,6 +297,7 @@ export default function VocabularyScreen() {
   const [learnedMixWords, setLearnedMixWords] = useState<Word[]>([]);
   const [selectionMode, setSelectionMode] = useState(false);
   const [selectedLessonKeys, setSelectedLessonKeys] = useState<Set<string>>(() => new Set());
+  const seenLessonHighlights = useSeenLessonHighlights();
 
   const markLessonImageFailed = useCallback((key: string) => {
     setFailedLessonImageKeys((current) => {
@@ -627,6 +632,7 @@ export default function VocabularyScreen() {
               imageFailed={failedLessonImageKeys.has(lessonImageKey)}
               imageSource={getVocabularyLessonImageSource(lesson)}
               difficulty={difficultyMap[lessonTitle]}
+              highlight={getLessonHighlightKind('vocabulary', lesson, seenLessonHighlights)}
               categoryEmoji={CATEGORY_EMOJI_MAP[item.categoryTitle] || '📚'}
               colors={colors}
               isDarkMode={isDarkMode}
@@ -641,7 +647,7 @@ export default function VocabularyScreen() {
       </View>
     );
   }, [
-    cardView, selectionMode, selectedLessonKeys, failedLessonImageKeys,
+    cardView, selectionMode, selectedLessonKeys, failedLessonImageKeys, seenLessonHighlights,
     colors, isDarkMode, copy, openVocabularyLesson, toggleLessonSelection, markLessonImageFailed, windowWidth,
   ]);
 
@@ -1513,7 +1519,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     borderColor: '#FFFFFF',
     borderRadius: 12,
-    borderWidth: 2.5,
+    borderWidth: 2.5,
     height: 90,
     justifyContent: 'center',
     overflow: 'hidden',

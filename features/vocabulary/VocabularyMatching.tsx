@@ -18,6 +18,7 @@ import type { ThemeColors } from '../settings/ThemeContext';
 import { DESIGN_ACCENTS, withColorAlpha } from '../shared/uiPrimitives';
 import { FRESH_COLORS, FRESH_COLORS_DARK } from '../shared/freshDirection';
 import { useEnglishSpeech } from '../shared/useEnglishSpeech';
+import useReducedMotion from '../shared/useReducedMotion';
 import SoundWaveIcon from '../shared/SoundWaveIcon';
 
 const MATCHING_LAYOUT_ANIMATION_MS = 150;
@@ -269,6 +270,9 @@ export default function VocabularyMatching({
     ));
   }, []);
 
+  // Card colours already show right and wrong pairs; the shake and pop are extra.
+  const reducedMotion = useReducedMotion();
+
   const getCardAnimation = React.useCallback((cardId: string) => {
     const existingAnimation = cardAnimationsRef.current.get(cardId);
     if (existingAnimation) return existingAnimation;
@@ -367,6 +371,7 @@ export default function VocabularyMatching({
     );
 
     newlyIncorrectIds.forEach((cardId) => {
+      if (reducedMotion) return;
       const animation = getCardAnimation(cardId);
       animation.shakeX.setValue(0);
       Animated.sequence([
@@ -379,7 +384,7 @@ export default function VocabularyMatching({
     });
 
     previousIncorrectPairIdsRef.current = incorrectIds;
-  }, [gameState.incorrectPair, getCardAnimation]);
+  }, [gameState.incorrectPair, getCardAnimation, reducedMotion]);
 
   React.useEffect(() => {
     if (refillOnMatch) {
@@ -393,6 +398,7 @@ export default function VocabularyMatching({
     );
 
     newlyMatchedIds.forEach((cardId) => {
+      if (reducedMotion) return;
       const animation = getCardAnimation(cardId);
       Animated.sequence([
         Animated.timing(animation.scale, {
@@ -411,7 +417,7 @@ export default function VocabularyMatching({
     });
 
     previousMatchedPairIdsRef.current = new Set(gameState.matchedPairs);
-  }, [gameState.matchedPairs, getCardAnimation, refillOnMatch]);
+  }, [gameState.matchedPairs, getCardAnimation, refillOnMatch, reducedMotion]);
 
   React.useEffect(() => {
     if (Platform.OS === 'android') {

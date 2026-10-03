@@ -299,6 +299,8 @@ export default function PronunciationLessonScreen({
                   speak(phrase);
                 }}
                 activeOpacity={0.86}
+                accessibilityRole="button"
+                accessibilityLabel={`Listen to "${phrase}"`}
               >
                 <MaterialIcons
                   name={speakingText === phrase ? 'volume-up' : 'play-arrow'}
@@ -361,6 +363,8 @@ export default function PronunciationLessonScreen({
                         ]}
                         onPress={() => speak(word)}
                         activeOpacity={0.85}
+                        accessibilityRole="button"
+                        accessibilityLabel={`Listen to "${word}"`}
                       >
                         <MaterialIcons
                           name={speakingText === word ? 'volume-up' : 'play-arrow'}
@@ -428,6 +432,8 @@ export default function PronunciationLessonScreen({
                 ]}
                 onPress={() => speak(word)}
                 activeOpacity={0.85}
+                accessibilityRole="button"
+                accessibilityLabel={`Listen to "${word}"`}
               >
                 <MaterialIcons
                   name={speakingText === word ? 'volume-up' : 'play-arrow'}
@@ -469,6 +475,8 @@ export default function PronunciationLessonScreen({
               ]}
               onPress={() => selectPracticeItem(selectedPracticeIndex - 1)}
               activeOpacity={0.86}
+              accessibilityRole="button"
+              accessibilityLabel="Previous phrase"
             >
               <MaterialIcons name="chevron-left" size={Math.round(22 * desktopScale)} color={accentColor} />
               <Text style={[styles.practiceSwitchText, { color: accentColor }]}>Previous</Text>
@@ -483,6 +491,8 @@ export default function PronunciationLessonScreen({
               ]}
               onPress={() => selectPracticeItem(selectedPracticeIndex + 1)}
               activeOpacity={0.86}
+              accessibilityRole="button"
+              accessibilityLabel="Next phrase"
             >
               <Text style={[styles.practiceSwitchText, { color: accentColor }]}>Next</Text>
               <MaterialIcons name="chevron-right" size={Math.round(22 * desktopScale)} color={accentColor} />
@@ -498,6 +508,8 @@ export default function PronunciationLessonScreen({
             ]}
             onPress={() => speak(practiceStarter)}
             activeOpacity={0.86}
+            accessibilityRole="button"
+            accessibilityLabel={`Listen to "${practiceStarter}"`}
           >
             <MaterialIcons
               name={speakingText === practiceStarter ? 'volume-up' : 'play-arrow'}

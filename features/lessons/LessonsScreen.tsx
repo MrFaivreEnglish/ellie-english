@@ -1,4 +1,5 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Alert, AppState, View, StyleSheet, ScrollView, TouchableOpacity, Linking, Platform, useWindowDimensions } from 'react-native';
 import BackButton from '../shared/BackButton';
 import Text from '../shared/ThemedText';
@@ -17,8 +18,11 @@ import { createMixedGrammarLesson } from '../../content/lessons/grammarRegistry'
 import { getDesktopContentMaxWidth, getDesktopTypographyScale, getTopSafeAreaInset, isDesktopWebWidth, NARROW_CARD_WIDTH, NARROW_TRAY_WIDTH } from '../shared/responsiveLayout';
 import { DesktopTypographyProvider } from '../shared/DesktopTypography';
 import type { ResolvedChapterAppLink } from '../../content/lessons/lessonTypes';
-import { getLessonImage, getSerializableVocabularyLesson } from '../vocabulary/vocabularyUtils';
+import { getLessonImage, getLessonSheetImageUris, getSerializableVocabularyLesson } from '../vocabulary/vocabularyUtils';
+import { Image as ExpoImage } from 'expo-image';
 import { getMenuCopy } from '../shared/menuCopy';
+import LessonHighlightBadge from '../shared/LessonHighlightBadge';
+import { getLessonHighlightKind, useSeenLessonHighlights, type LessonHighlightKind } from '../shared/lessonHighlights';
 import {
   getCustomChapterLinkOverrides,
   makeChapterLinkOverrideId,
@@ -33,6 +37,7 @@ import { mergeCustomChapters } from './chapterContent';
 import { getCustomVocabularyLessons, type CustomVocabularyLesson } from './customLessonStorage';
 
 const bundledCustomChapterLinks = require('../../content/lessons/customChapterLinks.json') as any[];
+const OPEN_LEVELS_STORAGE_KEY = '@lessons_open_levels_v1';
 
 
 
@@ -120,6 +125,38 @@ export default function LessonsScreen() {
 
   const [openChapterLevels, setOpenChapterLevels] = useState<Set<string>>(() => new Set());
   const [openResourceLevels, setOpenResourceLevels] = useState<Set<string>>(() => new Set());
+  const hasLoadedOpenLevelsRef = useRef(false);
+
+  // Every visit used to start with all years closed, so students reopened their own (6e,
+  // 4e…) each time. Remember what they left open instead.
+  useEffect(() => {
+    let active = true;
+    AsyncStorage.getItem(OPEN_LEVELS_STORAGE_KEY)
+      .then((raw) => {
+        if (!active || !raw) return;
+        const saved = JSON.parse(raw) as { chapters?: unknown; resources?: unknown };
+        const toSet = (value: unknown) =>
+          new Set(Array.isArray(value) ? value.filter((item): item is string => typeof item === 'string') : []);
+        setOpenChapterLevels(toSet(saved.chapters));
+        setOpenResourceLevels(toSet(saved.resources));
+      })
+      .catch(() => {})
+      .finally(() => {
+        if (active) hasLoadedOpenLevelsRef.current = true;
+      });
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    // Skip the initial empty state so it can't overwrite what's saved before it loads.
+    if (!hasLoadedOpenLevelsRef.current) return;
+    AsyncStorage.setItem(
+      OPEN_LEVELS_STORAGE_KEY,
+      JSON.stringify({ chapters: [...openChapterLevels], resources: [...openResourceLevels] })
+    ).catch(() => {});
+  }, [openChapterLevels, openResourceLevels]);
   const bundledChapterLinkOverrides = useMemo(
     () => normalizeChapterLinkOverrides(bundledCustomChapterLinks),
     []
@@ -127,6 +164,20 @@ export default function LessonsScreen() {
   const [localChapterLinkOverrides, setLocalChapterLinkOverrides] = useState<ChapterLinkOverride[]>([]);
   const [customChapters, setCustomChapters] = useState<CustomChapter[]>([]);
   const [liveVocabularyLessons, setLiveVocabularyLessons] = useState<CustomVocabularyLesson[]>([]);
+  const seenLessonHighlights = useSeenLessonHighlights();
+  const getAppLinkHighlight = (appLink: ResolvedChapterAppLink): LessonHighlightKind | undefined =>
+    appLink.target === 'vocabulary' || appLink.target === 'grammar'
+      ? getLessonHighlightKind(appLink.target, appLink.lesson, seenLessonHighlights)
+      : undefined;
+  // Levels start collapsed, so the header shows the strongest badge of any lesson inside.
+  const getLevelHighlight = (chapters: Array<{ appLinks?: any[] }>): LessonHighlightKind | undefined => {
+    const kinds = chapters
+      .flatMap((chapter) => chapter.appLinks ?? [])
+      .filter((link) => link.target !== 'pronunciation')
+      .map((link) => resolveChapterAppLink(link, { vocabularyLessons: liveVocabularyLessons }))
+      .map((link) => (link ? getAppLinkHighlight(link) : undefined));
+    return kinds.includes('new') ? 'new' : kinds.includes('updated') ? 'updated' : undefined;
+  };
   const effectiveChapterCategories = useMemo(
     () => mergeCustomChapters(chapterCategories, customChapters),
     [customChapters]
@@ -144,6 +195,39 @@ export default function LessonsScreen() {
 
     return map;
   }, [bundledChapterLinkOverrides, localChapterLinkOverrides]);
+
+  // Download the sheets for the years a student keeps open, so they're already on the
+  // phone when class Wi-Fi isn't. Sheets already in expo-image's disk cache are skipped,
+  // so each one only costs data once.
+  useEffect(() => {
+    if (openChapterLevels.size === 0) return;
+
+    const options = { vocabularyLessons: liveVocabularyLessons };
+    const uris = new Set<string>();
+    const addSheets = (link: ResolvedChapterAppLink | null) => {
+      if (link?.target === 'vocabulary') getLessonSheetImageUris(link.lesson).forEach((uri) => uris.add(uri));
+    };
+
+    effectiveChapterCategories
+      .filter((category) => openChapterLevels.has(category.title))
+      .forEach((category) => {
+        category.lessons.forEach((lesson) => {
+          const override = chapterLinkOverrideMap.get(makeChapterLinkOverrideId(category.title, lesson.title));
+          if (override?.appLink) {
+            addSheets(resolveChapterAppLink({
+              label: lesson.title,
+              target: override.appLink.target,
+              lessonTitle: override.appLink.lessonTitle,
+              ...(override.appLink.lessonId ? { lessonId: override.appLink.lessonId } : {}),
+            }, options));
+          }
+          if (lesson.liveAppLink) addSheets(resolveChapterAppLink(lesson.liveAppLink, options));
+          (lesson.appLinks ?? []).forEach((link) => addSheets(resolveChapterAppLink(link, options)));
+        });
+      });
+
+    if (uris.size > 0) ExpoImage.prefetch([...uris], 'disk').catch(() => {});
+  }, [chapterLinkOverrideMap, effectiveChapterCategories, liveVocabularyLessons, openChapterLevels]);
 
   const refreshLiveContent = React.useCallback(async () => {
     const [overrides, chapters, vocabularyLessons] = await Promise.all([
@@ -439,6 +523,7 @@ export default function LessonsScreen() {
       {viewMode === 'chapters' && effectiveChapterCategories.map((category, levelIndex) => {
         const isOpen = openChapterLevels.has(category.title);
         const levelColor = LEVEL_COLORS[levelIndex % LEVEL_COLORS.length];
+        const levelHighlight = getLevelHighlight(category.lessons);
 
         return (
           <View
@@ -473,7 +558,14 @@ export default function LessonsScreen() {
               accessibilityState={{ expanded: isOpen }}
             >
               <Text style={styles.levelIcon}>{category.icon}</Text>
-              <Text style={styles.levelTitle} numberOfLines={1}>{category.title}</Text>
+              {levelHighlight ? (
+                <View style={styles.levelTitleBlock}>
+                  <Text style={styles.levelTitle} numberOfLines={1}>{category.title}</Text>
+                  <LessonHighlightBadge kind={levelHighlight} variant="inline" style={styles.levelHighlightBadge} />
+                </View>
+              ) : (
+                <Text style={styles.levelTitle} numberOfLines={1}>{category.title}</Text>
+              )}
               <View style={styles.levelCountPill}>
                 <Text style={styles.levelCountText}>
                   {category.lessons.length} {category.lessons.length > 1 ? copy.chapterPlural : copy.chapterSingular}
@@ -580,6 +672,9 @@ export default function LessonsScreen() {
                               <Text style={[styles.chipText, { color: FRESH_COLORS.grammarLavenderText }]} numberOfLines={1}>
                                 {appLink.label}
                               </Text>
+                              {!!getAppLinkHighlight(appLink) && (
+                                <LessonHighlightBadge kind={getAppLinkHighlight(appLink)!} style={styles.chipHighlightBadge} />
+                              )}
                             </TouchableOpacity>
                           ))}
                         </View>
@@ -606,6 +701,9 @@ export default function LessonsScreen() {
                                   <Text style={[styles.chipText, { color: FRESH_COLORS.vocabCoralChipText }]} numberOfLines={1}>
                                     {appLink.label}
                                   </Text>
+                                  {!!getAppLinkHighlight(appLink) && (
+                                    <LessonHighlightBadge kind={getAppLinkHighlight(appLink)!} style={styles.chipHighlightBadge} />
+                                  )}
                                 </TouchableOpacity>
                               ))}
                               {vocabularyAppLinks.length >= 2 && (
@@ -655,6 +753,9 @@ export default function LessonsScreen() {
                                   <Text style={[styles.chipText, { color: FRESH_COLORS.grammarLavenderText }]} numberOfLines={1}>
                                     {appLink.label}
                                   </Text>
+                                  {!!getAppLinkHighlight(appLink) && (
+                                    <LessonHighlightBadge kind={getAppLinkHighlight(appLink)!} style={styles.chipHighlightBadge} />
+                                  )}
                                 </TouchableOpacity>
                               ))}
                               {grammarAppLinks.length >= 2 && (
@@ -780,6 +881,9 @@ export default function LessonsScreen() {
 }
 
 const styles = StyleSheet.create({
+  chipHighlightBadge: { top: -10, right: -6 },
+  levelTitleBlock: { flex: 1, minWidth: 0 },
+  levelHighlightBadge: { alignSelf: 'flex-start', marginTop: 4 },
   container: {
     flex: 1,
   },

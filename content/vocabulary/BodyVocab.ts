@@ -4,9 +4,26 @@ const BodyVocab = {
   thumbnail: require('../../assets/thumbnails/body-thumbnail.png'),
   flashcards:[
     {
-      category: 'Head & Face 🙂',
+      // The sheet labels the two diagrams "Spider-Man's body" and "Spider-Man's face",
+      // so the head sits with the body here rather than with the face.
+      category: 'Body 🧍',
       words: [
         { english: 'Head', french: 'Tête' },
+        { english: 'Shoulders', french: 'Épaules' },
+        { english: 'Arm', french: 'Bras' },
+        { english: 'Elbow', french: 'Coude' },
+        { english: 'Hand', french: 'Main' },
+        { english: 'Fingers', french: 'Doigts' },
+        { english: 'Back', french: 'Dos' },
+        { english: 'Belly', french: 'Ventre' },
+        { english: 'Leg', french: 'Jambe' },
+        { english: 'Knee', french: 'Genou' },
+        { english: 'Foot', french: 'Pied' }
+      ]
+    },
+    {
+      category: 'Face 🙂',
+      words: [
         { english: 'Face', french: 'Visage' },
         { english: 'Eye', french: 'Œil' },
         { english: 'Ear', french: 'Oreille' },
@@ -16,21 +33,6 @@ const BodyVocab = {
         { english: 'Tongue', french: 'Langue' },
         { english: 'Cheek', french: 'Joue' },
         { english: 'Chin', french: 'Menton' }
-      ]
-    },
-    {
-      category: 'Body 🧍',
-      words: [
-        { english: 'Shoulders', french: 'Épaules' },
-        { english: 'Arm', french: 'Bras' },
-        { english: 'Elbow', french: 'Coude' },
-        { english: 'Hand', french: 'Main' },
-        { english: 'Fingers', french: 'Doigts' },
-        { english: 'Back', french: 'Dos' },
-        { english: 'Belly', french: 'Ventre' },
-          { english: 'Leg', french: 'Jambe' },
-        { english: 'Knee', french: 'Genou' },
-        { english: 'Foot', french: 'Pied' }
       ]
     },
   ]

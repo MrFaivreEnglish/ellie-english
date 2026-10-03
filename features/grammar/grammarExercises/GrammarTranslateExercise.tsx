@@ -15,6 +15,7 @@ import { getWebLessonScale, isCompactViewport, isDesktopWebWidth, scaleValue } f
 import { CHIP_DESKTOP_SCALE_ADJUSTMENT } from '../../shared/exerciseLayoutTokens';
 import type { ThemeColors } from '../../settings/ThemeContext';
 import { useSelectedWordDrag } from './useSelectedWordDrag';
+import useReducedMotion from '../../shared/useReducedMotion';
 import DraggableWordChip, { CHIP_DRAG_COMMIT_THRESHOLD_DY } from './DraggableWordChip';
 import {
   CHIP_COMPACT_MAX_HEIGHT,
@@ -231,8 +232,9 @@ const GrammarTranslateExercise: React.FC<GrammarTranslateExerciseProps> = ({
   const disabled = userAnswer !== '' || selectedWordIndexes.length === 0;
 
   const trayShakeAnim = useRef(new Animated.Value(0)).current;
+  const reducedMotion = useReducedMotion();
   useEffect(() => {
-    if (incorrectAnswer !== 'translate') return;
+    if (incorrectAnswer !== 'translate' || reducedMotion) return;
     trayShakeAnim.setValue(0);
     Animated.sequence([
       Animated.timing(trayShakeAnim, { toValue: -4, duration: 70, useNativeDriver: Platform.OS !== 'web' }),
@@ -240,7 +242,7 @@ const GrammarTranslateExercise: React.FC<GrammarTranslateExerciseProps> = ({
       Animated.timing(trayShakeAnim, { toValue: -2, duration: 110, useNativeDriver: Platform.OS !== 'web' }),
       Animated.timing(trayShakeAnim, { toValue: 0, duration: 90, useNativeDriver: Platform.OS !== 'web' }),
     ]).start();
-  }, [incorrectAnswer, trayShakeAnim]);
+  }, [incorrectAnswer, trayShakeAnim, reducedMotion]);
 
   return (
     <View

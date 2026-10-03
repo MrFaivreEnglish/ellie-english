@@ -5,7 +5,7 @@ const AnimalsVocab = {
   thumbnail: require('../../assets/thumbnails/animals-thumbnail.png'),
   flashcards: [
     {
-      category: 'Pets & Small Animals 🐾',
+      category: 'In the house 🐾',
       words: [
         { english: 'Dog', french: 'Chien' },
         { english: 'Puppy', french: 'Chiot' },
@@ -17,7 +17,7 @@ const AnimalsVocab = {
       ]
     },
     {
-      category: 'Farm Animals 🐔',
+      category: 'At the farm 🐔',
       words: [
         { english: 'Rooster', french: 'Coq' },
         { english: 'Hen', french: 'Poule' },
@@ -34,7 +34,7 @@ const AnimalsVocab = {
       ]
     },
     {
-      category: 'Wild Animals 🐯',
+      category: 'In the wild 🐯',
       words: [
         { english: 'Squirrel', french: 'Écureuil' },
         { english: 'Fox', french: 'Renard' },

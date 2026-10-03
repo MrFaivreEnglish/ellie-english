@@ -10,12 +10,12 @@ import type { Word } from '../../types/VocabularyTypes';
 
 const bundledCustomVocabularyLessons = require('../../content/lessons/customVocabularyLessons.json') as any[];
 
-const getLessonProgressKey = (lesson: any) =>
+export const getLessonProgressKey = (lesson: any) =>
   normalizeFlashcardLessonKey(String(lesson?.id || lesson?.title || 'lesson'));
 
-const vocabularyWordKey = (word: Word) => `${word.english.trim().toLowerCase()}|${word.french.trim().toLowerCase()}`;
+export const vocabularyWordKey = (word: Word) => `${word.english.trim().toLowerCase()}|${word.french.trim().toLowerCase()}`;
 
-const getLessonWords = (lesson: any): Word[] => {
+export const getLessonWords = (lesson: any): Word[] => {
   if (!lesson?.flashcards) return [];
 
   const words = Array.isArray(lesson.flashcards[0]?.words)
@@ -36,13 +36,18 @@ const getLessonWords = (lesson: any): Word[] => {
 export const MAX_VOCAB_RUSH_WORDS = 30;
 
 
-export const getKnownVocabularyWords = async (limit = MAX_VOCAB_RUSH_WORDS): Promise<Word[]> => {
+// Every vocabulary lesson a student can have learned words in: bundled, teacher-added, built-in.
+export const getAllVocabularyLessons = async (): Promise<any[]> => {
   const customLessons = await getCustomVocabularyLessons().catch(() => []);
-  const allLessons = [
+  return [
     ...bundledCustomVocabularyLessons,
     ...customLessons,
     ...vocabularyCategories.flatMap((category) => category.lessons),
   ];
+};
+
+export const getKnownVocabularyWords = async (limit = MAX_VOCAB_RUSH_WORDS): Promise<Word[]> => {
+  const allLessons = await getAllVocabularyLessons();
 
   const [learnedByLesson, recencyByActivityKey] = await Promise.all([
     getLearnedFlashcardKeysByLesson(),

@@ -10,19 +10,16 @@ import {
   View,
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import Animated, { ZoomIn } from 'react-native-reanimated';
 import Text, { ThemedTextInput as TextInput } from '../shared/ThemedText';
 import MaterialIcons from '../shared/ThemedMaterialIcon';
 import { useDesktopTypographyScale } from '../shared/DesktopTypography';
 import AccountAvatar from './AccountAvatar';
 import { useAccount } from './AccountContext';
+import { bilingual } from '../shared/bilingual';
+import ProfileStylePicker from './ProfileStylePicker';
 import {
-  ACCOUNT_AVATAR_COLOR_PRESETS,
-  IMAGE_ACCOUNT_AVATAR_PRESETS,
   getUnlockedAccountAvatarColorId,
   getUnlockedAccountAvatarId,
-  type AccountAvatarColorId,
-  type AccountAvatarId,
 } from './accountAvatarStorage';
 import { useAccountStats } from './useAccountStats';
 import {
@@ -62,6 +59,7 @@ type AccountPanelProps = {
   isDarkMode: boolean;
   openAvatarPicker?: boolean;
   onAvatarSectionLayout?: (y: number) => void;
+  onOpenMyWords?: () => void;
 };
 
 type AccountMode = 'signIn' | 'create';
@@ -70,11 +68,9 @@ type MaterialIconName = React.ComponentProps<typeof MaterialIcons>['name'];
 
 const ACCOUNT_TOUR_SEEN_KEY = '@ellie_account_signed_in_tour_seen';
 
-const ALL_AVATAR_PRESETS = [...IMAGE_ACCOUNT_AVATAR_PRESETS]
-  .sort((a, b) => (a.unlockLevel ?? 0) - (b.unlockLevel ?? 0));
 
 
-export default function AccountPanel({ colors, isDarkMode, openAvatarPicker, onAvatarSectionLayout }: AccountPanelProps) {
+export default function AccountPanel({ colors, isDarkMode, openAvatarPicker, onAvatarSectionLayout, onOpenMyWords }: AccountPanelProps) {
 
 
 
@@ -218,8 +214,10 @@ export default function AccountPanel({ colors, isDarkMode, openAvatarPicker, onA
     streakDayLabel,
   ]);
   const backupSummary = useMemo(
-    () =>
-      `${grammarSummary.totalCorrectAnswers} grammar answers, ${learnedSummary.totalLearned} learnt words, ${timerBestCount} best times, and ${localXP} revision points.`,
+    () => ({
+      english: `${grammarSummary.totalCorrectAnswers} grammar answers, ${learnedSummary.totalLearned} learnt words, ${timerBestCount} best times, and ${localXP} revision points.`,
+      french: `${grammarSummary.totalCorrectAnswers} réponses de grammaire, ${learnedSummary.totalLearned} mots appris, ${timerBestCount} meilleurs temps et ${localXP} points de révision.`,
+    }),
     [grammarSummary.totalCorrectAnswers, learnedSummary.totalLearned, localXP, timerBestCount]
   );
   const formCopy = useMemo(() => ({
@@ -233,15 +231,15 @@ export default function AccountPanel({ colors, isDarkMode, openAvatarPicker, onA
   }), [isCreateMode]);
   const hasAuthValidationWarning = isUsernameTooShort || isPasswordTooShort;
   const authSupportText = isUsernameTooShort
-    ? 'Username needs at least 3 characters.'
-    : 'Password needs at least 6 characters.';
+    ? bilingual('Username needs at least 3 characters.', 'Le nom d’utilisateur doit faire au moins 3 caractères.')
+    : bilingual('Password needs at least 6 characters.', 'Le mot de passe doit faire au moins 6 caractères.');
   const authSupportIcon: React.ComponentProps<typeof MaterialIcons>['name'] = 'error-outline';
   const syncCopy = useMemo(() => {
     if (!session) {
       return {
         icon: 'phone-iphone' as const,
         color: colors.primary,
-        text: 'Your work is saved on this device.',
+        text: bilingual('Your work is saved on this device.', 'Ton travail est enregistré sur cet appareil.'),
       };
     }
 
@@ -249,7 +247,7 @@ export default function AccountPanel({ colors, isDarkMode, openAvatarPicker, onA
       return {
         icon: 'sync' as const,
         color: colors.primary,
-        text: 'Saving an online copy...',
+        text: bilingual('Saving an online copy...', 'Sauvegarde en ligne en cours…'),
       };
     }
 
@@ -257,7 +255,7 @@ export default function AccountPanel({ colors, isDarkMode, openAvatarPicker, onA
       return {
         icon: 'error-outline' as const,
         color: colors.danger,
-        text: 'Backup did not work. Tap Retry.',
+        text: bilingual('Backup did not work. Tap Retry.', 'La sauvegarde n’a pas marché. Appuie sur « Retry ».'),
       };
     }
 
@@ -265,14 +263,17 @@ export default function AccountPanel({ colors, isDarkMode, openAvatarPicker, onA
       return {
         icon: 'cloud-done' as const,
         color: colors.success,
-        text: `Backed up online at ${lastSyncAt.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`,
+        text: (() => {
+          const time = lastSyncAt.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+          return bilingual(`Backed up online at ${time}`, `Sauvegardé en ligne à ${time}`);
+        })(),
       };
     }
 
     return {
       icon: 'cloud-queue' as const,
       color: colors.primary,
-      text: 'Online copy not saved yet.',
+      text: bilingual('Online copy not saved yet.', 'Pas encore de sauvegarde en ligne.'),
     };
   }, [colors.danger, colors.primary, colors.success, error, isSyncing, lastSyncAt, session, syncStatus]);
 
@@ -325,7 +326,7 @@ export default function AccountPanel({ colors, isDarkMode, openAvatarPicker, onA
     try {
       if (isCreateMode) {
         await createAccount(trimmedUsername, password);
-        setLocalMessage('Account made. Fresh online progress loaded.');
+        setLocalMessage(bilingual('Account made. Fresh online progress loaded.', 'Compte créé. Ta nouvelle progression en ligne est chargée.'));
       } else {
         await signIn(trimmedUsername, password);
       }
@@ -351,7 +352,7 @@ export default function AccountPanel({ colors, isDarkMode, openAvatarPicker, onA
 
     try {
       await syncNow();
-      setLocalMessage('Backed up online.');
+      setLocalMessage(bilingual('Backed up online.', 'Sauvegardé en ligne.'));
     } catch {
 
     }
@@ -385,20 +386,26 @@ export default function AccountPanel({ colors, isDarkMode, openAvatarPicker, onA
     try {
       await updateAccountDisplayName(cleanedDraftAccountName);
       setIsNameEditorOpen(false);
-      setLocalMessage('Name updated.');
+      setLocalMessage(bilingual('Name updated.', 'Nom mis à jour.'));
     } catch {
 
     }
   }, [cleanedDraftAccountName, clearError, isNameSaveDisabled, updateAccountDisplayName]);
 
   const confirmSync = useCallback(() => {
-    const title = syncStatus === 'failed' || error ? 'Try backup again?' : 'Save online copy?';
+    const title = syncStatus === 'failed' || error
+      ? bilingual('Try backup again?', 'Réessayer la sauvegarde ?')
+      : bilingual('Save online copy?', 'Sauvegarder en ligne ?');
     const message = [
       'This saves a copy of:',
-      backupSummary,
-      '',
+      backupSummary.english,
       'Only progress already tied to this account is backed up.',
       'It keeps the highest revision-points total and the fastest times for this account.',
+      '',
+      'Cela sauvegarde une copie de :',
+      backupSummary.french,
+      'Seule la progression déjà liée à ce compte est sauvegardée.',
+      'Le compte garde le meilleur total de points de révision et les temps les plus rapides.',
     ].join('\n');
 
     if (Platform.OS === 'web') {
@@ -538,133 +545,40 @@ export default function AccountPanel({ colors, isDarkMode, openAvatarPicker, onA
           </View>
         ))}
       </View>
+
+      {onOpenMyWords && (
+        <TouchableOpacity
+          onPress={onOpenMyWords}
+          activeOpacity={0.8}
+          style={[styles.myWordsButton, { backgroundColor: colors.surface, borderColor: colors.border }]}
+          accessibilityRole="button"
+          accessibilityLabel="Open My words: what you've learnt and what to review"
+        >
+          <MaterialIcons name="menu-book" size={Math.round(18 * desktopScale)} color={colors.primary} />
+          <Text style={[styles.myWordsText, { color: colors.text }]} numberOfLines={1}>My words</Text>
+          <Text style={[styles.myWordsHint, { color: colors.secondaryText }]} numberOfLines={1}>Learnt and to review</Text>
+          <MaterialIcons name="chevron-right" size={Math.round(20 * desktopScale)} color={colors.secondaryText} />
+        </TouchableOpacity>
+      )}
     </View>
   );
 
-  const isUnlocked = (unlockLevel?: number) => !unlockLevel || levelStats.level >= unlockLevel;
-
-  const renderAvatarChoice = (avatarId: AccountAvatarId, label: string, unlockLevel?: number) => {
-    const selected = unlockedAccountAvatarId === avatarId;
-    const unlocked = isUnlocked(unlockLevel);
-    const lockLabel = unlockLevel ? `Level ${unlockLevel}` : '';
-
-    return (
-      <TouchableOpacity
-        key={avatarId}
-        onPress={() => {
-          if (unlocked) void updateAccountAvatar(avatarId);
-        }}
-        disabled={!unlocked}
-        activeOpacity={unlocked ? 0.78 : 1}
-        style={[
-          styles.avatarChoice,
-          {
-            backgroundColor: selected ? colors.primarySoft : colors.card,
-            borderColor: selected ? colors.primary : unlocked ? colors.border : colors.borderStrong,
-          },
-          !unlocked && styles.lockedChoice,
-        ]}
-        accessibilityRole="button"
-        accessibilityLabel={unlocked ? `Choose ${label} avatar` : `${label} avatar unlocks at level ${unlockLevel}`}
-        accessibilityState={{ selected, disabled: !unlocked }}
-      >
-        <AccountAvatar avatarId={avatarId} colorId={unlockedAccountAvatarColorId} size={Math.round(36 * desktopScale)} />
-        {selected && (
-          <Animated.View entering={ZoomIn.springify().damping(12)} style={[styles.avatarChoiceCheck, { backgroundColor: actionButtonColor }]}>
-            <MaterialIcons name="check" size={Math.round(13 * desktopScale)} color={actionButtonTextColor} />
-          </Animated.View>
-        )}
-        {!selected && !unlocked && (
-          <View style={[styles.lockBadge, { backgroundColor: colors.secondaryText }]}>
-            <MaterialIcons name="lock" size={Math.round(9 * desktopScale)} color="#fff" />
-            <Text style={styles.lockBadgeText}>{lockLabel.replace('Level ', 'L')}</Text>
-          </View>
-        )}
-      </TouchableOpacity>
-    );
-  };
-
-  const renderColorChoice = (
-    colorId: AccountAvatarColorId,
-    label: string,
-    backgroundColor: string,
-    accentColor: string,
-    unlockLevel?: number,
-    borderWidth?: number
-  ) => {
-    const selected = unlockedAccountAvatarColorId === colorId;
-    const unlocked = isUnlocked(unlockLevel);
-    const lockLabel = unlockLevel ? `Level ${unlockLevel}` : '';
-
-    return (
-      <TouchableOpacity
-        key={colorId}
-        onPress={() => {
-          if (unlocked) void updateAccountAvatarColor(colorId);
-        }}
-        disabled={!unlocked}
-        activeOpacity={unlocked ? 0.78 : 1}
-        style={[
-          styles.colorChoice,
-          {
-            backgroundColor: selected ? colors.primarySoft : colors.card,
-            borderColor: selected ? colors.primary : unlocked ? colors.border : colors.borderStrong,
-          },
-          !unlocked && styles.lockedChoice,
-        ]}
-        accessibilityRole="button"
-        accessibilityLabel={unlocked ? `Choose ${label} avatar colour` : `${label} avatar colour unlocks at level ${unlockLevel}`}
-        accessibilityState={{ selected, disabled: !unlocked }}
-      >
-        <View style={[styles.colorSwatch, { backgroundColor, borderColor: accentColor, borderWidth: borderWidth ?? 2 }]} />
-        {selected && (
-          <Animated.View entering={ZoomIn.springify().damping(12)} style={[styles.colorChoiceCheck, { backgroundColor: actionButtonColor }]}>
-            <MaterialIcons name="check" size={Math.round(12 * desktopScale)} color={actionButtonTextColor} />
-          </Animated.View>
-        )}
-        {!selected && !unlocked && (
-          <View style={[styles.lockBadge, { backgroundColor: colors.secondaryText }]}>
-            <MaterialIcons name="lock" size={Math.round(9 * desktopScale)} color="#fff" />
-            <Text style={styles.lockBadgeText}>{lockLabel.replace('Level ', 'L')}</Text>
-          </View>
-        )}
-      </TouchableOpacity>
-    );
-  };
-
   const renderProfileCustomizer = () => !isProfileEditorOpen ? null : (
-    <View
-      style={[styles.profileCustomizer, { backgroundColor: colors.surface, borderColor: colors.border }]}
-      onLayout={(event) => onAvatarSectionLayout?.(event.nativeEvent.layout.y)}
-    >
-      <View style={styles.profileEditor}>
-        <View style={styles.profileEditorHeader}>
-          <Text style={[styles.profileEditorTitle, { color: colors.text }]}>Profile styles</Text>
-          <Text style={[styles.profileEditorMeta, { color: isMaster ? masterTextColor : colors.secondaryText }]}>
-            {levelBadgeLabel}
-          </Text>
-        </View>
-        <Text style={[styles.avatarGroupLabel, { color: colors.secondaryText }]}>Colour</Text>
-        <View style={styles.colorGrid}>
-          {ACCOUNT_AVATAR_COLOR_PRESETS.map((preset) =>
-            renderColorChoice(
-              preset.id,
-              preset.label,
-              preset.backgroundColor,
-              preset.accentColor,
-              preset.unlockLevel,
-              preset.borderWidth
-            )
-          )}
-        </View>
-        <Text style={[styles.avatarGroupLabel, { color: colors.secondaryText }]}>Avatars</Text>
-        <View style={styles.avatarGrid}>
-          {ALL_AVATAR_PRESETS.map((preset) =>
-            renderAvatarChoice(preset.id, preset.label, preset.unlockLevel)
-          )}
-        </View>
-      </View>
-    </View>
+    <ProfileStylePicker
+      colors={colors}
+      level={levelStats.level}
+      levelBadgeLabel={levelBadgeLabel}
+      levelBadgeColor={isMaster ? masterTextColor : colors.secondaryText}
+      checkColor={actionButtonColor}
+      checkIconColor={actionButtonTextColor}
+      storedAvatarId={accountAvatarId}
+      storedColorId={accountAvatarColorId}
+      selectedAvatarId={unlockedAccountAvatarId}
+      selectedColorId={unlockedAccountAvatarColorId}
+      onSelectAvatar={(avatarId) => void updateAccountAvatar(avatarId)}
+      onSelectColor={(colorId) => void updateAccountAvatarColor(colorId)}
+      onLayout={onAvatarSectionLayout}
+    />
   );
 
   const renderLocalProfileOverview = () => (
@@ -1463,6 +1377,28 @@ const styles = StyleSheet.create({
     fontWeight: '800',
     textAlign: 'center',
   },
+  myWordsButton: {
+    minHeight: 44,
+    marginTop: 8,
+    borderRadius: 10,
+    borderWidth: 1,
+    paddingHorizontal: 10,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  myWordsText: {
+    fontSize: 14,
+    lineHeight: 18,
+    fontWeight: '900',
+  },
+  myWordsHint: {
+    flex: 1,
+    fontSize: 12,
+    lineHeight: 16,
+    fontWeight: '700',
+    textAlign: 'right',
+  },
   levelShowcaseSubtext: {
     fontSize: 11,
     lineHeight: 15,
@@ -1515,143 +1451,6 @@ const styles = StyleSheet.create({
   },
   tourDismissText: {
     fontSize: 13,
-    fontWeight: '900',
-  },
-  profileCustomizer: {
-    borderRadius: 12,
-    borderWidth: 1.5,
-    overflow: 'hidden',
-  },
-  profileEditor: {
-    padding: 9,
-  },
-  profileEditorHeader: {
-    minHeight: 28,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    gap: 12,
-    marginBottom: 10,
-  },
-  profileEditorTitle: {
-    fontSize: 14,
-    lineHeight: 18,
-    fontWeight: '900',
-  },
-  profileEditorMeta: {
-    fontSize: 12,
-    lineHeight: 16,
-    fontWeight: '800',
-  },
-  avatarChooser: {
-    borderRadius: 14,
-    borderWidth: 1.5,
-    padding: 12,
-  },
-  avatarChooserHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    gap: 10,
-    marginBottom: 10,
-  },
-  avatarChooserCopy: {
-    flex: 1,
-    minWidth: 0,
-  },
-  avatarChooserTitle: {
-    fontSize: 15,
-    fontWeight: '900',
-  },
-  avatarChooserText: {
-    fontSize: 12,
-    lineHeight: 17,
-    fontWeight: '700',
-    marginTop: 2,
-  },
-  avatarGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 6,
-  },
-  colorGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 6,
-    marginBottom: 10,
-  },
-  avatarGroupLabel: {
-    fontSize: 11,
-    lineHeight: 14,
-    fontWeight: '900',
-    textTransform: 'uppercase',
-    marginBottom: 8,
-  },
-  avatarGroupLabelSpaced: {
-    marginTop: 10,
-  },
-  avatarChoice: {
-    width: 46,
-    height: 46,
-    borderRadius: 14,
-    borderWidth: 1.5,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  colorChoice: {
-    width: 44,
-    height: 38,
-    borderRadius: 13,
-    borderWidth: 1.5,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  colorSwatch: {
-    width: 26,
-    height: 20,
-    borderRadius: 8,
-    borderWidth: 2,
-  },
-  lockedChoice: {
-    opacity: 0.58,
-  },
-  avatarChoiceCheck: {
-    position: 'absolute',
-    right: -3,
-    top: -3,
-    width: 19,
-    height: 19,
-    borderRadius: 10,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  colorChoiceCheck: {
-    position: 'absolute',
-    right: -3,
-    top: -3,
-    width: 18,
-    height: 18,
-    borderRadius: 9,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  lockBadge: {
-    position: 'absolute',
-    right: -3,
-    bottom: -3,
-    minWidth: 34,
-    height: 17,
-    borderRadius: 8.5,
-    paddingHorizontal: 3,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 1,
-  },
-  lockBadgeText: {
-    color: '#fff',
-    fontSize: 9,
-    lineHeight: 11,
     fontWeight: '900',
   },
   sectionHeaderRow: {

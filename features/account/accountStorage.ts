@@ -1,6 +1,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { createClient, type Session, type SupabaseClient, type User } from '@supabase/supabase-js';
 import { supabaseAnonKey, supabaseUrl } from '../../lib/config';
+import { bilingual } from '../shared/bilingual';
 
 const LEGACY_ACCOUNT_SESSION_KEY = '@ellie_account_session';
 const PROFILE_TABLE = 'student_profiles';
@@ -8,6 +9,8 @@ const PROGRESS_TABLE = 'student_progress_items';
 const DELETE_ACCOUNT_RPC = 'delete_current_student_account';
 const ACCOUNT_PROGRESS_OWNER_KEY = '@ellie_account_progress_owner';
 const USERNAME_EMAIL_DOMAIN = 'ellie-students.example.com';
+// Messages about Supabase setup are for the teacher and stay English-only.
+const NOT_SIGNED_IN_MESSAGE = bilingual('You are not signed in.', 'Tu dois d’abord te connecter.');
 const BLOCKED_ACCOUNT_NAME_PARTS = [
   'asshole',
   'bastard',
@@ -193,7 +196,7 @@ const normalizeNameTokensForSafetyCheck = (value: string) =>
     .map((token) => token.trim())
     .filter(Boolean);
 
-const assertStudentNameIsAllowed = (value: string, label: string) => {
+const assertStudentNameIsAllowed = (value: string, kind: 'Username' | 'Name') => {
   const checked = normalizeNameForSafetyCheck(value);
   if (!checked) return;
 
@@ -205,7 +208,10 @@ const assertStudentNameIsAllowed = (value: string, label: string) => {
   });
 
   if (blocked || blockedExact) {
-    throw new Error(`${label} is not allowed. Choose a respectful name.`);
+    throw new Error(bilingual(
+      `${kind} is not allowed. Choose a respectful name.`,
+      `${kind === 'Username' ? 'Ce nom d’utilisateur' : 'Ce nom'} n’est pas autorisé. Choisis un nom respectueux.`
+    ));
   }
 };
 
@@ -236,7 +242,7 @@ const getReadableAuthError = (error: unknown) => {
   }
 
   if (!message) {
-    message = 'Account action failed.';
+    message = bilingual('Account action failed.', 'L’action sur le compte a échoué.');
   }
 
   const normalized = message.toLowerCase();
@@ -246,11 +252,11 @@ const getReadableAuthError = (error: unknown) => {
   }
 
   if (normalized.includes('invalid login credentials')) {
-    return 'Wrong username or password.';
+    return bilingual('Wrong username or password.', 'Nom d’utilisateur ou mot de passe incorrect.');
   }
 
   if (normalized.includes('user already registered') || normalized.includes('already registered')) {
-    return 'This username already exists. Choose another username or sign in.';
+    return bilingual('This username already exists. Choose another username or sign in.', 'Ce nom d’utilisateur existe déjà. Choisis-en un autre ou connecte-toi.');
   }
 
   if (
@@ -432,7 +438,7 @@ export const fetchCloudProgressItems = async (): Promise<CloudProgressItem[]> =>
   const authSession = await getActiveAuthSession();
 
   if (!authSession) {
-    throw new Error('You are not signed in.');
+    throw new Error(NOT_SIGNED_IN_MESSAGE);
   }
 
   const { data, error } = await getSupabaseClient()
@@ -456,7 +462,7 @@ export const upsertCloudProgressItems = async (items: CloudProgressItem[]) => {
   const authSession = await getActiveAuthSession();
 
   if (!authSession) {
-    throw new Error('You are not signed in.');
+    throw new Error(NOT_SIGNED_IN_MESSAGE);
   }
 
   const now = new Date().toISOString();
@@ -484,7 +490,7 @@ export const deleteCloudProgressItem = async (type: CloudProgressType, itemKey: 
   const authSession = await getActiveAuthSession();
 
   if (!authSession) {
-    throw new Error('You are not signed in.');
+    throw new Error(NOT_SIGNED_IN_MESSAGE);
   }
 
   const { error } = await getSupabaseClient()
@@ -503,7 +509,7 @@ export const clearCloudProgressItems = async () => {
   const authSession = await getActiveAuthSession();
 
   if (!authSession) {
-    throw new Error('You are not signed in.');
+    throw new Error(NOT_SIGNED_IN_MESSAGE);
   }
 
   const { error } = await getSupabaseClient()
@@ -561,7 +567,7 @@ export const deleteSupabaseAccount = async () => {
   const authSession = await getActiveAuthSession();
 
   if (!authSession) {
-    throw new Error('You are not signed in.');
+    throw new Error(NOT_SIGNED_IN_MESSAGE);
   }
 
   const { error } = await supabase.rpc(DELETE_ACCOUNT_RPC);
@@ -581,7 +587,7 @@ export const signInWithSupabase = async (username: string, password: string) => 
   const normalizedUsername = normalizeUsername(username);
 
   if (normalizedUsername.length < 3) {
-    throw new Error('Enter a username with at least 3 characters.');
+    throw new Error(bilingual('Enter a username with at least 3 characters.', 'Entre un nom d’utilisateur d’au moins 3 caractères.'));
   }
 
   assertStudentNameIsAllowed(normalizedUsername, 'Username');
@@ -610,13 +616,13 @@ export const createSupabaseAccount = async (
   const normalizedUsername = normalizeUsername(username);
 
   if (normalizedUsername.length < 3) {
-    throw new Error('Choose a username with at least 3 characters.');
+    throw new Error(bilingual('Choose a username with at least 3 characters.', 'Choisis un nom d’utilisateur d’au moins 3 caractères.'));
   }
 
   assertStudentNameIsAllowed(normalizedUsername, 'Username');
 
   if (password.length < 6) {
-    throw new Error('Choose a password with at least 6 characters.');
+    throw new Error(bilingual('Choose a password with at least 6 characters.', 'Choisis un mot de passe d’au moins 6 caractères.'));
   }
 
   const normalizedDisplayName = normalizedUsername;
@@ -652,7 +658,7 @@ export const refreshSupabaseUser = async () => {
   const authSession = await getActiveAuthSession();
 
   if (!authSession) {
-    throw new Error('You are not signed in.');
+    throw new Error(NOT_SIGNED_IN_MESSAGE);
   }
 
   return buildAccountSession(authSession);
@@ -677,7 +683,7 @@ export const updateSupabaseXP = async (session: AccountSession, xp: number) => {
   const authSession = await getActiveAuthSession();
 
   if (!authSession) {
-    throw new Error('You are not signed in.');
+    throw new Error(NOT_SIGNED_IN_MESSAGE);
   }
 
   return {
@@ -693,11 +699,11 @@ export const updateSupabaseDisplayName = async (
   const cleanedDisplayName = displayName.trim().replace(/\s+/g, ' ');
 
   if (cleanedDisplayName.length < 1) {
-    throw new Error('Enter a name.');
+    throw new Error(bilingual('Enter a name.', 'Entre un nom.'));
   }
 
   if (cleanedDisplayName.length > 40) {
-    throw new Error('Use a shorter name.');
+    throw new Error(bilingual('Use a shorter name.', 'Choisis un nom plus court.'));
   }
 
   assertStudentNameIsAllowed(cleanedDisplayName, 'Name');
@@ -720,7 +726,7 @@ export const updateSupabaseDisplayName = async (
   const authSession = await getActiveAuthSession();
 
   if (!authSession) {
-    throw new Error('You are not signed in.');
+    throw new Error(NOT_SIGNED_IN_MESSAGE);
   }
 
   return {
@@ -761,6 +767,19 @@ export const syncProgressItemToCloudIfSignedIn = async (item: CloudProgressItem)
   } catch {
     return null;
   }
+};
+
+// Same checks as syncProgressItemToCloudIfSignedIn, but upload errors are thrown rather
+// than swallowed, for callers that tell the student when a backup didn't work.
+export const uploadProgressItemIfSignedIn = async (item: CloudProgressItem) => {
+  if (!isAccountBackendConfigured()) return null;
+
+  const authSession = await getActiveAuthSession();
+  if (!authSession) return null;
+  if (!(await localProgressBelongsToAccount(authSession.user.id))) return null;
+
+  await upsertCloudProgressItems([item]);
+  return item;
 };
 
 export const deleteProgressItemFromCloudIfSignedIn = async (

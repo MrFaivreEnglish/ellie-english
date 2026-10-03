@@ -6,6 +6,19 @@ const DateVocab = {
   thumbnail: require('../../assets/thumbnails/date-thumbnail.png'),
   flashcards: [
     {
+      // The sheet asks for a day first, then a month, so the order follows it.
+      category: 'Days 🗓️',
+      words: [
+        { english: 'Monday', french: 'Lundi' },
+        { english: 'Tuesday', french: 'Mardi' },
+        { english: 'Wednesday', french: 'Mercredi' },
+        { english: 'Thursday', french: 'Jeudi' },
+        { english: 'Friday', french: 'Vendredi' },
+        { english: 'Saturday', french: 'Samedi' },
+        { english: 'Sunday', french: 'Dimanche' }
+      ]
+    },
+    {
       category: 'Months 📆',
       words: [
         { english: 'January', french: 'Janvier' },
@@ -20,18 +33,6 @@ const DateVocab = {
         { english: 'October', french: 'Octobre' },
         { english: 'November', french: 'Novembre' },
         { english: 'December', french: 'Décembre' }
-      ]
-    },
-    {
-      category: 'Days of the Week 🗓️',
-      words: [
-        { english: 'Sunday', french: 'Dimanche' },
-        { english: 'Monday', french: 'Lundi' },
-        { english: 'Tuesday', french: 'Mardi' },
-        { english: 'Wednesday', french: 'Mercredi' },
-        { english: 'Thursday', french: 'Jeudi' },
-        { english: 'Friday', french: 'Vendredi' },
-        { english: 'Saturday', french: 'Samedi' }
       ]
     }
   ]

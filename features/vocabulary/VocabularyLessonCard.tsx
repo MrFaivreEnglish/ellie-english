@@ -9,6 +9,8 @@ import type { ThemeColors } from '../settings/ThemeContext';
 import { getPanelStyle } from '../shared/uiPrimitives';
 import { useSpringPress } from '../shared/useSpringPress';
 import type { VocabularyLesson, VocabGroup } from '../../types/lessonTypes';
+import type { LessonHighlightKind } from '../shared/lessonHighlights';
+import LessonHighlightBadge from '../shared/LessonHighlightBadge';
 import type { getMenuCopy } from '../shared/menuCopy';
 import { getVocabularySelectionCardHeight } from './vocabularySelectionCardLayout';
 import { useDesktopTypographyScale } from '../shared/DesktopTypography';
@@ -37,6 +39,7 @@ export type VocabularyLessonCardProps = {
   imageFailed: boolean;
   imageSource: ImageSourcePropType | undefined;
   difficulty: number | undefined;
+  highlight?: LessonHighlightKind;
   categoryEmoji: string;
   colors: ThemeColors;
   isDarkMode: boolean;
@@ -56,6 +59,7 @@ const VocabularyLessonCard = React.memo(({
   imageFailed,
   imageSource,
   difficulty,
+  highlight,
   categoryEmoji,
   colors,
   isDarkMode,
@@ -153,6 +157,8 @@ const VocabularyLessonCard = React.memo(({
           />
         </View>
       )}
+
+      {!selectionMode && !!highlight && <LessonHighlightBadge kind={highlight} side={isTile ? 'right' : 'left'} />}
 
       {isTile && !!difficulty && (
         <View

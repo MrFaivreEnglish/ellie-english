@@ -6,7 +6,7 @@ const DystopiaVocab = {
   thumbnail: require('../../assets/thumbnails/dystopia-thumbnail.png'),
   flashcards: [
     {
-      category: 'Government 🏛️',
+      category: 'Dystopian Government 🏛️',
       words: [
         { english: '(to) control', french: 'Contrôler' },
         { english: '(to) monitor', french: 'Surveiller' },
@@ -16,10 +16,16 @@ const DystopiaVocab = {
       ],
     },
     {
-      category: 'People & Concepts 👥',
+      // People and Concepts sit side by side on the sheet as two separate blocks.
+      category: 'People 👥',
       words: [
         { english: 'A leader', french: 'Un dirigeant' },
         { english: 'Citizens', french: 'Des citoyens' },
+      ],
+    },
+    {
+      category: 'Concepts ⚖️',
+      words: [
         { english: 'Freedom', french: 'La liberté' },
         { english: 'Rules', french: 'Des règles' },
         { english: 'Laws', french: 'Des lois' },
@@ -27,7 +33,7 @@ const DystopiaVocab = {
       ],
     },
     {
-      category: 'Obedience & Resistance ✊',
+      category: 'Actions ✊',
       words: [
         { english: '(to) obey', french: 'Obéir' },
         { english: '(to) follow', french: 'Suivre' },

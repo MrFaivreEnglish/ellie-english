@@ -12,6 +12,7 @@ import {
 } from 'react-native';
 import Text, { ThemedTextInput as TextInput } from '../shared/ThemedText';
 import MaterialIcons from '../shared/ThemedMaterialIcon';
+import useReducedMotion from '../shared/useReducedMotion';
 import { useAudioPlayer } from 'expo-audio';
 
 import { useTypingGame } from './useTypingGame';
@@ -231,6 +232,9 @@ export default function TypingView({
   const wordFadeAnim = useRef(new Animated.Value(1)).current;
   const xpPulseAnim = useRef(new Animated.Value(1)).current;
   const prevXpRef = useRef(0);
+  // Decorative motion only (floating Ellie, combo flame, shakes, pulses); progress and
+  // feedback still update, just without the movement.
+  const reducedMotion = useReducedMotion();
 
   const theme = useMemo(() => {
     const resolvedColors = {
@@ -391,7 +395,7 @@ export default function TypingView({
 
 
   useEffect(() => {
-    if (!showFeedbackCard || feedbackType === 'correct' || feedbackType === null) {
+    if (!showFeedbackCard || feedbackType === 'correct' || feedbackType === null || reducedMotion) {
       feedbackAvatarFloat.setValue(0);
       return;
     }
@@ -419,7 +423,7 @@ export default function TypingView({
       loop.stop();
       feedbackAvatarFloat.setValue(0);
     };
-  }, [showFeedbackCard, feedbackType, feedbackAvatarFloat]);
+  }, [showFeedbackCard, feedbackType, feedbackAvatarFloat, reducedMotion]);
 
   // Set when the student taps empty space to put the keyboard away; cleared when they tap
   // back into the input or move to the next word.
@@ -456,6 +460,19 @@ export default function TypingView({
   const handleInputFocus = useCallback(() => {
     // Tapping back into the field opts back into the keyboard staying open.
     setKeyboardDismissed(false);
+  }, []);
+
+  // Web only fires onPress from the DOM click, which bubbles out of the input up to the
+  // tap-to-dismiss Pressable wrapping the exercise, so a tap focused the field and was then
+  // blurred again in the same tick, and mobile browsers never showed the keyboard at all.
+  // Giving the field its own Pressable consumes that click (react-native-web stops
+  // propagation at the first PressResponder ancestor), the same shape Fill already uses.
+  // Native is unaffected: there the touch never reached the outer Pressable to begin with.
+  const handleInputAreaPress = useCallback(() => {
+    setKeyboardDismissed(false);
+    // Focus straight from the tap handler: iOS Safari only opens the keyboard for a focus()
+    // call made inside the user gesture, so the hook's requestAnimationFrame path is too late.
+    inputRef.current?.focus();
   }, []);
 
   const onSubmit = useCallback(() => {
@@ -573,7 +590,7 @@ export default function TypingView({
   }, [isFinished, onSessionComplete]);
 
   useEffect(() => {
-    if (streak < 3) {
+    if (streak < 3 || reducedMotion) {
       comboFireScale.setValue(1);
       return;
     }
@@ -595,12 +612,12 @@ export default function TypingView({
         useNativeDriver: Platform.OS !== 'web',
       }),
     ]).start();
-  }, [comboFireScale, streak]);
+  }, [comboFireScale, streak, reducedMotion]);
 
   useEffect(() => {
     const wasCombo = prevStreakRef.current >= 3;
     prevStreakRef.current = streak;
-    if (wasCombo && streak === 0) {
+    if (wasCombo && streak === 0 && !reducedMotion) {
       Animated.sequence([
         Animated.timing(comboShakeAnim, { toValue: -7, duration: 55, useNativeDriver: Platform.OS !== 'web' }),
         Animated.timing(comboShakeAnim, { toValue: 7, duration: 55, useNativeDriver: Platform.OS !== 'web' }),
@@ -608,7 +625,7 @@ export default function TypingView({
         Animated.timing(comboShakeAnim, { toValue: 0, duration: 45, useNativeDriver: Platform.OS !== 'web' }),
       ]).start();
     }
-  }, [comboShakeAnim, streak]);
+  }, [comboShakeAnim, streak, reducedMotion]);
 
   useEffect(() => {
     const target = safeWords.length > 0
@@ -629,14 +646,14 @@ export default function TypingView({
   }, [typingIndex, wordFadeAnim]);
 
   useEffect(() => {
-    if (sessionXp > prevXpRef.current) {
+    if (sessionXp > prevXpRef.current && !reducedMotion) {
       Animated.sequence([
         Animated.spring(xpPulseAnim, { toValue: 1.11, friction: 4, tension: 260, useNativeDriver: Platform.OS !== 'web' }),
         Animated.spring(xpPulseAnim, { toValue: 1, friction: 5, tension: 180, useNativeDriver: Platform.OS !== 'web' }),
       ]).start();
     }
     prevXpRef.current = sessionXp;
-  }, [sessionXp, xpPulseAnim]);
+  }, [sessionXp, xpPulseAnim, reducedMotion]);
 
   if (!safeWords.length) {
     return null;
@@ -900,7 +917,7 @@ export default function TypingView({
 
           <View style={{ position: 'relative' }}>
           <View style={[styles.answerPanel, { marginTop: answerMarginTop }]}>
-            <View style={styles.inputWrap}>
+            <Pressable style={styles.inputWrap} onPress={handleInputAreaPress}>
               <TextInput
                 ref={inputRef}
                 value={typedAnswer}
@@ -978,7 +995,7 @@ export default function TypingView({
                   )}
                 </TouchableOpacity>
               )}
-            </View>
+            </Pressable>
 
             <View style={[styles.checkButtonRow, { marginTop: checkButtonRowMarginTop }]}>
               <TouchableOpacity

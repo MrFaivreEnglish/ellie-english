@@ -19,7 +19,7 @@ import {
 } from './accountAvatarStorage';
 import {
   getSignedInAccountIdIfSignedIn,
-  syncProgressItemToCloudIfSignedIn,
+  uploadProgressItemIfSignedIn,
   type CloudProgressItem,
 } from './accountStorage';
 
@@ -33,6 +33,7 @@ export const VOCAB_LESSON_CARD_VIEW_KEY = '@vocab_lesson_card_view';
 export const TYPING_STRICT_MODE_KEY = '@typing_strict_mode';
 export const HAPTICS_ENABLED_KEY = '@haptics_enabled';
 export const SOUND_EFFECTS_ENABLED_KEY = '@sound_effects_enabled';
+export const REDUCE_ANIMATIONS_KEY = '@reduce_animations';
 export const WEB_HAPTICS_RESTORED_KEY = '@web_haptics_restored';
 export const TODAY_CARD_ENABLED_KEY = '@today_card_enabled';
 export const TODAY_CARD_OPT_IN_KEY = '@today_card_opt_in';
@@ -51,6 +52,7 @@ export type AccountPreferenceSnapshot = {
   typingStrictMode: boolean;
   hapticsEnabled: boolean;
   soundEffectsEnabled: boolean;
+  reduceAnimations: boolean;
   todayCardEnabled: boolean;
   todayCardOptIn: boolean;
   androidStatusBarEnabled: boolean;
@@ -87,6 +89,7 @@ const normalizeSnapshot = (value: unknown): AccountPreferenceSnapshot => {
     typingStrictMode: asBoolean(record.typingStrictMode),
     hapticsEnabled: hapticsAreSupported && asBoolean(record.hapticsEnabled, hapticsAreSupported),
     soundEffectsEnabled: asBoolean(record.soundEffectsEnabled, true),
+    reduceAnimations: asBoolean(record.reduceAnimations),
     todayCardEnabled: asBoolean(record.todayCardEnabled),
     todayCardOptIn: asBoolean(record.todayCardOptIn),
     androidStatusBarEnabled: asBoolean(record.androidStatusBarEnabled, true),
@@ -113,6 +116,7 @@ export const getLocalAccountPreferenceSnapshot = async (
     savedTypingStrictMode,
     savedHapticsEnabled,
     savedSoundEffectsEnabled,
+    savedReduceAnimations,
     savedTodayCardEnabled,
     savedTodayCardOptIn,
     savedAndroidStatusBarEnabled,
@@ -130,6 +134,7 @@ export const getLocalAccountPreferenceSnapshot = async (
     AsyncStorage.getItem(TYPING_STRICT_MODE_KEY),
     AsyncStorage.getItem(HAPTICS_ENABLED_KEY),
     AsyncStorage.getItem(SOUND_EFFECTS_ENABLED_KEY),
+    AsyncStorage.getItem(REDUCE_ANIMATIONS_KEY),
     AsyncStorage.getItem(TODAY_CARD_ENABLED_KEY),
     AsyncStorage.getItem(TODAY_CARD_OPT_IN_KEY),
     AsyncStorage.getItem(ANDROID_STATUS_BAR_ENABLED_KEY),
@@ -150,6 +155,7 @@ export const getLocalAccountPreferenceSnapshot = async (
     typingStrictMode: savedTypingStrictMode === 'true',
     hapticsEnabled: hapticsAreSupported && savedHapticsEnabled !== 'false',
     soundEffectsEnabled: savedSoundEffectsEnabled !== 'false',
+    reduceAnimations: savedReduceAnimations === 'true',
     todayCardEnabled: savedTodayCardOptIn === 'true' && savedTodayCardEnabled === 'true',
     todayCardOptIn: savedTodayCardOptIn === 'true',
     androidStatusBarEnabled: savedAndroidStatusBarEnabled !== 'false',
@@ -176,6 +182,7 @@ export const saveLocalAccountPreferenceSnapshot = async (
       [TYPING_STRICT_MODE_KEY, snapshot.typingStrictMode ? 'true' : 'false'],
       [HAPTICS_ENABLED_KEY, snapshot.hapticsEnabled ? 'true' : 'false'],
       [SOUND_EFFECTS_ENABLED_KEY, snapshot.soundEffectsEnabled ? 'true' : 'false'],
+      [REDUCE_ANIMATIONS_KEY, snapshot.reduceAnimations ? 'true' : 'false'],
       [TODAY_CARD_OPT_IN_KEY, snapshot.todayCardOptIn ? 'true' : 'false'],
       [TODAY_CARD_ENABLED_KEY, snapshot.todayCardEnabled ? 'true' : 'false'],
       [ANDROID_STATUS_BAR_ENABLED_KEY, snapshot.androidStatusBarEnabled ? 'true' : 'false'],
@@ -210,15 +217,14 @@ export const findAccountPreferenceSnapshot = (items: CloudProgressItem[]) => {
   return item ? normalizeSnapshot(item.value) : null;
 };
 
+// Upload errors are thrown: callers report them ("Tap Retry to save them online"). This
+// used to swallow them, so a failed profile backup still showed as backed up. Not being
+// signed in isn't an error and still returns null.
 export const syncAccountPreferencesToCloudIfSignedIn = async () => {
-  try {
-    const accountId = await getSignedInAccountIdIfSignedIn();
-    if (!accountId) return null;
+  const accountId = await getSignedInAccountIdIfSignedIn();
+  if (!accountId) return null;
 
-    const snapshot = await getLocalAccountPreferenceSnapshot(accountId);
-    await syncProgressItemToCloudIfSignedIn(buildAccountPreferencesCloudItem(snapshot));
-    return snapshot;
-  } catch {
-    return null;
-  }
+  const snapshot = await getLocalAccountPreferenceSnapshot(accountId);
+  await uploadProgressItemIfSignedIn(buildAccountPreferencesCloudItem(snapshot));
+  return snapshot;
 };

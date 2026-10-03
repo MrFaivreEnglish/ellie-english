@@ -7,6 +7,7 @@ import {
   markWordXpAwardedToday,
 } from '../progress/xpStorage';
 import { recordPracticeToday } from '../progress/streakStorage';
+import { recordReviewMistake, recordReviewSuccess } from './reviewWordsStorage';
 
 import type { Word } from '../../types/VocabularyTypes';
 import { useTheme } from '../settings/ThemeContext';
@@ -24,6 +25,8 @@ type DifficultyStats = {
 type TypingGameOptions = {
   allowSlashAlternatives?: boolean;
   lessonDifficulty?: number | null;
+  // Shown next to a missed word in Words to review. Mixed practice words carry their own.
+  lessonTitle?: string;
 };
 
 const CLOSE_TRIES_BEFORE_COMBO_LOSS = 2;
@@ -168,6 +171,12 @@ export function useTypingGame(words: Word[], options: TypingGameOptions = {}) {
   const { isTypingStrictMode } = useTheme();
   const allowSlashAlternatives = options.allowSlashAlternatives ?? true;
   const replayXpFraction = getReplayXpFraction(options.lessonDifficulty);
+  const lessonTitle = options.lessonTitle;
+  // Typing is the one mode where a mistake clearly belongs to one word, so it's the only
+  // one that fills Words to review. A hint counts as a mistake: the word wasn't known.
+  const recordMistakeForReview = useCallback((word: Word) => {
+    void recordReviewMistake(word, word.sourceLesson?.title ?? lessonTitle);
+  }, [lessonTitle]);
   const [typedAnswer, setTypedAnswer] = useState('');
   const [typingIndex, setTypingIndex] = useState(0);
   const [gameWords, setGameWords] = useState<Word[]>(() => shuffleArray(words));
@@ -274,7 +283,8 @@ export function useTypingGame(words: Word[], options: TypingGameOptions = {}) {
     setHintsUsed((prev) => ({ ...prev, [currentWordKey]: next }));
     setTypedAnswer(primary.slice(0, next));
     setMissedWordKeys((prev) => new Set(prev).add(currentWordKey));
-  }, [currentWord, currentWordKey, hintsUsed]);
+    if (current === 0) recordMistakeForReview(currentWord);
+  }, [currentWord, currentWordKey, hintsUsed, recordMistakeForReview]);
 
   const reset = useCallback(() => {
     clearPendingAdvance();
@@ -418,6 +428,7 @@ export function useTypingGame(words: Word[], options: TypingGameOptions = {}) {
       // Practice counts toward the streak as soon as it happens, independently of the
       // end-screen XP claim — the student did the work either way.
       void recordPracticeToday();
+      void recordReviewSuccess(currentWord);
 
       if (!alreadyAnswered) {
         awardedWordKeysRef.current.add(currentWordKey);
@@ -469,6 +480,7 @@ export function useTypingGame(words: Word[], options: TypingGameOptions = {}) {
           },
         }));
         setMissedWordKeys((prev) => new Set(prev).add(currentWordKey));
+        recordMistakeForReview(currentWord);
         setStreak(0);
         answerLockedRef.current = true;
         setIsAdvancing(true);
@@ -508,6 +520,7 @@ export function useTypingGame(words: Word[], options: TypingGameOptions = {}) {
       },
     }));
     setMissedWordKeys((prev) => new Set(prev).add(currentWordKey));
+    recordMistakeForReview(currentWord);
     setStreak(0);
     pendingAdvanceTimeoutRef.current = setTimeout(() => {
       pendingAdvanceTimeoutRef.current = null;
@@ -525,6 +538,7 @@ export function useTypingGame(words: Word[], options: TypingGameOptions = {}) {
     currentWord,
     currentWordKey,
     isReviewMode,
+    recordMistakeForReview,
     streak,
     isTypingStrictMode,
     typedAnswer,

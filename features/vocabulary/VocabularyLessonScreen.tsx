@@ -26,6 +26,7 @@ import { getSoftShadow } from '../shared/uiPrimitives';
 import { commitMeasuredSize, getWebLessonScale, isTabletWebViewport, scaleValue } from '../shared/responsiveLayout';
 import { reservesSoftKeyboardSpace } from '../shared/softKeyboardLayout';
 import PracticeDock from '../shared/PracticeDock';
+import { markLessonHighlightSeen } from '../shared/lessonHighlights';
 import VocabularyCategoryControls from './VocabularyCategoryControls';
 import type { CompositeScreenProps } from '@react-navigation/native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
@@ -33,6 +34,7 @@ import type { VocabularyStackParamList, RootStackParamList } from '../../types/n
 
 const shuffleWordList = (words: Word[]) => shuffleArray(words);
 const MAIN_TAB_TARGETS = ['Grammar', 'Vocabulary', 'Lessons', 'Settings'];
+const ROOT_BACK_TARGETS = ['Home', 'MyWords'];
 const vocabularyWordKey = (word: Word) => `${word.english.trim().toLowerCase()}|${word.french.trim().toLowerCase()}`;
 const resolveVocabularyMode = (value: any): VocabularyMode =>
   value === 'matching' || value === 'typing' || value === 'flashcards' ? value : 'flashcards';
@@ -74,6 +76,10 @@ export default function VocabularyLessonScreen({ route, navigation }: Props) {
   const activeModeLabel = sheetMode ? MODE_TITLE_LABELS[sheetMode] : null;
 
   const { lesson, backLabel = 'Back to Vocabulary', backTarget } = route.params;
+
+  useEffect(() => {
+    markLessonHighlightSeen('vocabulary', lesson);
+  }, [lesson]);
   const useRefillMatching = !!lesson?.useRefillMatching;
   // Harder lessons keep more of their XP value on replay — see getReplayXpFraction.
   const lessonDifficulty = (lesson?.title && difficultyMap[lesson.title]) || null;
@@ -151,6 +157,13 @@ export default function VocabularyLessonScreen({ route, navigation }: Props) {
       return;
     }
 
+    // Word reviews open from root screens. Popping back closes MainTabs, so the review
+    // lesson doesn't linger in the Vocabulary tab for the next visit.
+    if (ROOT_BACK_TARGETS.includes(backTarget) && typeof (navigation as any).popTo === 'function') {
+      (navigation as any).popTo(backTarget);
+      return;
+    }
+
     (navigation as any).navigate(backTarget);
   }, [backTarget, navigation, resetBorrowedVocabularyLesson]);
 
@@ -189,7 +202,9 @@ export default function VocabularyLessonScreen({ route, navigation }: Props) {
   const initializedLessonKeyRef = useRef<string | null>(null);
 
   useEffect(() => {
-    if (lesson?.isLearnedMix) return;
+    // A review session is rebuilt from whatever is due, so reopening it from "Continue"
+    // would show a stale list.
+    if (lesson?.isLearnedMix || lesson?.isWordReview) return;
 
     const lastLessonType = backTarget === 'Grammar' || lesson?.practiceType === 'vocabulary'
       ? 'grammar'
@@ -200,7 +215,7 @@ export default function VocabularyLessonScreen({ route, navigation }: Props) {
       lessonId: lesson?.id != null ? String(lesson.id) : undefined,
       title: lesson.title,
     });
-  }, [backTarget, lesson?.id, lesson?.isLearnedMix, lesson?.practiceType, lesson.title]);
+  }, [backTarget, lesson?.id, lesson?.isLearnedMix, lesson?.isWordReview, lesson?.practiceType, lesson.title]);
 
 
   const [timerMode, setTimerMode] = useState(isVocabTimerMode);
@@ -572,7 +587,12 @@ export default function VocabularyLessonScreen({ route, navigation }: Props) {
   const allowTypingSlashAlternatives = !String(lesson?.title ?? '')
     .toLowerCase()
     .includes('irregular verbs');
-  const typingGame = useTypingGame(typingWords, { allowSlashAlternatives: allowTypingSlashAlternatives, lessonDifficulty });
+  const typingGame = useTypingGame(typingWords, {
+    allowSlashAlternatives: allowTypingSlashAlternatives,
+    lessonDifficulty,
+    // A review session's own title isn't where the word came from; its words carry that.
+    lessonTitle: lesson?.isWordReview ? undefined : lesson?.title,
+  });
   useEffect(() => {
     if (mode === 'typing') {
       typingGame.reset?.();

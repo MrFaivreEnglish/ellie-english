@@ -6,6 +6,7 @@ import { scaleValue } from '../../shared/responsiveLayout';
 import { getGrammarGameColors, getSoftShadow } from '../../shared/uiPrimitives';
 import { QUIZ_OPTIONS_MAX_WIDTH } from '../../shared/exerciseLayoutTokens';
 import { freshFontFamily } from '../../shared/freshDirection';
+import useReducedMotion from '../../shared/useReducedMotion';
 import type { ThemeColors } from '../../settings/ThemeContext';
 
 interface GrammarQuizExerciseProps {
@@ -53,6 +54,8 @@ const GrammarQuizExercise: React.FC<GrammarQuizExerciseProps> = ({
   onAnswerPress,
 }) => {
   const grammarGame = getGrammarGameColors(colors, isDarkMode);
+  // The red option and feedback already mark the answer; the shake and pulse are extra.
+  const reducedMotion = useReducedMotion();
 
   const optionShakeAnimsRef = useRef<Map<string, Animated.Value>>(new Map());
   const getOptionShakeAnim = useCallback((option: string) => {
@@ -64,7 +67,7 @@ const GrammarQuizExercise: React.FC<GrammarQuizExerciseProps> = ({
   }, []);
 
   useEffect(() => {
-    if (!incorrectAnswer) return;
+    if (!incorrectAnswer || reducedMotion) return;
     const shakeAnim = getOptionShakeAnim(incorrectAnswer);
     shakeAnim.setValue(0);
     Animated.sequence([
@@ -74,7 +77,7 @@ const GrammarQuizExercise: React.FC<GrammarQuizExerciseProps> = ({
       Animated.timing(shakeAnim, { toValue: 6, duration: 70, useNativeDriver: Platform.OS !== 'web' }),
       Animated.timing(shakeAnim, { toValue: 0, duration: 60, useNativeDriver: Platform.OS !== 'web' }),
     ]).start();
-  }, [incorrectAnswer, getOptionShakeAnim]);
+  }, [incorrectAnswer, getOptionShakeAnim, reducedMotion]);
 
   const optionPulseAnimsRef = useRef<Map<string, Animated.Value>>(new Map());
   const getOptionPulseAnim = useCallback((option: string) => {
@@ -87,14 +90,14 @@ const GrammarQuizExercise: React.FC<GrammarQuizExerciseProps> = ({
 
   useEffect(() => {
     if (!userAnswer) return;
-    if (userAnswer !== exercise?.answer) return;
+    if (userAnswer !== exercise?.answer || reducedMotion) return;
     const pulseAnim = getOptionPulseAnim(userAnswer);
     pulseAnim.setValue(1);
     Animated.sequence([
       Animated.timing(pulseAnim, { toValue: 1.06, duration: 110, easing: Easing.out(Easing.cubic), useNativeDriver: Platform.OS !== 'web' }),
       Animated.timing(pulseAnim, { toValue: 1, duration: 140, easing: Easing.out(Easing.cubic), useNativeDriver: Platform.OS !== 'web' }),
     ]).start();
-  }, [userAnswer, exercise, getOptionPulseAnim]);
+  }, [userAnswer, exercise, getOptionPulseAnim, reducedMotion]);
 
   const options = exercise?.options ?? (typeof exercise?.answer === 'boolean' ? ['True', 'False'] : []);
 

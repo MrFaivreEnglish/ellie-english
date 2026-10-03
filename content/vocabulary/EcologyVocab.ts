@@ -5,7 +5,7 @@ const EcologyVocab = {
   thumbnail: require('../../assets/thumbnails/ecology-thumbnail.png'),
   flashcards: [
     {
-      category: 'Core Concepts & Nature 🌿',
+      category: 'Elements 🌿',
       words: [
         { english: 'Nature', french: 'La nature' },
         { english: 'Climate', french: 'Le climat' },
@@ -16,22 +16,19 @@ const EcologyVocab = {
       ]
     },
     {
-      category: 'Renewable Energy ⚡️',
+      // The sheet keeps the solar panel, the turbine, the litter and the pollution
+      // together in one Objects block rather than splitting energy from waste.
+      category: 'Objects ⚡️',
       words: [
         { english: 'A solar panel', french: 'Un panneau solaire' },
-        { english: 'A wind turbine', french: 'Une éolienne' }
-      ]
-    },
-    {
-      category: 'Waste & Pollution 🗑️',
-      words: [
         { english: 'Garbage', french: 'Les ordures' },
         { english: 'Litter', french: 'Les détritus' },
+        { english: 'A wind turbine', french: 'Une éolienne' },
         { english: 'Pollution', french: 'La pollution' }
       ]
     },
     {
-      category: 'Status & Labels 🏷️',
+      category: 'Adjectives 🏷️',
       words: [
         { english: 'Ecofriendly', french: 'Écologique' },
         { english: 'Endangered', french: 'En danger' },
@@ -40,7 +37,7 @@ const EcologyVocab = {
       ]
     },
     {
-      category: 'Actions & Conservation ♻️',
+      category: 'Actions ♻️',
       words: [
         { english: 'To clean', french: 'Nettoyer' },
         { english: 'To preserve', french: 'Préserver' },

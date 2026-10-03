@@ -1,8 +1,8 @@
 import React from 'react';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
-import Animated, { useAnimatedStyle, useSharedValue, withSequence, withSpring } from 'react-native-reanimated';
+import Animated, { ReducedMotionConfig, ReduceMotion, useAnimatedStyle, useSharedValue, withSequence, withSpring } from 'react-native-reanimated';
 import { NavigationContainer, DefaultTheme as NavDefaultTheme, DarkTheme as NavDarkTheme } from '@react-navigation/native';
-import { BackHandler, View, Image, Platform, useWindowDimensions, type ImageSourcePropType } from 'react-native';
+import { BackHandler, InteractionManager, View, Image, Platform, useWindowDimensions, type ImageSourcePropType } from 'react-native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import 'react-native-gesture-handler';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
@@ -25,6 +25,7 @@ import VocabularyLessonScreen from "./features/vocabulary/VocabularyLessonScreen
 import VocabRushScreen from "./features/vocabulary/vocabRush/VocabRushScreen";
 import SettingsScreen from "./features/settings/SettingsScreen";
 import AccountScreen from "./features/account/AccountScreen";
+import MyWordsScreen from "./features/progress/MyWordsScreen";
 import AdminLessonPreviewScreen from "./features/lessons/AdminLessonPreviewScreen";
 import { Asset } from 'expo-asset';
 import { applyAppChrome, applyImmersiveMode, bindImmersiveOnForeground } from './lib/immersive';
@@ -34,6 +35,8 @@ import ErrorBoundary from './features/shared/ErrorBoundary';
 import { StatusBar } from 'expo-status-bar';
 import { DESKTOP_WEB_MIN_WIDTH, getDesktopTypographyScale, getWebAppContentMaxWidth, LARGE_WIDTH, NARROW_TRAY_WIDTH } from './features/shared/responsiveLayout';
 import { getMenuCopy } from './features/shared/menuCopy';
+import LessonHighlightBadge from './features/shared/LessonHighlightBadge';
+import { getSectionHighlightKind, useSeenLessonHighlights } from './features/shared/lessonHighlights';
 import {
   getSplashBackground,
   HOME_MENU_ROUTE_COLORS,
@@ -42,6 +45,22 @@ import {
 import { getAndroidBottomBarButtonStyle, getAndroidBottomBarColor } from './features/shared/appChromeColors';
 import { getApkPreviewContentMaxWidth, isApkLayoutPreviewEnabled } from './features/shared/apkPreview';
 import type { RootStackParamList, TabParamList, VocabularyStackParamList } from './types/navigationTypes';
+import { pruneOldDailyProgressRecords } from './features/progress/studentProgressStorage';
+import { installGlobalErrorReporter } from './features/system/errorReporting';
+import { bilingual } from './features/shared/bilingual';
+import * as Updates from 'expo-updates';
+
+installGlobalErrorReporter();
+
+// Navigation state may be what broke, so the app-wide boundary restarts instead of
+// navigating. Reloading also picks up a fixed OTA update if one has downloaded.
+const restartApp = () => {
+  if (Platform.OS === 'web') {
+    if (typeof window !== 'undefined') window.location.reload();
+    return;
+  }
+  Updates.reloadAsync().catch(() => {});
+};
 
 
 
@@ -188,6 +207,7 @@ function MainTabNavigator() {
   const isCompactTabBar = width < NARROW_TRAY_WIDTH;
   const isLargeTabBar = width >= LARGE_WIDTH;
   const useApkPreviewLayout = isApkLayoutPreviewEnabled();
+  const seenLessonHighlights = useSeenLessonHighlights();
   const isAndroidTabBarLayout = Platform.OS === 'android' || useApkPreviewLayout;
   const isWebTabBar = Platform.OS === 'web' && !useApkPreviewLayout;
   const isMobileWebTabBar = isWebTabBar && width < DESKTOP_WEB_MIN_WIDTH;
@@ -317,6 +337,11 @@ function MainTabNavigator() {
                 : route.name === 'Settings'
                   ? settingsIconSource
                   : undefined;
+          const tabHighlight = route.name === 'Grammar'
+            ? getSectionHighlightKind('grammar', seenLessonHighlights)
+            : route.name === 'Vocabulary'
+              ? getSectionHighlightKind('vocabulary', seenLessonHighlights)
+              : undefined;
           const isFullColorIcon = route.name === 'Grammar'
             || route.name === 'Vocabulary'
             || route.name === 'Lessons'
@@ -345,6 +370,7 @@ function MainTabNavigator() {
                 color={iconColor}
                 focused={visuallyFocused}
               />
+              {!!tabHighlight && <LessonHighlightBadge kind={tabHighlight} variant="dot" />}
             </View>
           );
         },
@@ -445,6 +471,11 @@ function RootStack() {
         options={{ headerShown: false }}
       />
       <RootStackNav.Screen
+        name="MyWords"
+        component={MyWordsScreen}
+        options={{ headerShown: false }}
+      />
+      <RootStackNav.Screen
         name="FullImageModal"
         component={FullImageScreen}
         options={{ presentation: 'transparentModal', headerShown: false }}
@@ -467,7 +498,7 @@ function RootStack() {
 
 function AppInner() {
   const navigationRef = React.useRef<any>(null);
-  const { isDarkMode, colors, isAndroidStatusBarEnabled, isShinyEllieMode, isShinyElliePresentationMode } = useTheme();
+  const { isDarkMode, colors, isAndroidStatusBarEnabled, isShinyEllieMode, isShinyElliePresentationMode, isReduceAnimationsEnabled } = useTheme();
   const { width: windowWidth } = useWindowDimensions();
   const [currentRoute, setCurrentRoute] = React.useState<string>('Splash');
   const splashBG = getSplashBackground(isShinyElliePresentationMode);
@@ -527,6 +558,13 @@ function AppInner() {
   // the session does not have to wait on that work before it can be heard.
   React.useEffect(() => {
     primeSoundEffects();
+  }, []);
+
+  React.useEffect(() => {
+    const task = InteractionManager.runAfterInteractions(() => {
+      void pruneOldDailyProgressRecords();
+    });
+    return () => task.cancel();
   }, []);
 
   React.useEffect(() => {
@@ -846,7 +884,10 @@ function AppInner() {
   return (
     <>
       <SafeAreaProvider style={{ flex: 1, backgroundColor: sideBackground }}>
-        <Toaster />
+        {/* Reanimated already follows the phone's reduce-motion setting; this adds the
+            in-app Fewer Animations switch on top. Unmounting restores the phone's setting. */}
+        {isReduceAnimationsEnabled && <ReducedMotionConfig mode={ReduceMotion.Always} />}
+        <Toaster theme={isDarkMode ? 'dark' : 'light'} />
         <UpdateBanner />
         <StatusBar
           hidden={shouldHideStatusBar}
@@ -855,6 +896,14 @@ function AppInner() {
         />
         <View style={[styles.appShell, { backgroundColor: sideBackground }]}>
           <View style={[styles.contentWrapper, { backgroundColor: contentBackground, maxWidth: contentMaxWidth }]}>
+            <ErrorBoundary
+              reportSource="app"
+              message={bilingual(
+                'Ellie hit a problem. Your saved progress is safe.',
+                'Ellie a rencontré un problème. Ta progression enregistrée est en sécurité.'
+              )}
+              onRestart={restartApp}
+            >
             <NavigationContainer
               ref={navigationRef}
               theme={navigationTheme}
@@ -875,6 +924,7 @@ function AppInner() {
             >
               <RootStack />
             </NavigationContainer>
+            </ErrorBoundary>
           </View>
         </View>
         <AndroidStatusBarBackdrop

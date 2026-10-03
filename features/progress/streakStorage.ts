@@ -32,11 +32,16 @@ export const getStreak = async (): Promise<StreakData> => {
     const raw = await AsyncStorage.getItem(STREAK_KEY);
     if (!raw) return DEFAULT_STREAK;
     const parsed = JSON.parse(raw);
-    return {
+    const stored: StreakData = {
       currentStreak: typeof parsed.currentStreak === 'number' ? parsed.currentStreak : 0,
       longestStreak: typeof parsed.longestStreak === 'number' ? parsed.longestStreak : 0,
       lastPracticeDate: typeof parsed.lastPracticeDate === 'string' ? parsed.lastPracticeDate : '',
     };
+    // The stored count is only rewritten when the student practises, so without this a
+    // student who stopped a week ago kept seeing their old streak until they came back.
+    const isStreakAlive =
+      stored.lastPracticeDate === getLocalDateKey() || stored.lastPracticeDate === getYesterdayKey();
+    return isStreakAlive ? stored : { ...stored, currentStreak: 0 };
   } catch {
     return DEFAULT_STREAK;
   }

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Image } from 'react-native';
+import { Image as ExpoImage } from 'expo-image';
 import { getLessonImage, getLessonThumbnailSource } from './vocabularyUtils';
 import { Word } from '../../types/VocabularyTypes';
 import type { VocabGroup } from '../../types/lessonTypes';
@@ -106,7 +106,8 @@ export function useVocabularyLessonContent(
     let cancelled = false;
     mixedLessonImageCards.forEach((imageCard) => {
       if (cancelled) return;
-      Image.prefetch(imageCard.imageUrl).catch(() => {});
+      // Into expo-image's disk cache, which is where ImageWithCredit reads sheets from.
+      ExpoImage.prefetch(imageCard.imageUrl, 'disk').catch(() => {});
     });
 
     return () => {

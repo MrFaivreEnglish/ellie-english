@@ -2,36 +2,28 @@ const FashionVocab = {
   id: '314',
   title: 'Fashion',
   description: 'Learn vocabulary related to fashion and clothing trends',
-  imageUrl: 'https://wretggbpaejzjdilemit.supabase.co/storage/v1/object/public/lesson-images/15274719ab/fashion.webp',
+  imageUrl: 'https://wretggbpaejzjdilemit.supabase.co/storage/v1/object/public/lesson-images/15274719ab/fashion.webp?v=2',
   thumbnail: require('../../assets/thumbnails/fashion-thumbnail.png'),
   flashcards: [
     {
-      category: 'Trendy & Stylish 🧥',
+      // The sheet runs every style adjective under one Defining style block, in this
+      // order, so a student reading down the sheet finds the same words here.
+      category: 'Defining style 🧥',
       words: [
         { english: 'Trendy, Stylish', french: 'Tendance, Stylé' },
         { english: 'Old-fashioned', french: 'Démodé' },
         { english: 'Casual, Relaxed', french: 'Décontracté, Détendu' },
         { english: 'Dressy, Fancy', french: 'Chic' },
         { english: 'Formal', french: 'Formel' },
-        { english: 'Elegant', french: 'Élégant' }
-      ]
-    },
-    {
-      category: 'Types of Clothing 👗',
-      words: [
+        { english: 'Elegant', french: 'Élégant' },
         { english: 'Classic', french: 'Classique' },
         { english: 'Basic', french: 'Basique' },
         { english: 'Colourful', french: 'Coloré' },
         { english: 'Worn out', french: 'Usé' },
         { english: 'Slim, Tight', french: 'Ajusté, Serré' },
         { english: 'Loose, Baggy', french: 'Ample, Large' },
-      ]
-    },
-    {
-      category: 'Comfort & Style 💃',
-      words: [
         { english: 'Comfortable', french: 'Confortable' },
-        { english: 'Exciting', french: 'Excitant' },
+        { english: 'Interesting', french: 'Intéressant' },
         { english: 'Boring', french: 'Ennuyeux' },
         { english: 'Playful, Fun', french: 'Amusant' },
         { english: 'Pretty', french: 'Joli' },
@@ -39,7 +31,7 @@ const FashionVocab = {
       ]
     },
     {
-      category: 'Sustainable Fashion 🌱',
+      category: 'Ecology and fashion 🌱',
       words: [
         { english: 'Sustainable, Eco-friendly', french: 'Durable, Écologique' },
         { english: 'Organic', french: 'Bio' },
@@ -52,7 +44,7 @@ const FashionVocab = {
       ]
     },
     {
-      category: 'Fashion Actions 🛒',
+      category: 'Actions 🛒',
       words: [
         { english: '(to) recycle', french: 'Recycler' },
         { english: '(to) repair', french: 'Réparer' },

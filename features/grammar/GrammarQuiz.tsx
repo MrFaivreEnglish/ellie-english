@@ -34,6 +34,7 @@ import { PERFECT_RUN_XP_MULTIPLIER } from '../progress/xpRewards';
 import { saveLastLesson } from '../progress/lastLessonStorage';
 import { unlockMode } from '../progress/modeUnlockStorage';
 import PracticeSheet from '../shared/PracticeSheet';
+import useReducedMotion from '../shared/useReducedMotion';
 import { triggerSelectionHaptic } from '../shared/haptics';
 import { getButtonStyle, getButtonTextColor, getGrammarGameColors, getSoftShadow, withColorAlpha } from '../shared/uiPrimitives';
 import PracticeDock from '../shared/PracticeDock';
@@ -439,10 +440,13 @@ const GrammarQuiz: React.FC<GrammarQuizProps> = ({ lesson, onBack, backLabel = '
     setExerciseMode('quiz');
   }, [lesson?.title]);
 
+  const reducedMotion = useReducedMotion();
+
   useEffect(() => {
     const previousLives = previousLivesRef.current;
 
-    if (lives < previousLives) {
+    // The lives pill already shows one fewer heart; the breaking-heart effect is extra.
+    if (lives < previousLives && !reducedMotion) {
       setLostLifeIndex(previousLives - 1);
       lostLifeAnim.setValue(0);
 
@@ -462,7 +466,7 @@ const GrammarQuiz: React.FC<GrammarQuizProps> = ({ lesson, onBack, backLabel = '
     }
 
     previousLivesRef.current = lives;
-  }, [lives, lostLifeAnim]);
+  }, [lives, lostLifeAnim, reducedMotion]);
 
   const switchExerciseMode = (mode: ExerciseMode) => {
     const safeMode = resolveSafeMode(mode);

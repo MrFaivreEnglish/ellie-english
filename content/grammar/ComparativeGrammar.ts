@@ -48,143 +48,142 @@ const ComparativeGrammar = {
   {
     type: 'translate',
     question: 'Translate into English.',
-    prompt: "Ce livre est aussi intéressant que l’autre.",
-    answer: "This book is as interesting as the other one.",
-    wordBank: ["This book", "is", "as interesting as", "more interesting than", "the other", "one."]
+    prompt: "Ce livre est plus intéressant que l’autre.",
+    answer: "This book is more interesting than the other one.",
+    wordBank: ["This book", "is", "more interesting than", "interestinger than", "the other", "one."]
   },
   {
     type: 'translate',
     question: 'Translate into English.',
-    prompt: "Paul est moins grand que Marc.",
-    answer: "Paul is less tall than Marc.",
-    wordBank: ["Paul", "is", "less tall than", "taller than", "Marc."]
+    prompt: "Paul est plus grand que Marc.",
+    answer: "Paul is taller than Marc.",
+    wordBank: ["Paul", "is", "taller than", "more tall than", "Marc."]
   },
   {
     type: 'translate',
     question: 'Translate into English.',
-    prompt: "Cette voiture est aussi chère que celle-là.",
-    answer: "This car is as expensive as that one.",
-    wordBank: ["This car", "is", "as expensive as", "more expensive than", "that one."]
+    prompt: "Cette voiture est plus chère que celle-là.",
+    answer: "This car is more expensive than that one.",
+    wordBank: ["This car", "is", "more expensive than", "expensiver than", "that one."]
   },
   {
     type: 'translate',
     question: 'Translate into English.',
-    prompt: "Aujourd’hui est moins chaud qu’hier.",
-    answer: "Today is less hot than yesterday.",
-    wordBank: ["Today", "is", "less hot than", "hotter than", "yesterday."]
+    prompt: "Aujourd’hui est plus chaud qu’hier.",
+    answer: "Today is hotter than yesterday.",
+    wordBank: ["Today", "is", "hotter than", "more hot than", "yesterday."]
   },
   {
     type: 'translate',
     question: 'Translate into English.',
-    prompt: "Ce test est aussi difficile que l’autre.",
-    answer: "This test is as difficult as the other one.",
-    wordBank: ["This test", "is", "as difficult as", "more difficult than", "the other", "one."]
+    prompt: "Ce test est plus difficile que l’autre.",
+    answer: "This test is more difficult than the other one.",
+    wordBank: ["This test", "is", "more difficult than", "difficulter than", "the other", "one."]
   },
   {
     type: 'translate',
     question: 'Translate into English.',
-    prompt: "Le vélo est moins rapide que la moto.",
-    answer: "The bike is less fast than the motorcycle.",
-    wordBank: ["The bike", "is", "less fast than", "faster than", "the motorcycle."]
+    prompt: "Le vélo est plus rapide que la moto.",
+    answer: "The bike is faster than the motorcycle.",
+    wordBank: ["The bike", "is", "faster than", "more fast than", "the motorcycle."]
   },
   {
     type: 'translate',
     question: 'Translate into English.',
-    prompt: "Cette robe est aussi jolie que la bleue.",
-    answer: "This dress is as pretty as the blue one.",
-    wordBank: ["This dress", "is", "as pretty as", "prettier than", "the blue", "one."]
+    prompt: "Cette robe est plus jolie que la bleue.",
+    answer: "This dress is prettier than the blue one.",
+    wordBank: ["This dress", "is", "prettier than", "more pretty than", "the blue", "one."]
   },
   {
     type: 'translate',
     question: 'Translate into English.',
-    prompt: "Ce restaurant est moins cher que l’autre.",
-    answer: "This restaurant is less expensive than the other one.",
-    wordBank: ["This restaurant", "is", "less expensive than", "cheaper than", "the other", "one."]
+    prompt: "Ce restaurant est plus cher que l’autre.",
+    answer: "This restaurant is cheaper than the other one.",
+    wordBank: ["This restaurant", "is", "cheaper than", "more cheap than", "the other", "one."]
   },
   {
     type: 'translate',
     question: 'Translate into English.',
-    prompt: "Sa voiture est aussi récente que la mienne.",
-    answer: "His car is as new as mine.",
-    wordBank: ["His car", "is", "as new as", "newer than", "mine."]
+    prompt: "Mon nouveau téléphone est meilleur que l’ancien.",
+    answer: "My new phone is better than the old one.",
+    wordBank: ["My new phone", "is", "better than", "more good than", "the old", "one."]
   },
   {
     type: 'translate',
     question: 'Translate into English.',
-    prompt: "Le film est moins mauvais que la série.",
-    answer: "The movie is less bad than the series.",
-    wordBank: ["The movie", "is", "less bad than", "worse than", "the series."]
-  },
-
-  {
-    type: 'translate',
-    question: 'Translate into English.',
-    prompt: "Cette plage est aussi calme.",
-    answer: "This beach is as quiet.",
-    wordBank: ["This beach", "is", "as quiet", "quieter"]
+    prompt: "Le film est plus mauvais que la série.",
+    answer: "The movie is worse than the series.",
+    wordBank: ["The movie", "is", "worse than", "more bad than", "the series."]
   },
   {
     type: 'translate',
     question: 'Translate into English.',
-    prompt: "Ce pantalon est moins élégant.",
-    answer: "These pants are less elegant.",
-    wordBank: ["These pants", "are", "less elegant", "more elegant"]
+    prompt: "Cette plage est plus calme.",
+    answer: "This beach is quieter.",
+    wordBank: ["This beach", "is", "quieter", "more quiet"]
   },
   {
     type: 'translate',
     question: 'Translate into English.',
-    prompt: "Le café est aussi fort.",
-    answer: "The coffee is as strong.",
-    wordBank: ["The coffee", "is", "as strong", "stronger"]
+    prompt: "Ce pantalon est plus élégant.",
+    answer: "These pants are more elegant.",
+    wordBank: ["These pants", "are", "more elegant", "eleganter"]
   },
   {
     type: 'translate',
     question: 'Translate into English.',
-    prompt: "Cette valise est moins lourde.",
-    answer: "This suitcase is less heavy.",
-    wordBank: ["This suitcase", "is", "less heavy", "heavier"]
+    prompt: "Le café est plus fort.",
+    answer: "The coffee is stronger.",
+    wordBank: ["The coffee", "is", "stronger", "more strong"]
   },
   {
     type: 'translate',
     question: 'Translate into English.',
-    prompt: "Paris est aussi grand.",
-    answer: "Paris is as big.",
-    wordBank: ["Paris", "is", "as big", "bigger"]
+    prompt: "Cette valise est plus lourde.",
+    answer: "This suitcase is heavier.",
+    wordBank: ["This suitcase", "is", "heavier", "more heavy"]
   },
   {
     type: 'translate',
     question: 'Translate into English.',
-    prompt: "Le train est moins rapide.",
-    answer: "The train is less fast.",
-    wordBank: ["The train", "is", "less fast", "faster"]
+    prompt: "Paris est plus grand.",
+    answer: "Paris is bigger.",
+    wordBank: ["Paris", "is", "bigger", "more big"]
   },
   {
     type: 'translate',
     question: 'Translate into English.',
-    prompt: "Cette chambre est aussi propre.",
-    answer: "This room is as clean.",
-    wordBank: ["This room", "is", "as clean", "cleaner"]
+    prompt: "Le train est plus rapide.",
+    answer: "The train is faster.",
+    wordBank: ["The train", "is", "faster", "more fast"]
   },
   {
     type: 'translate',
     question: 'Translate into English.',
-    prompt: "Ces chaussures sont moins confortables.",
-    answer: "These shoes are less comfortable.",
-    wordBank: ["These shoes", "are", "less comfortable", "more comfortable"]
+    prompt: "Cette chambre est plus propre.",
+    answer: "This room is cleaner.",
+    wordBank: ["This room", "is", "cleaner", "more clean"]
   },
   {
     type: 'translate',
     question: 'Translate into English.',
-    prompt: "Le musée est aussi loin que le parc.",
-    answer: "The museum is as far as the park.",
-    wordBank: ["The museum", "is", "as far as", "farther than", "the park."]
+    prompt: "Ces chaussures sont plus confortables.",
+    answer: "These shoes are more comfortable.",
+    wordBank: ["These shoes", "are", "more comfortable", "comfortabler"]
   },
   {
     type: 'translate',
     question: 'Translate into English.',
-    prompt: "Mon sac est moins lourd que le tien.",
-    answer: "My bag is less heavy than yours.",
-    wordBank: ["My bag", "is", "less heavy than", "heavier than", "yours."]
+    prompt: "Le musée est plus loin que le parc.",
+    answer: "The museum is farther than the park.",
+    wordBank: ["The museum", "is", "farther than", "more far than", "the park."]
+  },
+  {
+    type: 'translate',
+    question: 'Translate into English.',
+    prompt: "Mon sac est plus lourd que le tien.",
+    answer: "My bag is heavier than yours.",
+    wordBank: ["My bag", "is", "heavier than", "more heavy than", "yours."]
   }
   ],
 

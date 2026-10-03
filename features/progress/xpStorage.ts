@@ -119,6 +119,29 @@ export const setXP = async (xp: number) => {
   } catch {}
 };
 
+const DAILY_RECORD_PREFIXES = [
+  DAILY_WORD_XP_PREFIX,
+  DAILY_ACTIVITY_XP_PREFIX,
+  DAILY_PRACTICE_PREFIX,
+  DAILY_GRANTED_XP_PREFIX,
+];
+
+// These per-day records are only ever read for today (replay dedupe and the daily soft
+// cap), but nothing deleted them, so every practice day left four behind for good.
+export const pruneOldDailyXPRecords = async () => {
+  try {
+    const currentKeys = new Set(DAILY_RECORD_PREFIXES.map(todayKey));
+    const allKeys = await AsyncStorage.getAllKeys();
+    const staleKeys = allKeys.filter(
+      (key) => DAILY_RECORD_PREFIXES.some((prefix) => key.startsWith(`${prefix}_`)) && !currentKeys.has(key)
+    );
+
+    if (staleKeys.length > 0) {
+      await AsyncStorage.multiRemove(staleKeys);
+    }
+  } catch {}
+};
+
 export const clearLocalXPProgress = async () => {
   try {
     const allKeys = await AsyncStorage.getAllKeys();

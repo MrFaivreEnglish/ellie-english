@@ -16,6 +16,7 @@ import type { ThemeColors } from '../settings/ThemeContext';
 import { freshFontFamily } from '../shared/freshDirection';
 import { useDesktopTypographyScale } from '../shared/DesktopTypography';
 import { getSheetDensity } from '../shared/responsiveLayout';
+import useReducedMotion from '../shared/useReducedMotion';
 
 export type SessionResultTone = 'success' | 'celebration' | 'perfect' | 'warning';
 
@@ -284,10 +285,13 @@ export function SessionResultStats({
   isDarkMode,
   items,
   reveal = true,
-  animationsEnabled = true,
+  animationsEnabled: animationsRequested = true,
   revealDelay = 0,
   forceDense = false,
 }: SessionResultStatsProps) {
+  // Vocab Rush's end card doesn't pass a motion preference, so check it here as well.
+  const reducedMotion = useReducedMotion();
+  const animationsEnabled = animationsRequested && !reducedMotion;
   const { width, height } = useWindowDimensions();
   const desktopScale = useDesktopTypographyScale();
   const tileAnimations = useRef(Array.from({ length: 6 }, () => new Animated.Value(0))).current;

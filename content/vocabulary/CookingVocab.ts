@@ -6,7 +6,7 @@ const CookingVocab = {
   thumbnail: require('../../assets/thumbnails/cooking-thumbnail.png'),
   flashcards: [
     {
-      category: 'Utensils & Tableware 🍽️',
+      category: 'Utensils 🍽️',
       words: [
         { english: 'A fork', french: 'Une fourchette' },
         { english: 'A knife', french: 'Un couteau' },
@@ -22,7 +22,7 @@ const CookingVocab = {
       ]
     },
     {
-      category: 'Verbs 👩‍🍳',
+      category: 'Actions 👩‍🍳',
       words: [
         { english: 'To stir', french: 'Remuer' },
         { english: 'To mix', french: 'Mélanger' },

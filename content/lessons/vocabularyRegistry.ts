@@ -38,7 +38,9 @@ import JobsVocab from '../vocabulary/JobsVocab';
 import LegendsVocab from '../vocabulary/LegendsVocab';
 import LocationVocab from '../vocabulary/LocationVocab';
 import LoveVocab from '../vocabulary/LoveVocab';
+import MonthsAndSeasonsVocab from '../vocabulary/MonthsAndSeasonsVocab';
 import MoreFoodBasicsVocab from '../vocabulary/MoreFoodBasicsVocab';
+import NumbersVocab from '../vocabulary/NumbersVocab';
 import NationalityVocab from '../vocabulary/NationalityVocab';
 import NourritureVocab from '../vocabulary/NourritureVocab';
 import OpinionLevel1Vocab from '../vocabulary/OpinionLevel1Vocab';
@@ -46,6 +48,7 @@ import OpinionLevel2Vocab from '../vocabulary/OpinionLevel2Vocab';
 import PersonalityLevel1Vocab from '../vocabulary/PersonalityLevel1Vocab';
 import PersonalityLevel2Vocab from '../vocabulary/PersonalityLevel2Vocab';
 import PhysicalDescriptionVocab from '../vocabulary/PhysicalDescriptionVocab';
+import PresentingFilmVocab from '../vocabulary/PresentingFilmVocab';
 import QuestionWordsVocab from '../vocabulary/QuestionWordsVocab';
 import RobotsVocab from '../vocabulary/RobotsVocab';
 import SchoolLvl2Vocab from '../vocabulary/SchoolLvl2Vocab';
@@ -83,6 +86,8 @@ export const vocabularyCategories: Array<{ title: string; lessons: any[] }> = [
     lessons: [
       withDescription(TimeVocab, 'Tell the time in English.'),
       withDescription(DateVocab, 'Say days, months, and dates.'),
+      withDescription(MonthsAndSeasonsVocab, 'Name the months and the four seasons.'),
+      withDescription(NumbersVocab, 'Count from zero to one thousand.'),
       withDescription(ColoursVocab, 'Name basic colours.'),
       withDescription(QuestionWordsVocab, 'Use who, what, where, and more.'),
       withDescription(FrequencyAdverbsVocab, 'Say how often things happen.'),
@@ -139,6 +144,7 @@ export const vocabularyCategories: Array<{ title: string; lessons: any[] }> = [
     lessons: [
       withDescription(ActivityVocab, 'Talk about free-time activities.'),
       withDescription(CinemaVocab, 'Talk about films and the cinema.'),
+      withDescription(PresentingFilmVocab, 'Present a film: plot, cast, director, release.'),
       withDescription(VideoGamesVocab, 'Use words for video games.'),
       withDescription(VideoGamePowersVocab, 'Talk about powers and game skills.'),
       withDescription(SportsVocab, 'Talk about people, actions, events, and skills in sports.'),

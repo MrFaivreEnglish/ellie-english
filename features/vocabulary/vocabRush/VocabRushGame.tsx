@@ -4,6 +4,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useIsFocused } from '@react-navigation/native';
 import Text from '../../shared/ThemedText';
 import MaterialIcons from '../../shared/ThemedMaterialIcon';
+import useReducedMotion from '../../shared/useReducedMotion';
 import { vocabRushColors, vocabRushColorsForTheme } from './vocabRushColors';
 import { shuffleArray } from '../vocabularyUtils';
 import { triggerSelectionHaptic, triggerSuccessHaptic, triggerWarningHaptic } from '../../shared/haptics';
@@ -38,9 +39,20 @@ const REFILL_DELAY_MS = 150;
 const GRID_MAX_WIDTH = 820;
 const GRID_COLUMN_GAP = 60;
 
-const CARD_ENTER_MS = 320;
+// The opening deal is the slow, Duolingo-style cascade: cards drift up row by
+// row while the clock is held. Mid-game refills use the snappy timings below so
+// play never waits on an animation.
+const CARD_ENTER_MS = 620;
+const CARD_ENTER_FADE_MS = 380;
+const CARD_ENTER_OFFSET = 16;
+const CARD_ENTER_SCALE = 0.84;
+const CARD_ENTER_ROW_STAGGER_MS = 95;
+
+const CARD_REFILL_ENTER_MS = 300;
+const CARD_REFILL_OFFSET = 6;
+const CARD_REFILL_SCALE = 0.97;
+
 const CARD_EXIT_MS = 130;
-const CARD_ENTER_OFFSET = 6;
 
 type ModeKey = 'easy' | 'normal' | 'hard' | 'impossible';
 
@@ -179,12 +191,18 @@ export default function VocabRushGame({
   const cardAnimsRef = useRef<Map<string, CardAnim>>(new Map());
   const prevPairIdsRef = useRef<Map<string, string | null>>(new Map());
 
+  // True only for the first board of a run, so the slow cascade never repeats on refills.
+  const openingDealRef = useRef(false);
+  const dealTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // Holds the countdown while the opening deal plays out.
+  const [dealing, setDealing] = useState(false);
+
   const getCardAnim = (slotKey: string): CardAnim => {
     let anim = cardAnimsRef.current.get(slotKey);
     if (!anim) {
       anim = {
         opacity: new Animated.Value(0),
-        scale: new Animated.Value(0.94),
+        scale: new Animated.Value(CARD_ENTER_SCALE),
         translateY: new Animated.Value(CARD_ENTER_OFFSET),
       };
       cardAnimsRef.current.set(slotKey, anim);
@@ -197,11 +215,13 @@ export default function VocabRushGame({
     Animated.parallel([
       Animated.timing(anim.opacity, { toValue: 0, duration: CARD_EXIT_MS, easing: Easing.in(Easing.cubic), useNativeDriver: Platform.OS !== 'web' }),
       Animated.timing(anim.scale, { toValue: 0.86, duration: CARD_EXIT_MS, easing: Easing.in(Easing.cubic), useNativeDriver: Platform.OS !== 'web' }),
-      Animated.timing(anim.translateY, { toValue: -CARD_ENTER_OFFSET, duration: CARD_EXIT_MS, easing: Easing.in(Easing.cubic), useNativeDriver: Platform.OS !== 'web' }),
+      Animated.timing(anim.translateY, { toValue: -CARD_REFILL_OFFSET, duration: CARD_EXIT_MS, easing: Easing.in(Easing.cubic), useNativeDriver: Platform.OS !== 'web' }),
     ]).start();
   };
 
   useEffect(() => {
+    const entering: { slotKey: string; index: number }[] = [];
+
     (['en', 'fr'] as const).forEach((column) => {
       board[column].forEach((slot, index) => {
         const slotKey = `${column}-${index}`;
@@ -209,21 +229,66 @@ export default function VocabRushGame({
         const prevPairId = prevPairIdsRef.current.get(slotKey);
 
         if (currentPairId && currentPairId !== prevPairId) {
-          const anim = getCardAnim(slotKey);
-          anim.opacity.setValue(0);
-          anim.scale.setValue(0.97);
-          anim.translateY.setValue(CARD_ENTER_OFFSET);
-          Animated.parallel([
-            Animated.timing(anim.opacity, { toValue: 1, duration: CARD_ENTER_MS, easing: Easing.out(Easing.quad), useNativeDriver: Platform.OS !== 'web' }),
-            Animated.timing(anim.scale, { toValue: 1, duration: CARD_ENTER_MS, easing: Easing.out(Easing.quad), useNativeDriver: Platform.OS !== 'web' }),
-            Animated.timing(anim.translateY, { toValue: 0, duration: CARD_ENTER_MS, easing: Easing.out(Easing.quad), useNativeDriver: Platform.OS !== 'web' }),
-          ]).start();
+          entering.push({ slotKey, index });
         }
 
         prevPairIdsRef.current.set(slotKey, currentPairId);
       });
     });
+
+    if (entering.length === 0) return;
+
+    const native = Platform.OS !== 'web';
+    const isOpeningDeal = openingDealRef.current;
+
+    if (!isOpeningDeal) {
+      // Refill after a match: appear right away, no stagger, no held clock.
+      entering.forEach(({ slotKey }) => {
+        const anim = getCardAnim(slotKey);
+        anim.opacity.setValue(0);
+        anim.scale.setValue(CARD_REFILL_SCALE);
+        anim.translateY.setValue(CARD_REFILL_OFFSET);
+        Animated.parallel([
+          Animated.timing(anim.opacity, { toValue: 1, duration: CARD_REFILL_ENTER_MS, easing: Easing.out(Easing.quad), useNativeDriver: native }),
+          Animated.timing(anim.scale, { toValue: 1, duration: CARD_REFILL_ENTER_MS, easing: Easing.out(Easing.quad), useNativeDriver: native }),
+          Animated.timing(anim.translateY, { toValue: 0, duration: CARD_REFILL_ENTER_MS, easing: Easing.out(Easing.quad), useNativeDriver: native }),
+        ]).start();
+      });
+      return;
+    }
+
+    openingDealRef.current = false;
+
+    // Stagger by row so both columns of a row land together.
+    const rowsEntering = [...new Set(entering.map((card) => card.index))].sort((a, b) => a - b);
+    const staggerStepForRow = new Map(rowsEntering.map((index, step) => [index, step]));
+
+    entering.forEach(({ slotKey, index }) => {
+      const anim = getCardAnim(slotKey);
+      const delay = (staggerStepForRow.get(index) ?? 0) * CARD_ENTER_ROW_STAGGER_MS;
+
+      anim.opacity.setValue(0);
+      anim.scale.setValue(CARD_ENTER_SCALE);
+      anim.translateY.setValue(CARD_ENTER_OFFSET);
+      Animated.parallel([
+        Animated.timing(anim.opacity, { toValue: 1, delay, duration: CARD_ENTER_FADE_MS, easing: Easing.out(Easing.quad), useNativeDriver: native }),
+        Animated.timing(anim.scale, { toValue: 1, delay, duration: CARD_ENTER_MS, easing: Easing.out(Easing.back(1.4)), useNativeDriver: native }),
+        Animated.timing(anim.translateY, { toValue: 0, delay, duration: CARD_ENTER_MS, easing: Easing.out(Easing.back(1.4)), useNativeDriver: native }),
+      ]).start();
+    });
+
+    // Release the clock once the last card has settled.
+    const lastStep = Math.max(0, rowsEntering.length - 1);
+    if (dealTimeoutRef.current) clearTimeout(dealTimeoutRef.current);
+    dealTimeoutRef.current = setTimeout(() => {
+      dealTimeoutRef.current = null;
+      setDealing(false);
+    }, lastStep * CARD_ENTER_ROW_STAGGER_MS + CARD_ENTER_MS);
   }, [board]);
+
+  useEffect(() => () => {
+    if (dealTimeoutRef.current) clearTimeout(dealTimeoutRef.current);
+  }, []);
 
   const startGame = (modeKey: ModeKey) => {
     const fresh = buildInitialBoard(words);
@@ -231,6 +296,12 @@ export default function VocabRushGame({
 
     cardAnimsRef.current.clear();
     prevPairIdsRef.current.clear();
+    if (dealTimeoutRef.current) {
+      clearTimeout(dealTimeoutRef.current);
+      dealTimeoutRef.current = null;
+    }
+    openingDealRef.current = true;
+    setDealing(true);
     gameEndedRef.current = false;
     pendingRefillSlotsRef.current = [];
     setBoard({ en: fresh.en, fr: fresh.fr });
@@ -318,7 +389,7 @@ export default function VocabRushGame({
     }
   }, [isFocused, mode, pickerVisible, gameOver, totalWords]);
 
-  const paused = pickerVisible || gameOver || !isFocused;
+  const paused = pickerVisible || gameOver || !isFocused || dealing;
 
   useEffect(() => {
     if (paused) return;
@@ -334,8 +405,11 @@ export default function VocabRushGame({
     }
   }, [timeLeft, gameOver, matchedCount, mode]);
 
+  // The countdown still ticks down visibly; only the pulse in the last 5 seconds goes.
+  const reducedMotion = useReducedMotion();
+
   useEffect(() => {
-    const shouldPulse = timeLeft > 0 && timeLeft <= 5 && !gameOver;
+    const shouldPulse = timeLeft > 0 && timeLeft <= 5 && !gameOver && !reducedMotion;
     if (shouldPulse) {
       if (!timerPulseLoopRef.current) {
         const loop = Animated.loop(
@@ -352,7 +426,7 @@ export default function VocabRushGame({
       timerPulseLoopRef.current = null;
       timerPulseAnim.setValue(1);
     }
-  }, [timeLeft, gameOver, timerPulseAnim]);
+  }, [timeLeft, gameOver, timerPulseAnim, reducedMotion]);
 
   useEffect(() => {
     if (totalWords > 0 && matchedCount >= totalWords && !gameOver && !gameEndedRef.current) {

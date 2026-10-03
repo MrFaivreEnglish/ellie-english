@@ -3,12 +3,18 @@ import { StyleSheet, TouchableOpacity, View } from 'react-native';
 import Text from './ThemedText';
 import MaterialIcons from './ThemedMaterialIcon';
 import { useTheme } from '../settings/ThemeContext';
+import { reportAppError, type ErrorReportSource } from '../system/errorReporting';
+import { bilingual } from './bilingual';
 
 type ErrorBoundaryProps = {
   children: React.ReactNode;
   onBack?: () => void;
   onHome?: () => void;
+  // For the app-wide boundary, where navigation itself may be what broke.
+  onRestart?: () => void;
   title?: string;
+  message?: string;
+  reportSource?: ErrorReportSource;
 };
 
 type ErrorBoundaryState = {
@@ -24,7 +30,13 @@ class ErrorBoundaryBase extends React.Component<ErrorBoundaryProps & ReturnType<
 
   componentDidCatch(error: Error, info: React.ErrorInfo) {
     console.warn('Screen error boundary caught an error', error, info.componentStack);
+    void reportAppError(error, { source: this.props.reportSource ?? 'screen', componentStack: info.componentStack });
   }
+
+  resetAndRestart = () => {
+    this.setState({ hasError: false });
+    this.props.onRestart?.();
+  };
 
   resetAndBack = () => {
     this.setState({ hasError: false });
@@ -41,7 +53,11 @@ class ErrorBoundaryBase extends React.Component<ErrorBoundaryProps & ReturnType<
       return this.props.children;
     }
 
-    const { colors, title = 'Something went wrong' } = this.props;
+    const {
+      colors,
+      title = bilingual('Something went wrong', 'Un problème est survenu'),
+      message = bilingual('This lesson could not be opened safely.', 'Cette leçon n’a pas pu s’ouvrir correctement.'),
+    } = this.props;
 
     return (
       <View style={[styles.container, { backgroundColor: colors.background }]}>
@@ -51,7 +67,7 @@ class ErrorBoundaryBase extends React.Component<ErrorBoundaryProps & ReturnType<
           </View>
           <Text style={[styles.title, { color: colors.text }]}>{title}</Text>
           <Text style={[styles.body, { color: colors.secondaryText }]}>
-            This lesson could not be opened safely.
+            {message}
           </Text>
           <View style={styles.actions}>
             {this.props.onBack && (
@@ -61,6 +77,15 @@ class ErrorBoundaryBase extends React.Component<ErrorBoundaryProps & ReturnType<
                 style={[styles.secondaryButton, { backgroundColor: colors.surface, borderColor: colors.border }]}
               >
                 <Text style={[styles.secondaryButtonText, { color: colors.text }]}>Go back</Text>
+              </TouchableOpacity>
+            )}
+            {this.props.onRestart && (
+              <TouchableOpacity
+                accessibilityRole="button"
+                onPress={this.resetAndRestart}
+                style={[styles.primaryButton, { backgroundColor: colors.buttonBackground, borderColor: colors.buttonBackground }]}
+              >
+                <Text style={[styles.primaryButtonText, { color: colors.buttonText }]}>Restart Ellie</Text>
               </TouchableOpacity>
             )}
             {this.props.onHome && (

@@ -6,7 +6,8 @@ const PhysicalDescriptionVocab = {
   thumbnail: require('../../assets/thumbnails/physical-description-thumbnail.png'),
   flashcards: [
     {
-      category: 'Hair 💇‍♂️',
+      // The sheet runs hair and face together in one block, beard and freckles included.
+      category: 'Hair and face 💇‍♂️',
       words: [
         { english: 'Blond hair', french: 'Cheveux blonds' },
         { english: 'Brown hair', french: 'Cheveux bruns' },
@@ -18,12 +19,7 @@ const PhysicalDescriptionVocab = {
         { english: 'Straight hair', french: 'Cheveux raides' },
         { english: 'Curly hair', french: 'Cheveux bouclés' },
         { english: 'Bald', french: 'Chauve' },
-        { english: 'A ponytail', french: 'Une queue de cheval' }
-      ]
-    },
-    {
-      category: 'Facial Features & Grooming 🧔',
-      words: [
+        { english: 'A ponytail', french: 'Une queue de cheval' },
         { english: 'A beard', french: 'Une barbe' },
         { english: 'A moustache', french: 'Une moustache' },
         { english: 'Freckles', french: 'Des taches de rousseur' },
@@ -31,26 +27,21 @@ const PhysicalDescriptionVocab = {
       ]
     },
     {
-      category: 'Build & Height 📏',
+      category: 'Physical characteristics 📏',
       words: [
         { english: 'Tall', french: 'Grand' },
         { english: 'Short', french: 'Petit' },
         { english: 'Thin', french: 'Mince' },
         { english: 'Slim', french: 'Svelte' },
         { english: 'Big', french: 'Gros' },
-        { english: 'Strong', french: 'Fort' },
-        { english: 'Athletic', french: 'Athlétique' }
-      ]
-    },
-    {
-      category: 'Appearance Adjectives ✨',
-      words: [
         { english: 'Beautiful', french: 'Beau / belle' },
         { english: 'Pretty', french: 'Joli' },
         { english: 'Handsome', french: 'Beau' },
         { english: 'Elegant', french: 'Élégant' },
         { english: 'Classy', french: 'Chic' },
         { english: 'Cute', french: 'Mignon' },
+        { english: 'Strong', french: 'Fort' },
+        { english: 'Athletic', french: 'Athlétique' },
         { english: 'Ugly', french: 'Laid' }
       ]
     }

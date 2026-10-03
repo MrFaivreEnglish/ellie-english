@@ -36,6 +36,28 @@ describe('getStreak', () => {
     const streak = await getStreak();
     expect(streak).toEqual({ currentStreak: 0, longestStreak: 0, lastPracticeDate: '' });
   });
+
+  it('keeps the streak alive the day after practising', async () => {
+    setDate('2025-03-01');
+    await recordPracticeToday();
+    setDate('2025-03-02');
+    await recordPracticeToday();
+
+    setDate('2025-03-03');
+    expect((await getStreak()).currentStreak).toBe(2);
+  });
+
+  it('shows a broken streak as 0 before the student practises again', async () => {
+    for (let day = 1; day <= 5; day++) {
+      setDate(`2025-03-0${day}`);
+      await recordPracticeToday();
+    }
+
+    setDate('2025-03-09');
+    const streak = await getStreak();
+    expect(streak.currentStreak).toBe(0);
+    expect(streak.longestStreak).toBe(5);
+  });
 });
 
 describe('recordPracticeToday', () => {

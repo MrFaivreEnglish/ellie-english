@@ -2,6 +2,8 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { StyleSheet, TouchableOpacity, Platform, View, LayoutChangeEvent, Image } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
+import { Image as ExpoImage } from 'expo-image';
+import { bilingual } from './bilingual';
 import Animated, {
   useAnimatedStyle,
   useSharedValue,
@@ -85,16 +87,10 @@ const PinchZoomImage: React.FC<Props> = ({
             }
             return;
           }
+          // Remote images report their size from onLoad below, which also works offline
+          // from the disk cache (Image.getSize needed the network).
           if ((source as any)?.uri) {
-            Image.getSize(
-              (source as any).uri,
-              (w, h) => {
-                if (!cancelled) setNaturalSize({ width: w, height: h });
-              },
-              () => {
-                if (!cancelled) setNaturalSize(null);
-              }
-            );
+            if (!cancelled) setNaturalSize(null);
             return;
           }
           if ((source as any)?.width && (source as any)?.height) {
@@ -103,18 +99,6 @@ const PinchZoomImage: React.FC<Props> = ({
             if (!cancelled) setNaturalSize({ width: w, height: h });
             return;
           }
-        }
-        if (uri) {
-          Image.getSize(
-            uri,
-            (w, h) => {
-              if (!cancelled) setNaturalSize({ width: w, height: h });
-            },
-            () => {
-              if (!cancelled) setNaturalSize(null);
-            }
-          );
-          return;
         }
 
         if (!cancelled) setNaturalSize(null);
@@ -280,10 +264,17 @@ const PinchZoomImage: React.FC<Props> = ({
         >
           <Animated.View style={[{ width: fittedBox.width, height: fittedBox.height }, animatedContentStyle]}>
             {!!imgSource && !hasImageError ? (
-              <Animated.Image
+              <ExpoImage
                 source={imgSource}
                 style={styles.image}
-                resizeMode="contain"
+                contentFit="contain"
+                cachePolicy="memory-disk"
+                onLoad={(event) => {
+                  const { width, height } = event.source ?? {};
+                  if (typeof source !== 'number' && width > 0 && height > 0) {
+                    setNaturalSize({ width, height });
+                  }
+                }}
                 onError={() => setHasImageError(true)}
                 accessible
                 accessibilityRole="image"
@@ -297,7 +288,7 @@ const PinchZoomImage: React.FC<Props> = ({
                 accessibilityLabel={`${accessibilityLabel} unavailable`}
               >
                 <Text style={styles.fallbackTitle}>Image unavailable</Text>
-                <Text style={styles.fallbackText}>Close this view and keep practising.</Text>
+                <Text style={styles.fallbackText}>{bilingual('Close this view and keep practising.', 'Ferme cette vue et continue à réviser.')}</Text>
               </View>
             )}
             {showCredit && (

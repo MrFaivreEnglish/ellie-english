@@ -12,6 +12,12 @@ import { useTheme } from '../settings/ThemeContext';
 import { useDesktopTypographyScale } from './DesktopTypography';
 
 export const PIXEL_FONT_FAMILY = 'PressStart2P_400Regular';
+
+// Text still follows the phone's font size, up to 1.5x, so Android's largest standard
+// setting (1.3x) is honoured in full. Nothing capped it before, and the app's many
+// fixed-size tiles, badges and buttons were never laid out for the 2x+ accessibility
+// sizes some phones offer. A caller can pass its own limit.
+const MAX_SYSTEM_FONT_SCALE = 1.5;
 export const PIXEL_FONT_SCALE = 0.66;
 
 const pixelTextStyle: TextStyle = {
@@ -54,6 +60,7 @@ const ThemedText = React.forwardRef<any, TextProps>(({ style, ...props }, ref) =
   return (
     <NativeText
       ref={ref}
+      maxFontSizeMultiplier={MAX_SYSTEM_FONT_SCALE}
       {...props}
       style={[resolvedStyle, isShinyEllieMode && getPixelTextStyle(resolvedStyle)]}
     />
@@ -71,6 +78,7 @@ export const ThemedTextInput = React.forwardRef<any, TextInputProps>(({ style, .
   return (
     <NativeTextInput
       ref={ref}
+      maxFontSizeMultiplier={MAX_SYSTEM_FONT_SCALE}
       {...props}
       style={[resolvedStyle, isShinyEllieMode && getPixelTextStyle(resolvedStyle)]}
     />

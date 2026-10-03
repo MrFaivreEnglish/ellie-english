@@ -41,6 +41,8 @@ import {
 } from '../shared/uiPrimitives';
 import type { GrammarLesson } from '../../types/lessonTypes';
 import { useDesktopTypographyScale } from '../shared/DesktopTypography';
+import LessonHighlightBadge from '../shared/LessonHighlightBadge';
+import { getLessonHighlightKind, useSeenLessonHighlights, type LessonHighlightKind } from '../shared/lessonHighlights';
 
 const isRemoteLessonImage = (imageUrl: any) =>
   typeof imageUrl === 'string' && /^https?:\/\//i.test(imageUrl);
@@ -64,6 +66,7 @@ type GrammarLessonRowProps = {
   selected?: boolean;
   selectable?: boolean;
   onToggleLesson?: (lesson: GrammarLesson) => void;
+  highlight?: LessonHighlightKind;
 };
 
 type GrammarSubcategoryListItem = {
@@ -91,6 +94,7 @@ const GrammarLessonRow = React.memo(({
   selected = false,
   selectable = true,
   onToggleLesson,
+  highlight,
 }: GrammarLessonRowProps) => {
   const desktopScale = useDesktopTypographyScale();
   const handlePress = useCallback(() => {
@@ -176,6 +180,7 @@ const GrammarLessonRow = React.memo(({
       accessibilityLabel={lesson.title}
       accessibilityState={{ selected }}
     >
+      {!selectionMode && !!highlight && <LessonHighlightBadge kind={highlight} />}
       <View
         style={[
           styles.lessonThumbnail,
@@ -381,6 +386,7 @@ const GrammarCategoryList: React.FC<{ onSelectLesson: (lesson: GrammarLesson) =>
   const topContentInset = getTopSafeAreaInset(Platform.OS, insets.top, isAndroidStatusBarEnabled);
 
   const [expandedSub, setExpandedSub] = useState<Record<string, boolean>>({});
+  const seenLessonHighlights = useSeenLessonHighlights();
   const [search, setSearch] = useState('');
   const [grammarProgressCounts, setGrammarProgressCounts] = useState<Record<string, number>>({});
   const [practicedTodayKeys, setPracticedTodayKeys] = useState<Set<string>>(() => new Set());
@@ -781,6 +787,11 @@ const GrammarCategoryList: React.FC<{ onSelectLesson: (lesson: GrammarLesson) =>
         const { key, sub, lessons, subIndex } = item;
         const open = search ? true : expandedSub[key];
         const subColor = subColors[subIndex % subColors.length];
+        // Groups start collapsed, so surface any badged lesson on the header too.
+        const lessonHighlightKinds = lessons.map((lesson: any) => getLessonHighlightKind('grammar', lesson, seenLessonHighlights));
+        const groupHighlight: LessonHighlightKind | undefined = lessonHighlightKinds.includes('new')
+          ? 'new'
+          : lessonHighlightKinds.includes('updated') ? 'updated' : undefined;
         const emoji = subEmojiMap[sub.title] || '\uD83D\uDCD8';
 
         return (
@@ -810,6 +821,7 @@ const GrammarCategoryList: React.FC<{ onSelectLesson: (lesson: GrammarLesson) =>
               <Text style={styles.categoryIcon}>{emoji}</Text>
               <View style={styles.categoryTitleBlock}>
                 <Text style={styles.categoryTitle}>{sub.title}</Text>
+                {!!groupHighlight && <LessonHighlightBadge kind={groupHighlight} variant="inline" style={styles.groupHighlightBadge} />}
               </View>
               <View style={styles.lessonCountPill}>
                 <Text style={styles.lessonCountText}>
@@ -850,6 +862,7 @@ const GrammarCategoryList: React.FC<{ onSelectLesson: (lesson: GrammarLesson) =>
                       selected={selectedLessonKeys.has(lessonKey)}
                       selectable={selectable}
                       onToggleLesson={toggleLessonSelection}
+                      highlight={lessonHighlightKinds[li]}
                     />
                   );
                 })}
@@ -1032,6 +1045,7 @@ const GrammarCategoryList: React.FC<{ onSelectLesson: (lesson: GrammarLesson) =>
 export default GrammarCategoryList;
 
 const styles = StyleSheet.create({
+  groupHighlightBadge: { alignSelf: 'flex-start', marginTop: 4 },
   screen: {
     flex: 1,
   },

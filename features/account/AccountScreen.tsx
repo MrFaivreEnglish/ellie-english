@@ -14,6 +14,7 @@ import { useTheme } from '../settings/ThemeContext';
 import { getButtonStyle, getButtonTextColor, getSoftShadow } from '../shared/uiPrimitives';
 import { getDesktopContentMaxWidth, getDesktopTypographyScale, getTopSafeAreaInset, isDesktopWebWidth } from '../shared/responsiveLayout';
 import { DesktopTypographyProvider } from '../shared/DesktopTypography';
+import { bilingual } from '../shared/bilingual';
 
 const cleanDisplayName = (value: string) => value.trim().replace(/\s+/g, ' ');
 
@@ -77,7 +78,9 @@ export default function AccountScreen() {
 
     try {
       await resetSavedProgress();
-      setResetMessage(session ? 'Saved work reset here and online.' : 'Saved work reset on this device.');
+      setResetMessage(session
+        ? bilingual('Saved work reset here and online.', 'Travail réinitialisé ici et en ligne.')
+        : bilingual('Saved work reset on this device.', 'Travail réinitialisé sur cet appareil.'));
     } catch {
 
     }
@@ -99,8 +102,11 @@ export default function AccountScreen() {
 
     clearError();
 
-    const title = 'Sign out?';
-    const message = 'This restores the work that was on this device before login. The online copy stays safe.';
+    const title = bilingual('Sign out?', 'Se déconnecter ?');
+    const message = bilingual(
+      'This restores the work that was on this device before login. The online copy stays safe.',
+      'Le travail qui était sur cet appareil avant la connexion revient. La copie en ligne reste en sécurité.'
+    );
 
     if (Platform.OS === 'web') {
       const confirmed = typeof window !== 'undefined' ? window.confirm(`${title}\n\n${message}`) : true;
@@ -117,10 +123,16 @@ export default function AccountScreen() {
   const confirmResetSavedProgress = React.useCallback(() => {
     clearError();
 
-    const title = 'Reset saved work?';
+    const title = bilingual('Reset saved work?', 'Réinitialiser ton travail ?');
     const message = session
-      ? 'This clears revision points, grammar answers, learnt words, and best times on this device and in this online account.'
-      : 'This clears revision points, grammar answers, learnt words, and best times on this device.';
+      ? bilingual(
+        'This clears revision points, grammar answers, learnt words, and best times on this device and in this online account.',
+        'Cela efface les points de révision, les réponses de grammaire, les mots appris et les meilleurs temps sur cet appareil et dans ce compte en ligne.'
+      )
+      : bilingual(
+        'This clears revision points, grammar answers, learnt words, and best times on this device.',
+        'Cela efface les points de révision, les réponses de grammaire, les mots appris et les meilleurs temps sur cet appareil.'
+      );
 
     if (Platform.OS === 'web') {
       const confirmed = typeof window !== 'undefined' ? window.confirm(`${title}\n\n${message}`) : true;
@@ -139,8 +151,11 @@ export default function AccountScreen() {
 
     clearError();
 
-    const title = 'Delete online account?';
-    const message = 'This deletes the online copy and the login. Work already saved on this device stays here.';
+    const title = bilingual('Delete online account?', 'Supprimer le compte en ligne ?');
+    const message = bilingual(
+      'This deletes the online copy and the login. Work already saved on this device stays here.',
+      'Cela supprime la copie en ligne et l’identifiant de connexion. Le travail déjà enregistré sur cet appareil reste ici.'
+    );
 
     if (Platform.OS === 'web') {
       const confirmed = typeof window !== 'undefined' ? window.confirm(`${title}\n\n${message}`) : true;
@@ -188,6 +203,7 @@ export default function AccountScreen() {
           isDarkMode={isDarkMode}
           openAvatarPicker={openAvatarPicker}
           onAvatarSectionLayout={(y) => setAvatarSectionOffset(accountPanelYRef.current + y)}
+          onOpenMyWords={() => navigation.navigate('MyWords')}
         />
       </View>
 

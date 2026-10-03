@@ -43,7 +43,7 @@ const SportsVocab = {
       ],
     },
     {
-      category: 'Events, Places, Results 🏆',
+      category: 'Sporting events 🏆',
       words: [
         { english: 'A stadium', french: 'Un stade' },
         { english: 'A tournament', french: 'Un tournoi' },
@@ -53,7 +53,7 @@ const SportsVocab = {
       ],
     },
     {
-      category: 'Values 💪',
+      category: 'Skills for an athlete 💪',
       words: [
         { english: 'Strong', french: 'Fort' },
         { english: 'Confident', french: 'Confiant' },

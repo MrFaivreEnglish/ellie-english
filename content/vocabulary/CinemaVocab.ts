@@ -22,7 +22,16 @@ const CinemaVocab = {
     { english: 'A set', french: 'Un décor' },
     { english: 'Special effects', french: 'Des effets spéciaux' },
     { english: 'Costumes', french: 'Des costumes' },
-    { english: 'Props', french: 'Des accessoires' }
+    { english: 'Wardrobe', french: 'La garde-robe' },
+    { english: 'Props', french: 'Des accessoires' },
+    { english: '(to) play in a film', french: 'Jouer dans un film' },
+    { english: '(to) shoot a film', french: 'Tourner un film' },
+    { english: '(to) edit a film', french: 'Monter un film' },
+    { english: '(to) release a film', french: 'Sortir un film' },
+    { english: 'A trailer', french: 'Une bande-annonce' },
+    { english: 'A poster', french: 'Une affiche' },
+    { english: 'A review', french: 'Une critique' },
+    { english: 'An award', french: 'Une récompense' }
   ]
 };
 

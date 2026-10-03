@@ -5,7 +5,7 @@ const VideoGamesVocab = {
   thumbnail: require('../../assets/thumbnails/videogames-thumbnail.png'),
   flashcards: [
   {
-    category: 'Gaming Devices 💻🎮',
+    category: 'Objects 💻🎮',
     words: [
       { english: 'A console', french: 'Une console' },
       { english: 'A computer', french: 'Un ordinateur' },
@@ -15,7 +15,7 @@ const VideoGamesVocab = {
     ]
   },
   {
-    category: 'Gameplay & Actions 🕹️',
+    category: 'Actions 🕹️',
     words: [
       { english: 'To play', french: 'Jouer' },
       { english: 'To have fun', french: "S'amuser" },
@@ -24,16 +24,21 @@ const VideoGamesVocab = {
       { english: 'To shoot', french: 'Tirer' },
       { english: 'To fight', french: 'Combattre' },
       { english: 'To think', french: 'Penser' },
-      { english: 'To solve problems', french: 'Résoudre des problèmes' },
+      { english: 'To solve problems', french: 'Résoudre des problèmes' }
+    ]
+  },
+  {
+    category: 'Elements in a game 🎯',
+    words: [
       { english: 'Rules', french: 'Des règles' },
+      { english: 'A character', french: 'Un personnage' },
+      { english: 'An enemy', french: 'Un ennemi' },
       { english: 'A goal', french: 'Un objectif' }
     ]
   },
   {
-    category: 'People & Roles 👥',
+    category: 'Jobs 👥',
     words: [
-      { english: 'A character', french: 'Un personnage' },
-      { english: 'An enemy', french: 'Un ennemi' },
       { english: 'A developer', french: 'Un développeur' },
       { english: 'A player', french: 'Un joueur' },
       { english: 'A streamer', french: 'Un streamer' },

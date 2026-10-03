@@ -5,7 +5,7 @@ const ClothesVocab = {
   thumbnail: require('../../assets/thumbnails/clothes-thumbnail.png'),
   flashcards: [
     {
-      category: 'Tops & Outerwear 🧥',
+      category: 'Tops 🧥',
       words: [
         { english: 'A jumper / A sweater', french: 'Un pull' },
         { english: 'A shirt', french: 'Une chemise' },
@@ -17,27 +17,28 @@ const ClothesVocab = {
       ]
     },
     {
+      // Footwear sits under Bottoms on the sheet, alongside tights and socks.
       category: 'Bottoms 👖',
       words: [
         { english: 'Trousers', french: 'Un pantalon' },
         { english: 'Jeans', french: 'Un jean' },
         { english: 'A skirt', french: 'Une jupe' },
         { english: 'Shorts', french: 'Un short' },
-        { english: 'Tights', french: 'Des collants' }
+        { english: 'Tights', french: 'Des collants' },
+        { english: 'Socks', french: 'Des chaussettes' },
+        { english: 'Shoes', french: 'Des chaussures' },
+        { english: 'Sneakers', french: 'Des baskets' }
       ]
     },
     {
-      category: 'Footwear & Accessories 👟',
+      category: 'Accessories 🧣',
       words: [
         { english: 'A hat', french: 'Un chapeau' },
         { english: 'Glasses', french: 'Des lunettes' },
         { english: 'A tie', french: 'Une cravate' },
         { english: 'A scarf', french: 'Une écharpe' },
         { english: 'A belt', french: 'Une ceinture' },
-        { english: 'Gloves', french: 'Des gants' },
-        { english: 'Socks', french: 'Des chaussettes' },
-        { english: 'Shoes', french: 'Des chaussures' },
-        { english: 'Sneakers', french: 'Des baskets' }
+        { english: 'Gloves', french: 'Des gants' }
       ]
     }
   ]

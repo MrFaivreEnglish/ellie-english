@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
   Image,
   ImageSourcePropType,
@@ -8,13 +8,14 @@ import {
   View,
   StyleProp,
   ViewStyle,
-  Animated,
-  Platform,
   useWindowDimensions,
 } from 'react-native';
+import { Image as ExpoImage, type ImageLoadEventData } from 'expo-image';
 import { useTheme } from '../settings/ThemeContext';
 import Text from './ThemedText';
 import { getWebLessonScale, scaleValue } from './responsiveLayout';
+import useReducedMotion from './useReducedMotion';
+import { bilingual } from './bilingual';
 
 interface ImageWithCreditProps {
   source?: ImageSourcePropType;
@@ -65,8 +66,7 @@ const ImageWithCredit: React.FC<ImageWithCreditProps> = ({
 
   const [containerSize, setContainerSize] = useState({ width: 0, height: 0 });
   const [naturalSize, setNaturalSize] = useState<{ width: number; height: number } | null>(null);
-
-  const fadeAnim = useRef(new Animated.Value(isLocalBundledAsset ? 1 : 0)).current;
+  const reducedMotion = useReducedMotion();
   const safeImageScale = Number.isFinite(imageScale) ? Math.max(1, imageScale) : 1;
 
 
@@ -103,14 +103,12 @@ const ImageWithCredit: React.FC<ImageWithCreditProps> = ({
     if (isLocal) {
       setLoading(false);
       setHasImageError(false);
-      fadeAnim.setValue(1);
       return;
     }
 
     setLoading(hasImageSource);
     setHasImageError(!hasImageSource);
     setLoadingText(LOADING_MESSAGES[Math.floor(Math.random() * LOADING_MESSAGES.length)]);
-    fadeAnim.setValue(0);
   }, [uri, source]); // eslint-disable-line react-hooks/exhaustive-deps
 
 
@@ -133,23 +131,13 @@ const ImageWithCredit: React.FC<ImageWithCreditProps> = ({
           applyNaturalSize({ width: asset.width, height: asset.height });
         }
       } else {
+        // Remote sheets report their size in handleLoad. Image.getSize used to fetch each
+        // one a second time just to measure it, and failed outright when offline.
         const s = source as any;
-        if (s?.uri) {
-          Image.getSize(
-            s.uri,
-            (w, h) => applyNaturalSize({ width: w, height: h }),
-            () => !cancelled && setNaturalSize(null)
-          );
-        } else if (s?.width && s?.height) {
+        if (!s?.uri && s?.width && s?.height) {
           applyNaturalSize({ width: s.width, height: s.height });
         }
       }
-    } else if (uri) {
-      Image.getSize(
-        uri,
-        (w, h) => applyNaturalSize({ width: w, height: h }),
-        () => !cancelled && setNaturalSize(null)
-      );
     }
 
     return () => {
@@ -198,23 +186,21 @@ const ImageWithCredit: React.FC<ImageWithCreditProps> = ({
 
 
 
-  const handleLoad = () => {
+  // The image is keyed by its source, so a load event always belongs to the current one.
+  const handleLoad = (event: ImageLoadEventData) => {
     setLoading(false);
     setHasImageError(false);
 
-    if (typeof source !== 'number') {
-      Animated.timing(fadeAnim, {
-        toValue: 1,
-        duration: 400,
-        useNativeDriver: Platform.OS !== 'web',
-      }).start();
+    const { width, height } = event.source ?? {};
+    if (typeof source !== 'number' && width > 0 && height > 0) {
+      setNaturalSize({ width, height });
+      onNaturalSize?.({ width, height });
     }
   };
 
   const handleError = () => {
     setLoading(false);
     setHasImageError(true);
-    fadeAnim.setValue(0);
   };
 
 
@@ -253,16 +239,18 @@ const ImageWithCredit: React.FC<ImageWithCreditProps> = ({
       )}
 
       {!!imgSource && !hasImageError && (
-        <Animated.Image
+        // expo-image keeps sheets in a disk cache (RN's Image left that to the platform),
+        // so a sheet opened once at home still shows in class without a connection.
+        <ExpoImage
           key={imageIdentity}
           source={imgSource}
           style={[
             styles.image,
             safeImageScale > 1 && { transform: [{ scale: safeImageScale }] },
-            { opacity: fadeAnim },
           ]}
-          resizeMode="contain"
-          fadeDuration={0}
+          contentFit="contain"
+          cachePolicy="memory-disk"
+          transition={isLocalBundledAsset || reducedMotion ? 0 : 400}
           onLoad={handleLoad}
           onError={handleError}
           accessible
@@ -279,7 +267,7 @@ const ImageWithCredit: React.FC<ImageWithCreditProps> = ({
           accessibilityLabel={`${accessibilityLabel} unavailable`}
         >
           <Text style={[styles.fallbackTitle, { color: colors.text }]}>Image unavailable</Text>
-          <Text style={[styles.fallbackText, { color: colors.secondaryText }]}>This lesson can still be practised.</Text>
+          <Text style={[styles.fallbackText, { color: colors.secondaryText }]}>{bilingual('This lesson can still be practised.', 'Tu peux quand même réviser cette leçon.')}</Text>
         </View>
       )}
 

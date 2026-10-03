@@ -36,7 +36,7 @@ const MoreFoodBasicsVocab = {
       ],
     },
     {
-      category: 'Desserts 🍰',
+      category: 'British Desserts 🍰',
       imageUrl: 'https://wretggbpaejzjdilemit.supabase.co/storage/v1/object/public/lesson-images/15274719ab/food-plus.webp',
       words: [
         { english: 'Cheesecake', french: 'Cheesecake' },
