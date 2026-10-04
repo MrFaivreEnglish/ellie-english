@@ -4,7 +4,10 @@ import {
   getGrammarLessonProgressKey,
   getGrammarProgressSummary,
 } from '../grammar/grammarProgressStorage';
-import { getLearnedFlashcardKeysByLesson } from '../vocabulary/flashcardProgressStorage';
+import {
+  getLearnedFlashcardKeysByLesson,
+  getLearnedFlashcardRecencyByActivityKey,
+} from '../vocabulary/flashcardProgressStorage';
 import {
   getAllVocabularyLessons,
   getLessonProgressKey,
@@ -32,7 +35,12 @@ export type PractisedGrammarLesson = {
   answers: number;
 };
 
+// Words saved in the last RECENT_DAYS days, newest first.
+export const RECENT_DAYS = 7;
+export const MAX_RECENT_WORDS = 12;
+
 export type LearningLibrary = {
+  recentWords: Word[];
   learnedGroups: LearnedWordGroup[];
   learnedWordCount: number;
   // Distinct words across every vocabulary lesson, for "x of y" progress.
@@ -49,10 +57,11 @@ const OTHER_PRACTICE_TITLE = 'Other practice';
 const byTitle = (a: { lessonTitle?: string; title?: string }, b: { lessonTitle?: string; title?: string }) =>
   String(a.lessonTitle ?? a.title).localeCompare(String(b.lessonTitle ?? b.title));
 
-const getLearnedWordGroups = async (): Promise<{ groups: LearnedWordGroup[]; totalWordCount: number }> => {
-  const [lessons, learnedByLesson] = await Promise.all([
+const getLearnedWordGroups = async (): Promise<{ groups: LearnedWordGroup[]; totalWordCount: number; recentWords: Word[] }> => {
+  const [lessons, learnedByLesson, recencyByActivityKey] = await Promise.all([
     getAllVocabularyLessons(),
     getLearnedFlashcardKeysByLesson(),
+    getLearnedFlashcardRecencyByActivityKey(),
   ]);
 
   // The first lesson each word appears in, so a word marked learnt during mixed practice
@@ -84,6 +93,10 @@ const getLearnedWordGroups = async (): Promise<{ groups: LearnedWordGroup[]; tot
     groups.set(lessonTitle, group);
   };
   const placed = new Set<string>();
+  const recentCutoff = new Date();
+  recentCutoff.setDate(recentCutoff.getDate() - RECENT_DAYS);
+  const cutoffKey = `${recentCutoff.getFullYear()}-${String(recentCutoff.getMonth() + 1).padStart(2, '0')}-${String(recentCutoff.getDate()).padStart(2, '0')}`;
+  const recent: Array<{ word: Word; date: string }> = [];
 
   learnedByLesson.forEach((wordKeys, lessonKey) => {
     const lessonTitle = lessonTitleByKey.get(lessonKey);
@@ -92,8 +105,10 @@ const getLearnedWordGroups = async (): Promise<{ groups: LearnedWordGroup[]; tot
       placed.add(key);
 
       const home = homeByWordKey.get(key);
+      const learntOn = recencyByActivityKey.get(`${lessonKey}:${key}`);
       if (home) {
         addWord(lessonTitle ?? home.lessonTitle, key, home.word);
+        if (learntOn && learntOn >= cutoffKey) recent.push({ word: home.word, date: learntOn });
         return;
       }
 
@@ -112,7 +127,12 @@ const getLearnedWordGroups = async (): Promise<{ groups: LearnedWordGroup[]; tot
     }))
     .sort(byTitle);
 
-  return { groups: sortedGroups, totalWordCount: homeByWordKey.size };
+  const recentWords = recent
+    .sort((a, b) => b.date.localeCompare(a.date))
+    .slice(0, MAX_RECENT_WORDS)
+    .map((entry) => entry.word);
+
+  return { groups: sortedGroups, totalWordCount: homeByWordKey.size, recentWords };
 };
 
 const getPractisedGrammarLessons = async (): Promise<PractisedGrammarLesson[]> => {
@@ -142,6 +162,7 @@ export const getLearningLibrary = async (): Promise<LearningLibrary> => {
   const learnedGroups = learned.groups;
 
   return {
+    recentWords: learned.recentWords,
     learnedGroups,
     learnedWordCount: learnedGroups.reduce((total, group) => total + group.words.length, 0),
     totalWordCount: learned.totalWordCount,

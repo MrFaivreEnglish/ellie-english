@@ -1,8 +1,11 @@
 import React from 'react';
-import { ActivityIndicator, Platform, ScrollView, StyleSheet, TouchableOpacity, useWindowDimensions, View } from 'react-native';
+import { ActivityIndicator, Platform, Pressable, ScrollView, StyleSheet, TouchableOpacity, useWindowDimensions, View } from 'react-native';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useFonts } from 'expo-font';
+import { Fredoka_600SemiBold } from '@expo-google-fonts/fredoka';
+import { Nunito_500Medium, Nunito_600SemiBold, Nunito_700Bold, Nunito_800ExtraBold } from '@expo-google-fonts/nunito';
 import { Image as ExpoImage } from 'expo-image';
 import type { RootStackParamList } from '../../types/navigationTypes';
 import Text, { ThemedTextInput as TextInput } from '../shared/ThemedText';
@@ -10,46 +13,140 @@ import MaterialIcons from '../shared/ThemedMaterialIcon';
 import BackButton from '../shared/BackButton';
 import { useTheme } from '../settings/ThemeContext';
 import { DesktopTypographyProvider } from '../shared/DesktopTypography';
-import { getDesktopContentMaxWidth, getDesktopTypographyScale, getTopSafeAreaInset, isDesktopWebWidth } from '../shared/responsiveLayout';
-import { getSoftShadow } from '../shared/uiPrimitives';
+import { getDesktopContentMaxWidth, getTopSafeAreaInset, isDesktopWebWidth } from '../shared/responsiveLayout';
 import { useEnglishSpeech } from '../shared/useEnglishSpeech';
-import { getLearningLibrary, type LearningLibrary } from './learningLibrary';
-import { getTodayKey } from '../vocabulary/reviewWordsStorage';
+import useReducedMotion from '../shared/useReducedMotion';
+import { getLearningLibrary, type LearnedWordGroup, type LearningLibrary } from './learningLibrary';
 import { openWordReview } from '../vocabulary/wordReviewLesson';
 import WeeklyGoalCard from './WeeklyGoalCard';
 import { getPracticeWeek, type PracticeWeek } from './weeklyGoal';
 
-// What a student has learnt and what's waiting for review, opened from Home or their profile.
+// What a student has learnt, one next action, and a searchable bank of every word saved.
+// Layout and colour follow the My Words design brief; the page background is the theme's.
 
-// The review list can grow long; the rest are summarised in a "+N more" line.
-const MAX_REVIEW_ROWS = 30;
-const DAY_MS = 24 * 60 * 60 * 1000;
-// Lesson groups cycle through these so a long list is easy to scan.
-const GROUP_ACCENTS = ['#3A8F5C', '#1F7AD1', '#D4681D', '#7654D4', '#D63B55', '#1687A7'];
-
-const getDueLabel = (dueOn: string, today: string) => {
-  if (dueOn <= today) return 'Due now';
-  const days = Math.round((Date.parse(dueOn) - Date.parse(today)) / DAY_MS);
-  return days === 1 ? 'Tomorrow' : `In ${days} days`;
+const FONT = {
+  heading: 'Fredoka_600SemiBold',
+  medium: 'Nunito_500Medium',
+  semi: 'Nunito_600SemiBold',
+  bold: 'Nunito_700Bold',
+  extra: 'Nunito_800ExtraBold',
 };
 
-const matchesSearch = (query: string, ...values: string[]) =>
-  values.some((value) => value.toLowerCase().includes(query));
+const MILESTONE_STEP = 25;
+const WIDE_LAYOUT = 700;
+// Each colour has one job: green is progress, coral is "needs attention".
+const LIGHT = {
+  line: '#E6E3DB',
+  greenBg: '#D3F5E0',
+  green: '#2F9B5C',
+  greenShade: '#1F7340',
+  greenInk: '#1C3D2A',
+  greenDark: '#BDEBCF',
+  coralBg: '#FADFD3',
+  coral: '#DB6A45',
+  coralShade: '#B04A28',
+  coralInk: '#5B2412',
+};
+const DARK = {
+  line: '#2C3340',
+  greenBg: '#17382A',
+  green: '#3DB873',
+  greenShade: '#237A4B',
+  greenInk: '#CFF3DE',
+  greenDark: '#1F4A37',
+  coralBg: '#3F2218',
+  coralInk: '#FBE0D5',
+  coral: '#E8744F',
+  coralShade: '#B9502C',
+};
+// Topic tints share lightness and chroma and change only hue: [background, bar].
+const TOPIC_TINTS: Array<[string, string]> = [
+  ['#D8F3E2', '#2FA063'],
+  ['#DCE8FB', '#4A7FD6'],
+  ['#FBE3D2', '#D9753F'],
+  ['#EBDDF8', '#9A62CF'],
+  ['#FADDE0', '#D55C70'],
+  ['#D5F0F3', '#2A9DAE'],
+];
+const TILTS = [-1.5, 1, -0.5, 1.5, -1, 0.5];
+
+const formatNumber = (value: number) => String(value).replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+
+const normalize = (value: string) =>
+  value
+    .normalize('NFD')
+    .replace(/[̀-ͯ]/g, '')
+    .toLowerCase()
+    .trim();
+
+const tintFor = (title: string) => {
+  let hash = 0;
+  for (let i = 0; i < title.length; i += 1) hash = (hash + title.charCodeAt(i)) % 1009;
+  return TOPIC_TINTS[hash % TOPIC_TINTS.length];
+};
+
+type TactileButtonProps = {
+  label: string;
+  icon?: React.ComponentProps<typeof MaterialIcons>['name'];
+  color: string;
+  shade: string;
+  onPress: () => void;
+  reducedMotion: boolean;
+};
+
+// A chunky button: it sits on a darker edge and presses down into it.
+function TactileButton({ label, icon, color, shade, onPress, reducedMotion }: TactileButtonProps) {
+  return (
+    <Pressable
+      onPress={onPress}
+      accessibilityRole="button"
+      accessibilityLabel={label}
+      style={({ pressed }) => [
+        styles.tactile,
+        {
+          backgroundColor: color,
+          borderBottomColor: shade,
+          borderBottomWidth: pressed ? 1 : 4,
+          marginBottom: pressed ? 3 : 0,
+          transform: pressed && !reducedMotion ? [{ translateY: 3 }] : undefined,
+        },
+      ]}
+    >
+      {icon && <MaterialIcons name={icon} size={20} color="#fff" />}
+      <Text style={styles.tactileText}>{label}</Text>
+    </Pressable>
+  );
+}
 
 export default function MyWordsScreen() {
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const { colors, isDarkMode, isAndroidStatusBarEnabled } = useTheme();
   const { speak } = useEnglishSpeech();
+  const reducedMotion = useReducedMotion();
   const insets = useSafeAreaInsets();
   const { width: windowWidth, height: windowHeight } = useWindowDimensions();
   const isDesktopWeb = isDesktopWebWidth(windowWidth, undefined, windowHeight);
   const desktopContentMaxWidth = getDesktopContentMaxWidth(windowWidth, 'fit', windowHeight);
-  const desktopScale = getDesktopTypographyScale(windowWidth, windowHeight, 'fit');
   const topContentInset = getTopSafeAreaInset(Platform.OS, insets.top, isAndroidStatusBarEnabled);
+  const wide = windowWidth >= WIDE_LAYOUT;
+  const palette = isDarkMode ? DARK : LIGHT;
+  const surface = colors.card;
+  const ink = colors.text;
+  const muted = colors.secondaryText;
+  const cardShadow = { boxShadow: `0px 1px 0px ${palette.line}` } as const;
 
+  const [fontsLoaded] = useFonts({
+    Fredoka_600SemiBold,
+    Nunito_500Medium,
+    Nunito_600SemiBold,
+    Nunito_700Bold,
+    Nunito_800ExtraBold,
+  });
   const [library, setLibrary] = React.useState<LearningLibrary | null>(null);
   const [week, setWeek] = React.useState<PracticeWeek | null>(null);
   const [search, setSearch] = React.useState('');
+  const [searchFocused, setSearchFocused] = React.useState(false);
+  const [showGrammar, setShowGrammar] = React.useState(false);
   const [openLessons, setOpenLessons] = React.useState<Set<string>>(() => new Set());
 
   // Reload on focus so a review session finished elsewhere shows up on return.
@@ -72,16 +169,19 @@ export default function MyWordsScreen() {
     }, [])
   );
 
-  const today = getTodayKey();
-  const query = search.trim().toLowerCase();
-  const visibleGroups = React.useMemo(() => {
+  const query = normalize(search);
+  // Matches French, English and the topic name; a topic that matches by name shows all its words.
+  const visibleGroups = React.useMemo<LearnedWordGroup[]>(() => {
     if (!library) return [];
     if (!query) return library.learnedGroups;
     return library.learnedGroups
-      .map((group) => ({
-        ...group,
-        words: group.words.filter((word) => matchesSearch(query, word.english, word.french)),
-      }))
+      .map((group) => {
+        if (normalize(group.lessonTitle).includes(query)) return group;
+        return {
+          ...group,
+          words: group.words.filter((word) => normalize(word.english).includes(query) || normalize(word.french).includes(query)),
+        };
+      })
       .filter((group) => group.words.length > 0);
   }, [library, query]);
 
@@ -93,301 +193,282 @@ export default function MyWordsScreen() {
     });
   };
 
-  const startReview = () => {
-    if (!library) return;
-    const dueWords = library.reviewWords.filter((word) => word.dueOn <= today);
-    openWordReview(navigation, dueWords, { backLabel: 'Back to My words', backTarget: 'MyWords' });
-  };
+  const dueWords = React.useMemo(() => {
+    if (!library) return [];
+    const today = new Date();
+    const todayKey = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+    return library.reviewWords.filter((word) => word.dueOn <= todayKey);
+  }, [library]);
 
-  const buttonColor = colors.buttonBackground ?? colors.primary;
-  const buttonTextColor = colors.buttonText ?? '#fff';
-  const cardStyle = [
-    styles.card,
-    getSoftShadow(isDarkMode, 'soft', colors.shadow ?? colors.border, colors.visualStyle === 'pixel'),
-    { backgroundColor: colors.card, borderColor: colors.border },
-  ];
-  const heroBackground = isDarkMode ? colors.successSoft : '#E3F6E8';
+  const startReview = () => openWordReview(navigation, dueWords, { backLabel: 'Back to My words', backTarget: 'MyWords' });
+  const learnNewWords = () => navigation.navigate('MainTabs', { screen: 'Vocabulary' });
+
+  const pageGutter = wide ? 24 : 20;
+  const titleSize = wide ? 44 : 36;
+  const sectionSize = wide ? 28 : 24;
+  const heroNumberSize = wide ? 76 : 64;
 
   const renderSpeaker = (text: string) => (
     <TouchableOpacity
       onPress={() => speak(text)}
       hitSlop={8}
-      style={[styles.speakerButton, { backgroundColor: colors.surface }]}
+      style={[styles.speakerButton, { backgroundColor: colors.background }]}
       accessibilityRole="button"
       accessibilityLabel={`Listen to "${text}"`}
     >
-      <MaterialIcons name="volume-up" size={Math.round(16 * desktopScale)} color={colors.primary} />
+      <MaterialIcons name="volume-up" size={16} color={palette.green} />
     </TouchableOpacity>
   );
 
-  const renderHero = (data: LearningLibrary) => {
-    const progress = data.totalWordCount > 0 ? Math.min(1, data.learnedWordCount / data.totalWordCount) : 0;
-    const accent = isDarkMode ? '#7DD9A0' : '#2F7D4F';
+  const renderProgressCard = (data: LearningLibrary) => {
+    const learnt = data.learnedWordCount;
+    const milestone = (Math.floor(learnt / MILESTONE_STEP) + 1) * MILESTONE_STEP;
+    const toGo = milestone - learnt;
+    // Progress through the current block of 25, so the bar always feels within reach.
+    const fill = (learnt % MILESTONE_STEP) / MILESTONE_STEP;
 
     return (
-      <View style={[styles.hero, { backgroundColor: heroBackground, borderColor: isDarkMode ? colors.border : '#BFE6CB' }]}>
-        <View style={styles.heroTop}>
-          <View style={[styles.heroIcon, { backgroundColor: isDarkMode ? colors.card : '#fff' }]}>
-            <MaterialIcons name="menu-book" size={Math.round(26 * desktopScale)} color={accent} />
-          </View>
-          <View style={styles.heroCopy}>
-            <Text style={[styles.heroNumber, { color: colors.text }]}>{data.learnedWordCount}</Text>
-            <Text style={[styles.heroLabel, { color: colors.secondaryText }]}>
-              {data.learnedWordCount === 1 ? 'word learnt' : 'words learnt'}
-            </Text>
-          </View>
+      <View style={[styles.heroCard, cardShadow, { backgroundColor: palette.greenBg }]}>
+        <View style={[styles.heroCircle, { backgroundColor: palette.greenDark }]} />
+        <Text style={[styles.eyebrow, { color: palette.green }]}>{learnt > 0 ? 'Bravo !' : 'C’est parti !'}</Text>
+        <View style={styles.heroNumberRow}>
+          <Text style={[styles.heroNumber, { color: palette.greenInk, fontSize: heroNumberSize, lineHeight: heroNumberSize + 6 }]}>{learnt}</Text>
+          <Text style={[styles.heroNumberLabel, { color: palette.greenInk }]}>{learnt === 1 ? 'word learnt' : 'words learnt'}</Text>
+        </View>
+        <Text style={[styles.milestoneText, { color: palette.greenInk }]}>
+          Next milestone: {milestone} words · {toGo} to go
+        </Text>
+        <View style={[styles.heroTrack, { backgroundColor: isDarkMode ? '#0F261C' : '#FFFFFF' }]}>
+          <View style={[styles.heroFill, { backgroundColor: palette.green, width: `${Math.max(fill * 100, learnt > 0 ? 3 : 0)}%` }]} />
         </View>
         {data.totalWordCount > 0 && (
-          <View style={styles.heroProgress}>
-            <View style={[styles.heroTrack, { backgroundColor: isDarkMode ? colors.progressTrack ?? colors.border : '#fff' }]}>
-              <View style={[styles.heroFill, { width: `${Math.max(progress * 100, data.learnedWordCount > 0 ? 3 : 0)}%`, backgroundColor: accent }]} />
-            </View>
-            <Text style={[styles.heroProgressText, { color: colors.secondaryText }]}>
-              {data.learnedWordCount} of {data.totalWordCount} words in Ellie
-            </Text>
-          </View>
-        )}
-        {data.dueReviewCount > 0 ? (
-          <TouchableOpacity
-            onPress={startReview}
-            activeOpacity={0.85}
-            style={[styles.heroButton, { backgroundColor: buttonColor }]}
-            accessibilityRole="button"
-          >
-            <MaterialIcons name="keyboard" size={Math.round(18 * desktopScale)} color={buttonTextColor} />
-            <Text style={[styles.heroButtonText, { color: buttonTextColor }]}>
-              {data.dueReviewCount === 1 ? 'Review 1 word now' : `Review ${data.dueReviewCount} words now`}
-            </Text>
-          </TouchableOpacity>
-        ) : (
-          <Text style={[styles.heroHint, { color: colors.secondaryText }]}>
-            {data.learnedWordCount === 0
-              ? 'Tap ✓ on a flashcard to save a word here.'
-              : 'Nothing to review right now. Nice work!'}
+          <Text style={[styles.caption, { color: palette.greenInk }]}>
+            {formatNumber(learnt)} of {formatNumber(data.totalWordCount)} words in Ellie
           </Text>
         )}
       </View>
     );
   };
 
-  const renderStat = (icon: React.ComponentProps<typeof MaterialIcons>['name'], value: number, label: string, accent: string, tint: string) => (
-    <View key={label} style={[styles.statTile, { backgroundColor: isDarkMode ? colors.card : tint, borderColor: isDarkMode ? colors.border : 'transparent' }]}>
-      <MaterialIcons name={icon} size={Math.round(20 * desktopScale)} color={accent} />
-      <Text style={[styles.statValue, { color: colors.text }]}>{value}</Text>
-      <Text style={[styles.statLabel, { color: colors.secondaryText }]} numberOfLines={2}>{label}</Text>
-    </View>
-  );
-
-  const renderSectionTitle = (icon: React.ComponentProps<typeof MaterialIcons>['name'], title: string, accent: string) => (
-    <View style={styles.cardHeader}>
-      <View style={[styles.cardHeaderIcon, { backgroundColor: accent + '22' }]}>
-        <MaterialIcons name={icon} size={Math.round(18 * desktopScale)} color={accent} />
-      </View>
-      <Text style={[styles.cardTitle, { color: colors.text }]}>{title}</Text>
-    </View>
-  );
-
-  const renderReviewSection = (data: LearningLibrary) => {
-    const { reviewWords } = data;
+  const renderActionCard = () => {
+    if (dueWords.length > 0) {
+      const shown = dueWords.slice(0, 6);
+      return (
+        <View style={[styles.actionCard, cardShadow, { backgroundColor: palette.coralBg }]}>
+          <Text style={[styles.eyebrow, { color: palette.coral }]}>Ready for another go</Text>
+          <Text style={[styles.actionTitle, { color: palette.coralInk }]}>
+            {dueWords.length === 1 ? '1 word wants a second look' : `${dueWords.length} words want a second look`}
+          </Text>
+          <View style={styles.chipRow}>
+            {shown.map((word) => (
+              <View key={`${word.english}|${word.french}`} style={[styles.chip, { backgroundColor: isDarkMode ? '#2A1710' : '#FFFFFF' }]}>
+                <Text style={[styles.chipText, { color: palette.coralInk }]}>{word.english}</Text>
+              </View>
+            ))}
+            {dueWords.length > shown.length && (
+              <View style={[styles.chip, { backgroundColor: isDarkMode ? '#2A1710' : '#FFFFFF' }]}>
+                <Text style={[styles.chipText, { color: palette.coral }]}>+{dueWords.length - shown.length}</Text>
+              </View>
+            )}
+          </View>
+          <TactileButton label="Start review" icon="keyboard" color={palette.coral} shade={palette.coralShade} onPress={startReview} reducedMotion={reducedMotion} />
+        </View>
+      );
+    }
 
     return (
-      <View style={cardStyle}>
-        {renderSectionTitle('replay', 'Words to review', colors.warning)}
-        {reviewWords.length === 0 ? (
-          <Text style={[styles.emptyText, { color: colors.secondaryText }]}>
-            Nothing to review. Words you get wrong while typing, or mark “not yet” on a flashcard, come back here a day later.
-          </Text>
-        ) : (
-          <>
-            <Text style={[styles.cardIntro, { color: colors.secondaryText }]}>
-              Get each word right 3 times, a few days apart, and it leaves the list.
-            </Text>
-            {reviewWords.slice(0, MAX_REVIEW_ROWS).map((word) => {
-              const isDue = word.dueOn <= today;
-              return (
-                <View key={`${word.english}|${word.french}`} style={[styles.wordRow, { borderTopColor: colors.border }]}>
-                  <View style={styles.wordCopy}>
-                    <Text style={[styles.wordEnglish, { color: colors.text }]}>{word.english}</Text>
-                    <Text style={[styles.wordFrench, { color: colors.secondaryText }]}>
-                      {word.french}{word.lessonTitle ? ` · ${word.lessonTitle}` : ''}
-                    </Text>
-                  </View>
-                  <View style={[styles.duePill, { backgroundColor: isDue ? colors.warning + '26' : colors.surface }]}>
-                    <Text style={[styles.dueLabel, { color: isDue ? colors.warning : colors.secondaryText }]}>
-                      {getDueLabel(word.dueOn, today)}
-                    </Text>
-                  </View>
-                  {renderSpeaker(word.english)}
-                </View>
-              );
-            })}
-            {reviewWords.length > MAX_REVIEW_ROWS && (
-              <Text style={[styles.moreText, { color: colors.secondaryText }]}>
-                +{reviewWords.length - MAX_REVIEW_ROWS} more
-              </Text>
+      <View style={[styles.actionCard, styles.actionCardEmpty, { backgroundColor: surface, borderColor: palette.line }]}>
+        <Text style={[styles.eyebrow, { color: palette.green }]}>Rien à réviser</Text>
+        <Text style={[styles.actionTitle, { color: ink }]}>All caught up. Fancy a few new words?</Text>
+        <Text style={[styles.actionBody, { color: muted }]}>
+          Words you get wrong while typing, or mark “not yet” on a flashcard, come back here a day later.
+        </Text>
+        <TactileButton label="Learn new words" icon="style" color={palette.green} shade={palette.greenShade} onPress={learnNewWords} reducedMotion={reducedMotion} />
+      </View>
+    );
+  };
+
+  const renderFreshThisWeek = (data: LearningLibrary) => {
+    if (data.recentWords.length === 0) return null;
+
+    return (
+      <View>
+        <Text style={[styles.eyebrow, styles.eyebrowPadded, { color: muted }]}>Fresh this week</Text>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.freshRow}>
+          {data.recentWords.map((word, index) => (
+            <View
+              key={`${word.english}|${word.french}`}
+              style={[styles.freshCard, cardShadow, { backgroundColor: surface, transform: [{ rotate: `${TILTS[index % TILTS.length]}deg` }] }]}
+            >
+              <Text style={[styles.freshFrench, { color: ink }]} numberOfLines={1}>{word.french}</Text>
+              <Text style={[styles.freshEnglish, { color: muted }]} numberOfLines={1}>{word.english}</Text>
+            </View>
+          ))}
+        </ScrollView>
+      </View>
+    );
+  };
+
+  const renderTopicRow = (group: LearnedWordGroup) => {
+    const [tintBg, tintBar] = tintFor(group.lessonTitle);
+    const isOpen = !!query || openLessons.has(group.lessonTitle);
+    const total = Math.max(group.lessonWordCount, group.words.length);
+
+    return (
+      <View key={group.lessonTitle} style={[styles.topicCard, cardShadow, { backgroundColor: surface }]}>
+        <TouchableOpacity
+          onPress={() => toggleLesson(group.lessonTitle)}
+          disabled={!!query}
+          activeOpacity={0.85}
+          style={styles.topicHeader}
+          accessibilityRole="button"
+          accessibilityState={{ expanded: isOpen }}
+          accessibilityLabel={`${group.lessonTitle}, ${group.words.length} ${group.words.length === 1 ? 'word' : 'words'}`}
+        >
+          <View style={[styles.topicIcon, { backgroundColor: isDarkMode ? tintBar + '33' : tintBg }]}>
+            {group.thumbnail ? (
+              <ExpoImage source={group.thumbnail as any} style={styles.topicThumb} contentFit="contain" cachePolicy="memory-disk" accessibilityElementsHidden />
+            ) : (
+              <MaterialIcons name="style" size={24} color={tintBar} />
             )}
-          </>
+          </View>
+          <View style={styles.topicCopy}>
+            <Text style={[styles.topicName, { color: ink }]} numberOfLines={1}>{group.lessonTitle}</Text>
+            <View style={styles.topicBarRow}>
+              <View style={[styles.topicTrack, { backgroundColor: isDarkMode ? '#2C3340' : tintBg }]}>
+                <View style={[styles.topicFill, { backgroundColor: tintBar, width: `${Math.min(100, Math.round((group.words.length / Math.max(1, total)) * 100))}%` }]} />
+              </View>
+              <Text style={[styles.topicCount, { color: muted }]}>{group.words.length} of {total}</Text>
+            </View>
+          </View>
+          <MaterialIcons
+            name="expand-more"
+            size={26}
+            color={muted}
+            style={isOpen ? styles.chevronOpen : undefined}
+          />
+        </TouchableOpacity>
+        {isOpen && (
+          <View style={[styles.tileGrid, { backgroundColor: colors.background }]}>
+            {group.words.map((word) => (
+              <View key={`${word.english}|${word.french}`} style={[styles.wordTile, { backgroundColor: surface }]}>
+                <View style={styles.wordTileCopy}>
+                  <Text style={[styles.tileFrench, { color: ink }]} numberOfLines={1}>{word.french}</Text>
+                  <Text style={[styles.tileEnglish, { color: muted }]} numberOfLines={1}>{word.english}</Text>
+                </View>
+                {renderSpeaker(word.english)}
+              </View>
+            ))}
+          </View>
         )}
       </View>
     );
   };
 
-  const renderLearnedSection = (data: LearningLibrary) => (
-    <View style={cardStyle}>
-      {renderSectionTitle('style', 'Words learnt', colors.success)}
-      {data.learnedWordCount === 0 ? (
-        <Text style={[styles.emptyText, { color: colors.secondaryText }]}>
-          No words yet. Tap ✓ on a flashcard and the word appears here, under its lesson.
-        </Text>
-      ) : (
-        <>
-          <View style={[styles.searchBox, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-            <MaterialIcons name="search" size={Math.round(18 * desktopScale)} color={colors.secondaryText} />
-            <TextInput
-              value={search}
-              onChangeText={setSearch}
-              placeholder="Search in English or French"
-              placeholderTextColor={colors.secondaryText}
-              style={[styles.searchInput, { color: colors.text }]}
-              autoCorrect={false}
-              autoCapitalize="none"
-              accessibilityLabel="Search learnt words"
-            />
-            {!!search && (
-              <TouchableOpacity onPress={() => setSearch('')} accessibilityRole="button" accessibilityLabel="Clear search" hitSlop={8}>
-                <MaterialIcons name="close" size={Math.round(18 * desktopScale)} color={colors.secondaryText} />
-              </TouchableOpacity>
-            )}
-          </View>
-          {visibleGroups.length === 0 && (
-            <Text style={[styles.emptyText, { color: colors.secondaryText }]}>No learnt word matches “{search.trim()}”.</Text>
+  const renderWordBank = (data: LearningLibrary) => (
+    <View style={styles.bankSection}>
+      <View style={styles.bankTitleRow}>
+        <Text style={[styles.sectionTitle, { color: ink, fontSize: sectionSize, lineHeight: sectionSize + 6 }]}>Your word bank</Text>
+        <View style={styles.bankLinks}>
+          <Text style={[styles.bankLink, { color: muted }]}>{data.masteredReviewCount} mistakes fixed</Text>
+          {data.grammarAnswerCount > 0 && (
+            <TouchableOpacity
+              onPress={() => setShowGrammar((current) => !current)}
+              accessibilityRole="button"
+              accessibilityState={{ expanded: showGrammar }}
+              accessibilityLabel={`${data.grammarAnswerCount} grammar answers`}
+              hitSlop={8}
+            >
+              <Text style={[styles.bankLink, { color: muted }]}>{data.grammarAnswerCount} grammar answers {showGrammar ? '↑' : '→'}</Text>
+            </TouchableOpacity>
           )}
-          {visibleGroups.map((group, index) => {
-            const accent = GROUP_ACCENTS[index % GROUP_ACCENTS.length];
-            // Searching opens every lesson with a match, so results are visible at once.
-            const isOpen = !!query || openLessons.has(group.lessonTitle);
-            return (
-              <View key={group.lessonTitle} style={[styles.lessonGroup, { borderTopColor: colors.border }]}>
-                <TouchableOpacity
-                  onPress={() => toggleLesson(group.lessonTitle)}
-                  disabled={!!query}
-                  activeOpacity={0.8}
-                  style={styles.lessonHeader}
-                  accessibilityRole="button"
-                  accessibilityState={{ expanded: isOpen }}
-                  accessibilityLabel={`${group.lessonTitle}, ${group.words.length} ${group.words.length === 1 ? 'word' : 'words'}`}
-                >
-                  <View style={[styles.lessonBadge, { backgroundColor: accent + '22' }]}>
-                    {group.thumbnail ? (
-                      <ExpoImage
-                        source={group.thumbnail as any}
-                        style={styles.lessonThumb}
-                        contentFit="contain"
-                        cachePolicy="memory-disk"
-                        accessibilityElementsHidden
-                      />
-                    ) : (
-                      <Text style={[styles.lessonBadgeText, { color: accent }]}>{group.lessonTitle.charAt(0).toUpperCase()}</Text>
-                    )}
-                  </View>
-                  <View style={styles.lessonCopy}>
-                    <Text style={[styles.lessonTitle, { color: colors.text }]} numberOfLines={1}>{group.lessonTitle}</Text>
-                    <View style={styles.lessonBarRow}>
-                      <View style={[styles.lessonBarTrack, { backgroundColor: colors.progressTrack ?? colors.border }]}>
-                        <View
-                          style={[
-                            styles.lessonBarFill,
-                            {
-                              backgroundColor: accent,
-                              width: `${Math.min(100, Math.round((group.words.length / Math.max(1, group.lessonWordCount)) * 100))}%`,
-                            },
-                          ]}
-                        />
-                      </View>
-                      <Text style={[styles.lessonBarText, { color: colors.secondaryText }]}>
-                        {group.words.length}/{Math.max(group.lessonWordCount, group.words.length)}
-                      </Text>
-                    </View>
-                  </View>
-                  <MaterialIcons
-                    name={isOpen ? 'expand-less' : 'expand-more'}
-                    size={Math.round(22 * desktopScale)}
-                    color={colors.secondaryText}
-                  />
-                </TouchableOpacity>
-                {isOpen && group.words.map((word) => (
-                  <View key={`${word.english}|${word.french}`} style={[styles.learnedRow, { backgroundColor: colors.surface }]}>
-                    <Text style={[styles.wordEnglish, styles.learnedEnglish, { color: colors.text }]}>{word.english}</Text>
-                    <Text style={[styles.wordFrench, styles.learnedFrench, { color: colors.secondaryText }]}>{word.french}</Text>
-                    {renderSpeaker(word.english)}
-                  </View>
-                ))}
-              </View>
-            );
-          })}
-        </>
+        </View>
+      </View>
+
+      {showGrammar && data.grammarLessons.length > 0 && (
+        <View style={[styles.grammarList, cardShadow, { backgroundColor: surface }]}>
+          {data.grammarLessons.map((lesson) => (
+            <View key={lesson.title} style={styles.grammarRow}>
+              <Text style={[styles.grammarTitle, { color: ink }]} numberOfLines={2}>{lesson.title}</Text>
+              <Text style={[styles.grammarCount, { color: muted }]}>{lesson.answers === 1 ? '1 answer' : `${lesson.answers} answers`}</Text>
+            </View>
+          ))}
+        </View>
+      )}
+
+      <View
+        style={[
+          styles.searchBox,
+          { backgroundColor: surface, borderColor: searchFocused ? palette.green : palette.line },
+        ]}
+      >
+        <MaterialIcons name="search" size={22} color={muted} />
+        <TextInput
+          value={search}
+          onChangeText={setSearch}
+          onFocus={() => setSearchFocused(true)}
+          onBlur={() => setSearchFocused(false)}
+          placeholder="Search a word or a topic"
+          placeholderTextColor={muted}
+          style={[styles.searchInput, { color: ink }]}
+          autoCorrect={false}
+          autoCapitalize="none"
+          accessibilityLabel="Search learnt words"
+        />
+        {!!search && (
+          <TouchableOpacity onPress={() => setSearch('')} accessibilityRole="button" accessibilityLabel="Clear search" hitSlop={8}>
+            <MaterialIcons name="close" size={20} color={muted} />
+          </TouchableOpacity>
+        )}
+      </View>
+
+      {data.learnedWordCount === 0 ? (
+        <Text style={[styles.emptyText, { color: muted }]}>
+          No words yet. Tap ✓ on a flashcard and the word appears here, under its topic.
+        </Text>
+      ) : visibleGroups.length === 0 ? (
+        <Text style={[styles.emptyText, { color: muted }]}>No words match “{search.trim()}” yet.</Text>
+      ) : (
+        <View style={styles.topicList}>{visibleGroups.map(renderTopicRow)}</View>
       )}
     </View>
   );
-
-  const renderGrammarSection = (data: LearningLibrary) => {
-    if (data.grammarLessons.length === 0) return null;
-
-    return (
-      <View style={cardStyle}>
-        {renderSectionTitle('edit', 'Grammar practised', colors.primary)}
-        {data.grammarLessons.map((lesson) => (
-          <View key={lesson.title} style={[styles.wordRow, { borderTopColor: colors.border }]}>
-            <Text style={[styles.wordEnglish, styles.wordCopy, { color: colors.text }]} numberOfLines={2}>{lesson.title}</Text>
-            <View style={[styles.duePill, { backgroundColor: colors.primarySoft }]}>
-              <Text style={[styles.dueLabel, { color: colors.primary }]}>
-                {lesson.answers === 1 ? '1 answer' : `${lesson.answers} answers`}
-              </Text>
-            </View>
-          </View>
-        ))}
-      </View>
-    );
-  };
 
   return (
     <DesktopTypographyProvider mode="fit">
       <ScrollView
         style={[styles.container, { backgroundColor: colors.background }]}
-        contentContainerStyle={{ paddingTop: topContentInset, paddingBottom: insets.bottom + 32 }}
+        contentContainerStyle={{ paddingTop: topContentInset, paddingBottom: insets.bottom + 40 }}
         keyboardShouldPersistTaps="handled"
       >
-        <View style={isDesktopWeb && [styles.desktopContentWrap, { maxWidth: desktopContentMaxWidth }]}>
+        <View style={isDesktopWeb && [styles.desktopContentWrap, { maxWidth: Math.min(desktopContentMaxWidth, 960) }]}>
           <BackButton onPress={() => navigation.goBack()} />
 
-          <View style={styles.header}>
-            <Text style={[styles.title, { color: colors.text }]}>My words</Text>
-            <Text style={[styles.subtitle, { color: colors.secondaryText }]}>
-              Everything you’ve learnt, in one place.
-            </Text>
-          </View>
+          <View style={[styles.column, { paddingHorizontal: pageGutter }]}>
+            <View>
+              <Text style={[styles.title, { color: ink, fontSize: titleSize, lineHeight: titleSize + 6 }]}>My words</Text>
+              <Text style={[styles.subtitle, { color: muted }]}>Everything you’ve learnt, in one place.</Text>
+            </View>
 
-          {!library ? (
-            <ActivityIndicator style={styles.loading} color={colors.primary} />
-          ) : (
-            <>
-              {renderHero(library)}
-              {week && (
-                <WeeklyGoalCard
-                  week={week}
-                  onGoalChange={(goal) => setWeek((current) => current && ({ ...current, goal, goalReached: current.daysPractised >= goal }))}
-                />
-              )}
-              <View style={styles.statsRow}>
-                {renderStat('replay', library.dueReviewCount, 'To review now', colors.warning, '#FFF1D6')}
-                {renderStat('verified', library.masteredReviewCount, 'Mistakes fixed', colors.primary, '#DCEBFF')}
-                {renderStat('edit', library.grammarAnswerCount, 'Grammar answers', colors.danger, '#FFE3E8')}
-              </View>
-              {renderReviewSection(library)}
-              {renderLearnedSection(library)}
-              {renderGrammarSection(library)}
-            </>
-          )}
+            {!library || !fontsLoaded ? (
+              <ActivityIndicator style={styles.loading} color={palette.green} />
+            ) : (
+              <>
+                <View style={[styles.heroRow, wide && styles.heroRowWide]}>
+                  <View style={wide ? styles.heroCol : undefined}>{renderProgressCard(library)}</View>
+                  <View style={wide ? styles.heroCol : undefined}>{renderActionCard()}</View>
+                </View>
+                {week && (
+                  <WeeklyGoalCard
+                    week={week}
+                    onGoalChange={(goal) => setWeek((current) => current && ({ ...current, goal, goalReached: current.daysPractised >= goal }))}
+                  />
+                )}
+                {renderFreshThisWeek(library)}
+                {renderWordBank(library)}
+              </>
+            )}
+          </View>
         </View>
       </ScrollView>
     </DesktopTypographyProvider>
@@ -395,304 +476,101 @@ export default function MyWordsScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-  },
-  desktopContentWrap: {
-    width: '100%',
-    alignSelf: 'center',
-  },
-  header: {
-    paddingHorizontal: 20,
-    paddingBottom: 10,
-  },
-  title: {
-    fontSize: 30,
-    fontWeight: '900',
-    lineHeight: 34,
-  },
-  subtitle: {
-    fontSize: 13,
-    fontWeight: '700',
-    lineHeight: 18,
-    marginTop: 4,
-  },
-  loading: {
-    marginTop: 40,
-  },
-  hero: {
-    marginHorizontal: 16,
-    borderRadius: 20,
-    borderWidth: 1,
-    padding: 16,
-    gap: 12,
-  },
-  heroTop: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 14,
-  },
-  heroIcon: {
-    width: 52,
-    height: 52,
-    borderRadius: 16,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  heroCopy: {
-    flex: 1,
-    minWidth: 0,
-  },
-  heroNumber: {
-    fontSize: 38,
-    lineHeight: 42,
-    fontWeight: '900',
-  },
-  heroLabel: {
+  container: { flex: 1 },
+  desktopContentWrap: { width: '100%', alignSelf: 'center' },
+  column: { gap: 28 },
+  loading: { marginTop: 40 },
+  title: { fontFamily: FONT.heading },
+  subtitle: { fontFamily: FONT.semi, fontSize: 16, lineHeight: 22, marginTop: 6 },
+  eyebrow: {
+    fontFamily: FONT.extra,
     fontSize: 14,
     lineHeight: 18,
-    fontWeight: '800',
+    textTransform: 'uppercase',
+    letterSpacing: 1.1,
   },
-  heroProgress: {
-    gap: 6,
-  },
-  heroTrack: {
-    height: 10,
-    borderRadius: 5,
-    overflow: 'hidden',
-  },
-  heroFill: {
-    height: '100%',
-    borderRadius: 5,
-  },
-  heroProgressText: {
-    fontSize: 12,
-    lineHeight: 16,
-    fontWeight: '700',
-  },
-  heroButton: {
-    minHeight: 48,
-    borderRadius: 999,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
-  },
-  heroButtonText: {
-    fontSize: 15,
-    lineHeight: 20,
-    fontWeight: '900',
-  },
-  heroHint: {
-    fontSize: 13,
-    lineHeight: 18,
-    fontWeight: '700',
-  },
-  statsRow: {
-    flexDirection: 'row',
-    gap: 8,
-    marginHorizontal: 16,
-    marginTop: 10,
-  },
-  statTile: {
-    flex: 1,
-    minWidth: 0,
-    borderRadius: 14,
-    borderWidth: 1,
-    paddingVertical: 12,
-    paddingHorizontal: 6,
-    alignItems: 'center',
-    gap: 2,
-  },
-  statValue: {
-    fontSize: 22,
-    lineHeight: 26,
-    fontWeight: '900',
-  },
-  statLabel: {
-    fontSize: 11,
-    lineHeight: 14,
-    fontWeight: '700',
-    textAlign: 'center',
-  },
-  card: {
-    marginHorizontal: 16,
-    marginTop: 12,
+  eyebrowPadded: { marginBottom: 12 },
+  heroRow: { gap: 16 },
+  heroRowWide: { flexDirection: 'row' },
+  heroCol: { flex: 1 },
+  heroCard: { borderRadius: 28, padding: 22, overflow: 'hidden', gap: 6 },
+  heroCircle: { position: 'absolute', width: 140, height: 140, borderRadius: 70, top: -44, right: -44 },
+  heroNumberRow: { flexDirection: 'row', alignItems: 'baseline', gap: 10, flexWrap: 'wrap' },
+  heroNumber: { fontFamily: FONT.heading },
+  heroNumberLabel: { fontFamily: FONT.extra, fontSize: 18, lineHeight: 24 },
+  milestoneText: { fontFamily: FONT.bold, fontSize: 15, lineHeight: 20, marginTop: 6 },
+  heroTrack: { height: 12, borderRadius: 6, overflow: 'hidden', marginTop: 4 },
+  heroFill: { height: '100%', borderRadius: 6 },
+  caption: { fontFamily: FONT.semi, fontSize: 13, lineHeight: 18, marginTop: 4, opacity: 0.8 },
+  actionCard: { borderRadius: 28, padding: 22, gap: 12 },
+  actionCardEmpty: { borderWidth: 2, borderStyle: 'dashed' },
+  actionTitle: { fontFamily: FONT.heading, fontSize: 24, lineHeight: 30 },
+  actionBody: { fontFamily: FONT.medium, fontSize: 15, lineHeight: 22 },
+  chipRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  chip: { borderRadius: 99, paddingHorizontal: 14, paddingVertical: 6 },
+  chipText: { fontFamily: FONT.bold, fontSize: 14, lineHeight: 18 },
+  tactile: {
+    minHeight: 52,
     borderRadius: 18,
-    borderWidth: 1,
-    padding: 14,
-  },
-  cardHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 10,
-    marginBottom: 8,
-  },
-  cardHeaderIcon: {
-    width: 32,
-    height: 32,
-    borderRadius: 10,
-    alignItems: 'center',
     justifyContent: 'center',
+    gap: 8,
+    paddingHorizontal: 22,
+    alignSelf: 'flex-start',
+    marginTop: 4,
   },
-  cardTitle: {
-    fontSize: 17,
-    lineHeight: 22,
-    fontWeight: '900',
-  },
-  cardIntro: {
-    fontSize: 13,
-    lineHeight: 18,
-    fontWeight: '600',
-    marginBottom: 6,
-  },
-  emptyText: {
-    fontSize: 13,
-    lineHeight: 18,
-    fontWeight: '600',
-    paddingVertical: 4,
-  },
-  wordRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-    paddingVertical: 9,
-    borderTopWidth: StyleSheet.hairlineWidth,
-  },
-  wordCopy: {
-    flex: 1,
-    minWidth: 0,
-  },
-  wordEnglish: {
-    fontSize: 15,
-    lineHeight: 20,
-    fontWeight: '800',
-  },
-  wordFrench: {
-    fontSize: 13,
-    lineHeight: 18,
-    fontWeight: '600',
-  },
-  duePill: {
-    borderRadius: 999,
-    paddingHorizontal: 9,
-    paddingVertical: 3,
-  },
-  dueLabel: {
-    fontSize: 12,
-    lineHeight: 16,
-    fontWeight: '800',
-  },
-  speakerButton: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  moreText: {
-    fontSize: 12,
-    lineHeight: 16,
-    fontWeight: '700',
-    paddingTop: 8,
-  },
+  tactileText: { fontFamily: FONT.extra, fontSize: 16, lineHeight: 22, color: '#FFFFFF' },
+  freshRow: { gap: 14, paddingVertical: 10, paddingHorizontal: 4 },
+  freshCard: { width: 132, borderRadius: 18, paddingVertical: 16, paddingHorizontal: 14, gap: 2 },
+  freshFrench: { fontFamily: FONT.heading, fontSize: 20, lineHeight: 26 },
+  freshEnglish: { fontFamily: FONT.semi, fontSize: 14, lineHeight: 18 },
+  bankSection: { gap: 14 },
+  bankTitleRow: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'baseline', justifyContent: 'space-between', gap: 8 },
+  sectionTitle: { fontFamily: FONT.heading },
+  bankLinks: { flexDirection: 'row', flexWrap: 'wrap', gap: 14 },
+  bankLink: { fontFamily: FONT.bold, fontSize: 14, lineHeight: 18 },
+  grammarList: { borderRadius: 22, padding: 8 },
+  grammarRow: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 10, paddingHorizontal: 12 },
+  grammarTitle: { flex: 1, fontFamily: FONT.bold, fontSize: 15, lineHeight: 20 },
+  grammarCount: { fontFamily: FONT.bold, fontSize: 13, lineHeight: 18 },
   searchBox: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
-    borderRadius: 12,
-    borderWidth: 1,
-    paddingHorizontal: 10,
-    minHeight: 44,
-    marginBottom: 6,
-  },
-  searchInput: {
-    flex: 1,
-    fontSize: 15,
-    paddingVertical: 8,
-  },
-  lessonGroup: {
-    borderTopWidth: StyleSheet.hairlineWidth,
-    paddingTop: 2,
-  },
-  lessonHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-    minHeight: 60,
-    paddingVertical: 6,
-  },
-  lessonBadge: {
-    width: 46,
-    height: 46,
-    borderRadius: 14,
-    alignItems: 'center',
-    justifyContent: 'center',
-    overflow: 'hidden',
-  },
-  lessonThumb: {
-    width: '100%',
-    height: '100%',
-  },
-  lessonCopy: {
-    flex: 1,
-    minWidth: 0,
-    gap: 4,
-  },
-  lessonBarRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  lessonBarTrack: {
-    flex: 1,
-    height: 6,
-    borderRadius: 3,
-    overflow: 'hidden',
-  },
-  lessonBarFill: {
-    height: '100%',
-    borderRadius: 3,
-  },
-  lessonBarText: {
-    fontSize: 11,
-    lineHeight: 14,
-    fontWeight: '800',
-  },
-  lessonBadgeText: {
-    fontSize: 14,
-    fontWeight: '900',
-  },
-  lessonTitle: {
-    fontSize: 15,
-    lineHeight: 20,
-    fontWeight: '800',
-  },
-  countPill: {
-    borderRadius: 999,
-    paddingHorizontal: 9,
-    paddingVertical: 2,
-    minWidth: 28,
-    alignItems: 'center',
-  },
-  lessonCount: {
-    fontSize: 13,
-    fontWeight: '900',
-  },
-  learnedRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
     gap: 10,
-    borderRadius: 10,
-    paddingVertical: 7,
-    paddingHorizontal: 10,
-    marginBottom: 4,
+    minHeight: 56,
+    borderRadius: 18,
+    borderWidth: 2,
+    paddingHorizontal: 16,
   },
-  learnedEnglish: {
-    flex: 1,
+  searchInput: { flex: 1, fontFamily: FONT.semi, fontSize: 16, paddingVertical: 10 },
+  emptyText: { fontFamily: FONT.semi, fontSize: 15, lineHeight: 22 },
+  topicList: { gap: 12 },
+  topicCard: { borderRadius: 22, overflow: 'hidden' },
+  topicHeader: { flexDirection: 'row', alignItems: 'center', gap: 14, padding: 14, minHeight: 76 },
+  topicIcon: { width: 48, height: 48, borderRadius: 14, alignItems: 'center', justifyContent: 'center', overflow: 'hidden' },
+  topicThumb: { width: '100%', height: '100%' },
+  topicCopy: { flex: 1, minWidth: 0, gap: 6 },
+  topicName: { fontFamily: FONT.extra, fontSize: 18, lineHeight: 24 },
+  topicBarRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  topicTrack: { flex: 1, maxWidth: 220, height: 8, borderRadius: 4, overflow: 'hidden' },
+  topicFill: { height: '100%', borderRadius: 4 },
+  topicCount: { fontFamily: FONT.bold, fontSize: 13, lineHeight: 18 },
+  chevronOpen: { transform: [{ rotate: '180deg' }] },
+  tileGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10, padding: 14 },
+  wordTile: {
+    flexGrow: 1,
+    flexBasis: 150,
+    minWidth: 150,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    borderRadius: 14,
+    paddingVertical: 10,
+    paddingHorizontal: 12,
   },
-  learnedFrench: {
-    flex: 1,
-    textAlign: 'right',
-  },
+  wordTileCopy: { flex: 1, minWidth: 0 },
+  tileFrench: { fontFamily: FONT.extra, fontSize: 16, lineHeight: 22 },
+  tileEnglish: { fontFamily: FONT.semi, fontSize: 14, lineHeight: 18 },
+  speakerButton: { width: 32, height: 32, borderRadius: 16, alignItems: 'center', justifyContent: 'center' },
 });

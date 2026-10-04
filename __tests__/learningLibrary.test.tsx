@@ -124,7 +124,7 @@ describe('MyWordsScreen', () => {
     jest.setSystemTime(new Date('2026-03-11T12:00:00'));
 
     const { getByText } = await renderScreen();
-    fireEvent.press(getByText('Review 1 word now'));
+    fireEvent.press(getByText('Start review'));
 
     expect(mockOpenWordReview).toHaveBeenCalledWith(
       expect.anything(),

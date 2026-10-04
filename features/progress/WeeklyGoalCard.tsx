@@ -2,7 +2,6 @@ import { StyleSheet, TouchableOpacity, View } from 'react-native';
 import Text from '../shared/ThemedText';
 import MaterialIcons from '../shared/ThemedMaterialIcon';
 import { useTheme } from '../settings/ThemeContext';
-import { getSoftShadow } from '../shared/uiPrimitives';
 import { WEEKLY_GOAL_OPTIONS, setWeeklyGoal, type PracticeWeek } from './weeklyGoal';
 
 const DAY_LETTERS = ['M', 'T', 'W', 'T', 'F', 'S', 'S'];
@@ -21,8 +20,9 @@ export default function WeeklyGoalCard({ week, onGoalChange }: WeeklyGoalCardPro
     <View
       style={[
         styles.card,
-        getSoftShadow(isDarkMode, 'soft', colors.shadow ?? colors.border, colors.visualStyle === 'pixel'),
-        { backgroundColor: colors.card, borderColor: week.goalReached ? colors.success : colors.border },
+        { backgroundColor: colors.card, boxShadow: `0px 1px 0px ${isDarkMode ? '#2C3340' : '#E6E3DB'}` },
+        // Depth comes from a hairline shadow, not a border; only a reached goal gets an outline.
+        week.goalReached && { borderWidth: 2, borderColor: colors.success },
       ]}
     >
       <View style={styles.headerRow}>
@@ -97,12 +97,9 @@ export default function WeeklyGoalCard({ week, onGoalChange }: WeeklyGoalCardPro
 
 const styles = StyleSheet.create({
   card: {
-    marginHorizontal: 16,
-    marginTop: 12,
-    borderRadius: 18,
-    borderWidth: 1.5,
-    padding: 14,
-    gap: 12,
+    borderRadius: 28,
+    padding: 20,
+    gap: 14,
   },
   headerRow: {
     flexDirection: 'row',
