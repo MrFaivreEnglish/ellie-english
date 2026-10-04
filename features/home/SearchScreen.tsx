@@ -348,7 +348,12 @@ const styles = StyleSheet.create({
     borderWidth: 2,
     paddingHorizontal: 16,
   },
-  input: { flex: 1, fontSize: 16, paddingVertical: 10 },
+  input: {
+    flex: 1,
+    fontSize: 16,
+    paddingVertical: 10,
+    ...(Platform.OS === 'web' ? ({ outlineStyle: 'none', outlineWidth: 0 } as object) : null),
+  },
   startState: { marginTop: 20, paddingHorizontal: 20, gap: 22 },
   block: { gap: 10 },
   blockHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
