@@ -323,15 +323,16 @@ export function MyWordsCard({ learnt, onPress }: { learnt: number; onPress: () =
 
 const styles = StyleSheet.create({
   tactile: {
-    minHeight: 48,
+    minHeight: 40,
     minWidth: 120,
     paddingHorizontal: 28,
+    paddingVertical: 0,
     borderRadius: 16,
     alignItems: 'center',
     justifyContent: 'center',
     alignSelf: 'flex-start',
   },
-  tactileLabel: { color: '#FFFFFF', fontWeight: '800', fontSize: 17 },
+  tactileLabel: { color: '#FFFFFF', fontWeight: '800', fontSize: 16 },
 
   banner: {
     flexDirection: 'row',

@@ -376,15 +376,15 @@ export default function HomeScreen() {
               accessibilityRole="button"
               accessibilityLabel="Open account"
             >
-              <View style={[styles.avatarFrame, { borderColor: '#1A7FD4' }]}>
+              <View style={styles.avatarFrame}>
                 {!isAccountLoading ? (
                   <AccountAvatar
                     avatarId={unlockedAccountAvatarId}
                     colorId={unlockedAccountAvatarColorId}
-                    size={54}
+                    size={60}
                   />
                 ) : (
-                  <MaterialIcons name="account-circle" size={54} color={accountPillAccent} />
+                  <MaterialIcons name="account-circle" size={60} color={accountPillAccent} />
                 )}
               </View>
               <View
@@ -511,15 +511,8 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   accountPillWrap: { alignItems: 'center', paddingBottom: 8 },
-  avatarFrame: {
-    width: 60,
-    height: 60,
-    borderRadius: 18,
-    borderWidth: 3,
-    overflow: 'hidden',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
+  // The avatar draws its own border in the colour the student picked.
+  avatarFrame: { width: 60, height: 60, alignItems: 'center', justifyContent: 'center' },
   levelBadge: {
     position: 'absolute',
     bottom: 0,
@@ -541,9 +534,9 @@ const styles = StyleSheet.create({
   grid: { flexDirection: 'row', flexWrap: 'wrap', gap: 14 },
   tileCell: { width: '47.5%', flexGrow: 1 },
   tile: {
-    minHeight: 76,
+    minHeight: 104,
     borderRadius: 22,
-    paddingVertical: 18,
+    paddingVertical: 22,
     paddingHorizontal: 24,
     marginBottom: 5,
     flexDirection: 'row',
@@ -552,7 +545,7 @@ const styles = StyleSheet.create({
     gap: 10,
   },
   tileTitleNarrow: { fontSize: 17 },
-  tileNarrow: { flexDirection: 'column', minHeight: 92, paddingHorizontal: 10, paddingVertical: 14, gap: 6 },
+  tileNarrow: { flexDirection: 'column', minHeight: 112, paddingHorizontal: 10, paddingVertical: 16, gap: 6 },
   tileIcon: { width: 28, height: 28 },
   tileTitle: { fontWeight: '800', fontSize: 20, flexShrink: 1, textAlign: 'center' },
 });
