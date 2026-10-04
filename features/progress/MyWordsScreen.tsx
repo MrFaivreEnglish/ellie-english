@@ -8,6 +8,7 @@ import type { RootStackParamList } from '../../types/navigationTypes';
 import Text, { ThemedTextInput as TextInput } from '../shared/ThemedText';
 import MaterialIcons from '../shared/ThemedMaterialIcon';
 import BackButton from '../shared/BackButton';
+import { getMilestoneProgress } from './milestones';
 import { useTheme } from '../settings/ThemeContext';
 import { DesktopTypographyProvider } from '../shared/DesktopTypography';
 import { getDesktopContentMaxWidth, getTopSafeAreaInset, isDesktopWebWidth } from '../shared/responsiveLayout';
@@ -19,11 +20,10 @@ import { openWordReview } from '../vocabulary/wordReviewLesson';
 // What a student has learnt, one next action, and a searchable bank of every word saved.
 // Layout and colour follow the My Words design brief; the page background is the theme's.
 
-const MILESTONE_STEP = 25;
 const WIDE_LAYOUT = 700;
 // Each colour has one job: green is progress, coral is "needs attention".
 const LIGHT = {
-  line: '#E6E3DB',
+  line: '#DCE3EE',
   greenBg: '#D3F5E0',
   green: '#2F9B5C',
   greenShade: '#1F7340',
@@ -120,7 +120,8 @@ export default function MyWordsScreen() {
   const surface = colors.card;
   const ink = colors.text;
   const muted = colors.secondaryText;
-  const cardShadow = { boxShadow: `0px 1px 0px ${palette.line}` } as const;
+  // A hard bottom edge, the same raised look as the Home cards.
+  const cardShadow = { boxShadow: `0px 3px 0px ${palette.line}` } as const;
 
   const [library, setLibrary] = React.useState<LearningLibrary | null>(null);
   const [search, setSearch] = React.useState('');
@@ -178,9 +179,9 @@ export default function MyWordsScreen() {
   const learnNewWords = () => navigation.navigate('MainTabs', { screen: 'Vocabulary' });
 
   const pageGutter = wide ? 24 : 20;
-  const titleSize = wide ? 44 : 36;
+  const titleSize = wide ? 40 : 32;
   const sectionSize = wide ? 28 : 24;
-  const heroNumberSize = wide ? 76 : 64;
+  const heroNumberSize = wide ? 64 : 56;
 
   const renderSpeaker = (text: string) => (
     <TouchableOpacity
@@ -196,15 +197,14 @@ export default function MyWordsScreen() {
 
   const renderProgressCard = (data: LearningLibrary) => {
     const learnt = data.learnedWordCount;
-    const milestone = (Math.floor(learnt / MILESTONE_STEP) + 1) * MILESTONE_STEP;
+    // Same milestones as the Home banner (25, 50, 100, 250...).
+    const { next: milestone, fraction: fill } = getMilestoneProgress(learnt);
     const toGo = milestone - learnt;
-    // Progress through the current block of 25, so the bar always feels within reach.
-    const fill = (learnt % MILESTONE_STEP) / MILESTONE_STEP;
 
     return (
       <View style={[styles.heroCard, cardShadow, { backgroundColor: palette.greenBg }]}>
         <View style={[styles.heroCircle, { backgroundColor: palette.greenDark }]} />
-        <Text style={[styles.eyebrow, { color: palette.green }]}>{learnt > 0 ? 'Bravo !' : 'C’est parti !'}</Text>
+        <Text style={[styles.eyebrow, { color: palette.green }]}>{learnt > 0 ? 'Well done!' : 'Let’s go!'}</Text>
         <View style={styles.heroNumberRow}>
           <Text style={[styles.heroNumber, { color: palette.greenInk, fontSize: heroNumberSize, lineHeight: heroNumberSize + 6 }]}>{learnt}</Text>
           <Text style={[styles.heroNumberLabel, { color: palette.greenInk }]}>{learnt === 1 ? 'word learnt' : 'words learnt'}</Text>
@@ -252,10 +252,10 @@ export default function MyWordsScreen() {
 
     return (
       <View style={[styles.actionCard, styles.actionCardEmpty, { backgroundColor: surface, borderColor: palette.line }]}>
-        <Text style={[styles.eyebrow, { color: palette.green }]}>Rien à réviser</Text>
+        <Text style={[styles.eyebrow, { color: palette.green }]}>Nothing to review</Text>
         <Text style={[styles.actionTitle, { color: ink }]}>All caught up. Fancy a few new words?</Text>
         <Text style={[styles.actionBody, { color: muted }]}>
-          Words you get wrong while typing, or mark “not yet” on a flashcard, come back here a day later.
+          Words you get wrong while typing, or mark “not yet”, come back here a day later.
         </Text>
         <TactileButton label="Learn new words" icon="style" color={palette.green} shade={palette.greenShade} onPress={learnNewWords} reducedMotion={reducedMotion} />
       </View>
@@ -344,7 +344,9 @@ export default function MyWordsScreen() {
       <View style={styles.bankTitleRow}>
         <Text style={[styles.sectionTitle, { color: ink, fontSize: sectionSize, lineHeight: sectionSize + 6 }]}>Your word bank</Text>
         <View style={styles.bankLinks}>
-          <Text style={[styles.bankLink, { color: muted }]}>{data.masteredReviewCount} mistakes fixed</Text>
+          {data.masteredReviewCount > 0 && (
+            <Text style={[styles.bankLink, { color: muted }]}>{data.masteredReviewCount} mistakes fixed</Text>
+          )}
           {data.grammarAnswerCount > 0 && (
             <TouchableOpacity
               onPress={() => setShowGrammar((current) => !current)}
@@ -461,7 +463,7 @@ const styles = StyleSheet.create({
   heroRow: { gap: 16 },
   heroRowWide: { flexDirection: 'row' },
   heroCol: { flex: 1 },
-  heroCard: { borderRadius: 28, padding: 22, overflow: 'hidden', gap: 6 },
+  heroCard: { flexGrow: 1, borderRadius: 28, padding: 22, overflow: 'hidden', gap: 6 },
   heroCircle: { position: 'absolute', width: 140, height: 140, borderRadius: 70, top: -44, right: -44 },
   heroNumberRow: { flexDirection: 'row', alignItems: 'baseline', gap: 10, flexWrap: 'wrap' },
   heroNumber: { fontWeight: '900' },
@@ -470,7 +472,7 @@ const styles = StyleSheet.create({
   heroTrack: { height: 12, borderRadius: 6, overflow: 'hidden', marginTop: 4 },
   heroFill: { height: '100%', borderRadius: 6 },
   caption: { fontWeight: '600', fontSize: 13, lineHeight: 18, marginTop: 4, opacity: 0.8 },
-  actionCard: { borderRadius: 28, padding: 22, gap: 12 },
+  actionCard: { flexGrow: 1, borderRadius: 28, padding: 22, gap: 12 },
   actionCardEmpty: { borderWidth: 2, borderStyle: 'dashed' },
   actionTitle: { fontWeight: '900', fontSize: 24, lineHeight: 30 },
   actionBody: { fontWeight: '500', fontSize: 15, lineHeight: 22 },
