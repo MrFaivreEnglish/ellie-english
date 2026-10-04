@@ -11,15 +11,18 @@ import { useTheme } from '../settings/ThemeContext';
 import { DesktopTypographyProvider } from '../shared/DesktopTypography';
 import { getDesktopContentMaxWidth, getDesktopTypographyScale, getTopSafeAreaInset, isDesktopWebWidth } from '../shared/responsiveLayout';
 import { getSoftShadow } from '../shared/uiPrimitives';
+import { useEnglishSpeech } from '../shared/useEnglishSpeech';
 import { getLearningLibrary, type LearningLibrary } from './learningLibrary';
 import { getTodayKey } from '../vocabulary/reviewWordsStorage';
 import { openWordReview } from '../vocabulary/wordReviewLesson';
 
-// What a student has learnt and what's waiting for review, opened from their profile.
+// What a student has learnt and what's waiting for review, opened from Home or their profile.
 
 // The review list can grow long; the rest are summarised in a "+N more" line.
 const MAX_REVIEW_ROWS = 30;
 const DAY_MS = 24 * 60 * 60 * 1000;
+// Lesson groups cycle through these so a long list is easy to scan.
+const GROUP_ACCENTS = ['#3A8F5C', '#1F7AD1', '#D4681D', '#7654D4', '#D63B55', '#1687A7'];
 
 const getDueLabel = (dueOn: string, today: string) => {
   if (dueOn <= today) return 'Due now';
@@ -33,6 +36,7 @@ const matchesSearch = (query: string, ...values: string[]) =>
 export default function MyWordsScreen() {
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const { colors, isDarkMode, isAndroidStatusBarEnabled } = useTheme();
+  const { speak } = useEnglishSpeech();
   const insets = useSafeAreaInsets();
   const { width: windowWidth, height: windowHeight } = useWindowDimensions();
   const isDesktopWeb = isDesktopWebWidth(windowWidth, undefined, windowHeight);
@@ -86,52 +90,109 @@ export default function MyWordsScreen() {
     openWordReview(navigation, dueWords, { backLabel: 'Back to My words', backTarget: 'MyWords' });
   };
 
+  const buttonColor = colors.buttonBackground ?? colors.primary;
+  const buttonTextColor = colors.buttonText ?? '#fff';
   const cardStyle = [
     styles.card,
     getSoftShadow(isDarkMode, 'soft', colors.shadow ?? colors.border, colors.visualStyle === 'pixel'),
     { backgroundColor: colors.card, borderColor: colors.border },
   ];
+  const heroBackground = isDarkMode ? colors.successSoft : '#E3F6E8';
 
-  const renderStat = (icon: React.ComponentProps<typeof MaterialIcons>['name'], value: number, label: string, accent: string) => (
-    <View key={label} style={[styles.statTile, { backgroundColor: colors.card, borderColor: colors.border }]}>
+  const renderSpeaker = (text: string) => (
+    <TouchableOpacity
+      onPress={() => speak(text)}
+      hitSlop={8}
+      style={[styles.speakerButton, { backgroundColor: colors.surface }]}
+      accessibilityRole="button"
+      accessibilityLabel={`Listen to "${text}"`}
+    >
+      <MaterialIcons name="volume-up" size={Math.round(16 * desktopScale)} color={colors.primary} />
+    </TouchableOpacity>
+  );
+
+  const renderHero = (data: LearningLibrary) => {
+    const progress = data.totalWordCount > 0 ? Math.min(1, data.learnedWordCount / data.totalWordCount) : 0;
+    const accent = isDarkMode ? '#7DD9A0' : '#2F7D4F';
+
+    return (
+      <View style={[styles.hero, { backgroundColor: heroBackground, borderColor: isDarkMode ? colors.border : '#BFE6CB' }]}>
+        <View style={styles.heroTop}>
+          <View style={[styles.heroIcon, { backgroundColor: isDarkMode ? colors.card : '#fff' }]}>
+            <MaterialIcons name="menu-book" size={Math.round(26 * desktopScale)} color={accent} />
+          </View>
+          <View style={styles.heroCopy}>
+            <Text style={[styles.heroNumber, { color: colors.text }]}>{data.learnedWordCount}</Text>
+            <Text style={[styles.heroLabel, { color: colors.secondaryText }]}>
+              {data.learnedWordCount === 1 ? 'word learnt' : 'words learnt'}
+            </Text>
+          </View>
+        </View>
+        {data.totalWordCount > 0 && (
+          <View style={styles.heroProgress}>
+            <View style={[styles.heroTrack, { backgroundColor: isDarkMode ? colors.progressTrack ?? colors.border : '#fff' }]}>
+              <View style={[styles.heroFill, { width: `${Math.max(progress * 100, data.learnedWordCount > 0 ? 3 : 0)}%`, backgroundColor: accent }]} />
+            </View>
+            <Text style={[styles.heroProgressText, { color: colors.secondaryText }]}>
+              {data.learnedWordCount} of {data.totalWordCount} words in Ellie
+            </Text>
+          </View>
+        )}
+        {data.dueReviewCount > 0 ? (
+          <TouchableOpacity
+            onPress={startReview}
+            activeOpacity={0.85}
+            style={[styles.heroButton, { backgroundColor: buttonColor }]}
+            accessibilityRole="button"
+          >
+            <MaterialIcons name="keyboard" size={Math.round(18 * desktopScale)} color={buttonTextColor} />
+            <Text style={[styles.heroButtonText, { color: buttonTextColor }]}>
+              {data.dueReviewCount === 1 ? 'Review 1 word now' : `Review ${data.dueReviewCount} words now`}
+            </Text>
+          </TouchableOpacity>
+        ) : (
+          <Text style={[styles.heroHint, { color: colors.secondaryText }]}>
+            {data.learnedWordCount === 0
+              ? 'Tap ✓ on a flashcard to save a word here.'
+              : 'Nothing to review right now. Nice work!'}
+          </Text>
+        )}
+      </View>
+    );
+  };
+
+  const renderStat = (icon: React.ComponentProps<typeof MaterialIcons>['name'], value: number, label: string, accent: string, tint: string) => (
+    <View key={label} style={[styles.statTile, { backgroundColor: isDarkMode ? colors.card : tint, borderColor: isDarkMode ? colors.border : 'transparent' }]}>
       <MaterialIcons name={icon} size={Math.round(20 * desktopScale)} color={accent} />
       <Text style={[styles.statValue, { color: colors.text }]}>{value}</Text>
       <Text style={[styles.statLabel, { color: colors.secondaryText }]} numberOfLines={2}>{label}</Text>
     </View>
   );
 
-  const renderReviewSection = () => {
-    if (!library) return null;
-    const { reviewWords, dueReviewCount } = library;
+  const renderSectionTitle = (icon: React.ComponentProps<typeof MaterialIcons>['name'], title: string, accent: string) => (
+    <View style={styles.cardHeader}>
+      <View style={[styles.cardHeaderIcon, { backgroundColor: accent + '22' }]}>
+        <MaterialIcons name={icon} size={Math.round(18 * desktopScale)} color={accent} />
+      </View>
+      <Text style={[styles.cardTitle, { color: colors.text }]}>{title}</Text>
+    </View>
+  );
+
+  const renderReviewSection = (data: LearningLibrary) => {
+    const { reviewWords } = data;
 
     return (
       <View style={cardStyle}>
-        <View style={styles.cardHeader}>
-          <MaterialIcons name="replay" size={Math.round(20 * desktopScale)} color={colors.warning} />
-          <Text style={[styles.cardTitle, { color: colors.text }]}>Words to review</Text>
-        </View>
+        {renderSectionTitle('replay', 'Words to review', colors.warning)}
         {reviewWords.length === 0 ? (
           <Text style={[styles.emptyText, { color: colors.secondaryText }]}>
-            Nothing to review. Words you get wrong while typing come back here a day later.
+            Nothing to review. Words you get wrong while typing, or mark “not yet” on a flashcard, come back here a day later.
           </Text>
         ) : (
           <>
             <Text style={[styles.cardIntro, { color: colors.secondaryText }]}>
-              Words you got wrong while typing. Get each one right 3 times, a few days apart, and it leaves the list.
+              Get each word right 3 times, a few days apart, and it leaves the list.
             </Text>
-            {dueReviewCount > 0 && (
-              <TouchableOpacity
-                onPress={startReview}
-                activeOpacity={0.85}
-                style={[styles.primaryButton, { backgroundColor: colors.buttonBackground ?? colors.primary }]}
-                accessibilityRole="button"
-              >
-                <MaterialIcons name="keyboard" size={Math.round(18 * desktopScale)} color={colors.buttonText ?? '#fff'} />
-                <Text style={[styles.primaryButtonText, { color: colors.buttonText ?? '#fff' }]}>
-                  {dueReviewCount === 1 ? 'Review 1 word now' : `Review ${dueReviewCount} words now`}
-                </Text>
-              </TouchableOpacity>
-            )}
             {reviewWords.slice(0, MAX_REVIEW_ROWS).map((word) => {
               const isDue = word.dueOn <= today;
               return (
@@ -142,9 +203,12 @@ export default function MyWordsScreen() {
                       {word.french}{word.lessonTitle ? ` · ${word.lessonTitle}` : ''}
                     </Text>
                   </View>
-                  <Text style={[styles.dueLabel, { color: isDue ? colors.warning : colors.secondaryText }]}>
-                    {getDueLabel(word.dueOn, today)}
-                  </Text>
+                  <View style={[styles.duePill, { backgroundColor: isDue ? colors.warning + '26' : colors.surface }]}>
+                    <Text style={[styles.dueLabel, { color: isDue ? colors.warning : colors.secondaryText }]}>
+                      {getDueLabel(word.dueOn, today)}
+                    </Text>
+                  </View>
+                  {renderSpeaker(word.english)}
                 </View>
               );
             })}
@@ -159,94 +223,93 @@ export default function MyWordsScreen() {
     );
   };
 
-  const renderLearnedSection = () => {
-    if (!library) return null;
-
-    return (
-      <View style={cardStyle}>
-        <View style={styles.cardHeader}>
-          <MaterialIcons name="style" size={Math.round(20 * desktopScale)} color={colors.success} />
-          <Text style={[styles.cardTitle, { color: colors.text }]}>Words learnt</Text>
-        </View>
-        {library.learnedWordCount === 0 ? (
-          <Text style={[styles.emptyText, { color: colors.secondaryText }]}>
-            No words yet. Mark a flashcard as learnt and it appears here, under its lesson.
-          </Text>
-        ) : (
-          <>
-            <View style={[styles.searchBox, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-              <MaterialIcons name="search" size={Math.round(18 * desktopScale)} color={colors.secondaryText} />
-              <TextInput
-                value={search}
-                onChangeText={setSearch}
-                placeholder="Search in English or French"
-                placeholderTextColor={colors.secondaryText}
-                style={[styles.searchInput, { color: colors.text }]}
-                autoCorrect={false}
-                autoCapitalize="none"
-                accessibilityLabel="Search learnt words"
-              />
-              {!!search && (
-                <TouchableOpacity onPress={() => setSearch('')} accessibilityRole="button" accessibilityLabel="Clear search" hitSlop={8}>
-                  <MaterialIcons name="close" size={Math.round(18 * desktopScale)} color={colors.secondaryText} />
-                </TouchableOpacity>
-              )}
-            </View>
-            {visibleGroups.length === 0 && (
-              <Text style={[styles.emptyText, { color: colors.secondaryText }]}>No learnt word matches “{search.trim()}”.</Text>
+  const renderLearnedSection = (data: LearningLibrary) => (
+    <View style={cardStyle}>
+      {renderSectionTitle('style', 'Words learnt', colors.success)}
+      {data.learnedWordCount === 0 ? (
+        <Text style={[styles.emptyText, { color: colors.secondaryText }]}>
+          No words yet. Tap ✓ on a flashcard and the word appears here, under its lesson.
+        </Text>
+      ) : (
+        <>
+          <View style={[styles.searchBox, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+            <MaterialIcons name="search" size={Math.round(18 * desktopScale)} color={colors.secondaryText} />
+            <TextInput
+              value={search}
+              onChangeText={setSearch}
+              placeholder="Search in English or French"
+              placeholderTextColor={colors.secondaryText}
+              style={[styles.searchInput, { color: colors.text }]}
+              autoCorrect={false}
+              autoCapitalize="none"
+              accessibilityLabel="Search learnt words"
+            />
+            {!!search && (
+              <TouchableOpacity onPress={() => setSearch('')} accessibilityRole="button" accessibilityLabel="Clear search" hitSlop={8}>
+                <MaterialIcons name="close" size={Math.round(18 * desktopScale)} color={colors.secondaryText} />
+              </TouchableOpacity>
             )}
-            {visibleGroups.map((group) => {
-              // Searching opens every lesson with a match, so results are visible at once.
-              const isOpen = !!query || openLessons.has(group.lessonTitle);
-              return (
-                <View key={group.lessonTitle} style={[styles.lessonGroup, { borderTopColor: colors.border }]}>
-                  <TouchableOpacity
-                    onPress={() => toggleLesson(group.lessonTitle)}
-                    disabled={!!query}
-                    activeOpacity={0.8}
-                    style={styles.lessonHeader}
-                    accessibilityRole="button"
-                    accessibilityState={{ expanded: isOpen }}
-                    accessibilityLabel={`${group.lessonTitle}, ${group.words.length} ${group.words.length === 1 ? 'word' : 'words'}`}
-                  >
-                    <Text style={[styles.lessonTitle, { color: colors.text }]} numberOfLines={1}>{group.lessonTitle}</Text>
-                    <Text style={[styles.lessonCount, { color: colors.secondaryText }]}>{group.words.length}</Text>
-                    <MaterialIcons
-                      name={isOpen ? 'expand-less' : 'expand-more'}
-                      size={Math.round(22 * desktopScale)}
-                      color={colors.secondaryText}
-                    />
-                  </TouchableOpacity>
-                  {isOpen && group.words.map((word) => (
-                    <View key={`${word.english}|${word.french}`} style={styles.learnedRow}>
-                      <Text style={[styles.wordEnglish, styles.learnedEnglish, { color: colors.text }]}>{word.english}</Text>
-                      <Text style={[styles.wordFrench, styles.learnedFrench, { color: colors.secondaryText }]}>{word.french}</Text>
-                    </View>
-                  ))}
-                </View>
-              );
-            })}
-          </>
-        )}
-      </View>
-    );
-  };
+          </View>
+          {visibleGroups.length === 0 && (
+            <Text style={[styles.emptyText, { color: colors.secondaryText }]}>No learnt word matches “{search.trim()}”.</Text>
+          )}
+          {visibleGroups.map((group, index) => {
+            const accent = GROUP_ACCENTS[index % GROUP_ACCENTS.length];
+            // Searching opens every lesson with a match, so results are visible at once.
+            const isOpen = !!query || openLessons.has(group.lessonTitle);
+            return (
+              <View key={group.lessonTitle} style={[styles.lessonGroup, { borderTopColor: colors.border }]}>
+                <TouchableOpacity
+                  onPress={() => toggleLesson(group.lessonTitle)}
+                  disabled={!!query}
+                  activeOpacity={0.8}
+                  style={styles.lessonHeader}
+                  accessibilityRole="button"
+                  accessibilityState={{ expanded: isOpen }}
+                  accessibilityLabel={`${group.lessonTitle}, ${group.words.length} ${group.words.length === 1 ? 'word' : 'words'}`}
+                >
+                  <View style={[styles.lessonBadge, { backgroundColor: accent + '22' }]}>
+                    <Text style={[styles.lessonBadgeText, { color: accent }]}>{group.lessonTitle.charAt(0).toUpperCase()}</Text>
+                  </View>
+                  <Text style={[styles.lessonTitle, { color: colors.text }]} numberOfLines={1}>{group.lessonTitle}</Text>
+                  <View style={[styles.countPill, { backgroundColor: accent + '22' }]}>
+                    <Text style={[styles.lessonCount, { color: accent }]}>{group.words.length}</Text>
+                  </View>
+                  <MaterialIcons
+                    name={isOpen ? 'expand-less' : 'expand-more'}
+                    size={Math.round(22 * desktopScale)}
+                    color={colors.secondaryText}
+                  />
+                </TouchableOpacity>
+                {isOpen && group.words.map((word) => (
+                  <View key={`${word.english}|${word.french}`} style={[styles.learnedRow, { backgroundColor: colors.surface }]}>
+                    <Text style={[styles.wordEnglish, styles.learnedEnglish, { color: colors.text }]}>{word.english}</Text>
+                    <Text style={[styles.wordFrench, styles.learnedFrench, { color: colors.secondaryText }]}>{word.french}</Text>
+                    {renderSpeaker(word.english)}
+                  </View>
+                ))}
+              </View>
+            );
+          })}
+        </>
+      )}
+    </View>
+  );
 
-  const renderGrammarSection = () => {
-    if (!library || library.grammarLessons.length === 0) return null;
+  const renderGrammarSection = (data: LearningLibrary) => {
+    if (data.grammarLessons.length === 0) return null;
 
     return (
       <View style={cardStyle}>
-        <View style={styles.cardHeader}>
-          <MaterialIcons name="edit" size={Math.round(20 * desktopScale)} color={colors.primary} />
-          <Text style={[styles.cardTitle, { color: colors.text }]}>Grammar practised</Text>
-        </View>
-        {library.grammarLessons.map((lesson) => (
+        {renderSectionTitle('edit', 'Grammar practised', colors.primary)}
+        {data.grammarLessons.map((lesson) => (
           <View key={lesson.title} style={[styles.wordRow, { borderTopColor: colors.border }]}>
             <Text style={[styles.wordEnglish, styles.wordCopy, { color: colors.text }]} numberOfLines={2}>{lesson.title}</Text>
-            <Text style={[styles.dueLabel, { color: colors.secondaryText }]}>
-              {lesson.answers === 1 ? '1 answer' : `${lesson.answers} answers`}
-            </Text>
+            <View style={[styles.duePill, { backgroundColor: colors.primarySoft }]}>
+              <Text style={[styles.dueLabel, { color: colors.primary }]}>
+                {lesson.answers === 1 ? '1 answer' : `${lesson.answers} answers`}
+              </Text>
+            </View>
           </View>
         ))}
       </View>
@@ -266,7 +329,7 @@ export default function MyWordsScreen() {
           <View style={styles.header}>
             <Text style={[styles.title, { color: colors.text }]}>My words</Text>
             <Text style={[styles.subtitle, { color: colors.secondaryText }]}>
-              What you’ve learnt so far, and what to review.
+              Everything you’ve learnt, in one place.
             </Text>
           </View>
 
@@ -274,15 +337,15 @@ export default function MyWordsScreen() {
             <ActivityIndicator style={styles.loading} color={colors.primary} />
           ) : (
             <>
+              {renderHero(library)}
               <View style={styles.statsRow}>
-                {renderStat('style', library.learnedWordCount, 'Words learnt', colors.success)}
-                {renderStat('replay', library.dueReviewCount, 'To review now', colors.warning)}
-                {renderStat('verified', library.masteredReviewCount, 'Mistakes fixed', colors.primary)}
-                {renderStat('edit', library.grammarAnswerCount, 'Grammar answers', colors.danger)}
+                {renderStat('replay', library.dueReviewCount, 'To review now', colors.warning, '#FFF1D6')}
+                {renderStat('verified', library.masteredReviewCount, 'Mistakes fixed', colors.primary, '#DCEBFF')}
+                {renderStat('edit', library.grammarAnswerCount, 'Grammar answers', colors.danger, '#FFE3E8')}
               </View>
-              {renderReviewSection()}
-              {renderLearnedSection()}
-              {renderGrammarSection()}
+              {renderReviewSection(library)}
+              {renderLearnedSection(library)}
+              {renderGrammarSection(library)}
             </>
           )}
         </View>
@@ -301,7 +364,7 @@ const styles = StyleSheet.create({
   },
   header: {
     paddingHorizontal: 20,
-    paddingBottom: 8,
+    paddingBottom: 10,
   },
   title: {
     fontSize: 30,
@@ -317,25 +380,93 @@ const styles = StyleSheet.create({
   loading: {
     marginTop: 40,
   },
+  hero: {
+    marginHorizontal: 16,
+    borderRadius: 20,
+    borderWidth: 1,
+    padding: 16,
+    gap: 12,
+  },
+  heroTop: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 14,
+  },
+  heroIcon: {
+    width: 52,
+    height: 52,
+    borderRadius: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  heroCopy: {
+    flex: 1,
+    minWidth: 0,
+  },
+  heroNumber: {
+    fontSize: 38,
+    lineHeight: 42,
+    fontWeight: '900',
+  },
+  heroLabel: {
+    fontSize: 14,
+    lineHeight: 18,
+    fontWeight: '800',
+  },
+  heroProgress: {
+    gap: 6,
+  },
+  heroTrack: {
+    height: 10,
+    borderRadius: 5,
+    overflow: 'hidden',
+  },
+  heroFill: {
+    height: '100%',
+    borderRadius: 5,
+  },
+  heroProgressText: {
+    fontSize: 12,
+    lineHeight: 16,
+    fontWeight: '700',
+  },
+  heroButton: {
+    minHeight: 48,
+    borderRadius: 999,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+  },
+  heroButtonText: {
+    fontSize: 15,
+    lineHeight: 20,
+    fontWeight: '900',
+  },
+  heroHint: {
+    fontSize: 13,
+    lineHeight: 18,
+    fontWeight: '700',
+  },
   statsRow: {
     flexDirection: 'row',
     gap: 8,
     marginHorizontal: 16,
-    marginTop: 4,
+    marginTop: 10,
   },
   statTile: {
     flex: 1,
     minWidth: 0,
-    borderRadius: 12,
+    borderRadius: 14,
     borderWidth: 1,
-    paddingVertical: 10,
+    paddingVertical: 12,
     paddingHorizontal: 6,
     alignItems: 'center',
     gap: 2,
   },
   statValue: {
-    fontSize: 20,
-    lineHeight: 24,
+    fontSize: 22,
+    lineHeight: 26,
     fontWeight: '900',
   },
   statLabel: {
@@ -347,15 +478,22 @@ const styles = StyleSheet.create({
   card: {
     marginHorizontal: 16,
     marginTop: 12,
-    borderRadius: 14,
+    borderRadius: 18,
     borderWidth: 1,
     padding: 14,
   },
   cardHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
-    marginBottom: 6,
+    gap: 10,
+    marginBottom: 8,
+  },
+  cardHeaderIcon: {
+    width: 32,
+    height: 32,
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   cardTitle: {
     fontSize: 17,
@@ -366,27 +504,13 @@ const styles = StyleSheet.create({
     fontSize: 13,
     lineHeight: 18,
     fontWeight: '600',
-    marginBottom: 10,
+    marginBottom: 6,
   },
   emptyText: {
     fontSize: 13,
     lineHeight: 18,
     fontWeight: '600',
     paddingVertical: 4,
-  },
-  primaryButton: {
-    minHeight: 46,
-    borderRadius: 999,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
-    marginBottom: 8,
-  },
-  primaryButtonText: {
-    fontSize: 15,
-    lineHeight: 20,
-    fontWeight: '900',
   },
   wordRow: {
     flexDirection: 'row',
@@ -409,10 +533,22 @@ const styles = StyleSheet.create({
     lineHeight: 18,
     fontWeight: '600',
   },
+  duePill: {
+    borderRadius: 999,
+    paddingHorizontal: 9,
+    paddingVertical: 3,
+  },
   dueLabel: {
     fontSize: 12,
     lineHeight: 16,
     fontWeight: '800',
+  },
+  speakerButton: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   moreText: {
     fontSize: 12,
@@ -424,10 +560,10 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
-    borderRadius: 10,
+    borderRadius: 12,
     borderWidth: 1,
     paddingHorizontal: 10,
-    minHeight: 42,
+    minHeight: 44,
     marginBottom: 6,
   },
   searchInput: {
@@ -437,12 +573,24 @@ const styles = StyleSheet.create({
   },
   lessonGroup: {
     borderTopWidth: StyleSheet.hairlineWidth,
+    paddingTop: 2,
   },
   lessonHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
-    minHeight: 44,
+    gap: 10,
+    minHeight: 48,
+  },
+  lessonBadge: {
+    width: 30,
+    height: 30,
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  lessonBadgeText: {
+    fontSize: 14,
+    fontWeight: '900',
   },
   lessonTitle: {
     flex: 1,
@@ -450,15 +598,25 @@ const styles = StyleSheet.create({
     lineHeight: 20,
     fontWeight: '800',
   },
+  countPill: {
+    borderRadius: 999,
+    paddingHorizontal: 9,
+    paddingVertical: 2,
+    minWidth: 28,
+    alignItems: 'center',
+  },
   lessonCount: {
     fontSize: 13,
-    fontWeight: '800',
+    fontWeight: '900',
   },
   learnedRow: {
     flexDirection: 'row',
+    alignItems: 'center',
     gap: 10,
-    paddingVertical: 5,
-    paddingLeft: 4,
+    borderRadius: 10,
+    paddingVertical: 7,
+    paddingHorizontal: 10,
+    marginBottom: 4,
   },
   learnedEnglish: {
     flex: 1,

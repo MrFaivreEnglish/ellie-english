@@ -388,7 +388,11 @@ export default function TypingView({
             useNativeDriver: canUseNativeDriver,
           }),
         ]),
-      ]).start(() => setShowFeedbackCard(false));
+      ]).start(({ finished }) => {
+        // Only a card that ran its full course hides itself. When the next answer comes in
+        // first, this sequence is interrupted, and hiding then removed the new card at once.
+        if (finished) setShowFeedbackCard(false);
+      });
     },
     [feedbackOpacity, feedbackTranslateY]
   );
@@ -421,9 +425,21 @@ export default function TypingView({
 
     return () => {
       loop.stop();
-      feedbackAvatarFloat.setValue(0);
+      // Resetting a native-driven value while the screen is closing could hit a view that
+      // is already gone, which crashed the app when leaving right after a wrong answer.
+      // stopAnimation is safe in both cases; the card remounts at 0 anyway.
+      feedbackAvatarFloat.stopAnimation();
     };
   }, [showFeedbackCard, feedbackType, feedbackAvatarFloat, reducedMotion]);
+
+  // Leaving mid-feedback: stop the card's own animation instead of letting it finish
+  // against a closed screen.
+  useEffect(() => {
+    return () => {
+      feedbackOpacity.stopAnimation();
+      feedbackTranslateY.stopAnimation();
+    };
+  }, [feedbackOpacity, feedbackTranslateY]);
 
   // Set when the student taps empty space to put the keyboard away; cleared when they tap
   // back into the input or move to the next word.
@@ -1086,11 +1102,13 @@ export default function TypingView({
               <Text style={styles.correctFeedbackTitle}>
                 Great job!
               </Text>
-              <View style={styles.correctFeedbackComboPill}>
-                <Text style={styles.correctFeedbackComboText}>
-                  Combo ×{feedbackStreak}
-                </Text>
-              </View>
+              {feedbackStreak >= 2 && (
+                <View style={styles.correctFeedbackComboPill}>
+                  <Text style={styles.correctFeedbackComboText}>
+                    Combo ×{feedbackStreak}
+                  </Text>
+                </View>
+              )}
             </Animated.View>
           )}
           {showFeedbackCard && (feedbackType === 'close' || feedbackType === 'wrong') && (
@@ -1162,7 +1180,7 @@ export default function TypingView({
                   </>
                 ) : (
                   <Text style={[styles.mascotHeadline, { fontSize: scaleValue(24, webScale), color: FEEDBACK_ALMOST_TEXT }]}>
-                    So close — one more try before you lose your combo!
+                    {feedbackStreak > 0 ? 'So close — one more try before you lose your combo!' : 'So close — one more try!'}
                   </Text>
                 )}
               </View>
@@ -1574,11 +1592,13 @@ export default function TypingView({
               <Text style={styles.correctFeedbackTitle}>
                 Great job!
               </Text>
-              <View style={styles.correctFeedbackComboPill}>
-                <Text style={styles.correctFeedbackComboText}>
-                  Combo ×{feedbackStreak}
-                </Text>
-              </View>
+              {feedbackStreak >= 2 && (
+                <View style={styles.correctFeedbackComboPill}>
+                  <Text style={styles.correctFeedbackComboText}>
+                    Combo ×{feedbackStreak}
+                  </Text>
+                </View>
+              )}
             </Animated.View>
           )}
           {showFeedbackCard && (feedbackType === 'close' || feedbackType === 'wrong') && (
@@ -1638,7 +1658,7 @@ export default function TypingView({
                   </>
                 ) : (
                   <Text style={[styles.mascotHeadline, { color: FEEDBACK_ALMOST_TEXT }]}>
-                    So close — one more try before you lose your combo!
+                    {feedbackStreak > 0 ? 'So close — one more try before you lose your combo!' : 'So close — one more try!'}
                   </Text>
                 )}
               </View>

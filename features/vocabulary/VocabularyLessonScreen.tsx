@@ -371,6 +371,7 @@ export default function VocabularyLessonScreen({ route, navigation }: Props) {
     reviewFlashcardWords,
     startLearnedReviewGame,
     handleToggleCurrentFlashcardLearned,
+    handleNotYetCurrentFlashcard,
     handleMarkFlashcardKnown,
     handleMarkFlashcardForReview,
   } = useVocabularyFlashcards(
@@ -841,6 +842,7 @@ export default function VocabularyLessonScreen({ route, navigation }: Props) {
                 onMarkKnown={handleMarkFlashcardKnown}
                 onMarkReview={handleMarkFlashcardForReview}
                 onToggleLearned={handleToggleCurrentFlashcardLearned}
+                onNotYet={handleNotYetCurrentFlashcard}
                 isCurrentWordLearned={currentFlashcardLearned}
                 learnedCount={learnedFlashcardCount}
                 totalWordCount={filteredWords.length}

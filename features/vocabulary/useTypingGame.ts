@@ -29,7 +29,8 @@ type TypingGameOptions = {
   lessonTitle?: string;
 };
 
-const CLOSE_TRIES_BEFORE_COMBO_LOSS = 2;
+// A second near-miss on the same word shows the answer and moves on, combo or not.
+const CLOSE_TRIES_BEFORE_REVEAL = 2;
 
 const wordKey = (word: Word) => `${word.english.trim().toLowerCase()}|${word.french.trim().toLowerCase()}`;
 
@@ -460,14 +461,14 @@ export function useTypingGame(words: Word[], options: TypingGameOptions = {}) {
 
     if (close) {
       const closeCount = (closeAttempts[currentWordKey] || 0) + 1;
-      const shouldBreakCombo = streak > 0 && closeCount >= CLOSE_TRIES_BEFORE_COMBO_LOSS;
+      // This used to need a running combo: without one, "So close" repeated for as long as
+      // the student kept misspelling, they never saw the answer, and the word never reached
+      // Words to review.
+      const shouldRevealAnswer = closeCount >= CLOSE_TRIES_BEFORE_REVEAL;
 
       setCloseAttempts((prev) => ({ ...prev, [currentWordKey]: closeCount }));
 
-      if (shouldBreakCombo) {
-
-
-
+      if (shouldRevealAnswer) {
         setTypingFeedback('wrong');
         setFeedbackEvent({ type: 'wrong', text: 'Not this time.', streak: 0, answer: currentWord.english });
         setInlineMessage('');
@@ -496,7 +497,7 @@ export function useTypingGame(words: Word[], options: TypingGameOptions = {}) {
       setTypingFeedback('close');
       setFeedbackEvent({
         type: 'close',
-        text: "So close — one more try before you lose your combo!",
+        text: streak > 0 ? 'So close — one more try before you lose your combo!' : 'So close — one more try!',
         streak,
       });
       setInlineMessage('');

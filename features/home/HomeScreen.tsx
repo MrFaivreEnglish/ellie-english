@@ -225,6 +225,8 @@ export default function HomeScreen() {
   const continueCardPress = useSpringPress();
   const reviewCardPress = useSpringPress();
   const [dueReviewWords, setDueReviewWords] = React.useState<ReviewWord[]>([]);
+  const [learntWordTotal, setLearntWordTotal] = React.useState(0);
+  const myWordsCardPress = useSpringPress();
   const seenLessonHighlights = useSeenLessonHighlights();
   const tileHighlights: Record<string, LessonHighlightKind | undefined> = {
     Grammar: getSectionHighlightKind('grammar', seenLessonHighlights),
@@ -317,6 +319,10 @@ export default function HomeScreen() {
       getDueReviewWords().then((words) => {
         if (!active) return;
         setDueReviewWords(words);
+      }).catch(() => {});
+      getLearnedFlashcardSummary().then((summary) => {
+        if (!active) return;
+        setLearntWordTotal(summary.totalLearned);
       }).catch(() => {});
 
       if (!isTodayCardEnabled) {
@@ -613,6 +619,40 @@ export default function HomeScreen() {
           </TouchableOpacity>
         </Animated.View>
       )}
+
+      {/* Always visible: the one place to see everything learnt so far. */}
+      <Animated.View style={myWordsCardPress.animatedStyle}>
+        <TouchableOpacity
+          style={[
+            styles.continueCard,
+            isScaledWeb && styles.continueCardDesktop,
+            { backgroundColor: colors.card },
+            getSoftShadow(isDarkMode, 'soft', colors.shadow, colors.visualStyle === 'pixel'),
+            pixelSurfaceStyle,
+          ]}
+          onPress={() => navigation.navigate('MyWords')}
+          onPressIn={myWordsCardPress.onPressIn}
+          onPressOut={myWordsCardPress.onPressOut}
+          accessibilityRole="button"
+          accessibilityLabel="Open My words: what you've learnt and what to review"
+        >
+          <View style={[styles.continueIcon, { backgroundColor: isDarkMode ? studySurface.control : '#E3F6E8', borderColor: isDarkMode ? colors.border : 'transparent' }]}>
+            <MaterialIcons name="menu-book" size={24} color={colors.success} />
+          </View>
+          <View style={styles.continueCopy}>
+            <Text style={[styles.continueLabel, { color: colors.success }]}>My words</Text>
+            <Text style={[styles.continueTitle, { color: colors.text }]} numberOfLines={1}>
+              {learntWordTotal === 1 ? '1 word learnt' : `${learntWordTotal} words learnt`}
+            </Text>
+            <Text style={[styles.continueMeta, { color: colors.secondaryText }]}>
+              {dueReviewWords.length > 0
+                ? `${dueReviewWords.length} to review now`
+                : 'Search your words and review mistakes'}
+            </Text>
+          </View>
+          <MaterialIcons name="arrow-forward" size={24} color={colors.secondaryText} />
+        </TouchableOpacity>
+      </Animated.View>
 
       <View style={[styles.categoriesContainer, styles.categoriesContainerDesktop]}>
         {localizedCategories.map((category, index) => (

@@ -48,6 +48,7 @@ interface FlashcardProps {
   onMarkKnown?: () => void;
   onMarkReview?: () => void;
   onToggleLearned?: () => void;
+  onNotYet?: () => void;
   isCurrentWordLearned?: boolean;
   learnedCount?: number;
   totalWordCount?: number;
@@ -80,6 +81,7 @@ export default function VocabularyFlashcard({
   onMarkKnown,
   onMarkReview,
   onToggleLearned,
+  onNotYet,
   isCurrentWordLearned = false,
   learnedCount = 0,
   totalWordCount,
@@ -457,6 +459,7 @@ export default function VocabularyFlashcard({
   const chooseNotYet = () => {
     if (!canChooseKnowledge) return;
     if (isCurrentWordLearned) onToggleLearned?.();
+    onNotYet?.();
     if (canGoNext) onNext();
   };
   const chooseIKnow = () => {

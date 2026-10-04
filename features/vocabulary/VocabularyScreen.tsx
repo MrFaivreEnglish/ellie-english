@@ -722,6 +722,19 @@ export default function VocabularyScreen() {
           </TouchableOpacity>
         </View>
 
+        <TouchableOpacity
+          activeOpacity={0.84}
+          onPress={() => (navigation as any).getParent?.()?.navigate('MyWords')}
+          style={[styles.myWordsLink, { backgroundColor: studySurface.control, borderColor: studySurface.controlBorder }]}
+          accessibilityRole="button"
+          accessibilityLabel="Open My words: what you've learnt and what to review"
+        >
+          <MaterialIcons name="menu-book" size={18} color={colors.success} />
+          <Text style={[styles.myWordsLinkText, { color: colors.text }]} numberOfLines={1}>My words</Text>
+          <Text style={[styles.myWordsLinkHint, { color: colors.secondaryText }]} numberOfLines={1}>Learnt and to review</Text>
+          <MaterialIcons name="chevron-right" size={20} color={colors.secondaryText} />
+        </TouchableOpacity>
+
         <Animated.View
           style={[
             styles.searchShell,
@@ -1196,6 +1209,29 @@ export default function VocabularyScreen() {
 }
 
 const styles = StyleSheet.create({
+  myWordsLink: {
+    minHeight: 42,
+    marginHorizontal: 16,
+    marginBottom: 8,
+    borderRadius: 12,
+    borderWidth: 1,
+    paddingHorizontal: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  myWordsLinkText: {
+    fontSize: 14,
+    lineHeight: 18,
+    fontWeight: '900',
+  },
+  myWordsLinkHint: {
+    flex: 1,
+    fontSize: 12,
+    lineHeight: 16,
+    fontWeight: '700',
+    textAlign: 'right',
+  },
   container: { flex: 1 },
   desktopContentWrap: {
 

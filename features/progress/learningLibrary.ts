@@ -30,6 +30,8 @@ export type PractisedGrammarLesson = {
 export type LearningLibrary = {
   learnedGroups: LearnedWordGroup[];
   learnedWordCount: number;
+  // Distinct words across every vocabulary lesson, for "x of y" progress.
+  totalWordCount: number;
   grammarLessons: PractisedGrammarLesson[];
   grammarAnswerCount: number;
   reviewWords: ReviewWord[];
@@ -42,7 +44,7 @@ const OTHER_PRACTICE_TITLE = 'Other practice';
 const byTitle = (a: { lessonTitle?: string; title?: string }, b: { lessonTitle?: string; title?: string }) =>
   String(a.lessonTitle ?? a.title).localeCompare(String(b.lessonTitle ?? b.title));
 
-const getLearnedWordGroups = async (): Promise<LearnedWordGroup[]> => {
+const getLearnedWordGroups = async (): Promise<{ groups: LearnedWordGroup[]; totalWordCount: number }> => {
   const [lessons, learnedByLesson] = await Promise.all([
     getAllVocabularyLessons(),
     getLearnedFlashcardKeysByLesson(),
@@ -88,12 +90,14 @@ const getLearnedWordGroups = async (): Promise<LearnedWordGroup[]> => {
     });
   });
 
-  return [...groups.entries()]
+  const sortedGroups = [...groups.entries()]
     .map(([lessonTitle, words]) => ({
       lessonTitle,
       words: [...words.values()].sort((a, b) => a.english.localeCompare(b.english)),
     }))
     .sort(byTitle);
+
+  return { groups: sortedGroups, totalWordCount: homeByWordKey.size };
 };
 
 const getPractisedGrammarLessons = async (): Promise<PractisedGrammarLesson[]> => {
@@ -112,7 +116,7 @@ const getPractisedGrammarLessons = async (): Promise<PractisedGrammarLesson[]> =
 };
 
 export const getLearningLibrary = async (): Promise<LearningLibrary> => {
-  const [learnedGroups, practisedGrammar, grammarSummary, reviewWords, masteredReviewCount] = await Promise.all([
+  const [learned, practisedGrammar, grammarSummary, reviewWords, masteredReviewCount] = await Promise.all([
     getLearnedWordGroups(),
     getPractisedGrammarLessons(),
     getGrammarProgressSummary(),
@@ -120,10 +124,12 @@ export const getLearningLibrary = async (): Promise<LearningLibrary> => {
     getMasteredReviewWordCount(),
   ]);
   const today = getTodayKey();
+  const learnedGroups = learned.groups;
 
   return {
     learnedGroups,
     learnedWordCount: learnedGroups.reduce((total, group) => total + group.words.length, 0),
+    totalWordCount: learned.totalWordCount,
     grammarLessons: practisedGrammar,
     grammarAnswerCount: grammarSummary.totalCorrectAnswers,
     reviewWords,

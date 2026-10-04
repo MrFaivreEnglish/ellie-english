@@ -9,6 +9,8 @@ import {
   saveLearnedFlashcardKeys,
 } from './flashcardProgressStorage';
 import { markPracticeActivityToday } from '../progress/xpStorage';
+import { toast } from 'sonner-native';
+import { recordReviewMistake } from './reviewWordsStorage';
 import type { VocabularyMode } from './useLessonSheetLayout';
 
 const vocabularyWordKey = (word: Word) => `${word.english.trim().toLowerCase()}|${word.french.trim().toLowerCase()}`;
@@ -216,6 +218,15 @@ export function useVocabularyFlashcards(
 
     if (nextLearned) {
       void markPracticeActivityToday(`vocabulary:flashcard-learnt:${lesson.title}:${key}`);
+      // The saving used to be invisible, so students had no idea the ✓ built a library.
+      const savedInLesson = learnedFlashcardKeys.size + 1;
+      toast('Saved to My words ✓', {
+        id: 'flashcard-saved-word',
+        duration: 2500,
+        description: savedInLesson === 1
+          ? 'Find every word you save in My words, on Home.'
+          : `${savedInLesson} saved in this lesson. See them all in My words.`,
+      });
     }
 
     void recordLearnedFlashcardToday(flashcardProgressLessonKey, key, nextLearned);
@@ -243,6 +254,20 @@ export function useVocabularyFlashcards(
       return;
     }
 
+  };
+
+  // "Not yet" is an honest "I don't know this": it joins Words to review, which brings the
+  // word back tomorrow, rather than just skipping to the next card.
+  const handleNotYetCurrentFlashcard = () => {
+    const currentWord = shuffledFlashcards[currentWordIndex];
+    if (!currentWord) return;
+
+    void recordReviewMistake(currentWord, lesson?.title);
+    toast('Added to Words to review', {
+      id: 'flashcard-saved-word',
+      duration: 2500,
+      description: 'It comes back tomorrow, so it sticks.',
+    });
   };
 
   const handleMarkFlashcardForReview = () => {
@@ -300,6 +325,7 @@ export function useVocabularyFlashcards(
     reviewFlashcardWords,
     startLearnedReviewGame,
     handleToggleCurrentFlashcardLearned,
+    handleNotYetCurrentFlashcard,
     handleMarkFlashcardKnown,
     handleMarkFlashcardForReview,
   };
