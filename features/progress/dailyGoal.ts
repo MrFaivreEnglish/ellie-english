@@ -8,9 +8,8 @@ export const BONUS_DAY_XP = 20;
 
 export const DAILY_ANSWERS_KEY = '@daily_answers_v1';
 export const BONUS_DAYS_AWARDED_KEY = '@bonus_days_awarded_v1';
-export const WEEKLY_GOAL_KEY = '@weekly_goal_days';
-export const WEEKLY_GOAL_OPTIONS = [2, 3, 4, 5];
-export const DEFAULT_WEEKLY_GOAL = 3;
+// Goal days per week. Fixed: students don't pick their own target.
+export const WEEKLY_GOAL = 3;
 const MAX_TRACKED_DAYS = 60;
 
 export const toDateKey = (date: Date) => {
@@ -28,15 +27,6 @@ export const getCurrentWeekKeys = (now = new Date()) => {
     toDateKey(new Date(monday.getFullYear(), monday.getMonth(), monday.getDate() + offset))
   );
   return { keys, todayIndex };
-};
-
-export const getWeeklyGoal = async (): Promise<number> => {
-  try {
-    const value = parseInt((await AsyncStorage.getItem(WEEKLY_GOAL_KEY)) ?? '', 10);
-    return WEEKLY_GOAL_OPTIONS.includes(value) ? value : DEFAULT_WEEKLY_GOAL;
-  } catch {
-    return DEFAULT_WEEKLY_GOAL;
-  }
 };
 
 export type DailyAnswerCounts = Record<string, number>;
@@ -101,7 +91,7 @@ const writeDailyAnswer = async (now: Date) => {
     await AsyncStorage.setItem(DAILY_ANSWERS_KEY, JSON.stringify(Object.fromEntries(kept)));
 
     if (next !== DAILY_GOAL) return;
-    const [weeklyGoal, updated] = [await getWeeklyGoal(), Object.fromEntries(kept)];
+    const [weeklyGoal, updated] = [WEEKLY_GOAL, Object.fromEntries(kept)];
     const { keys } = getCurrentWeekKeys(now);
     const goalDays = keys.map((key) => (updated[key] ?? 0) >= DAILY_GOAL);
     const todayIndex = keys.indexOf(today);
@@ -156,6 +146,5 @@ export const buildGoalWeek = (counts: DailyAnswerCounts, weeklyGoal: number, now
 };
 
 export const getGoalWeek = async (): Promise<GoalWeek> => {
-  const [counts, weeklyGoal] = await Promise.all([getDailyAnswerCounts(), getWeeklyGoal()]);
-  return buildGoalWeek(counts, weeklyGoal);
+  return buildGoalWeek(await getDailyAnswerCounts(), WEEKLY_GOAL);
 };

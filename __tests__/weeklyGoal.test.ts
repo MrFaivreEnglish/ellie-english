@@ -1,7 +1,6 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { getStreak, recordPracticeToday } from '../features/progress/streakStorage';
-import { getCurrentWeekKeys, getPracticeWeek, setWeeklyGoal } from '../features/progress/weeklyGoal';
-import { BONUS_DAY_XP, DAILY_GOAL, getGoalWeek } from '../features/progress/dailyGoal';
+import { BONUS_DAY_XP, DAILY_GOAL, WEEKLY_GOAL, getCurrentWeekKeys, getGoalWeek } from '../features/progress/dailyGoal';
 import { getMilestoneProgress, getMilestones } from '../features/progress/milestones';
 
 const mockAddXP = jest.fn(() => Promise.resolve(0));
@@ -54,16 +53,16 @@ describe('weekly goal', () => {
     setDay('2026-03-11');
     await answer(DAILY_GOAL + 3);
 
-    let week = await getPracticeWeek();
-    expect(week.days).toEqual([true, false, true, false, false, false, false]);
-    expect(week.daysPractised).toBe(2);
+    let week = await getGoalWeek();
+    expect(week.states.map((state) => state === 'goal')).toEqual([true, false, true, false, false, false, false]);
+    expect(week.daysHit).toBe(2);
     expect(week.goal).toBe(3);
     expect(week.goalReached).toBe(false);
-    expect(week.totalDaysPractised).toBe(3);
+    expect(week.totalGoalDays).toBe(3);
 
     setDay('2026-03-13');
     await answer(DAILY_GOAL);
-    week = await getPracticeWeek();
+    week = await getGoalWeek();
     expect(week.goalReached).toBe(true);
   });
 
@@ -96,20 +95,18 @@ describe('weekly goal', () => {
     expect(week.bonusDays).toBe(1);
   });
 
-  it('lets the student pick a goal from the allowed choices only', async () => {
-    await setWeeklyGoal(4);
-    expect((await getPracticeWeek()).goal).toBe(4);
-    await setWeeklyGoal(7);
-    expect((await getPracticeWeek()).goal).toBe(4);
+  it('always sets the goal at three days', async () => {
+    expect(WEEKLY_GOAL).toBe(3);
+    expect((await getGoalWeek()).goal).toBe(3);
   });
 
   it('starts a fresh week at zero while the streak is unaffected', async () => {
     setDay('2026-03-09');
     await answer(DAILY_GOAL);
     setDay('2026-03-16'); // next Monday
-    const week = await getPracticeWeek();
-    expect(week.daysPractised).toBe(0);
-    expect(week.totalDaysPractised).toBe(1);
+    const week = await getGoalWeek();
+    expect(week.daysHit).toBe(0);
+    expect(week.totalGoalDays).toBe(1);
     expect((await getStreak()).longestStreak).toBe(1);
   });
 });

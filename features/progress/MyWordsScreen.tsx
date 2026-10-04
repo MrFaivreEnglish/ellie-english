@@ -15,8 +15,6 @@ import { useEnglishSpeech } from '../shared/useEnglishSpeech';
 import useReducedMotion from '../shared/useReducedMotion';
 import { getLearningLibrary, type LearnedWordGroup, type LearningLibrary } from './learningLibrary';
 import { openWordReview } from '../vocabulary/wordReviewLesson';
-import WeeklyGoalCard from './WeeklyGoalCard';
-import { getPracticeWeek, type PracticeWeek } from './weeklyGoal';
 
 // What a student has learnt, one next action, and a searchable bank of every word saved.
 // Layout and colour follow the My Words design brief; the page background is the theme's.
@@ -125,7 +123,6 @@ export default function MyWordsScreen() {
   const cardShadow = { boxShadow: `0px 1px 0px ${palette.line}` } as const;
 
   const [library, setLibrary] = React.useState<LearningLibrary | null>(null);
-  const [week, setWeek] = React.useState<PracticeWeek | null>(null);
   const [search, setSearch] = React.useState('');
   const [searchFocused, setSearchFocused] = React.useState(false);
   const [showGrammar, setShowGrammar] = React.useState(false);
@@ -138,11 +135,6 @@ export default function MyWordsScreen() {
       getLearningLibrary()
         .then((next) => {
           if (active) setLibrary(next);
-        })
-        .catch(() => {});
-      getPracticeWeek()
-        .then((next) => {
-          if (active) setWeek(next);
         })
         .catch(() => {});
       return () => {
@@ -440,12 +432,6 @@ export default function MyWordsScreen() {
                   <View style={wide ? styles.heroCol : undefined}>{renderProgressCard(library)}</View>
                   <View style={wide ? styles.heroCol : undefined}>{renderActionCard()}</View>
                 </View>
-                {week && (
-                  <WeeklyGoalCard
-                    week={week}
-                    onGoalChange={(goal) => setWeek((current) => current && ({ ...current, goal, goalReached: current.daysPractised >= goal }))}
-                  />
-                )}
                 {renderFreshThisWeek(library)}
                 {renderWordBank(library)}
               </>
