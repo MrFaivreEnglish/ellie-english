@@ -3,6 +3,7 @@ import { ActivityIndicator, Platform, ScrollView, StyleSheet, TouchableOpacity, 
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { Image as ExpoImage } from 'expo-image';
 import type { RootStackParamList } from '../../types/navigationTypes';
 import Text, { ThemedTextInput as TextInput } from '../shared/ThemedText';
 import MaterialIcons from '../shared/ThemedMaterialIcon';
@@ -15,6 +16,8 @@ import { useEnglishSpeech } from '../shared/useEnglishSpeech';
 import { getLearningLibrary, type LearningLibrary } from './learningLibrary';
 import { getTodayKey } from '../vocabulary/reviewWordsStorage';
 import { openWordReview } from '../vocabulary/wordReviewLesson';
+import WeeklyGoalCard from './WeeklyGoalCard';
+import { getPracticeWeek, type PracticeWeek } from './weeklyGoal';
 
 // What a student has learnt and what's waiting for review, opened from Home or their profile.
 
@@ -45,6 +48,7 @@ export default function MyWordsScreen() {
   const topContentInset = getTopSafeAreaInset(Platform.OS, insets.top, isAndroidStatusBarEnabled);
 
   const [library, setLibrary] = React.useState<LearningLibrary | null>(null);
+  const [week, setWeek] = React.useState<PracticeWeek | null>(null);
   const [search, setSearch] = React.useState('');
   const [openLessons, setOpenLessons] = React.useState<Set<string>>(() => new Set());
 
@@ -55,6 +59,11 @@ export default function MyWordsScreen() {
       getLearningLibrary()
         .then((next) => {
           if (active) setLibrary(next);
+        })
+        .catch(() => {});
+      getPracticeWeek()
+        .then((next) => {
+          if (active) setWeek(next);
         })
         .catch(() => {});
       return () => {
@@ -269,11 +278,36 @@ export default function MyWordsScreen() {
                   accessibilityLabel={`${group.lessonTitle}, ${group.words.length} ${group.words.length === 1 ? 'word' : 'words'}`}
                 >
                   <View style={[styles.lessonBadge, { backgroundColor: accent + '22' }]}>
-                    <Text style={[styles.lessonBadgeText, { color: accent }]}>{group.lessonTitle.charAt(0).toUpperCase()}</Text>
+                    {group.thumbnail ? (
+                      <ExpoImage
+                        source={group.thumbnail as any}
+                        style={styles.lessonThumb}
+                        contentFit="contain"
+                        cachePolicy="memory-disk"
+                        accessibilityElementsHidden
+                      />
+                    ) : (
+                      <Text style={[styles.lessonBadgeText, { color: accent }]}>{group.lessonTitle.charAt(0).toUpperCase()}</Text>
+                    )}
                   </View>
-                  <Text style={[styles.lessonTitle, { color: colors.text }]} numberOfLines={1}>{group.lessonTitle}</Text>
-                  <View style={[styles.countPill, { backgroundColor: accent + '22' }]}>
-                    <Text style={[styles.lessonCount, { color: accent }]}>{group.words.length}</Text>
+                  <View style={styles.lessonCopy}>
+                    <Text style={[styles.lessonTitle, { color: colors.text }]} numberOfLines={1}>{group.lessonTitle}</Text>
+                    <View style={styles.lessonBarRow}>
+                      <View style={[styles.lessonBarTrack, { backgroundColor: colors.progressTrack ?? colors.border }]}>
+                        <View
+                          style={[
+                            styles.lessonBarFill,
+                            {
+                              backgroundColor: accent,
+                              width: `${Math.min(100, Math.round((group.words.length / Math.max(1, group.lessonWordCount)) * 100))}%`,
+                            },
+                          ]}
+                        />
+                      </View>
+                      <Text style={[styles.lessonBarText, { color: colors.secondaryText }]}>
+                        {group.words.length}/{Math.max(group.lessonWordCount, group.words.length)}
+                      </Text>
+                    </View>
                   </View>
                   <MaterialIcons
                     name={isOpen ? 'expand-less' : 'expand-more'}
@@ -338,6 +372,12 @@ export default function MyWordsScreen() {
           ) : (
             <>
               {renderHero(library)}
+              {week && (
+                <WeeklyGoalCard
+                  week={week}
+                  onGoalChange={(goal) => setWeek((current) => current && ({ ...current, goal, goalReached: current.daysPractised >= goal }))}
+                />
+              )}
               <View style={styles.statsRow}>
                 {renderStat('replay', library.dueReviewCount, 'To review now', colors.warning, '#FFF1D6')}
                 {renderStat('verified', library.masteredReviewCount, 'Mistakes fixed', colors.primary, '#DCEBFF')}
@@ -578,22 +618,52 @@ const styles = StyleSheet.create({
   lessonHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 10,
-    minHeight: 48,
+    gap: 12,
+    minHeight: 60,
+    paddingVertical: 6,
   },
   lessonBadge: {
-    width: 30,
-    height: 30,
-    borderRadius: 10,
+    width: 46,
+    height: 46,
+    borderRadius: 14,
     alignItems: 'center',
     justifyContent: 'center',
+    overflow: 'hidden',
+  },
+  lessonThumb: {
+    width: '100%',
+    height: '100%',
+  },
+  lessonCopy: {
+    flex: 1,
+    minWidth: 0,
+    gap: 4,
+  },
+  lessonBarRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  lessonBarTrack: {
+    flex: 1,
+    height: 6,
+    borderRadius: 3,
+    overflow: 'hidden',
+  },
+  lessonBarFill: {
+    height: '100%',
+    borderRadius: 3,
+  },
+  lessonBarText: {
+    fontSize: 11,
+    lineHeight: 14,
+    fontWeight: '800',
   },
   lessonBadgeText: {
     fontSize: 14,
     fontWeight: '900',
   },
   lessonTitle: {
-    flex: 1,
     fontSize: 15,
     lineHeight: 20,
     fontWeight: '800',

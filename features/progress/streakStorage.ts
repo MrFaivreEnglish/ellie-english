@@ -1,6 +1,10 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const STREAK_KEY = '@practice_streak_v2';
+// Every date the student practised (YYYY-MM-DD), kept for the weekly goal and the
+// "days practised" total. Capped so it can't grow without bound.
+export const PRACTICE_DAYS_KEY = '@practice_days_v1';
+const MAX_PRACTICE_DAYS = 400;
 
 export type StreakData = {
   currentStreak: number;
@@ -47,9 +51,26 @@ export const getStreak = async (): Promise<StreakData> => {
   }
 };
 
+export const getPracticeDays = async (): Promise<string[]> => {
+  try {
+    const raw = await AsyncStorage.getItem(PRACTICE_DAYS_KEY);
+    const parsed = raw ? JSON.parse(raw) : [];
+    return Array.isArray(parsed) ? parsed.filter((day): day is string => typeof day === 'string') : [];
+  } catch {
+    return [];
+  }
+};
+
+const addPracticeDay = async (day: string) => {
+  const days = await getPracticeDays();
+  if (days.includes(day)) return;
+  await AsyncStorage.setItem(PRACTICE_DAYS_KEY, JSON.stringify([...days, day].sort().slice(-MAX_PRACTICE_DAYS)));
+};
+
 export const recordPracticeToday = async (): Promise<void> => {
   try {
     const today = getLocalDateKey();
+    await addPracticeDay(today);
     const current = await getStreak();
 
 

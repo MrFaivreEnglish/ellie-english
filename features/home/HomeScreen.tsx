@@ -80,6 +80,7 @@ import { exitImmersiveOpaque } from '../../lib/immersive';
 import { getStreak, type StreakData } from '../progress/streakStorage';
 import { getDueReviewWords, type ReviewWord } from '../vocabulary/reviewWordsStorage';
 import { openWordReview } from '../vocabulary/wordReviewLesson';
+import { getPracticeWeek, type PracticeWeek } from '../progress/weeklyGoal';
 import { getLearnedFlashcardSummary } from '../vocabulary/flashcardProgressStorage';
 import { getGrammarProgressSummary } from '../grammar/grammarProgressStorage';
 import { getMenuCopy } from '../shared/menuCopy';
@@ -226,6 +227,7 @@ export default function HomeScreen() {
   const reviewCardPress = useSpringPress();
   const [dueReviewWords, setDueReviewWords] = React.useState<ReviewWord[]>([]);
   const [learntWordTotal, setLearntWordTotal] = React.useState(0);
+  const [practiceWeek, setPracticeWeek] = React.useState<PracticeWeek | null>(null);
   const myWordsCardPress = useSpringPress();
   const seenLessonHighlights = useSeenLessonHighlights();
   const tileHighlights: Record<string, LessonHighlightKind | undefined> = {
@@ -323,6 +325,10 @@ export default function HomeScreen() {
       getLearnedFlashcardSummary().then((summary) => {
         if (!active) return;
         setLearntWordTotal(summary.totalLearned);
+      }).catch(() => {});
+      getPracticeWeek().then((week) => {
+        if (!active) return;
+        setPracticeWeek(week);
       }).catch(() => {});
 
       if (!isTodayCardEnabled) {
@@ -538,6 +544,17 @@ export default function HomeScreen() {
         </View>
       )}
 
+      <TouchableOpacity
+        activeOpacity={0.85}
+        onPress={() => navigation.navigate('Search')}
+        style={[styles.searchPill, { backgroundColor: colors.card, borderColor: colors.border }]}
+        accessibilityRole="button"
+        accessibilityLabel="Search words and lessons"
+      >
+        <MaterialIcons name="search" size={20} color={colors.secondaryText} />
+        <Text style={[styles.searchPillText, { color: colors.secondaryText }]} numberOfLines={1}>Search words and lessons</Text>
+      </TouchableOpacity>
+
       {/* Mistakes from typing, due for review today. Above "Continue" because this is the
           practice that most helps words stick. */}
       {dueReviewWords.length > 0 && (
@@ -647,7 +664,9 @@ export default function HomeScreen() {
             <Text style={[styles.continueMeta, { color: colors.secondaryText }]}>
               {dueReviewWords.length > 0
                 ? `${dueReviewWords.length} to review now`
-                : 'Search your words and review mistakes'}
+                : practiceWeek
+                  ? `${practiceWeek.daysPractised}/${practiceWeek.goal} days this week`
+                  : 'Search your words and review mistakes'}
             </Text>
           </View>
           <MaterialIcons name="arrow-forward" size={24} color={colors.secondaryText} />
@@ -1001,6 +1020,23 @@ const styles = StyleSheet.create({
   todayMetricValueDesktop: {
     fontSize: 16,
     lineHeight: 20,
+  },
+  searchPill: {
+    minHeight: 46,
+    marginHorizontal: 16,
+    marginTop: 4,
+    marginBottom: 4,
+    borderRadius: 14,
+    borderWidth: 1,
+    paddingHorizontal: 14,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  searchPillText: {
+    flex: 1,
+    fontSize: 14,
+    fontWeight: '700',
   },
   continueCard: {
     minHeight: 84,

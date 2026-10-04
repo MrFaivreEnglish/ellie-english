@@ -9,6 +9,7 @@ export type RootStackParamList = {
   Home: undefined;
   Account: { openAvatarPicker?: boolean } | undefined;
   MyWords: undefined;
+  Search: undefined;
   FullImageModal: { source?: ImageSourcePropType; uri?: string };
   MainTabs: NavigatorScreenParams<TabParamList> | undefined;
   AdminLessonPreview: undefined;

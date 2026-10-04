@@ -11,6 +11,7 @@ import {
   getLessonWords,
   vocabularyWordKey,
 } from '../vocabulary/knownWords';
+import { getLessonThumbnailSource } from '../vocabulary/vocabularyUtils';
 import { getMasteredReviewWordCount, getReviewWords, getTodayKey, type ReviewWord } from '../vocabulary/reviewWordsStorage';
 import type { Word } from '../../types/VocabularyTypes';
 
@@ -20,6 +21,10 @@ import type { Word } from '../../types/VocabularyTypes';
 export type LearnedWordGroup = {
   lessonTitle: string;
   words: Word[];
+  // How many words the lesson has in all, for "3 of 20".
+  lessonWordCount: number;
+  // Bundled image (number) or { uri }, the same picture the lesson card shows.
+  thumbnail?: number | { uri: string };
 };
 
 export type PractisedGrammarLesson = {
@@ -54,10 +59,18 @@ const getLearnedWordGroups = async (): Promise<{ groups: LearnedWordGroup[]; tot
   // (saved under the mix, not its lesson) still lands under the lesson it comes from.
   const homeByWordKey = new Map<string, { word: Word; lessonTitle: string }>();
   const lessonTitleByKey = new Map<string, string>();
+  const lessonInfoByTitle = new Map<string, { lessonWordCount: number; thumbnail?: number | { uri: string } }>();
   lessons.forEach((lesson) => {
     const title = String(lesson?.title ?? '').trim();
     if (!title) return;
     lessonTitleByKey.set(getLessonProgressKey(lesson), title);
+    if (!lessonInfoByTitle.has(title)) {
+      const own = lesson.imageUrl ?? lesson.image;
+      lessonInfoByTitle.set(title, {
+        lessonWordCount: getLessonWords(lesson).length,
+        thumbnail: getLessonThumbnailSource(lesson) ?? (typeof own === 'string' && own ? { uri: own } : undefined),
+      });
+    }
     getLessonWords(lesson).forEach((word) => {
       const key = vocabularyWordKey(word);
       if (!homeByWordKey.has(key)) homeByWordKey.set(key, { word, lessonTitle: title });
@@ -94,6 +107,8 @@ const getLearnedWordGroups = async (): Promise<{ groups: LearnedWordGroup[]; tot
     .map(([lessonTitle, words]) => ({
       lessonTitle,
       words: [...words.values()].sort((a, b) => a.english.localeCompare(b.english)),
+      lessonWordCount: lessonInfoByTitle.get(lessonTitle)?.lessonWordCount ?? words.size,
+      thumbnail: lessonInfoByTitle.get(lessonTitle)?.thumbnail,
     }))
     .sort(byTitle);
 

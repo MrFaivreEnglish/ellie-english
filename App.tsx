@@ -26,6 +26,7 @@ import VocabRushScreen from "./features/vocabulary/vocabRush/VocabRushScreen";
 import SettingsScreen from "./features/settings/SettingsScreen";
 import AccountScreen from "./features/account/AccountScreen";
 import MyWordsScreen from "./features/progress/MyWordsScreen";
+import SearchScreen from "./features/home/SearchScreen";
 import AdminLessonPreviewScreen from "./features/lessons/AdminLessonPreviewScreen";
 import { Asset } from 'expo-asset';
 import { applyAppChrome, applyImmersiveMode, bindImmersiveOnForeground } from './lib/immersive';
@@ -473,6 +474,11 @@ function RootStack() {
       <RootStackNav.Screen
         name="MyWords"
         component={MyWordsScreen}
+        options={{ headerShown: false }}
+      />
+      <RootStackNav.Screen
+        name="Search"
+        component={SearchScreen}
         options={{ headerShown: false }}
       />
       <RootStackNav.Screen

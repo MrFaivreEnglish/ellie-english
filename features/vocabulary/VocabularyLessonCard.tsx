@@ -14,6 +14,7 @@ import LessonHighlightBadge from '../shared/LessonHighlightBadge';
 import type { getMenuCopy } from '../shared/menuCopy';
 import { getVocabularySelectionCardHeight } from './vocabularySelectionCardLayout';
 import { useDesktopTypographyScale } from '../shared/DesktopTypography';
+import { useSheetSavedOffline } from './useSheetSavedOffline';
 
 const STAR = '★';
 
@@ -74,6 +75,7 @@ const VocabularyLessonCard = React.memo(({
   );
   const lessonImageKey = String(lesson.id || lesson.title || lessonTitle || rowIndex);
   const wordCount = getLessonWordCount(lesson);
+  const sheetSavedOffline = useSheetSavedOffline(lesson);
   const isTile = cardView === 'tile';
   const isCompactTile = isTile && compactTile;
   const desktopScale = useDesktopTypographyScale();
@@ -233,6 +235,8 @@ const VocabularyLessonCard = React.memo(({
           style={[styles.lessonMetaLine, isTile && styles.lessonMetaLineTile, isCompactTile && styles.lessonMetaLineTileCompact, { color: colors.secondaryText }]}
         >
           {wordCount} {wordCount > 1 ? copy.wordPlural : copy.wordSingular}
+          {sheetSavedOffline ? ' · ' : ''}
+          {sheetSavedOffline && <MaterialIcons name="offline-pin" size={13} color={colors.success} accessibilityLabel="Saved on this phone" />}
         </Text>
 
         {!isTile && !!lesson.description && (
