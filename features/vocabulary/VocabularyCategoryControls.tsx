@@ -330,8 +330,10 @@ export default function VocabularyCategoryControls({
     );
   };
 
+  // One switch for both games: in matching the English cards are spoken, in typing the
+  // English word is spoken and the French prompt hidden.
   const renderAudioMatchToggle = () => {
-    if (mode !== 'matching') return null;
+    if (mode !== 'matching' && mode !== 'typing') return null;
 
     const audioAccent = isDarkMode ? '#4BBAF4' : FRESH_COLORS.exerciseBlue;
 
@@ -342,13 +344,13 @@ export default function VocabularyCategoryControls({
           triggerSelectionHaptic();
           toggleVocabAudioMatchMode();
 
-
-
-
-          Keyboard.dismiss();
-          stopTimer();
-          resetGameState();
-          initializeGameSet();
+          // Typing carries on from the same word; only matching restarts its board.
+          if (mode === 'matching') {
+            Keyboard.dismiss();
+            stopTimer();
+            resetGameState();
+            initializeGameSet();
+          }
         }}
         accessibilityRole="switch"
         accessibilityLabel={isVocabAudioMatchMode ? 'Turn off audio match mode' : 'Turn on audio match mode'}

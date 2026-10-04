@@ -1,4 +1,5 @@
-import { render } from '@testing-library/react-native';
+import { act, fireEvent, render } from '@testing-library/react-native';
+import * as Speech from 'expo-speech';
 
 jest.mock('../features/vocabulary/useTypingGame', () => ({
   useTypingGame: () => ({
@@ -91,5 +92,46 @@ describe('TypingView', () => {
     expect(toJSON()).toBeTruthy();
     expect(getByText('bonjour')).toBeTruthy();
     expect(getByText('Type the English translation')).toBeTruthy();
+  });
+
+  describe('audio mode', () => {
+    beforeEach(() => {
+      jest.useFakeTimers();
+      jest.mocked(Speech.speak).mockClear();
+    });
+
+    afterEach(() => {
+      jest.useRealTimers();
+    });
+
+    it('hides the French word, speaks the English one, and can replay it', () => {
+      const { queryByText, getByLabelText } = render(
+        <TypingView words={mockWords} colors={mockColors} isDarkMode={false} audioMode />
+      );
+
+      expect(queryByText('bonjour')).toBeNull();
+      expect(Speech.speak).not.toHaveBeenCalled();
+
+      act(() => {
+        jest.advanceTimersByTime(500);
+      });
+      expect(Speech.speak).toHaveBeenCalledTimes(1);
+      expect(jest.mocked(Speech.speak).mock.calls[0][0]).toBe('hello');
+
+      fireEvent.press(getByLabelText('Play the word again'));
+      expect(Speech.speak).toHaveBeenCalledTimes(2);
+    });
+
+    it('keeps showing the French word and stays silent when audio mode is off', () => {
+      const { getByText } = render(
+        <TypingView words={mockWords} colors={mockColors} isDarkMode={false} />
+      );
+
+      act(() => {
+        jest.advanceTimersByTime(1000);
+      });
+      expect(getByText('bonjour')).toBeTruthy();
+      expect(Speech.speak).not.toHaveBeenCalled();
+    });
   });
 });

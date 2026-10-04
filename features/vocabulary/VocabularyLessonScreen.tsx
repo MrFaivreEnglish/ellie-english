@@ -933,6 +933,7 @@ export default function VocabularyLessonScreen({ route, navigation }: Props) {
                 colors={colors}
                 isDarkMode={isDarkMode}
                 allowSlashAlternatives={allowTypingSlashAlternatives}
+                audioMode={isVocabAudioMatchMode}
                 promptLabel={lesson?.typingPromptLabel}
                 answerPlaceholder={lesson?.typingAnswerPlaceholder}
                 keyboardVisible={reservesKeyboardSpace}

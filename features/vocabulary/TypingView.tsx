@@ -12,6 +12,7 @@ import {
 } from 'react-native';
 import Text, { ThemedTextInput as TextInput } from '../shared/ThemedText';
 import MaterialIcons from '../shared/ThemedMaterialIcon';
+import { useEnglishSpeech } from '../shared/useEnglishSpeech';
 import useReducedMotion from '../shared/useReducedMotion';
 import { useAudioPlayer } from 'expo-audio';
 
@@ -66,10 +67,9 @@ interface TypingViewProps {
   answerPlaceholder?: string;
   keyboardVisible?: boolean;
   isDesktopWeb?: boolean;
-
-
-
-
+  // Audio Mode (the same switch matching uses): the French word is hidden, the English one
+  // is spoken, and the student types what they hear.
+  audioMode?: boolean;
 
   practiceSheetReady?: boolean;
   layoutHeight?: number;
@@ -173,6 +173,7 @@ export default function TypingView({
   answerPlaceholder = 'Type the English translation',
   keyboardVisible = false,
   isDesktopWeb: isDesktopWebProp,
+  audioMode = false,
   practiceSheetReady = true,
   layoutHeight,
   forceAndroidLayout = false,
@@ -303,6 +304,64 @@ export default function TypingView({
   }, [onGoToAccount]);
 
   const isFinished = safeWords.length > 0 && isSessionComplete && !completionDismissedForAccount;
+
+  const { speak: speakEnglish, stop: stopEnglishSpeech, isAvailable: speechAvailable } = useEnglishSpeech();
+  // Without a speech engine, hiding the prompt would leave nothing to answer.
+  const isListenMode = audioMode && speechAvailable;
+  const spokenWordText = currentWord?.english ?? '';
+  useEffect(() => {
+    if (!isListenMode || isFinished || !spokenWordText) return undefined;
+
+    // A beat after the new word appears, so it doesn't talk over the feedback card leaving.
+    const timeoutId = setTimeout(() => speakEnglish(spokenWordText), 450);
+    return () => {
+      clearTimeout(timeoutId);
+      stopEnglishSpeech();
+    };
+  }, [isListenMode, isFinished, spokenWordText, speakEnglish, stopEnglishSpeech]);
+
+  const renderPromptWord = (fontSize: number, lineHeight: number) => {
+    if (isListenMode) {
+      return (
+        <View style={styles.listenPromptWrap}>
+          <Pressable
+            onPress={() => speakEnglish(spokenWordText)}
+            accessibilityRole="button"
+            accessibilityLabel="Play the word again"
+            style={({ pressed }) => [
+              styles.listenButton,
+              {
+                width: Math.round(lineHeight * 1.5),
+                height: Math.round(lineHeight * 1.5),
+                borderRadius: Math.round(lineHeight * 0.75),
+                backgroundColor: theme.primary,
+                opacity: pressed ? 0.8 : 1,
+              },
+            ]}
+          >
+            <MaterialIcons name="volume-up" size={Math.round(fontSize * 0.9)} color="#fff" />
+          </Pressable>
+          <Text style={[styles.listenCaption, { color: theme.subText }]}>Listen, then type what you hear</Text>
+        </View>
+      );
+    }
+
+    return (
+      <Animated.Text
+        style={[
+          styles.writeWordText,
+          {
+            color: theme.isDark ? theme.text : '#1e1a10',
+            fontSize,
+            lineHeight,
+            opacity: wordFadeAnim,
+          },
+        ]}
+      >
+        {currentWord?.french}
+      </Animated.Text>
+    );
+  };
   const currentSourceLessonTitle =
     typeof currentWord?.sourceLesson?.title === 'string'
       ? currentWord.sourceLesson.title.trim()
@@ -894,19 +953,7 @@ export default function TypingView({
             ]}
           >
             <View style={styles.writeWordRow}>
-              <Animated.Text
-                style={[
-                  styles.writeWordText,
-                  {
-                    color: theme.isDark ? theme.text : '#1e1a10',
-                    fontSize: promptFontSize,
-                    lineHeight: promptLineHeight,
-                    opacity: wordFadeAnim,
-                  },
-                ]}
-              >
-                {currentWord?.french}
-              </Animated.Text>
+              {renderPromptWord(promptFontSize, promptLineHeight)}
             </View>
             {currentSourceLessonTitle ? (
               <View
@@ -1361,19 +1408,7 @@ export default function TypingView({
             ]}
           >
             <View style={styles.writeWordRow}>
-              <Animated.Text
-                style={[
-                  styles.writeWordText,
-                  {
-                    color: theme.isDark ? theme.text : '#1e1a10',
-                    fontSize: promptFontSize,
-                    lineHeight: promptLineHeight,
-                    opacity: wordFadeAnim,
-                  },
-                ]}
-              >
-                {currentWord?.french}
-              </Animated.Text>
+              {renderPromptWord(promptFontSize, promptLineHeight)}
             </View>
             {currentSourceLessonTitle ? (
               <View
@@ -2380,6 +2415,20 @@ const styles = StyleSheet.create({
     fontSize: 12,
     lineHeight: 15,
     fontWeight: '800',
+  },
+  listenPromptWrap: {
+    alignItems: 'center',
+    gap: 10,
+  },
+  listenButton: {
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  listenCaption: {
+    fontSize: 14,
+    lineHeight: 18,
+    fontWeight: '700',
+    textAlign: 'center',
   },
   promptText: {
     textAlign: 'center',
