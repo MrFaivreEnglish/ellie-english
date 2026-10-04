@@ -125,7 +125,7 @@ export function ContinueCard({ type, title, icon, stacked = false, onContinue }:
         </View>
       ) : null}
       <View style={styles.continueLeft}>
-        <Text style={[styles.eyebrow, { color: section.text }]}>CONTINUE · {section.label}</Text>
+        <Text style={[styles.eyebrow, { color: section.text }]}>{section.label}</Text>
         <Text style={[styles.continueTitle, { color: colors.text }]} numberOfLines={2}>{title}</Text>
       </View>
       <TactileButton
