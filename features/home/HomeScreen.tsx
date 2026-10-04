@@ -225,6 +225,20 @@ export default function HomeScreen() {
     return getLessonWords(continueLessonTarget.lesson)[0]?.french;
   }, [continueLessonTarget]);
 
+  // A fill-in-the-blank exercise from the lesson, for the grammar preview card.
+  const continueExercise = React.useMemo(() => {
+    if (continueLessonTarget?.type !== 'grammar') return undefined;
+    const exercises: any[] = continueLessonTarget.lesson?.exercises ?? [];
+    const match = exercises.find(
+      (item) => typeof item?.question === 'string' && item.question.includes('___') && Array.isArray(item.options) && item.options.length >= 2
+    );
+    if (!match) return undefined;
+    // The right answer plus one other choice, in a fixed order so the card never flickers.
+    const distractor = match.options.find((option: string) => option !== match.answer);
+    const options = ([match.answer, distractor].filter((option) => typeof option === 'string') as string[]).sort();
+    return { question: match.question as string, options: options.length === 2 ? options : match.options.slice(0, 2) };
+  }, [continueLessonTarget]);
+
   // The highest milestone reached and not yet dismissed. Shown once, then never again.
   const reachedMilestone = React.useMemo(() => getMilestoneProgress(learntWordTotal).reached, [learntWordTotal]);
   const pendingMilestone =
@@ -406,6 +420,7 @@ export default function HomeScreen() {
             type={continueLessonTarget.type === 'grammar' ? 'grammar' : 'vocabulary'}
             title={continueLessonTarget.title}
             nextWord={continueNextWord}
+            exercise={continueExercise}
             wide={isWide}
             onContinue={openContinueLesson}
           />

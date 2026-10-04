@@ -3,7 +3,7 @@ import { Svg, Circle } from 'react-native-svg';
 import { Pressable, StyleSheet, TouchableOpacity, View } from 'react-native';
 import Text from '../shared/ThemedText';
 import { useTheme } from '../settings/ThemeContext';
-import { DAILY_GOAL, BONUS_DAY_XP, type DayState, type GoalWeek } from '../progress/dailyGoal';
+import { BONUS_DAY_XP, type DayState, type GoalWeek } from '../progress/dailyGoal';
 import { getMilestoneProgress } from '../progress/milestones';
 import type { Word } from '../../types/VocabularyTypes';
 
@@ -100,11 +100,13 @@ type ContinueCardProps = {
   type: 'vocabulary' | 'grammar';
   title: string;
   nextWord?: string;
+  // A real exercise from the lesson, shown on the grammar preview card.
+  exercise?: { question: string; options: string[] };
   wide: boolean;
   onContinue: () => void;
 };
 
-export function ContinueCard({ type, title, nextWord, wide, onContinue }: ContinueCardProps) {
+export function ContinueCard({ type, title, nextWord, exercise, wide, onContinue }: ContinueCardProps) {
   const { colors } = useTheme();
   const section = SECTION[type];
   const cardStyle = useCardStyle();
@@ -137,10 +139,11 @@ export function ContinueCard({ type, title, nextWord, wide, onContinue }: Contin
             </>
           ) : (
             <View style={[styles.stackCard, styles.stackFront, { backgroundColor: '#4DA6F2' }]}>
-              <Text style={styles.grammarSentence}>Elle ___ allée au marché.</Text>
+              <Text style={styles.grammarSentence} numberOfLines={3}>{exercise?.question ?? 'Elle ___ allée au marché.'}</Text>
               <View style={styles.grammarChips}>
-                <View style={styles.grammarChip}><Text style={styles.grammarChipText}>est</Text></View>
-                <View style={styles.grammarChip}><Text style={styles.grammarChipText}>a</Text></View>
+                {(exercise?.options ?? ['est', 'a']).map((option) => (
+                  <View key={option} style={styles.grammarChip}><Text style={styles.grammarChipText}>{option}</Text></View>
+                ))}
               </View>
             </View>
           )}
@@ -261,13 +264,6 @@ export function WeekCard({ week, compact = false }: { week: GoalWeek; compact?: 
           );
         })}
       </View>
-      {!week.goalReached && week.todayIndex >= 0 && (
-        <Text style={[styles.weekHint, { color: colors.secondaryText }]}>
-          {week.todayCount >= DAILY_GOAL
-            ? 'Today counts!'
-            : `${week.todayCount}/${DAILY_GOAL} answers today`}
-        </Text>
-      )}
     </View>
   );
 }
@@ -384,12 +380,11 @@ const styles = StyleSheet.create({
   grammarChip: { backgroundColor: '#FFFFFF', borderRadius: 99, paddingHorizontal: 16, paddingVertical: 5 },
   grammarChipText: { color: '#1A7FD4', fontWeight: '800', fontSize: 15 },
 
-  weekCard: { flexGrow: 1, borderRadius: 22, padding: 18, gap: 12 },
-  myWordsCard: { flexGrow: 1, borderRadius: 22, padding: 18, gap: 18, justifyContent: 'space-between' },
+  weekCard: { flexGrow: 1, borderRadius: 22, paddingVertical: 14, paddingHorizontal: 18, gap: 10 },
+  myWordsCard: { flexGrow: 1, borderRadius: 22, paddingVertical: 14, paddingHorizontal: 18, gap: 12, justifyContent: 'space-between' },
   cardHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8 },
   cardTitle: { fontWeight: '900', fontSize: 18 },
   weekStatus: { fontWeight: '800', fontSize: 14, flexShrink: 1 },
-  weekHint: { fontWeight: '600', fontSize: 13, textAlign: 'center' },
   daysRow: { flexDirection: 'row', justifyContent: 'space-between', gap: 4 },
   dayCell: { flex: 1, alignItems: 'center', gap: 6, minWidth: 0 },
   dayLabel: { fontSize: 12 },
