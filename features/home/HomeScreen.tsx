@@ -400,6 +400,8 @@ export default function HomeScreen() {
           <ContinueCard
             type={continueLessonTarget.type === 'grammar' ? 'grammar' : 'vocabulary'}
             title={continueLessonTarget.title}
+            stacked={!isWide}
+            icon={continueLessonTarget.type === 'grammar' ? GRAMMAR_ICON_SOURCE : VOCABULARY_ICON_SOURCE}
             onContinue={openContinueLesson}
           />
         )}
@@ -502,9 +504,9 @@ const styles = StyleSheet.create({
   grid: { flexDirection: 'row', flexWrap: 'wrap', gap: 14 },
   tileCell: { width: '47.5%', flexGrow: 1 },
   tile: {
-    minHeight: 104,
-    borderRadius: 22,
-    paddingVertical: 22,
+    minHeight: 132,
+    borderRadius: 24,
+    paddingVertical: 26,
     paddingHorizontal: 24,
     marginBottom: 5,
     flexDirection: 'row',
@@ -512,8 +514,8 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     gap: 10,
   },
-  tileTitleNarrow: { fontSize: 17 },
-  tileNarrow: { flexDirection: 'column', minHeight: 112, paddingHorizontal: 10, paddingVertical: 16, gap: 6 },
-  tileIcon: { width: 28, height: 28 },
-  tileTitle: { fontWeight: '800', fontSize: 20, flexShrink: 1, textAlign: 'center' },
+  tileTitleNarrow: { fontSize: 18 },
+  tileNarrow: { flexDirection: 'column', minHeight: 140, paddingHorizontal: 10, paddingVertical: 18, gap: 6 },
+  tileIcon: { width: 40, height: 40 },
+  tileTitle: { fontWeight: '800', fontSize: 24, flexShrink: 1, textAlign: 'center' },
 });

@@ -1,5 +1,5 @@
 import { Svg, Circle } from 'react-native-svg';
-import { Pressable, StyleSheet, TouchableOpacity, View } from 'react-native';
+import { Image, Pressable, StyleSheet, TouchableOpacity, View } from 'react-native';
 import Text from '../shared/ThemedText';
 import { useTheme } from '../settings/ThemeContext';
 import { BONUS_DAY_XP, type DayState, type GoalWeek } from '../progress/dailyGoal';
@@ -105,17 +105,25 @@ const SECTION = {
 type ContinueCardProps = {
   type: 'vocabulary' | 'grammar';
   title: string;
+  icon?: number;
+  // Narrow screens: title above the button, no icon.
+  stacked?: boolean;
   onContinue: () => void;
 };
 
 // Where the student left off: the lesson's title and one button.
-export function ContinueCard({ type, title, onContinue }: ContinueCardProps) {
+export function ContinueCard({ type, title, icon, stacked = false, onContinue }: ContinueCardProps) {
   const { colors } = useTheme();
   const section = SECTION[type];
   const cardStyle = useCardStyle();
 
   return (
-    <View style={[styles.continueCard, cardStyle]}>
+    <View style={[styles.continueCard, cardStyle, stacked && styles.continueCardStacked]}>
+      {icon && !stacked ? (
+        <View style={[styles.continueIcon, { backgroundColor: section.text + '22' }]}>
+          <Image source={icon} style={styles.continueIconImage} resizeMode="contain" fadeDuration={0} accessibilityIgnoresInvertColors />
+        </View>
+      ) : null}
       <View style={styles.continueLeft}>
         <Text style={[styles.eyebrow, { color: section.text }]}>CONTINUE · {section.label}</Text>
         <Text style={[styles.continueTitle, { color: colors.text }]} numberOfLines={2}>{title}</Text>
@@ -261,8 +269,8 @@ const styles = StyleSheet.create({
   daySlotText: { fontWeight: '800', fontSize: 11 },
   dashed: { borderWidth: 2, borderStyle: 'dashed' },
   tactile: {
-    minHeight: 40,
-    minWidth: 120,
+    minHeight: 44,
+    minWidth: 130,
     paddingHorizontal: 28,
     paddingVertical: 0,
     borderRadius: 16,
@@ -295,15 +303,18 @@ const styles = StyleSheet.create({
 
   continueCard: {
     borderRadius: 24,
-    paddingVertical: 16,
-    paddingHorizontal: 20,
+    paddingVertical: 20,
+    paddingHorizontal: 22,
     flexDirection: 'row',
     alignItems: 'center',
     gap: 16,
   },
+  continueCardStacked: { flexDirection: 'column', alignItems: 'stretch' },
+  continueIcon: { width: 64, height: 64, borderRadius: 18, alignItems: 'center', justifyContent: 'center' },
+  continueIconImage: { width: 38, height: 38 },
   continueLeft: { flex: 1, minWidth: 0, gap: 6 },
   eyebrow: { fontWeight: '800', fontSize: 13, letterSpacing: 1, textTransform: 'uppercase' },
-  continueTitle: { fontWeight: '900', fontSize: 24, lineHeight: 29 },
+  continueTitle: { fontWeight: '900', fontSize: 28, lineHeight: 33 },
 
 
 });
