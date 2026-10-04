@@ -79,7 +79,6 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { exitImmersiveOpaque } from '../../lib/immersive';
 import { getStreak, type StreakData } from '../progress/streakStorage';
 import { getDueReviewWords, type ReviewWord } from '../vocabulary/reviewWordsStorage';
-import { openWordReview } from '../vocabulary/wordReviewLesson';
 import { getPracticeWeek, type PracticeWeek } from '../progress/weeklyGoal';
 import { getLearnedFlashcardSummary } from '../vocabulary/flashcardProgressStorage';
 import { getGrammarProgressSummary } from '../grammar/grammarProgressStorage';
@@ -224,7 +223,6 @@ export default function HomeScreen() {
   const homeMenuTextColor = isShinyElliePresentationMode ? SHINY_HOME_MENU_TEXT_COLOR : HOME_MENU_TEXT_COLOR;
   const todayCardColors = isShinyElliePresentationMode ? TODAY_CARD_COLORS.shiny : TODAY_CARD_COLORS.normal;
   const continueCardPress = useSpringPress();
-  const reviewCardPress = useSpringPress();
   const [dueReviewWords, setDueReviewWords] = React.useState<ReviewWord[]>([]);
   const [learntWordTotal, setLearntWordTotal] = React.useState(0);
   const [practiceWeek, setPracticeWeek] = React.useState<PracticeWeek | null>(null);
@@ -421,6 +419,14 @@ export default function HomeScreen() {
           </View>
           <View style={styles.headerRightGroup}>
           <TouchableOpacity
+            onPress={() => navigation.navigate('Search')}
+            style={[styles.headerSearchButton, { backgroundColor: colors.card, borderColor: colors.border }]}
+            accessibilityRole="button"
+            accessibilityLabel="Search words and lessons"
+          >
+            <MaterialIcons name="search" size={22} color={colors.secondaryText} />
+          </TouchableOpacity>
+          <TouchableOpacity
             onPress={() => navigation.navigate('Account')}
             style={styles.accountPillWrap}
             accessibilityRole="button"
@@ -544,57 +550,6 @@ export default function HomeScreen() {
         </View>
       )}
 
-      <TouchableOpacity
-        activeOpacity={0.85}
-        onPress={() => navigation.navigate('Search')}
-        style={[styles.searchPill, { backgroundColor: colors.card, borderColor: colors.border }]}
-        accessibilityRole="button"
-        accessibilityLabel="Search words and lessons"
-      >
-        <MaterialIcons name="search" size={20} color={colors.secondaryText} />
-        <Text style={[styles.searchPillText, { color: colors.secondaryText }]} numberOfLines={1}>Search words and lessons</Text>
-      </TouchableOpacity>
-
-      {/* Mistakes from typing, due for review today. Above "Continue" because this is the
-          practice that most helps words stick. */}
-      {dueReviewWords.length > 0 && (
-        <Animated.View style={reviewCardPress.animatedStyle}>
-          <TouchableOpacity
-            style={[
-              styles.continueCard,
-              isScaledWeb && styles.continueCardDesktop,
-              isScaledWeb && {
-                minHeight: Math.round(100 * desktopScale),
-                paddingHorizontal: Math.round(20 * desktopScale),
-                paddingVertical: Math.round(16 * desktopScale),
-              },
-              { backgroundColor: colors.card },
-              getSoftShadow(isDarkMode, 'soft', colors.shadow, colors.visualStyle === 'pixel'),
-              pixelSurfaceStyle,
-            ]}
-            onPress={() => openWordReview(navigation, dueReviewWords)}
-            onPressIn={reviewCardPress.onPressIn}
-            onPressOut={reviewCardPress.onPressOut}
-            accessibilityRole="button"
-            accessibilityLabel={`Review ${dueReviewWords.length} ${dueReviewWords.length === 1 ? 'word' : 'words'}`}
-          >
-            <View style={[styles.continueIcon, isScaledWeb && { width: Math.round(48 * desktopScale), height: Math.round(48 * desktopScale) }, { backgroundColor: isDarkMode ? studySurface.control : '#FFF1D6', borderColor: isDarkMode ? colors.border : 'transparent' }]}>
-              <MaterialIcons name="replay" size={isScaledWeb ? Math.round(28 * desktopScale) : 24} color={colors.warning} />
-            </View>
-            <View style={styles.continueCopy}>
-              <Text style={[styles.continueLabel, isScaledWeb && styles.continueLabelDesktop, { color: colors.warning }]}>Words to review</Text>
-              <Text style={[styles.continueTitle, isScaledWeb && styles.continueTitleDesktop, { color: colors.text }]} numberOfLines={1}>
-                {dueReviewWords.length === 1 ? '1 word is ready' : `${dueReviewWords.length} words are ready`}
-              </Text>
-              <Text style={[styles.continueMeta, isScaledWeb && styles.continueMetaDesktop, { color: colors.secondaryText }]}>
-                From your typing mistakes
-              </Text>
-            </View>
-            <MaterialIcons name="arrow-forward" size={isScaledWeb ? Math.round(24 * desktopScale) : 24} color={colors.secondaryText} />
-          </TouchableOpacity>
-        </Animated.View>
-      )}
-
       {continueLessonTarget && (
         <Animated.View style={continueCardPress.animatedStyle}>
           <TouchableOpacity
@@ -654,10 +609,10 @@ export default function HomeScreen() {
           accessibilityLabel="Open My words: what you've learnt and what to review"
         >
           <View style={[styles.continueIcon, { backgroundColor: isDarkMode ? studySurface.control : '#E3F6E8', borderColor: isDarkMode ? colors.border : 'transparent' }]}>
-            <MaterialIcons name="menu-book" size={24} color={colors.success} />
+            <MaterialIcons name={dueReviewWords.length > 0 ? "replay" : "menu-book"} size={24} color={dueReviewWords.length > 0 ? colors.warning : colors.success} />
           </View>
           <View style={styles.continueCopy}>
-            <Text style={[styles.continueLabel, { color: colors.success }]}>My words</Text>
+            <Text style={[styles.continueLabel, { color: dueReviewWords.length > 0 ? colors.warning : colors.success }]}>My words</Text>
             <Text style={[styles.continueTitle, { color: colors.text }]} numberOfLines={1}>
               {learntWordTotal === 1 ? '1 word learnt' : `${learntWordTotal} words learnt`}
             </Text>
@@ -666,7 +621,7 @@ export default function HomeScreen() {
                 ? `${dueReviewWords.length} to review now`
                 : practiceWeek
                   ? `${practiceWeek.daysPractised}/${practiceWeek.goal} days this week`
-                  : 'Search your words and review mistakes'}
+                  : 'Your words and what to review'}
             </Text>
           </View>
           <MaterialIcons name="arrow-forward" size={24} color={colors.secondaryText} />
@@ -1021,22 +976,13 @@ const styles = StyleSheet.create({
     fontSize: 16,
     lineHeight: 20,
   },
-  searchPill: {
-    minHeight: 46,
-    marginHorizontal: 16,
-    marginTop: 4,
-    marginBottom: 4,
-    borderRadius: 14,
+  headerSearchButton: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
     borderWidth: 1,
-    paddingHorizontal: 14,
-    flexDirection: 'row',
     alignItems: 'center',
-    gap: 10,
-  },
-  searchPillText: {
-    flex: 1,
-    fontSize: 14,
-    fontWeight: '700',
+    justifyContent: 'center',
   },
   continueCard: {
     minHeight: 84,
