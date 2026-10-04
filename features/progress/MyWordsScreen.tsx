@@ -3,9 +3,6 @@ import { ActivityIndicator, Platform, Pressable, ScrollView, StyleSheet, Touchab
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useFonts } from 'expo-font';
-import { Fredoka_600SemiBold } from '@expo-google-fonts/fredoka';
-import { Nunito_500Medium, Nunito_600SemiBold, Nunito_700Bold, Nunito_800ExtraBold } from '@expo-google-fonts/nunito';
 import { Image as ExpoImage } from 'expo-image';
 import type { RootStackParamList } from '../../types/navigationTypes';
 import Text, { ThemedTextInput as TextInput } from '../shared/ThemedText';
@@ -23,14 +20,6 @@ import { getPracticeWeek, type PracticeWeek } from './weeklyGoal';
 
 // What a student has learnt, one next action, and a searchable bank of every word saved.
 // Layout and colour follow the My Words design brief; the page background is the theme's.
-
-const FONT = {
-  heading: 'Fredoka_600SemiBold',
-  medium: 'Nunito_500Medium',
-  semi: 'Nunito_600SemiBold',
-  bold: 'Nunito_700Bold',
-  extra: 'Nunito_800ExtraBold',
-};
 
 const MILESTONE_STEP = 25;
 const WIDE_LAYOUT = 700;
@@ -135,13 +124,6 @@ export default function MyWordsScreen() {
   const muted = colors.secondaryText;
   const cardShadow = { boxShadow: `0px 1px 0px ${palette.line}` } as const;
 
-  const [fontsLoaded] = useFonts({
-    Fredoka_600SemiBold,
-    Nunito_500Medium,
-    Nunito_600SemiBold,
-    Nunito_700Bold,
-    Nunito_800ExtraBold,
-  });
   const [library, setLibrary] = React.useState<LearningLibrary | null>(null);
   const [week, setWeek] = React.useState<PracticeWeek | null>(null);
   const [search, setSearch] = React.useState('');
@@ -450,7 +432,7 @@ export default function MyWordsScreen() {
               <Text style={[styles.subtitle, { color: muted }]}>Everything you’ve learnt, in one place.</Text>
             </View>
 
-            {!library || !fontsLoaded ? (
+            {!library ? (
               <ActivityIndicator style={styles.loading} color={palette.green} />
             ) : (
               <>
@@ -480,10 +462,10 @@ const styles = StyleSheet.create({
   desktopContentWrap: { width: '100%', alignSelf: 'center' },
   column: { gap: 28 },
   loading: { marginTop: 40 },
-  title: { fontFamily: FONT.heading },
-  subtitle: { fontFamily: FONT.semi, fontSize: 16, lineHeight: 22, marginTop: 6 },
+  title: { fontWeight: '900' },
+  subtitle: { fontWeight: '600', fontSize: 16, lineHeight: 22, marginTop: 6 },
   eyebrow: {
-    fontFamily: FONT.extra,
+    fontWeight: '800',
     fontSize: 14,
     lineHeight: 18,
     textTransform: 'uppercase',
@@ -496,19 +478,19 @@ const styles = StyleSheet.create({
   heroCard: { borderRadius: 28, padding: 22, overflow: 'hidden', gap: 6 },
   heroCircle: { position: 'absolute', width: 140, height: 140, borderRadius: 70, top: -44, right: -44 },
   heroNumberRow: { flexDirection: 'row', alignItems: 'baseline', gap: 10, flexWrap: 'wrap' },
-  heroNumber: { fontFamily: FONT.heading },
-  heroNumberLabel: { fontFamily: FONT.extra, fontSize: 18, lineHeight: 24 },
-  milestoneText: { fontFamily: FONT.bold, fontSize: 15, lineHeight: 20, marginTop: 6 },
+  heroNumber: { fontWeight: '900' },
+  heroNumberLabel: { fontWeight: '800', fontSize: 18, lineHeight: 24 },
+  milestoneText: { fontWeight: '700', fontSize: 15, lineHeight: 20, marginTop: 6 },
   heroTrack: { height: 12, borderRadius: 6, overflow: 'hidden', marginTop: 4 },
   heroFill: { height: '100%', borderRadius: 6 },
-  caption: { fontFamily: FONT.semi, fontSize: 13, lineHeight: 18, marginTop: 4, opacity: 0.8 },
+  caption: { fontWeight: '600', fontSize: 13, lineHeight: 18, marginTop: 4, opacity: 0.8 },
   actionCard: { borderRadius: 28, padding: 22, gap: 12 },
   actionCardEmpty: { borderWidth: 2, borderStyle: 'dashed' },
-  actionTitle: { fontFamily: FONT.heading, fontSize: 24, lineHeight: 30 },
-  actionBody: { fontFamily: FONT.medium, fontSize: 15, lineHeight: 22 },
+  actionTitle: { fontWeight: '900', fontSize: 24, lineHeight: 30 },
+  actionBody: { fontWeight: '500', fontSize: 15, lineHeight: 22 },
   chipRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   chip: { borderRadius: 99, paddingHorizontal: 14, paddingVertical: 6 },
-  chipText: { fontFamily: FONT.bold, fontSize: 14, lineHeight: 18 },
+  chipText: { fontWeight: '700', fontSize: 14, lineHeight: 18 },
   tactile: {
     minHeight: 52,
     borderRadius: 18,
@@ -520,20 +502,20 @@ const styles = StyleSheet.create({
     alignSelf: 'flex-start',
     marginTop: 4,
   },
-  tactileText: { fontFamily: FONT.extra, fontSize: 16, lineHeight: 22, color: '#FFFFFF' },
+  tactileText: { fontWeight: '800', fontSize: 16, lineHeight: 22, color: '#FFFFFF' },
   freshRow: { gap: 14, paddingVertical: 10, paddingHorizontal: 4 },
   freshCard: { width: 132, borderRadius: 18, paddingVertical: 16, paddingHorizontal: 14, gap: 2 },
-  freshFrench: { fontFamily: FONT.heading, fontSize: 20, lineHeight: 26 },
-  freshEnglish: { fontFamily: FONT.semi, fontSize: 14, lineHeight: 18 },
+  freshFrench: { fontWeight: '900', fontSize: 20, lineHeight: 26 },
+  freshEnglish: { fontWeight: '600', fontSize: 14, lineHeight: 18 },
   bankSection: { gap: 14 },
   bankTitleRow: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'baseline', justifyContent: 'space-between', gap: 8 },
-  sectionTitle: { fontFamily: FONT.heading },
+  sectionTitle: { fontWeight: '900' },
   bankLinks: { flexDirection: 'row', flexWrap: 'wrap', gap: 14 },
-  bankLink: { fontFamily: FONT.bold, fontSize: 14, lineHeight: 18 },
+  bankLink: { fontWeight: '700', fontSize: 14, lineHeight: 18 },
   grammarList: { borderRadius: 22, padding: 8 },
   grammarRow: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 10, paddingHorizontal: 12 },
-  grammarTitle: { flex: 1, fontFamily: FONT.bold, fontSize: 15, lineHeight: 20 },
-  grammarCount: { fontFamily: FONT.bold, fontSize: 13, lineHeight: 18 },
+  grammarTitle: { flex: 1, fontWeight: '700', fontSize: 15, lineHeight: 20 },
+  grammarCount: { fontWeight: '700', fontSize: 13, lineHeight: 18 },
   searchBox: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -543,19 +525,19 @@ const styles = StyleSheet.create({
     borderWidth: 2,
     paddingHorizontal: 16,
   },
-  searchInput: { flex: 1, fontFamily: FONT.semi, fontSize: 16, paddingVertical: 10 },
-  emptyText: { fontFamily: FONT.semi, fontSize: 15, lineHeight: 22 },
+  searchInput: { flex: 1, fontWeight: '600', fontSize: 16, paddingVertical: 10 },
+  emptyText: { fontWeight: '600', fontSize: 15, lineHeight: 22 },
   topicList: { gap: 12 },
   topicCard: { borderRadius: 22, overflow: 'hidden' },
   topicHeader: { flexDirection: 'row', alignItems: 'center', gap: 14, padding: 14, minHeight: 76 },
   topicIcon: { width: 48, height: 48, borderRadius: 14, alignItems: 'center', justifyContent: 'center', overflow: 'hidden' },
   topicThumb: { width: '100%', height: '100%' },
   topicCopy: { flex: 1, minWidth: 0, gap: 6 },
-  topicName: { fontFamily: FONT.extra, fontSize: 18, lineHeight: 24 },
+  topicName: { fontWeight: '800', fontSize: 18, lineHeight: 24 },
   topicBarRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
   topicTrack: { flex: 1, maxWidth: 220, height: 8, borderRadius: 4, overflow: 'hidden' },
   topicFill: { height: '100%', borderRadius: 4 },
-  topicCount: { fontFamily: FONT.bold, fontSize: 13, lineHeight: 18 },
+  topicCount: { fontWeight: '700', fontSize: 13, lineHeight: 18 },
   chevronOpen: { transform: [{ rotate: '180deg' }] },
   tileGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10, padding: 14 },
   wordTile: {
@@ -570,7 +552,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
   },
   wordTileCopy: { flex: 1, minWidth: 0 },
-  tileFrench: { fontFamily: FONT.extra, fontSize: 16, lineHeight: 22 },
-  tileEnglish: { fontFamily: FONT.semi, fontSize: 14, lineHeight: 18 },
+  tileFrench: { fontWeight: '800', fontSize: 16, lineHeight: 22 },
+  tileEnglish: { fontWeight: '600', fontSize: 14, lineHeight: 18 },
   speakerButton: { width: 32, height: 32, borderRadius: 16, alignItems: 'center', justifyContent: 'center' },
 });

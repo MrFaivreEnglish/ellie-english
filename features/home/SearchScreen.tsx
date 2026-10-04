@@ -3,9 +3,6 @@ import { Platform, ScrollView, StyleSheet, TouchableOpacity, View } from 'react-
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useFonts } from 'expo-font';
-import { Fredoka_600SemiBold } from '@expo-google-fonts/fredoka';
-import { Nunito_600SemiBold, Nunito_700Bold, Nunito_800ExtraBold } from '@expo-google-fonts/nunito';
 import { Image as ExpoImage } from 'expo-image';
 import type { RootStackParamList } from '../../types/navigationTypes';
 import Text, { ThemedTextInput as TextInput } from '../shared/ThemedText';
@@ -26,22 +23,12 @@ type ResultFilter = 'all' | 'lessons' | 'words';
 // A few lesson titles to try when the box is empty.
 const SUGGESTION_COUNT = 6;
 
-const FONT = {
-  heading: 'Fredoka_600SemiBold',
-  semi: 'Nunito_600SemiBold',
-  bold: 'Nunito_700Bold',
-  extra: 'Nunito_800ExtraBold',
-};
-
 export default function SearchScreen() {
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const { colors, isDarkMode, isAndroidStatusBarEnabled } = useTheme();
   const { speak } = useEnglishSpeech();
   const insets = useSafeAreaInsets();
   const topContentInset = getTopSafeAreaInset(Platform.OS, insets.top, isAndroidStatusBarEnabled);
-  // Same fonts as My words. Until they load the text just uses the default font.
-  const [fontsLoaded] = useFonts({ Fredoka_600SemiBold, Nunito_600SemiBold, Nunito_700Bold, Nunito_800ExtraBold });
-  const font = (name: keyof typeof FONT) => (fontsLoaded ? { fontFamily: FONT[name] } : null);
 
   const accent = isDarkMode ? '#3DB873' : '#2F9B5C';
   const accentSoft = isDarkMode ? '#17382A' : '#D3F5E0';
@@ -137,7 +124,7 @@ export default function SearchScreen() {
         accessibilityState={{ selected }}
         accessibilityLabel={`${label}, ${count}`}
       >
-        <Text style={[styles.chipText, font('extra'), { color: selected ? '#FFFFFF' : colors.text }]}>
+        <Text style={[styles.chipText, { color: selected ? '#FFFFFF' : colors.text }]}>
           {label} {count}
         </Text>
       </TouchableOpacity>
@@ -167,8 +154,8 @@ export default function SearchScreen() {
           )}
         </View>
         <View style={styles.rowCopy}>
-          {renderHighlighted(hit.title, [styles.rowTitle, font('extra') ?? {}, { color: colors.text }], 1)}
-          <Text style={[styles.rowMeta, font('semi'), { color: colors.secondaryText }]}>
+          {renderHighlighted(hit.title, [styles.rowTitle, { color: colors.text }], 1)}
+          <Text style={[styles.rowMeta, { color: colors.secondaryText }]}>
             {hit.type === 'grammar' ? 'Grammar lesson' : 'Vocabulary lesson'}
           </Text>
         </View>
@@ -190,14 +177,14 @@ export default function SearchScreen() {
         accessibilityLabel={`Open lesson ${hit.lessonTitle}, ${hit.word.english}, ${hit.word.french}${isLearnt ? ', saved' : ''}`}
       >
         <View style={styles.rowCopy}>
-          {renderHighlighted(hit.word.french, [styles.wordFrench, font('heading') ?? {}, { color: colors.text }], 1)}
-          {renderHighlighted(hit.word.english, [styles.wordEnglish, font('bold') ?? {}, { color: colors.secondaryText }], 1)}
-          <Text style={[styles.rowMeta, font('semi'), { color: colors.secondaryText }]} numberOfLines={1}>{hit.lessonTitle}</Text>
+          {renderHighlighted(hit.word.french, [styles.wordFrench, { color: colors.text }], 1)}
+          {renderHighlighted(hit.word.english, [styles.wordEnglish, { color: colors.secondaryText }], 1)}
+          <Text style={[styles.rowMeta, { color: colors.secondaryText }]} numberOfLines={1}>{hit.lessonTitle}</Text>
         </View>
         {isLearnt && (
           <View style={[styles.savedBadge, { backgroundColor: accentSoft }]} accessible={false}>
             <MaterialIcons name="check" size={14} color={accent} />
-            <Text style={[styles.savedText, font('extra'), { color: accent }]}>Saved</Text>
+            <Text style={[styles.savedText, { color: accent }]}>Saved</Text>
           </View>
         )}
         <TouchableOpacity
@@ -218,7 +205,7 @@ export default function SearchScreen() {
       {recent.length > 0 && (
         <View style={styles.block}>
           <View style={styles.blockHeader}>
-            <Text style={[styles.eyebrow, font('extra'), { color: colors.secondaryText }]}>Recent</Text>
+            <Text style={[styles.eyebrow, { color: colors.secondaryText }]}>Recent</Text>
             <TouchableOpacity
               onPress={() => {
                 void clearRecentSearches();
@@ -228,7 +215,7 @@ export default function SearchScreen() {
               accessibilityLabel="Clear recent searches"
               hitSlop={8}
             >
-              <Text style={[styles.clearText, font('bold'), { color: colors.secondaryText }]}>Clear</Text>
+              <Text style={[styles.clearText, { color: colors.secondaryText }]}>Clear</Text>
             </TouchableOpacity>
           </View>
           <View style={styles.pillRow}>
@@ -242,7 +229,7 @@ export default function SearchScreen() {
                 accessibilityLabel={`Search again for ${item}`}
               >
                 <MaterialIcons name="history" size={16} color={colors.secondaryText} />
-                <Text style={[styles.pillText, font('bold'), { color: colors.text }]}>{item}</Text>
+                <Text style={[styles.pillText, { color: colors.text }]}>{item}</Text>
               </TouchableOpacity>
             ))}
           </View>
@@ -250,7 +237,7 @@ export default function SearchScreen() {
       )}
 
       <View style={styles.block}>
-        <Text style={[styles.eyebrow, font('extra'), { color: colors.secondaryText }]}>Try a lesson</Text>
+        <Text style={[styles.eyebrow, { color: colors.secondaryText }]}>Try a lesson</Text>
         <View style={styles.pillRow}>
           {suggestions.map((title) => (
             <TouchableOpacity
@@ -261,13 +248,13 @@ export default function SearchScreen() {
               accessibilityRole="button"
               accessibilityLabel={`Search for ${title}`}
             >
-              <Text style={[styles.pillText, font('bold'), { color: isDarkMode ? '#CFF3DE' : '#1C3D2A' }]}>{title}</Text>
+              <Text style={[styles.pillText, { color: isDarkMode ? '#CFF3DE' : '#1C3D2A' }]}>{title}</Text>
             </TouchableOpacity>
           ))}
         </View>
       </View>
 
-      <Text style={[styles.hint, font('semi'), { color: colors.secondaryText }]}>
+      <Text style={[styles.hint, { color: colors.secondaryText }]}>
         Search a word in English or French. Accents don’t matter: “ete” finds “été”.
       </Text>
     </View>
@@ -281,7 +268,7 @@ export default function SearchScreen() {
     >
       <View style={styles.column}>
       <BackButton onPress={() => navigation.goBack()} />
-      <Text style={[styles.title, font('heading'), { color: colors.text }]}>Search</Text>
+      <Text style={[styles.title, { color: colors.text }]}>Search</Text>
 
       <View style={[styles.searchBox, { backgroundColor: colors.card, borderColor: focused ? accent : lineColor }]}>
         <MaterialIcons name="search" size={22} color={colors.secondaryText} />
@@ -294,7 +281,7 @@ export default function SearchScreen() {
           returnKeyType="search"
           placeholder="A word or a lesson"
           placeholderTextColor={colors.secondaryText}
-          style={[styles.input, font('semi'), { color: colors.text }]}
+          style={[styles.input, { color: colors.text }]}
           autoFocus
           autoCorrect={false}
           autoCapitalize="none"
@@ -311,8 +298,8 @@ export default function SearchScreen() {
 
       {isEmpty && (
         <View style={styles.emptyState}>
-          <Text style={[styles.emptyTitle, font('heading'), { color: colors.text }]}>Nothing found</Text>
-          <Text style={[styles.hint, styles.hintCentered, font('semi'), { color: colors.secondaryText }]}>
+          <Text style={[styles.emptyTitle, { color: colors.text }]}>Nothing found</Text>
+          <Text style={[styles.hint, styles.hintCentered, { color: colors.secondaryText }]}>
             No lesson or word matches “{query.trim()}”. Try fewer letters, or the other language.
           </Text>
         </View>
@@ -328,14 +315,14 @@ export default function SearchScreen() {
 
           {showLessons && (
             <View style={styles.section}>
-              <Text style={[styles.eyebrow, font('extra'), { color: colors.secondaryText }]}>Lessons</Text>
+              <Text style={[styles.eyebrow, { color: colors.secondaryText }]}>Lessons</Text>
               {results.lessons.map(renderLessonRow)}
             </View>
           )}
 
           {showWords && (
             <View style={styles.section}>
-              <Text style={[styles.eyebrow, font('extra'), { color: colors.secondaryText }]}>Words</Text>
+              <Text style={[styles.eyebrow, { color: colors.secondaryText }]}>Words</Text>
               {results.words.map(renderWordRow)}
             </View>
           )}
