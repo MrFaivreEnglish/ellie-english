@@ -82,3 +82,25 @@ export const searchContent = (
     words: words.slice(0, MAX_WORD_HITS).map(({ score: _score, ...hit }) => hit),
   };
 };
+
+export type TextPart = { text: string; match: boolean };
+
+// Splits `text` so the part matching `query` can be highlighted. Accents and case are
+// ignored, and the split keeps the original spelling ("été" stays "été").
+export const highlightParts = (text: string, query: string): TextPart[] => {
+  const needle = normalizeSearchText(query);
+  if (!needle) return [{ text, match: false }];
+
+  // One normalised character per original character, so positions line up.
+  const chars = Array.from(text);
+  const folded = chars.map((char) => normalizeSearchText(char) || char.toLowerCase()).join('');
+  const start = folded.indexOf(needle);
+  if (start < 0 || folded.length !== chars.length) return [{ text, match: false }];
+
+  const end = start + needle.length;
+  return [
+    { text: chars.slice(0, start).join(''), match: false },
+    { text: chars.slice(start, end).join(''), match: true },
+    { text: chars.slice(end).join(''), match: false },
+  ].filter((part) => part.text.length > 0);
+};

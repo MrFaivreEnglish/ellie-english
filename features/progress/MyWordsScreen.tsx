@@ -441,7 +441,7 @@ export default function MyWordsScreen() {
         contentContainerStyle={{ paddingTop: topContentInset, paddingBottom: insets.bottom + 40 }}
         keyboardShouldPersistTaps="handled"
       >
-        <View style={isDesktopWeb && [styles.desktopContentWrap, { maxWidth: Math.min(desktopContentMaxWidth, 960) }]}>
+        <View style={[styles.desktopContentWrap, { maxWidth: isDesktopWeb ? Math.min(desktopContentMaxWidth, 960) : 960 }]}>
           <BackButton onPress={() => navigation.goBack()} />
 
           <View style={[styles.column, { paddingHorizontal: pageGutter }]}>
