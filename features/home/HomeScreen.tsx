@@ -19,12 +19,10 @@ import MaterialIcons from '../shared/ThemedMaterialIcon';
 import { useTheme } from '../settings/ThemeContext';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { exitImmersiveOpaque } from '../../lib/immersive';
-import { getGoalWeek, type GoalWeek } from '../progress/dailyGoal';
 import { dismissMilestone, getDismissedMilestone, getMilestoneProgress } from '../progress/milestones';
 import { getLearningLibrary } from '../progress/learningLibrary';
-import { getLessonWords } from '../vocabulary/knownWords';
 import type { Word } from '../../types/VocabularyTypes';
-import { ContinueCard, MilestoneBanner, MyWordsCard, WeekCard } from './HomeCards';
+import { ContinueCard, MilestoneBanner } from './HomeCards';
 import { getLearnedFlashcardSummary } from '../vocabulary/flashcardProgressStorage';
 import { getMenuCopy } from '../shared/menuCopy';
 import { useAccount } from '../account/AccountContext';
@@ -155,7 +153,6 @@ export default function HomeScreen() {
   const homeMenuCardGradientEnds = isShinyElliePresentationMode ? SHINY_HOME_MENU_CARD_GRADIENT_ENDS : HOME_TILE_EDGES;
   const homeMenuTextColor = isShinyElliePresentationMode ? SHINY_HOME_MENU_TEXT_COLOR : HOME_MENU_TEXT_COLOR;
   const [learntWordTotal, setLearntWordTotal] = React.useState(0);
-  const [goalWeek, setGoalWeek] = React.useState<GoalWeek | null>(null);
   const [dismissedMilestone, setDismissedMilestone] = React.useState<number | null>(null);
   const [milestoneWords, setMilestoneWords] = React.useState<Word[]>([]);
   const seenLessonHighlights = useSeenLessonHighlights();
@@ -220,25 +217,6 @@ export default function HomeScreen() {
   );
   const accountPillAccent = accountAvatarColorPreset.accentColor;
   const continueLessonTarget = React.useMemo(() => findLastLessonTarget(lastLesson), [lastLesson]);
-  const continueNextWord = React.useMemo(() => {
-    if (continueLessonTarget?.type !== 'vocabulary') return undefined;
-    return getLessonWords(continueLessonTarget.lesson)[0]?.french;
-  }, [continueLessonTarget]);
-
-  // A fill-in-the-blank exercise from the lesson, for the grammar preview card.
-  const continueExercise = React.useMemo(() => {
-    if (continueLessonTarget?.type !== 'grammar') return undefined;
-    const exercises: any[] = continueLessonTarget.lesson?.exercises ?? [];
-    const match = exercises.find(
-      (item) => typeof item?.question === 'string' && item.question.includes('___') && Array.isArray(item.options) && item.options.length >= 2
-    );
-    if (!match) return undefined;
-    // The right answer plus one other choice, in a fixed order so the card never flickers.
-    const distractor = match.options.find((option: string) => option !== match.answer);
-    const options = ([match.answer, distractor].filter((option) => typeof option === 'string') as string[]).sort();
-    return { question: match.question as string, options: options.length === 2 ? options : match.options.slice(0, 2) };
-  }, [continueLessonTarget]);
-
   // The highest milestone reached and not yet dismissed. Shown once, then never again.
   const reachedMilestone = React.useMemo(() => getMilestoneProgress(learntWordTotal).reached, [learntWordTotal]);
   const pendingMilestone =
@@ -288,10 +266,6 @@ export default function HomeScreen() {
       getLearnedFlashcardSummary().then((summary) => {
         if (!active) return;
         setLearntWordTotal(summary.totalLearned);
-      }).catch(() => {});
-      getGoalWeek().then((week) => {
-        if (!active) return;
-        setGoalWeek(week);
       }).catch(() => {});
 
       return () => {
@@ -412,6 +386,7 @@ export default function HomeScreen() {
             sampleWords={milestoneWords}
             extraCount={milestoneWords.length > 0 ? Math.max(0, learntWordTotal - milestoneWords.length) : 0}
             onDismiss={dismissPendingMilestone}
+            onOpen={() => navigation.navigate('MyWords')}
           />
         )}
 
@@ -419,21 +394,10 @@ export default function HomeScreen() {
           <ContinueCard
             type={continueLessonTarget.type === 'grammar' ? 'grammar' : 'vocabulary'}
             title={continueLessonTarget.title}
-            nextWord={continueNextWord}
-            exercise={continueExercise}
-            wide={isWide}
             onContinue={openContinueLesson}
           />
         )}
 
-        <View style={[styles.weekRow, isWide && styles.weekRowWide]}>
-          <View style={isWide ? styles.weekCol : undefined}>
-            {goalWeek && <WeekCard week={goalWeek} compact={!isWide} />}
-          </View>
-          <View style={isWide ? styles.wordsCol : undefined}>
-            <MyWordsCard learnt={learntWordTotal} onPress={() => navigation.navigate('MyWords')} />
-          </View>
-        </View>
 
         <View style={styles.grid}>
           {localizedCategories.map((category) => (
@@ -527,10 +491,6 @@ const styles = StyleSheet.create({
   },
   levelBadgeIcon: { fontSize: 9, lineHeight: 11 },
   levelBadgeText: { fontWeight: '800', fontSize: 11, lineHeight: 13 },
-  weekRow: { gap: 14 },
-  weekRowWide: { flexDirection: 'row', gap: 16 },
-  weekCol: { flex: 1.7, minWidth: 0 },
-  wordsCol: { flex: 1, minWidth: 0 },
   grid: { flexDirection: 'row', flexWrap: 'wrap', gap: 14 },
   tileCell: { width: '47.5%', flexGrow: 1 },
   tile: {

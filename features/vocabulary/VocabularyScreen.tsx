@@ -669,10 +669,7 @@ export default function VocabularyScreen() {
         keyboardShouldPersistTaps="handled"
         stickySectionHeadersEnabled={false}
         ListHeaderComponent={<>
-        <View style={styles.topRow}>
-          <BackButton label={commonCopy.backToHome} onPress={() => navigation.navigate('Home')} />
-          <MyWordsPill onPress={() => (navigation as any).getParent?.()?.navigate('MyWords')} />
-        </View>
+        <BackButton label={commonCopy.backToHome} onPress={() => navigation.navigate('Home')} />
 
         <View style={styles.headerRow}>
           <Text
@@ -687,6 +684,12 @@ export default function VocabularyScreen() {
           >
             {copy.header}
           </Text>
+          <MyWordsPill
+            onPress={() => (navigation as any).getParent?.()?.navigate('MyWords')}
+            iconOnly={isPortraitTight}
+            backgroundColor={studySurface.control}
+            borderColor={studySurface.controlBorder}
+          />
           <TouchableOpacity
             activeOpacity={0.84}
             onPress={toggleSelectionMode}
@@ -1200,12 +1203,6 @@ export default function VocabularyScreen() {
 }
 
 const styles = StyleSheet.create({
-  topRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginRight: 16,
-  },
   container: { flex: 1 },
   desktopContentWrap: {
 

@@ -2,35 +2,48 @@ import { StyleSheet, TouchableOpacity } from 'react-native';
 import Text from './ThemedText';
 import MaterialIcons from './ThemedMaterialIcon';
 import { useTheme } from '../settings/ThemeContext';
+import { uiRadii } from './uiPrimitives';
 
-// One small "My words" shortcut that sits on the same row as a screen's back button, instead
-// of a full-width row of its own.
-export default function MyWordsPill({ onPress }: { onPress: () => void }) {
+type MyWordsPillProps = {
+  onPress: () => void;
+  // Icon only, for rows too narrow for the label.
+  iconOnly?: boolean;
+  backgroundColor?: string;
+  borderColor?: string;
+};
+
+// A small "My words" shortcut that sits beside another control, styled like it.
+export default function MyWordsPill({ onPress, iconOnly = false, backgroundColor, borderColor }: MyWordsPillProps) {
   const { colors } = useTheme();
 
   return (
     <TouchableOpacity
       onPress={onPress}
-      activeOpacity={0.8}
-      style={[styles.pill, { backgroundColor: colors.card, borderColor: colors.border }]}
+      activeOpacity={0.84}
+      style={[
+        styles.pill,
+        iconOnly && styles.pillIconOnly,
+        { backgroundColor: backgroundColor ?? colors.card, borderColor: borderColor ?? colors.border },
+      ]}
       accessibilityRole="button"
       accessibilityLabel="Open My words: what you've learnt and what to review"
     >
       <MaterialIcons name="menu-book" size={18} color={colors.success} />
-      <Text style={[styles.label, { color: colors.text }]} numberOfLines={1}>My words</Text>
+      {!iconOnly && <Text style={[styles.label, { color: colors.text }]} numberOfLines={1}>My words</Text>}
     </TouchableOpacity>
   );
 }
 
 const styles = StyleSheet.create({
   pill: {
-    minHeight: 40,
-    paddingHorizontal: 14,
-    borderRadius: 20,
-    borderWidth: 1,
+    minHeight: 42,
+    paddingHorizontal: 12,
+    borderRadius: uiRadii.control,
+    borderWidth: 1.5,
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
+    gap: 7,
   },
+  pillIconOnly: { width: 42, paddingHorizontal: 0, justifyContent: 'center' },
   label: { fontSize: 14, fontWeight: '800' },
 });
