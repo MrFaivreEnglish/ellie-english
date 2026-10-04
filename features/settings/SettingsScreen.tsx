@@ -51,8 +51,6 @@ export default function SettingsScreen() {
     toggleSoundEffects,
     isReduceAnimationsEnabled,
     toggleReduceAnimations,
-    isTodayCardEnabled,
-    toggleTodayCard,
     isAndroidStatusBarEnabled,
     toggleAndroidStatusBar,
     isShinyEllieUnlocked,
@@ -356,14 +354,6 @@ export default function SettingsScreen() {
             description: copy.darkModeDescription,
             value: isDarkMode,
             onValueChange: toggleTheme,
-            activeColor: colors.primary,
-          })}
-          {renderSetting({
-            icon: 'today',
-            title: copy.todayCardTitle,
-            description: copy.todayCardDescription,
-            value: isTodayCardEnabled,
-            onValueChange: toggleTodayCard,
             activeColor: colors.primary,
           })}
           {renderSetting({

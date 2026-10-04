@@ -7,69 +7,13 @@ import {
   ScrollView,
   Platform,
   Image,
-  InteractionManager,
   useWindowDimensions,
 } from 'react-native';
-import { Svg, Circle } from 'react-native-svg';
-import Animated, { FadeInDown, useAnimatedProps, useSharedValue, withTiming, ZoomIn } from 'react-native-reanimated';
+import { useNavigation, useFocusEffect } from '@react-navigation/native';
+import Animated, { FadeInDown } from 'react-native-reanimated';
 import { useSpringPress } from '../shared/useSpringPress';
 import { getSerializableVocabularyLesson } from '../vocabulary/vocabularyUtils';
 
-const AnimatedCircle = Animated.createAnimatedComponent(Circle);
-
-function TodayProgressRing({
-  progress,
-  size,
-  strokeWidth,
-  trackColor,
-  fillColor,
-}: {
-  progress: number;
-  size: number;
-  strokeWidth: number;
-  trackColor: string;
-  fillColor: string;
-}) {
-  const radius = (size - strokeWidth) / 2;
-  const circumference = 2 * Math.PI * radius;
-  const progressValue = useSharedValue(0);
-
-  React.useEffect(() => {
-    progressValue.value = withTiming(Math.min(progress / 100, 1), { duration: 700 });
-  }, [progress, progressValue]);
-
-  const animatedProps = useAnimatedProps(() => ({
-    strokeDashoffset: circumference * (1 - progressValue.value),
-  }));
-
-  return (
-    <Svg width={size} height={size}>
-      <Circle
-        cx={size / 2}
-        cy={size / 2}
-        r={radius}
-        stroke={trackColor}
-        strokeWidth={strokeWidth}
-        fill="none"
-      />
-      <AnimatedCircle
-        cx={size / 2}
-        cy={size / 2}
-        r={radius}
-        stroke={fillColor}
-        strokeWidth={strokeWidth}
-        fill="none"
-        strokeDasharray={circumference}
-        animatedProps={animatedProps}
-        strokeLinecap="round"
-        rotation="-90"
-        origin={`${size / 2}, ${size / 2}`}
-      />
-    </Svg>
-  );
-}
-
-import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import type { RootStackParamList, TabParamList } from '../../types/navigationTypes';
 import Text from '../shared/ThemedText';
@@ -77,11 +21,9 @@ import MaterialIcons from '../shared/ThemedMaterialIcon';
 import { useTheme } from '../settings/ThemeContext';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { exitImmersiveOpaque } from '../../lib/immersive';
-import { getStreak, type StreakData } from '../progress/streakStorage';
 import { getDueReviewWords, type ReviewWord } from '../vocabulary/reviewWordsStorage';
 import { getPracticeWeek, type PracticeWeek } from '../progress/weeklyGoal';
 import { getLearnedFlashcardSummary } from '../vocabulary/flashcardProgressStorage';
-import { getGrammarProgressSummary } from '../grammar/grammarProgressStorage';
 import { getMenuCopy } from '../shared/menuCopy';
 import { useAccount } from '../account/AccountContext';
 import AccountAvatar from '../account/AccountAvatar';
@@ -106,7 +48,6 @@ import {
   SHINY_HOME_MENU_CARD_COLORS,
   SHINY_HOME_MENU_CARD_GRADIENT_ENDS,
   SHINY_HOME_MENU_TEXT_COLOR,
-  TODAY_CARD_COLORS,
 } from '../shared/homeMenuColors';
 import { getAndroidBottomBarButtonStyle, getAndroidBottomBarColor } from '../shared/appChromeColors';
 import { getDesktopContentMaxWidth, getDesktopTypographyScale, isDesktopWebWidth } from '../shared/responsiveLayout';
@@ -170,7 +111,7 @@ const findLastLessonTarget = (entry: LastLessonEntry | null) => {
 
 export default function HomeScreen() {
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
-  const { colors, isDarkMode, isTodayCardEnabled, isAndroidStatusBarEnabled, isShinyElliePresentationMode } = useTheme();
+  const { colors, isDarkMode, isAndroidStatusBarEnabled, isShinyElliePresentationMode } = useTheme();
   const { width: windowWidth, height: windowHeight } = useWindowDimensions();
 
 
@@ -188,7 +129,6 @@ export default function HomeScreen() {
 
 
 
-  const todayRingSize = isScaledWeb ? 44 : 42;
   const {
     isLoading: isAccountLoading,
     lastSyncAt,
@@ -208,20 +148,13 @@ export default function HomeScreen() {
     : Platform.OS === 'android' && isAndroidStatusBarEnabled
       ? insets.top + 16
       : 10;
-  const [todayGrammarAnswerCount, setTodayGrammarAnswerCount] = React.useState(0);
-  const [todayLearntCount, setTodayLearntCount] = React.useState(0);
   const [localXP, setLocalXP] = React.useState(0);
   const [lastLesson, setLastLesson] = React.useState<LastLessonEntry | null>(null);
-  const [streak, setStreak] = React.useState<StreakData>({ currentStreak: 0, longestStreak: 0, lastPracticeDate: '' });
   const [showTutorial, setShowTutorial] = React.useState(false);
   const isNavigatingFromMenuRef = React.useRef(false);
-  const dailyPracticeGoal = 15;
-  const todaySavedProgressCount = todayGrammarAnswerCount + todayLearntCount;
-  const todayProgress = Math.min(100, Math.round((todaySavedProgressCount / dailyPracticeGoal) * 100));
   const homeMenuCardColors = isShinyElliePresentationMode ? SHINY_HOME_MENU_CARD_COLORS : HOME_MENU_CARD_COLORS;
   const homeMenuCardGradientEnds = isShinyElliePresentationMode ? SHINY_HOME_MENU_CARD_GRADIENT_ENDS : HOME_MENU_CARD_GRADIENT_ENDS;
   const homeMenuTextColor = isShinyElliePresentationMode ? SHINY_HOME_MENU_TEXT_COLOR : HOME_MENU_TEXT_COLOR;
-  const todayCardColors = isShinyElliePresentationMode ? TODAY_CARD_COLORS.shiny : TODAY_CARD_COLORS.normal;
   const continueCardPress = useSpringPress();
   const [dueReviewWords, setDueReviewWords] = React.useState<ReviewWord[]>([]);
   const [learntWordTotal, setLearntWordTotal] = React.useState(0);
@@ -293,7 +226,6 @@ export default function HomeScreen() {
   useFocusEffect(
     React.useCallback(() => {
       let active = true;
-      let summaryTask: { cancel?: () => void } | null = null;
 
       isNavigatingFromMenuRef.current = false;
       checkAndMarkFirstVisit().then((isFirst) => {
@@ -312,10 +244,6 @@ export default function HomeScreen() {
         if (!active) return;
         setLastLesson(entry);
       }).catch(() => {});
-      getStreak().then((s) => {
-        if (!active) return;
-        setStreak(s);
-      }).catch(() => {});
       getDueReviewWords().then((words) => {
         if (!active) return;
         setDueReviewWords(words);
@@ -329,29 +257,13 @@ export default function HomeScreen() {
         setPracticeWeek(week);
       }).catch(() => {});
 
-      if (!isTodayCardEnabled) {
-        return () => {
-          active = false;
-        };
-      }
-
-      summaryTask = InteractionManager.runAfterInteractions(() => {
-        Promise.all([getGrammarProgressSummary(), getLearnedFlashcardSummary()]).then(([grammarSummary, learnedSummary]) => {
-          if (!active) return;
-          setTodayGrammarAnswerCount(grammarSummary.correctToday);
-          setTodayLearntCount(learnedSummary.learnedToday);
-        }).catch(() => {});
-      });
-
       return () => {
         active = false;
-        summaryTask?.cancel?.();
       };
     }, [
       androidNavigationBarButtonStyle,
       androidNavigationBarColor,
       isAndroidStatusBarEnabled,
-      isTodayCardEnabled,
       lastSyncAt,
     ])
   );
@@ -464,92 +376,6 @@ export default function HomeScreen() {
         </View>
       </View>
 
-      {isTodayCardEnabled && (
-        <View
-          style={[
-            styles.todayCard,
-            isScaledWeb && styles.todayCardDesktop,
-            isScaledWeb && { padding: Math.round(18 * desktopScale) },
-            { backgroundColor: todayCardColors.solid },
-            freshTileShadow(todayCardColors.shadow, true),
-            pixelSurfaceStyle,
-          ]}
-        >
-          <View style={[styles.todayDecorCircle, { backgroundColor: todayCardColors.decoration, pointerEvents: 'none' }]} />
-          <View style={styles.todayHeaderRow}>
-            <View style={styles.todayLeftBlock}>
-              <View style={styles.todayTitleRow}>
-                <Text style={[styles.todayTitle, isScaledWeb && styles.todayTitleDesktop, { color: todayCardColors.text }]}>{copy.today}</Text>
-                {streak.currentStreak >= 2 && (
-                  <Animated.View
-                    entering={ZoomIn.springify().damping(14)}
-                    style={[styles.todayStreakChip, { backgroundColor: todayCardColors.strongSurface }]}
-                  >
-                    <Text style={[styles.streakFlame, isScaledWeb && styles.streakFlameDesktop]}>🔥</Text>
-                    <Text style={[styles.todayStreakText, isScaledWeb && styles.todayStreakTextDesktop, { color: todayCardColors.text }]}>
-                      {streak.currentStreak}-day streak
-                    </Text>
-                  </Animated.View>
-                )}
-              </View>
-              <Text style={[styles.todaySubtitle, isScaledWeb && styles.todaySubtitleDesktop, { color: todayCardColors.mutedText }]} numberOfLines={2}>
-                {todaySavedProgressCount > 0 ? copy.todayLogged : copy.todayStart}
-              </Text>
-            </View>
-            <View style={[styles.todayRingWrap, isScaledWeb && styles.todayRingWrapDesktop, isScaledWeb && { width: todayRingSize, height: todayRingSize }]}>
-              <TodayProgressRing
-                progress={todayProgress}
-                size={todayRingSize}
-                strokeWidth={isScaledWeb ? Math.max(5, Math.round(5 * desktopScale)) : 4}
-                trackColor={todayCardColors.ringTrack}
-                fillColor={todayCardColors.text}
-              />
-              <View style={[styles.todayRingCenter, { pointerEvents: 'none' }]}>
-                <Text style={[styles.todayRingValue, isScaledWeb && styles.todayRingValueDesktop, { color: todayCardColors.text }]}>{todaySavedProgressCount}</Text>
-                <Text style={[styles.todayRingGoal, isScaledWeb && styles.todayRingGoalDesktop, { color: todayCardColors.faintText }]}>/{dailyPracticeGoal}</Text>
-              </View>
-            </View>
-          </View>
-
-          <View style={styles.todayRows}>
-            <View style={[styles.todayMetricRow, { backgroundColor: todayCardColors.surface }]}>
-              <View
-                style={[
-                  styles.todayMetricIcon,
-                  isScaledWeb && { width: Math.round(36 * desktopScale), height: Math.round(36 * desktopScale) },
-                  { backgroundColor: todayCardColors.strongSurface },
-                ]}
-              >
-                <MaterialIcons name="edit" size={isScaledWeb ? Math.round(20 * desktopScale) : 20} color={todayCardColors.text} />
-              </View>
-              <View style={styles.todayMetricCopy}>
-                <Text style={[styles.todayMetricLabel, isScaledWeb && styles.todayMetricLabelDesktop, { color: todayCardColors.subtleText }]} numberOfLines={2}>{copy.itemsToday}</Text>
-                <Text style={[styles.todayMetricValue, isScaledWeb && styles.todayMetricValueDesktop, { color: todayCardColors.text }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.7}>
-                  {todayGrammarAnswerCount} {todayGrammarAnswerCount === 1 ? copy.practiceItemSingular : copy.practiceItemPlural}
-                </Text>
-              </View>
-            </View>
-            <View style={[styles.todayMetricRow, { backgroundColor: todayCardColors.surface }]}>
-              <View
-                style={[
-                  styles.todayMetricIcon,
-                  isScaledWeb && { width: Math.round(36 * desktopScale), height: Math.round(36 * desktopScale) },
-                  { backgroundColor: todayCardColors.strongSurface },
-                ]}
-              >
-                <MaterialIcons name="style" size={isScaledWeb ? Math.round(20 * desktopScale) : 20} color={todayCardColors.text} />
-              </View>
-              <View style={styles.todayMetricCopy}>
-                <Text style={[styles.todayMetricLabel, isScaledWeb && styles.todayMetricLabelDesktop, { color: todayCardColors.subtleText }]} numberOfLines={2}>{copy.learntToday}</Text>
-                <Text style={[styles.todayMetricValue, isScaledWeb && styles.todayMetricValueDesktop, { color: todayCardColors.text }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.7}>
-                  {todayLearntCount} {todayLearntCount === 1 ? copy.wordSingular : copy.wordPlural}
-                </Text>
-              </View>
-            </View>
-          </View>
-        </View>
-      )}
-
       {continueLessonTarget && (
         <Animated.View style={continueCardPress.animatedStyle}>
           <TouchableOpacity
@@ -633,7 +459,7 @@ export default function HomeScreen() {
           <Animated.View
             key={category.route}
             entering={FadeInDown.delay(index * 60).duration(320)}
-            style={(isTodayCardEnabled || isScaledWeb) ? styles.categoryCardDesktop : styles.categoryCardFullRow}
+            style={isScaledWeb ? styles.categoryCardDesktop : styles.categoryCardFullRow}
           >
             <Pressable
               style={({ pressed }) => [
