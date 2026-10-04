@@ -9,6 +9,7 @@ import Text from '../shared/ThemedText';
 import MaterialIcons from '../shared/ThemedMaterialIcon';
 import AccountPanel from './AccountPanel';
 import BackButton from '../shared/BackButton';
+import MyWordsPill from '../shared/MyWordsPill';
 import { useAccount } from './AccountContext';
 import { useTheme } from '../settings/ThemeContext';
 import { getButtonStyle, getButtonTextColor, getSoftShadow } from '../shared/uiPrimitives';
@@ -182,7 +183,10 @@ export default function AccountScreen() {
       keyboardDismissMode="none"
     >
       <View style={isDesktopWeb && [styles.desktopContentWrap, { maxWidth: desktopContentMaxWidth }]}>
-      <BackButton onPress={() => navigation.goBack()} />
+      <View style={styles.topRow}>
+        <BackButton onPress={() => navigation.goBack()} />
+        <MyWordsPill onPress={() => navigation.navigate('MyWords')} />
+      </View>
 
       <View style={styles.header}>
         <View style={styles.headerCopy}>
@@ -329,6 +333,12 @@ export default function AccountScreen() {
 }
 
 const styles = StyleSheet.create({
+  topRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginRight: 16,
+  },
   container: {
     flex: 1,
   },

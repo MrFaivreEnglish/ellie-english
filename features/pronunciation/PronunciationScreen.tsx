@@ -78,7 +78,7 @@ export default function PronunciationScreen() {
       ]}
     >
       <BackButton
-        label="Back to Home"
+        label="Home"
         onPress={() => {
           const parentNavigation = (navigation as any).getParent?.();
           if (parentNavigation) {

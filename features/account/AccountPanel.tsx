@@ -70,7 +70,7 @@ const ACCOUNT_TOUR_SEEN_KEY = '@ellie_account_signed_in_tour_seen';
 
 
 
-export default function AccountPanel({ colors, isDarkMode, openAvatarPicker, onAvatarSectionLayout, onOpenMyWords }: AccountPanelProps) {
+export default function AccountPanel({ colors, isDarkMode, openAvatarPicker, onAvatarSectionLayout }: AccountPanelProps) {
 
 
 
@@ -546,20 +546,6 @@ export default function AccountPanel({ colors, isDarkMode, openAvatarPicker, onA
         ))}
       </View>
 
-      {onOpenMyWords && (
-        <TouchableOpacity
-          onPress={onOpenMyWords}
-          activeOpacity={0.8}
-          style={[styles.myWordsButton, { backgroundColor: colors.surface, borderColor: colors.border }]}
-          accessibilityRole="button"
-          accessibilityLabel="Open My words: what you've learnt and what to review"
-        >
-          <MaterialIcons name="menu-book" size={Math.round(18 * desktopScale)} color={colors.primary} />
-          <Text style={[styles.myWordsText, { color: colors.text }]} numberOfLines={1}>My words</Text>
-          <Text style={[styles.myWordsHint, { color: colors.secondaryText }]} numberOfLines={1}>Learnt and to review</Text>
-          <MaterialIcons name="chevron-right" size={Math.round(20 * desktopScale)} color={colors.secondaryText} />
-        </TouchableOpacity>
-      )}
     </View>
   );
 
@@ -1376,28 +1362,6 @@ const styles = StyleSheet.create({
     lineHeight: 12,
     fontWeight: '800',
     textAlign: 'center',
-  },
-  myWordsButton: {
-    minHeight: 44,
-    marginTop: 8,
-    borderRadius: 10,
-    borderWidth: 1,
-    paddingHorizontal: 10,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  myWordsText: {
-    fontSize: 14,
-    lineHeight: 18,
-    fontWeight: '900',
-  },
-  myWordsHint: {
-    flex: 1,
-    fontSize: 12,
-    lineHeight: 16,
-    fontWeight: '700',
-    textAlign: 'right',
   },
   levelShowcaseSubtext: {
     fontSize: 11,

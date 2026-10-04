@@ -182,7 +182,7 @@ type MenuCopy = {
 const englishCopy: MenuCopy = {
   common: {
     back: 'Back',
-    backToHome: 'Back to Home',
+    backToHome: 'Home',
     newBadge: 'New',
     updatedBadge: 'Updated',
     backToSettings: 'Back to Settings',

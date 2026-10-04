@@ -17,6 +17,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Animated, { FadeIn, FadeOut } from 'react-native-reanimated';
 import { useTheme } from '../settings/ThemeContext';
 import BackButton from '../shared/BackButton';
+import MyWordsPill from '../shared/MyWordsPill';
 import { useSearchFocusAnimation } from '../shared/useSearchFocusAnimation';
 import {
   DESKTOP_WEB_MIN_WIDTH,
@@ -668,7 +669,10 @@ export default function VocabularyScreen() {
         keyboardShouldPersistTaps="handled"
         stickySectionHeadersEnabled={false}
         ListHeaderComponent={<>
-        <BackButton label={commonCopy.backToHome} onPress={() => navigation.navigate('Home')} />
+        <View style={styles.topRow}>
+          <BackButton label={commonCopy.backToHome} onPress={() => navigation.navigate('Home')} />
+          <MyWordsPill onPress={() => (navigation as any).getParent?.()?.navigate('MyWords')} />
+        </View>
 
         <View style={styles.headerRow}>
           <Text
@@ -721,19 +725,6 @@ export default function VocabularyScreen() {
             </Text>
           </TouchableOpacity>
         </View>
-
-        <TouchableOpacity
-          activeOpacity={0.84}
-          onPress={() => (navigation as any).getParent?.()?.navigate('MyWords')}
-          style={[styles.myWordsLink, { backgroundColor: studySurface.control, borderColor: studySurface.controlBorder }]}
-          accessibilityRole="button"
-          accessibilityLabel="Open My words: what you've learnt and what to review"
-        >
-          <MaterialIcons name="menu-book" size={18} color={colors.success} />
-          <Text style={[styles.myWordsLinkText, { color: colors.text }]} numberOfLines={1}>My words</Text>
-          <Text style={[styles.myWordsLinkHint, { color: colors.secondaryText }]} numberOfLines={1}>Learnt and to review</Text>
-          <MaterialIcons name="chevron-right" size={20} color={colors.secondaryText} />
-        </TouchableOpacity>
 
         <Animated.View
           style={[
@@ -1209,28 +1200,11 @@ export default function VocabularyScreen() {
 }
 
 const styles = StyleSheet.create({
-  myWordsLink: {
-    minHeight: 42,
-    marginHorizontal: 16,
-    marginBottom: 8,
-    borderRadius: 12,
-    borderWidth: 1,
-    paddingHorizontal: 12,
+  topRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
-  },
-  myWordsLinkText: {
-    fontSize: 14,
-    lineHeight: 18,
-    fontWeight: '900',
-  },
-  myWordsLinkHint: {
-    flex: 1,
-    fontSize: 12,
-    lineHeight: 16,
-    fontWeight: '700',
-    textAlign: 'right',
+    justifyContent: 'space-between',
+    marginRight: 16,
   },
   container: { flex: 1 },
   desktopContentWrap: {
