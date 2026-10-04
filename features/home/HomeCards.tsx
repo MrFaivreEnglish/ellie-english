@@ -1,6 +1,8 @@
+import { Svg, Circle } from 'react-native-svg';
 import { Pressable, StyleSheet, TouchableOpacity, View } from 'react-native';
 import Text from '../shared/ThemedText';
 import { useTheme } from '../settings/ThemeContext';
+import { BONUS_DAY_XP, type DayState, type GoalWeek } from '../progress/dailyGoal';
 import type { Word } from '../../types/VocabularyTypes';
 
 // The presentational blocks of the Home screen (see HANDOFF-home.md). They only draw what
@@ -9,6 +11,10 @@ import type { Word } from '../../types/VocabularyTypes';
 const SHADOW_SOFT = '#DCE3EE';
 const TEAL = '#34C8B4';
 const TEAL_EDGE = '#1F9C8B';
+const CORAL = '#EF7A6B';
+const CORAL_EDGE = '#D6594A';
+const PURPLE = '#8B6CF0';
+const PURPLE_EDGE = '#6A4FC9';
 
 const useCardStyle = () => {
   const { colors, isDarkMode } = useTheme();
@@ -125,7 +131,135 @@ export function ContinueCard({ type, title, onContinue }: ContinueCardProps) {
   );
 }
 
+const DAY_NAMES = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+const DAY_LABELS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+
+const describeDay = (name: string, state: DayState, isToday: boolean) => {
+  const when = isToday ? `${name} (today)` : name;
+  switch (state) {
+    case 'goal': return `${when}, goal reached`;
+    case 'bonus': return `${when}, bonus day, +${BONUS_DAY_XP} XP`;
+    case 'today': return `${when}, in progress`;
+    case 'missed': return `${when}, missed`;
+    case 'bonusSlot': return `${when}, bonus day still open, +${BONUS_DAY_XP} XP`;
+    default: return `${when}, not yet`;
+  }
+};
+
+function DayCircle({ state, progress }: { state: DayState; progress: number }) {
+  const { colors, isDarkMode } = useTheme();
+  if (state === 'goal') {
+    return (
+      <View style={[styles.dayCircle, { backgroundColor: CORAL, boxShadow: `0px 2px 0px ${CORAL_EDGE}` }]}>
+        <Text style={styles.dayCheck}>✓</Text>
+      </View>
+    );
+  }
+  if (state === 'bonus') {
+    return (
+      <View style={[styles.dayCircle, { backgroundColor: PURPLE, boxShadow: `0px 2px 0px ${PURPLE_EDGE}` }]}>
+        <Text style={styles.dayStar}>★</Text>
+      </View>
+    );
+  }
+  if (state === 'today') {
+    // A 4px ring (36px outside, 28px inside) that fills clockwise as today's answers add up.
+    const radius = 16;
+    const circumference = 2 * Math.PI * radius;
+    return (
+      <View style={styles.dayCircle}>
+        <Svg width={36} height={36} style={StyleSheet.absoluteFill}>
+          <Circle cx={18} cy={18} r={radius} stroke="#FBDCD7" strokeWidth={4} fill={colors.card} />
+          <Circle
+            cx={18}
+            cy={18}
+            r={radius}
+            stroke={CORAL}
+            strokeWidth={4}
+            fill="none"
+            strokeDasharray={circumference}
+            strokeDashoffset={circumference * (1 - progress / 100)}
+            strokeLinecap="round"
+            rotation="-90"
+            origin="18, 18"
+          />
+        </Svg>
+      </View>
+    );
+  }
+  if (state === 'missed') {
+    return <View style={[styles.dayCircle, { backgroundColor: isDarkMode ? '#2C3340' : '#F1F5F9' }]} />;
+  }
+  if (state === 'bonusSlot') {
+    return (
+      <View style={[styles.dayCircle, styles.dashed, { borderColor: '#CBD5E1' }]}>
+        <Text style={[styles.daySlotText, { color: colors.secondaryText }]}>+{BONUS_DAY_XP}</Text>
+      </View>
+    );
+  }
+  return <View style={[styles.dayCircle, styles.dashed, { borderColor: SHADOW_SOFT }]} />;
+}
+
+export function WeekCard({ week, compact = false }: { week: GoalWeek; compact?: boolean }) {
+  const { colors, isDarkMode } = useTheme();
+  const cardStyle = useCardStyle();
+
+  return (
+    <View style={[styles.weekCard, cardStyle]}>
+      <View style={styles.cardHeader}>
+        <Text style={[styles.cardTitle, { color: colors.text }]}>Your week</Text>
+        {week.goalReached ? (
+          <Text style={[styles.weekStatus, { color: isDarkMode ? '#B7A3FF' : PURPLE_EDGE }]} numberOfLines={1}>
+            {compact ? `Goal reached! ★ +${BONUS_DAY_XP} XP` : `Goal reached! ★ +${BONUS_DAY_XP} XP per extra day`}
+          </Text>
+        ) : (
+          <Text style={[styles.weekStatus, { color: '#C2483A' }]} numberOfLines={1}>
+            {week.daysHit} of {week.goal} days
+          </Text>
+        )}
+      </View>
+      <View style={styles.daysRow}>
+        {week.states.map((state, index) => {
+          const isToday = index === week.todayIndex;
+          return (
+            <View
+              key={DAY_NAMES[index]}
+              style={styles.dayCell}
+              accessible
+              accessibilityLabel={describeDay(DAY_NAMES[index], state, isToday)}
+            >
+              <DayCircle state={state} progress={week.todayProgress} />
+              <Text
+                style={[
+                  styles.dayLabel,
+                  { color: isToday ? colors.text : colors.secondaryText, fontWeight: isToday ? '800' : '600' },
+                ]}
+                numberOfLines={1}
+              >
+                {isToday ? 'Today' : DAY_LABELS[index]}
+              </Text>
+            </View>
+          );
+        })}
+      </View>
+    </View>
+  );
+}
+
+
 const styles = StyleSheet.create({
+  weekCard: { flexGrow: 1, borderRadius: 22, paddingVertical: 14, paddingHorizontal: 18, gap: 10 },
+  cardHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8 },
+  cardTitle: { fontWeight: '900', fontSize: 18 },
+  weekStatus: { fontWeight: '800', fontSize: 14, flexShrink: 1 },
+  daysRow: { flexDirection: 'row', justifyContent: 'space-between', gap: 4 },
+  dayCell: { flex: 1, alignItems: 'center', gap: 6, minWidth: 0 },
+  dayLabel: { fontSize: 12 },
+  dayCircle: { width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center' },
+  dayCheck: { color: '#FFFFFF', fontWeight: '900', fontSize: 18, lineHeight: 22 },
+  dayStar: { color: '#FFE27A', fontWeight: '900', fontSize: 18, lineHeight: 22 },
+  daySlotText: { fontWeight: '800', fontSize: 11 },
+  dashed: { borderWidth: 2, borderStyle: 'dashed' },
   tactile: {
     minHeight: 40,
     minWidth: 120,

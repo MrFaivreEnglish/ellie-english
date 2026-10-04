@@ -22,7 +22,8 @@ import { exitImmersiveOpaque } from '../../lib/immersive';
 import { dismissMilestone, getDismissedMilestone, getMilestoneProgress } from '../progress/milestones';
 import { getLearningLibrary } from '../progress/learningLibrary';
 import type { Word } from '../../types/VocabularyTypes';
-import { ContinueCard, MilestoneBanner } from './HomeCards';
+import { getGoalWeek, type GoalWeek } from '../progress/dailyGoal';
+import { ContinueCard, MilestoneBanner, WeekCard } from './HomeCards';
 import { getLearnedFlashcardSummary } from '../vocabulary/flashcardProgressStorage';
 import { getMenuCopy } from '../shared/menuCopy';
 import { useAccount } from '../account/AccountContext';
@@ -152,6 +153,7 @@ export default function HomeScreen() {
   const homeMenuCardColors = isShinyElliePresentationMode ? SHINY_HOME_MENU_CARD_COLORS : HOME_TILE_COLORS;
   const homeMenuCardGradientEnds = isShinyElliePresentationMode ? SHINY_HOME_MENU_CARD_GRADIENT_ENDS : HOME_TILE_EDGES;
   const homeMenuTextColor = isShinyElliePresentationMode ? SHINY_HOME_MENU_TEXT_COLOR : HOME_MENU_TEXT_COLOR;
+  const [goalWeek, setGoalWeek] = React.useState<GoalWeek | null>(null);
   const [learntWordTotal, setLearntWordTotal] = React.useState(0);
   const [dismissedMilestone, setDismissedMilestone] = React.useState<number | null>(null);
   const [milestoneWords, setMilestoneWords] = React.useState<Word[]>([]);
@@ -262,6 +264,10 @@ export default function HomeScreen() {
       getDismissedMilestone().then((value) => {
         if (!active) return;
         setDismissedMilestone(value);
+      }).catch(() => {});
+      getGoalWeek().then((week) => {
+        if (!active) return;
+        setGoalWeek(week);
       }).catch(() => {});
       getLearnedFlashcardSummary().then((summary) => {
         if (!active) return;
@@ -398,6 +404,8 @@ export default function HomeScreen() {
           />
         )}
 
+
+        {goalWeek && <WeekCard week={goalWeek} compact={!isWide} />}
 
         <View style={styles.grid}>
           {localizedCategories.map((category) => (
