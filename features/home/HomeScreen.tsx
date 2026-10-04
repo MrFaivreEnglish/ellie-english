@@ -396,7 +396,7 @@ export default function HomeScreen() {
             milestone={pendingMilestone}
             nextMilestone={getMilestoneProgress(pendingMilestone).next}
             sampleWords={milestoneWords}
-            extraCount={Math.max(0, learntWordTotal - Math.min(3, milestoneWords.length))}
+            extraCount={milestoneWords.length > 0 ? Math.max(0, learntWordTotal - milestoneWords.length) : 0}
             onDismiss={dismissPendingMilestone}
           />
         )}
@@ -413,7 +413,7 @@ export default function HomeScreen() {
 
         <View style={[styles.weekRow, isWide && styles.weekRowWide]}>
           <View style={isWide ? styles.weekCol : undefined}>
-            {goalWeek && <WeekCard week={goalWeek} />}
+            {goalWeek && <WeekCard week={goalWeek} compact={!isWide} />}
           </View>
           <View style={isWide ? styles.wordsCol : undefined}>
             <MyWordsCard learnt={learntWordTotal} onPress={() => navigation.navigate('MyWords')} />
@@ -426,6 +426,7 @@ export default function HomeScreen() {
               <Pressable
                 style={({ pressed }) => [
                   styles.tile,
+                  !isWide && styles.tileNarrow,
                   {
                     backgroundColor: category.color,
                     boxShadow: pressed ? `0px 1px 0px ${category.gradientEnd}` : `0px 5px 0px ${category.gradientEnd}`,
@@ -445,7 +446,7 @@ export default function HomeScreen() {
                   fadeDuration={0}
                   accessibilityIgnoresInvertColors
                 />
-                <Text style={[styles.tileTitle, { color: homeMenuTextColor }]} numberOfLines={1} adjustsFontSizeToFit>
+                <Text style={[styles.tileTitle, !isWide && styles.tileTitleNarrow, { color: homeMenuTextColor }]} numberOfLines={isWide ? 1 : 2}>
                   {category.title}
                 </Text>
                 {!!tileHighlights[category.route] && <LessonHighlightBadge kind={tileHighlights[category.route]!} />}
@@ -535,6 +536,8 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     gap: 10,
   },
+  tileTitleNarrow: { fontSize: 17 },
+  tileNarrow: { flexDirection: 'column', minHeight: 92, paddingHorizontal: 10, paddingVertical: 14, gap: 6 },
   tileIcon: { width: 28, height: 28 },
-  tileTitle: { fontWeight: '800', fontSize: 20, flexShrink: 1 },
+  tileTitle: { fontWeight: '800', fontSize: 20, flexShrink: 1, textAlign: 'center' },
 });

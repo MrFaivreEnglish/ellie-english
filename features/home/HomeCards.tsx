@@ -166,7 +166,7 @@ const describeDay = (name: string, state: DayState, isToday: boolean) => {
 };
 
 function DayCircle({ state, progress }: { state: DayState; progress: number }) {
-  const { colors } = useTheme();
+  const { colors, isDarkMode } = useTheme();
   if (state === 'goal') {
     return (
       <View style={[styles.dayCircle, { backgroundColor: CORAL, boxShadow: `0px 2px 0px ${CORAL_EDGE}` }]}>
@@ -207,7 +207,7 @@ function DayCircle({ state, progress }: { state: DayState; progress: number }) {
     );
   }
   if (state === 'missed') {
-    return <View style={[styles.dayCircle, { backgroundColor: colors.surface }]} />;
+    return <View style={[styles.dayCircle, { backgroundColor: isDarkMode ? '#2C3340' : '#F1F5F9' }]} />;
   }
   if (state === 'bonusSlot') {
     return (
@@ -219,8 +219,8 @@ function DayCircle({ state, progress }: { state: DayState; progress: number }) {
   return <View style={[styles.dayCircle, styles.dashed, { borderColor: SHADOW_SOFT }]} />;
 }
 
-export function WeekCard({ week }: { week: GoalWeek }) {
-  const { colors } = useTheme();
+export function WeekCard({ week, compact = false }: { week: GoalWeek; compact?: boolean }) {
+  const { colors, isDarkMode } = useTheme();
   const cardStyle = useCardStyle();
 
   return (
@@ -228,8 +228,8 @@ export function WeekCard({ week }: { week: GoalWeek }) {
       <View style={styles.cardHeader}>
         <Text style={[styles.cardTitle, { color: colors.text }]}>Your week</Text>
         {week.goalReached ? (
-          <Text style={[styles.weekStatus, { color: PURPLE_EDGE }]} numberOfLines={1}>
-            Goal reached! ★ +{BONUS_DAY_XP} XP per extra day
+          <Text style={[styles.weekStatus, { color: isDarkMode ? '#B7A3FF' : PURPLE_EDGE }]} numberOfLines={1}>
+            {compact ? `Goal reached! ★ +${BONUS_DAY_XP} XP` : `Goal reached! ★ +${BONUS_DAY_XP} XP per extra day`}
           </Text>
         ) : (
           <Text style={[styles.weekStatus, { color: '#C2483A' }]} numberOfLines={1}>
@@ -384,8 +384,8 @@ const styles = StyleSheet.create({
   grammarChip: { backgroundColor: '#FFFFFF', borderRadius: 99, paddingHorizontal: 16, paddingVertical: 5 },
   grammarChipText: { color: '#1A7FD4', fontWeight: '800', fontSize: 15 },
 
-  weekCard: { borderRadius: 22, padding: 18, gap: 12 },
-  myWordsCard: { borderRadius: 22, padding: 18, gap: 18, justifyContent: 'space-between' },
+  weekCard: { flexGrow: 1, borderRadius: 22, padding: 18, gap: 12 },
+  myWordsCard: { flexGrow: 1, borderRadius: 22, padding: 18, gap: 18, justifyContent: 'space-between' },
   cardHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8 },
   cardTitle: { fontWeight: '900', fontSize: 18 },
   weekStatus: { fontWeight: '800', fontSize: 14, flexShrink: 1 },
