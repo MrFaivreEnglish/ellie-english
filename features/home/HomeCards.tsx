@@ -30,10 +30,11 @@ type TactileButtonProps = {
   edge: string;
   onPress: () => void;
   accessibilityLabel?: string;
+  compact?: boolean;
 };
 
 // A button with a hard bottom edge that sinks when pressed.
-export function TactileButton({ label, color, edge, onPress, accessibilityLabel }: TactileButtonProps) {
+export function TactileButton({ label, color, edge, onPress, accessibilityLabel, compact = false }: TactileButtonProps) {
   return (
     <Pressable
       onPress={onPress}
@@ -41,6 +42,7 @@ export function TactileButton({ label, color, edge, onPress, accessibilityLabel 
       accessibilityLabel={accessibilityLabel ?? label}
       style={({ pressed }) => [
         styles.tactile,
+        compact && styles.tactileCompact,
         {
           backgroundColor: color,
           boxShadow: pressed ? `0px 1px 0px ${edge}` : `0px 4px 0px ${edge}`,
@@ -106,7 +108,7 @@ type ContinueCardProps = {
   type: 'vocabulary' | 'grammar';
   title: string;
   icon?: number;
-  // Narrow screens: title above the button, no icon.
+  // Narrow screens: no icon and a tighter card, still title left and button right.
   stacked?: boolean;
   onContinue: () => void;
 };
@@ -118,7 +120,7 @@ export function ContinueCard({ type, title, icon, stacked = false, onContinue }:
   const cardStyle = useCardStyle();
 
   return (
-    <View style={[styles.continueCard, cardStyle, stacked && styles.continueCardStacked]}>
+    <View style={[styles.continueCard, cardStyle, stacked && styles.continueCardNarrow]}>
       {icon && !stacked ? (
         <View style={[styles.continueIcon, { backgroundColor: section.text + '22' }]}>
           <Image source={icon} style={styles.continueIconImage} resizeMode="contain" fadeDuration={0} accessibilityIgnoresInvertColors />
@@ -126,13 +128,14 @@ export function ContinueCard({ type, title, icon, stacked = false, onContinue }:
       ) : null}
       <View style={styles.continueLeft}>
         <Text style={[styles.eyebrow, { color: section.text }]}>{section.label}</Text>
-        <Text style={[styles.continueTitle, { color: colors.text }]} numberOfLines={2}>{title}</Text>
+        <Text style={[styles.continueTitle, stacked && styles.continueTitleNarrow, { color: colors.text }]} numberOfLines={2}>{title}</Text>
       </View>
       <TactileButton
         label="Continue"
         color={section.text}
         edge={section.edge}
         onPress={onContinue}
+        compact={stacked}
         accessibilityLabel={'Continue ' + title}
       />
     </View>
@@ -278,6 +281,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignSelf: 'flex-start',
   },
+  tactileCompact: { minWidth: 0, paddingHorizontal: 18 },
   tactileLabel: { color: '#FFFFFF', fontWeight: '800', fontSize: 16 },
 
   banner: {
@@ -309,7 +313,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 16,
   },
-  continueCardStacked: { flexDirection: 'column', alignItems: 'stretch' },
+  continueCardNarrow: { paddingVertical: 16, paddingHorizontal: 16, gap: 10 },
+  continueTitleNarrow: { fontSize: 22, lineHeight: 27 },
   continueIcon: { width: 64, height: 64, borderRadius: 18, alignItems: 'center', justifyContent: 'center' },
   continueIconImage: { width: 38, height: 38 },
   continueLeft: { flex: 1, minWidth: 0, gap: 6 },
