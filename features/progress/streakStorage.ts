@@ -1,4 +1,5 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { recordDailyAnswer } from './dailyGoal';
 
 const STREAK_KEY = '@practice_streak_v2';
 // Every date the student practised (YYYY-MM-DD), kept for the weekly goal and the
@@ -71,6 +72,7 @@ export const recordPracticeToday = async (): Promise<void> => {
   try {
     const today = getLocalDateKey();
     await addPracticeDay(today);
+    await recordDailyAnswer();
     const current = await getStreak();
 
 

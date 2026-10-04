@@ -61,4 +61,16 @@ describe('HomeScreen', () => {
     });
     expect(getAllByText(/grammar|vocabulary|lessons|home/i).length).toBeGreaterThan(0);
   });
+
+  it('shows the week, My words and the four practice tiles', async () => {
+    const { getByText, getByLabelText } = render(<HomeScreen />);
+    await act(async () => {
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+    expect(getByText('Your week')).toBeTruthy();
+    expect(getByText(/My words/)).toBeTruthy();
+    expect(getByLabelText('Grammar')).toBeTruthy();
+    expect(getByLabelText('Settings')).toBeTruthy();
+  });
 });

@@ -10,8 +10,6 @@ import {
   useWindowDimensions,
 } from 'react-native';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
-import Animated, { FadeInDown } from 'react-native-reanimated';
-import { useSpringPress } from '../shared/useSpringPress';
 import { getSerializableVocabularyLesson } from '../vocabulary/vocabularyUtils';
 
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
@@ -21,8 +19,12 @@ import MaterialIcons from '../shared/ThemedMaterialIcon';
 import { useTheme } from '../settings/ThemeContext';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { exitImmersiveOpaque } from '../../lib/immersive';
-import { getDueReviewWords, type ReviewWord } from '../vocabulary/reviewWordsStorage';
-import { getPracticeWeek, type PracticeWeek } from '../progress/weeklyGoal';
+import { getGoalWeek, type GoalWeek } from '../progress/dailyGoal';
+import { dismissMilestone, getDismissedMilestone, getMilestoneProgress } from '../progress/milestones';
+import { getLearningLibrary } from '../progress/learningLibrary';
+import { getLessonWords } from '../vocabulary/knownWords';
+import type { Word } from '../../types/VocabularyTypes';
+import { ContinueCard, MilestoneBanner, MyWordsCard, WeekCard } from './HomeCards';
 import { getLearnedFlashcardSummary } from '../vocabulary/flashcardProgressStorage';
 import { getMenuCopy } from '../shared/menuCopy';
 import { useAccount } from '../account/AccountContext';
@@ -39,19 +41,16 @@ import { checkAndMarkFirstVisit } from './firstVisitStorage';
 import FirstVisitModal from './FirstVisitModal';
 import { grammarLessons } from '../../content/lessons/grammarRegistry';
 import { vocabularyLessons } from '../../content/lessons/vocabularyRegistry';
-import { DESIGN_ACCENTS, getPixelSurfaceStyle, getSoftShadow, getStudySurfaceColors, uiRadii } from '../shared/uiPrimitives';
-import { freshFontFamily, freshSmallPillShadow, freshTileShadow } from '../shared/freshDirection';
+import { DESIGN_ACCENTS } from '../shared/uiPrimitives';
+import { freshSmallPillShadow } from '../shared/freshDirection';
 import {
-  HOME_MENU_CARD_COLORS,
-  HOME_MENU_CARD_GRADIENT_ENDS,
   HOME_MENU_TEXT_COLOR,
   SHINY_HOME_MENU_CARD_COLORS,
   SHINY_HOME_MENU_CARD_GRADIENT_ENDS,
   SHINY_HOME_MENU_TEXT_COLOR,
 } from '../shared/homeMenuColors';
 import { getAndroidBottomBarButtonStyle, getAndroidBottomBarColor } from '../shared/appChromeColors';
-import { getDesktopContentMaxWidth, getDesktopTypographyScale, isDesktopWebWidth } from '../shared/responsiveLayout';
-import { DesktopTypographyProvider } from '../shared/DesktopTypography';
+import { isDesktopWebWidth } from '../shared/responsiveLayout';
 import LessonHighlightBadge from '../shared/LessonHighlightBadge';
 import { getSectionHighlightKind, useSeenLessonHighlights, type LessonHighlightKind } from '../shared/lessonHighlights';
 
@@ -60,14 +59,21 @@ const GRAMMAR_ICON_SOURCE = require('../../assets/navigation/grammar.png');
 const VOCABULARY_ICON_SOURCE = require('../../assets/navigation/vocabulary.png');
 const CHAPTERS_ICON_SOURCE = require('../../assets/navigation/chapters.png');
 const SETTINGS_ICON_SOURCE = require('../../assets/navigation/settings.png');
+// Tile fill and bottom edge from the Home handoff.
+const HOME_TILE_COLORS = { grammar: '#4DA6F2', vocabulary: '#34C8B4', lessons: '#A794E8', settings: '#90A4B8' } as const;
+const HOME_TILE_EDGES = { grammar: '#2B7FD0', vocabulary: '#1F9C8B', lessons: '#7E66D0', settings: '#6B8095' } as const;
+const TILE_ICONS: Record<string, number> = {
+  Grammar: GRAMMAR_ICON_SOURCE,
+  Vocabulary: VOCABULARY_ICON_SOURCE,
+  Lessons: CHAPTERS_ICON_SOURCE,
+  Settings: SETTINGS_ICON_SOURCE,
+};
 
 
 
 
 
 
-const HOME_MAX_DESKTOP_SCALE = 1.7;
-const HOME_MAX_CONTENT_WIDTH = 1400;
 
 const cleanDisplayName = (value: string) => value.trim().replace(/\s+/g, ' ');
 
@@ -124,8 +130,6 @@ export default function HomeScreen() {
 
   const isTabletDevice = !isDesktopWeb && Math.min(windowWidth, windowHeight) >= 600;
   const isScaledWeb = isDesktopWeb || isTabletDevice;
-  const desktopScale = Math.min(getDesktopTypographyScale(windowWidth, windowHeight, 'fit'), HOME_MAX_DESKTOP_SCALE);
-  const desktopContentMaxWidth = Math.min(getDesktopContentMaxWidth(windowWidth, 'fit', windowHeight), HOME_MAX_CONTENT_WIDTH);
 
 
 
@@ -138,11 +142,6 @@ export default function HomeScreen() {
   } = useAccount();
   const copy = getMenuCopy().home;
   const insets = useSafeAreaInsets();
-  const studySurface = React.useMemo(() => getStudySurfaceColors(colors, isDarkMode), [colors, isDarkMode]);
-  const pixelSurfaceStyle = React.useMemo(
-    () => getPixelSurfaceStyle(colors, isDarkMode, 'raised'),
-    [colors, isDarkMode]
-  );
   const homeHeaderTopPadding = Platform.OS === 'ios'
     ? (insets.top > 0 ? insets.top : 24)
     : Platform.OS === 'android' && isAndroidStatusBarEnabled
@@ -152,14 +151,13 @@ export default function HomeScreen() {
   const [lastLesson, setLastLesson] = React.useState<LastLessonEntry | null>(null);
   const [showTutorial, setShowTutorial] = React.useState(false);
   const isNavigatingFromMenuRef = React.useRef(false);
-  const homeMenuCardColors = isShinyElliePresentationMode ? SHINY_HOME_MENU_CARD_COLORS : HOME_MENU_CARD_COLORS;
-  const homeMenuCardGradientEnds = isShinyElliePresentationMode ? SHINY_HOME_MENU_CARD_GRADIENT_ENDS : HOME_MENU_CARD_GRADIENT_ENDS;
+  const homeMenuCardColors = isShinyElliePresentationMode ? SHINY_HOME_MENU_CARD_COLORS : HOME_TILE_COLORS;
+  const homeMenuCardGradientEnds = isShinyElliePresentationMode ? SHINY_HOME_MENU_CARD_GRADIENT_ENDS : HOME_TILE_EDGES;
   const homeMenuTextColor = isShinyElliePresentationMode ? SHINY_HOME_MENU_TEXT_COLOR : HOME_MENU_TEXT_COLOR;
-  const continueCardPress = useSpringPress();
-  const [dueReviewWords, setDueReviewWords] = React.useState<ReviewWord[]>([]);
   const [learntWordTotal, setLearntWordTotal] = React.useState(0);
-  const [practiceWeek, setPracticeWeek] = React.useState<PracticeWeek | null>(null);
-  const myWordsCardPress = useSpringPress();
+  const [goalWeek, setGoalWeek] = React.useState<GoalWeek | null>(null);
+  const [dismissedMilestone, setDismissedMilestone] = React.useState<number | null>(null);
+  const [milestoneWords, setMilestoneWords] = React.useState<Word[]>([]);
   const seenLessonHighlights = useSeenLessonHighlights();
   const tileHighlights: Record<string, LessonHighlightKind | undefined> = {
     Grammar: getSectionHighlightKind('grammar', seenLessonHighlights),
@@ -222,6 +220,31 @@ export default function HomeScreen() {
   );
   const accountPillAccent = accountAvatarColorPreset.accentColor;
   const continueLessonTarget = React.useMemo(() => findLastLessonTarget(lastLesson), [lastLesson]);
+  const continueNextWord = React.useMemo(() => {
+    if (continueLessonTarget?.type !== 'vocabulary') return undefined;
+    return getLessonWords(continueLessonTarget.lesson)[0]?.french;
+  }, [continueLessonTarget]);
+
+  // The highest milestone reached and not yet dismissed. Shown once, then never again.
+  const reachedMilestone = React.useMemo(() => getMilestoneProgress(learntWordTotal).reached, [learntWordTotal]);
+  const pendingMilestone =
+    dismissedMilestone !== null && reachedMilestone > dismissedMilestone ? reachedMilestone : 0;
+  const dismissPendingMilestone = React.useCallback(() => {
+    if (!pendingMilestone) return;
+    setDismissedMilestone(pendingMilestone);
+    void dismissMilestone(pendingMilestone);
+  }, [pendingMilestone]);
+
+  React.useEffect(() => {
+    if (!pendingMilestone) return;
+    let active = true;
+    getLearningLibrary().then((library) => {
+      if (active) setMilestoneWords(library.recentWords.slice(0, 3));
+    }).catch(() => {});
+    return () => {
+      active = false;
+    };
+  }, [pendingMilestone]);
 
   useFocusEffect(
     React.useCallback(() => {
@@ -244,17 +267,17 @@ export default function HomeScreen() {
         if (!active) return;
         setLastLesson(entry);
       }).catch(() => {});
-      getDueReviewWords().then((words) => {
+      getDismissedMilestone().then((value) => {
         if (!active) return;
-        setDueReviewWords(words);
+        setDismissedMilestone(value);
       }).catch(() => {});
       getLearnedFlashcardSummary().then((summary) => {
         if (!active) return;
         setLearntWordTotal(summary.totalLearned);
       }).catch(() => {});
-      getPracticeWeek().then((week) => {
+      getGoalWeek().then((week) => {
         if (!active) return;
-        setPracticeWeek(week);
+        setGoalWeek(week);
       }).catch(() => {});
 
       return () => {
@@ -300,257 +323,136 @@ export default function HomeScreen() {
     });
   }, [continueLessonTarget, navigation]);
 
+  const isWide = windowWidth >= 720;
+  const columnPadding = windowWidth >= 480 ? 24 : 16;
+
   return (
-    <DesktopTypographyProvider mode="fit" maxScale={HOME_MAX_DESKTOP_SCALE}>
     <ScrollView
       style={[styles.container, { backgroundColor: colors.background }]}
       contentContainerStyle={{ paddingBottom: insets.bottom + 24 }}
     >
-      <View style={isDesktopWeb && [styles.desktopContentWrap, { maxWidth: desktopContentMaxWidth }]}>
       <View
         style={[
-          styles.header,
-          {
-            backgroundColor: colors.background,
-            paddingTop: homeHeaderTopPadding
-          }
+          styles.column,
+          { paddingHorizontal: columnPadding, paddingTop: homeHeaderTopPadding + 14 },
         ]}
       >
         <View style={styles.headerTopRow}>
           <View style={styles.headerCopy}>
             <Text
-              style={[
-                styles.headerTitle,
-                { color: colors.text },
-                isScaledWeb ? styles.headerTitleDesktop : styles.headerTitleMobile,
-              ]}
+              style={[styles.headerTitle, !isWide && styles.headerTitleNarrow, { color: colors.text }]}
               numberOfLines={1}
+              adjustsFontSizeToFit
             >
               {welcomeText}
             </Text>
           </View>
           <View style={styles.headerRightGroup}>
-          <TouchableOpacity
-            onPress={() => navigation.navigate('Search')}
-            style={[styles.headerSearchButton, { backgroundColor: colors.card, borderColor: colors.border }]}
-            accessibilityRole="button"
-            accessibilityLabel="Search words and lessons"
-          >
-            <MaterialIcons name="search" size={22} color={colors.secondaryText} />
-          </TouchableOpacity>
-          <TouchableOpacity
-            onPress={() => navigation.navigate('Account')}
-            style={styles.accountPillWrap}
-            accessibilityRole="button"
-            accessibilityLabel="Open account"
-          >
-            {!isAccountLoading ? (
-              <AccountAvatar
-                avatarId={unlockedAccountAvatarId}
-                colorId={unlockedAccountAvatarColorId}
-                size={isScaledWeb ? Math.round(64 * desktopScale) : 60}
-              />
-            ) : (
-              <MaterialIcons
-                name="account-circle"
-                size={isScaledWeb ? Math.round(64 * desktopScale) : 48}
-                color={accountPillAccent}
-              />
-            )}
-            <View
-              style={[
-                styles.levelBadge,
-                isAccountMaster
-                  ? { backgroundColor: isDarkMode ? colors.warningSoft : '#FFF7D7' }
-                  : { backgroundColor: colors.primary },
-                freshSmallPillShadow(isAccountMaster ? colors.warning : DESIGN_ACCENTS.blue.shadow),
-              ]}
-            >
-              {isAccountMaster && <Text style={styles.levelBadgeIcon}>★</Text>}
-              <Text style={[styles.levelBadgeText, { color: isAccountMaster ? (isDarkMode ? '#FFD166' : '#7A4B00') : '#FFFFFF' }]}>
-                {accountLevelBadgeLabel.replace('Level ', 'Lv.')}
-              </Text>
-            </View>
-          </TouchableOpacity>
-        </View>
-        </View>
-      </View>
-
-      {continueLessonTarget && (
-        <Animated.View style={continueCardPress.animatedStyle}>
-          <TouchableOpacity
-            style={[
-              styles.continueCard,
-              isScaledWeb && styles.continueCardDesktop,
-              isScaledWeb && {
-                minHeight: Math.round(100 * desktopScale),
-                paddingHorizontal: Math.round(20 * desktopScale),
-                paddingVertical: Math.round(16 * desktopScale),
-              },
-              { backgroundColor: colors.card },
-              getSoftShadow(isDarkMode, 'soft', colors.shadow, colors.visualStyle === 'pixel'),
-              pixelSurfaceStyle,
-            ]}
-            onPress={openContinueLesson}
-            onPressIn={continueCardPress.onPressIn}
-            onPressOut={continueCardPress.onPressOut}
-            accessibilityRole="button"
-            accessibilityLabel={`Continue ${continueLessonTarget.title}`}
-          >
-            <View style={[styles.continueIcon, isScaledWeb && { width: Math.round(48 * desktopScale), height: Math.round(48 * desktopScale) }, { backgroundColor: isDarkMode ? studySurface.control : '#DDF4FF', borderColor: isDarkMode ? colors.border : 'transparent' }]}>
-              <MaterialIcons
-                name={continueLessonTarget.type === 'grammar' ? 'edit' : 'style'}
-                size={isScaledWeb ? Math.round(28 * desktopScale) : 24}
-                color={colors.primary}
-              />
-            </View>
-            <View style={styles.continueCopy}>
-              <Text style={[styles.continueLabel, isScaledWeb && styles.continueLabelDesktop, { color: colors.primary }]}>Continue</Text>
-              <Text style={[styles.continueTitle, isScaledWeb && styles.continueTitleDesktop, { color: colors.text }]} numberOfLines={1}>
-                {continueLessonTarget.title}
-              </Text>
-              <Text style={[styles.continueMeta, isScaledWeb && styles.continueMetaDesktop, { color: colors.secondaryText }]}>
-                {continueLessonTarget.type === 'grammar' ? 'Grammar' : 'Vocabulary'}
-              </Text>
-            </View>
-            <MaterialIcons name="arrow-forward" size={isScaledWeb ? Math.round(24 * desktopScale) : 24} color={colors.secondaryText} />
-          </TouchableOpacity>
-        </Animated.View>
-      )}
-
-      {/* Always visible: the one place to see everything learnt so far. */}
-      <Animated.View style={myWordsCardPress.animatedStyle}>
-        <TouchableOpacity
-          style={[
-            styles.continueCard,
-            isScaledWeb && styles.continueCardDesktop,
-            { backgroundColor: colors.card },
-            getSoftShadow(isDarkMode, 'soft', colors.shadow, colors.visualStyle === 'pixel'),
-            pixelSurfaceStyle,
-          ]}
-          onPress={() => navigation.navigate('MyWords')}
-          onPressIn={myWordsCardPress.onPressIn}
-          onPressOut={myWordsCardPress.onPressOut}
-          accessibilityRole="button"
-          accessibilityLabel="Open My words: what you've learnt and what to review"
-        >
-          <View style={[styles.continueIcon, { backgroundColor: isDarkMode ? studySurface.control : '#E3F6E8', borderColor: isDarkMode ? colors.border : 'transparent' }]}>
-            <MaterialIcons name={dueReviewWords.length > 0 ? "replay" : "menu-book"} size={24} color={dueReviewWords.length > 0 ? colors.warning : colors.success} />
-          </View>
-          <View style={styles.continueCopy}>
-            <Text style={[styles.continueLabel, { color: dueReviewWords.length > 0 ? colors.warning : colors.success }]}>My words</Text>
-            <Text style={[styles.continueTitle, { color: colors.text }]} numberOfLines={1}>
-              {learntWordTotal === 1 ? '1 word learnt' : `${learntWordTotal} words learnt`}
-            </Text>
-            <Text style={[styles.continueMeta, { color: colors.secondaryText }]}>
-              {dueReviewWords.length > 0
-                ? `${dueReviewWords.length} to review now`
-                : practiceWeek
-                  ? `${practiceWeek.daysPractised}/${practiceWeek.goal} days this week`
-                  : 'Your words and what to review'}
-            </Text>
-          </View>
-          <MaterialIcons name="arrow-forward" size={24} color={colors.secondaryText} />
-        </TouchableOpacity>
-      </Animated.View>
-
-      <View style={[styles.categoriesContainer, styles.categoriesContainerDesktop]}>
-        {localizedCategories.map((category, index) => (
-          <Animated.View
-            key={category.route}
-            entering={FadeInDown.delay(index * 60).duration(320)}
-            style={isScaledWeb ? styles.categoryCardDesktop : styles.categoryCardFullRow}
-          >
-            <Pressable
-              style={({ pressed }) => [
-                styles.categoryCard,
-                styles.categoryCardGrid,
-                isScaledWeb && styles.categoryCardGridDesktop,
-                isScaledWeb && {
-                  minHeight: Math.round(136 * desktopScale),
-                  padding: Math.round(24 * desktopScale),
-                },
-                pressed && styles.categoryCardPressed,
-                { backgroundColor: category.color, width: '100%' },
-                freshTileShadow(category.gradientEnd, true, pressed),
-                pixelSurfaceStyle,
-              ]}
-              android_ripple={{ color: 'rgba(255,255,255,0.26)' }}
-              unstable_pressDelay={0}
-              onPress={() => openHomeMenuRoute(category.route)}
+            <TouchableOpacity
+              onPress={() => navigation.navigate('Search')}
+              style={[styles.headerSearchButton, { backgroundColor: colors.card, borderColor: colors.border }]}
               accessibilityRole="button"
-              accessibilityLabel={category.title}
+              accessibilityLabel="Search words and lessons"
             >
-              <View style={[styles.categoryTitleRow, styles.categoryTitleRowCentered]}>
-                {category.route === 'Grammar' ? (
-                  <Image
-                    source={GRAMMAR_ICON_SOURCE}
-                    style={{
-                      width: isScaledWeb ? Math.round(27 * desktopScale) : 26,
-                      height: isScaledWeb ? Math.round(27 * desktopScale) : 26,
-                    }}
-                    resizeMode="contain"
-                    fadeDuration={0}
-                    accessibilityIgnoresInvertColors
-                  />
-                ) : category.route === 'Vocabulary' ? (
-                  <Image
-                    source={VOCABULARY_ICON_SOURCE}
-                    style={{
-                      width: isScaledWeb ? Math.round(27 * desktopScale) : 26,
-                      height: isScaledWeb ? Math.round(27 * desktopScale) : 26,
-                    }}
-                    resizeMode="contain"
-                    fadeDuration={0}
-                    accessibilityIgnoresInvertColors
-                  />
-                ) : category.route === 'Lessons' ? (
-                  <Image
-                    source={CHAPTERS_ICON_SOURCE}
-                    style={{
-                      width: isScaledWeb ? Math.round(27 * desktopScale) : 26,
-                      height: isScaledWeb ? Math.round(27 * desktopScale) : 26,
-                      // This artwork has more baked-in transparent padding than the other nav
-                      // icons, which otherwise reads as a bigger gap before the title text.
-                      marginRight: isScaledWeb ? -Math.round(4 * desktopScale) : -4,
-                    }}
-                    resizeMode="contain"
-                    fadeDuration={0}
-                    accessibilityIgnoresInvertColors
-                  />
-                ) : category.route === 'Settings' ? (
-                  <Image
-                    source={SETTINGS_ICON_SOURCE}
-                    style={{
-                      width: isScaledWeb ? Math.round(27 * desktopScale) : 26,
-                      height: isScaledWeb ? Math.round(27 * desktopScale) : 26,
-                      // Same baked-in transparent padding as the chapters icon.
-                      marginRight: isScaledWeb ? -Math.round(3 * desktopScale) : -3,
-                    }}
-                    resizeMode="contain"
-                    fadeDuration={0}
-                    accessibilityIgnoresInvertColors
+              <MaterialIcons name="search" size={24} color={colors.secondaryText} />
+            </TouchableOpacity>
+            <TouchableOpacity
+              onPress={() => navigation.navigate('Account')}
+              style={styles.accountPillWrap}
+              accessibilityRole="button"
+              accessibilityLabel="Open account"
+            >
+              <View style={[styles.avatarFrame, { borderColor: '#1A7FD4' }]}>
+                {!isAccountLoading ? (
+                  <AccountAvatar
+                    avatarId={unlockedAccountAvatarId}
+                    colorId={unlockedAccountAvatarColorId}
+                    size={54}
                   />
                 ) : (
-                  <MaterialIcons name={category.icon} size={isScaledWeb ? Math.round(27 * desktopScale) : 22} color={homeMenuTextColor} />
+                  <MaterialIcons name="account-circle" size={54} color={accountPillAccent} />
                 )}
-                <Text style={[styles.categoryTitle, isScaledWeb && styles.categoryTitleDesktop, { color: homeMenuTextColor }]}>{category.title}</Text>
               </View>
-              <Text
+              <View
                 style={[
-                  styles.categoryDescription,
-                  { color: homeMenuTextColor },
-                  styles.categoryDescriptionCentered,
-                  isScaledWeb && styles.categoryDescriptionDesktop,
+                  styles.levelBadge,
+                  isAccountMaster
+                    ? { backgroundColor: isDarkMode ? colors.warningSoft : '#FFF7D7' }
+                    : { backgroundColor: colors.primary },
+                  freshSmallPillShadow(isAccountMaster ? colors.warning : DESIGN_ACCENTS.blue.shadow),
                 ]}
               >
-                {category.description}
-              </Text>
-              {!!tileHighlights[category.route] && <LessonHighlightBadge kind={tileHighlights[category.route]!} />}
-            </Pressable>
-          </Animated.View>
-        ))}
-      </View>
+                {isAccountMaster && <Text style={styles.levelBadgeIcon}>★</Text>}
+                <Text style={[styles.levelBadgeText, { color: isAccountMaster ? (isDarkMode ? '#FFD166' : '#7A4B00') : '#FFFFFF' }]}>
+                  {accountLevelBadgeLabel.replace('Level ', 'Lv.')}
+                </Text>
+              </View>
+            </TouchableOpacity>
+          </View>
+        </View>
+
+        {pendingMilestone > 0 && (
+          <MilestoneBanner
+            milestone={pendingMilestone}
+            nextMilestone={getMilestoneProgress(pendingMilestone).next}
+            sampleWords={milestoneWords}
+            extraCount={Math.max(0, learntWordTotal - Math.min(3, milestoneWords.length))}
+            onDismiss={dismissPendingMilestone}
+          />
+        )}
+
+        {continueLessonTarget && (
+          <ContinueCard
+            type={continueLessonTarget.type === 'grammar' ? 'grammar' : 'vocabulary'}
+            title={continueLessonTarget.title}
+            nextWord={continueNextWord}
+            wide={isWide}
+            onContinue={openContinueLesson}
+          />
+        )}
+
+        <View style={[styles.weekRow, isWide && styles.weekRowWide]}>
+          <View style={isWide ? styles.weekCol : undefined}>
+            {goalWeek && <WeekCard week={goalWeek} />}
+          </View>
+          <View style={isWide ? styles.wordsCol : undefined}>
+            <MyWordsCard learnt={learntWordTotal} onPress={() => navigation.navigate('MyWords')} />
+          </View>
+        </View>
+
+        <View style={styles.grid}>
+          {localizedCategories.map((category) => (
+            <View key={category.route} style={styles.tileCell}>
+              <Pressable
+                style={({ pressed }) => [
+                  styles.tile,
+                  {
+                    backgroundColor: category.color,
+                    boxShadow: pressed ? `0px 1px 0px ${category.gradientEnd}` : `0px 5px 0px ${category.gradientEnd}`,
+                    transform: [{ translateY: pressed ? 4 : 0 }],
+                  },
+                ]}
+                android_ripple={{ color: 'rgba(255,255,255,0.26)' }}
+                unstable_pressDelay={0}
+                onPress={() => openHomeMenuRoute(category.route)}
+                accessibilityRole="button"
+                accessibilityLabel={category.title}
+              >
+                <Image
+                  source={TILE_ICONS[category.route]}
+                  style={styles.tileIcon}
+                  resizeMode="contain"
+                  fadeDuration={0}
+                  accessibilityIgnoresInvertColors
+                />
+                <Text style={[styles.tileTitle, { color: homeMenuTextColor }]} numberOfLines={1} adjustsFontSizeToFit>
+                  {category.title}
+                </Text>
+                {!!tileHighlights[category.route] && <LessonHighlightBadge kind={tileHighlights[category.route]!} />}
+              </Pressable>
+            </View>
+          ))}
+        </View>
       </View>
 
       <FirstVisitModal
@@ -562,23 +464,17 @@ export default function HomeScreen() {
         }}
       />
     </ScrollView>
-    </DesktopTypographyProvider>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-  },
-  desktopContentWrap: {
-
-
+  container: { flex: 1 },
+  column: {
     width: '100%',
+    maxWidth: 1000,
     alignSelf: 'center',
-  },
-  header: {
-    paddingHorizontal: 22,
-    paddingBottom: 18,
+    paddingBottom: 32,
+    gap: 14,
   },
   headerTopRow: {
     flexDirection: 'row',
@@ -586,361 +482,59 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     gap: 12,
   },
-  headerCopy: {
-    flex: 1,
-    minWidth: 0,
-  },
-  headerSpacer: {
-    height: 24,
-  },
-  headerTitle: {
-    fontWeight: freshFontFamily.extrabold,
-    fontSize: 29,
-  },
-  headerTitleMobile: {
-    fontSize: 32,
-  },
-  headerTitleDesktop: {
-    fontSize: 44,
-  },
-  todayStreakChip: {
-    flexDirection: 'row',
+  headerCopy: { flex: 1, minWidth: 0 },
+  headerTitle: { fontWeight: '900', fontSize: 40 },
+  headerTitleNarrow: { fontSize: 30 },
+  headerRightGroup: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+  headerSearchButton: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    borderWidth: 1,
     alignItems: 'center',
-    gap: 4,
-    borderRadius: 999,
-    paddingHorizontal: 8,
-    paddingVertical: 3,
+    justifyContent: 'center',
   },
-  todayStreakText: {
-    fontWeight: freshFontFamily.extrabold,
-    fontSize: 10,
-    lineHeight: 13,
-  },
-  todayStreakTextDesktop: {
-    fontSize: 12,
-    lineHeight: 16,
-  },
-  headerRightGroup: {
-    flexDirection: 'row',
+  accountPillWrap: { alignItems: 'center', paddingBottom: 8 },
+  avatarFrame: {
+    width: 60,
+    height: 60,
+    borderRadius: 18,
+    borderWidth: 3,
+    overflow: 'hidden',
     alignItems: 'center',
-    gap: 8,
-  },
-  accountPillWrap: {
-    alignItems: 'center',
-    gap: 5,
+    justifyContent: 'center',
   },
   levelBadge: {
+    position: 'absolute',
+    bottom: 0,
     flexDirection: 'row',
     alignItems: 'center',
     gap: 3,
     borderRadius: 999,
     paddingHorizontal: 8,
-    paddingVertical: 3,
+    paddingVertical: 2,
     minWidth: 48,
     justifyContent: 'center',
   },
-  levelBadgeIcon: {
-    fontSize: 9,
-    lineHeight: 11,
-  },
-  levelBadgeText: {
-    fontWeight: freshFontFamily.extrabold,
-    fontSize: 11,
-    lineHeight: 13,
-  },
-  todayCard: {
-    marginHorizontal: 16,
-    marginTop: 10,
-    marginBottom: 4,
-    padding: 12,
-    borderRadius: 18,
-    overflow: 'hidden',
-    position: 'relative',
-  },
-  todayCardDesktop: {
-    padding: 14,
-    marginHorizontal: 22,
-    marginTop: 10,
-  },
-  todayDecorCircle: {
-    position: 'absolute',
-    top: -24,
-    right: -16,
-    width: 90,
-    height: 90,
-    borderRadius: 45,
-    backgroundColor: 'rgba(255,255,255,0.08)',
-  },
-  todayHeaderRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-    justifyContent: 'space-between',
-  },
-  todayLeftBlock: {
-    flex: 1,
-    minWidth: 0,
-    gap: 4,
-  },
-  todayTitleRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    flexWrap: 'wrap',
-  },
-  todayTitle: {
-    fontWeight: freshFontFamily.extrabold,
-    fontSize: 17,
-    lineHeight: 20,
-  },
-  todayTitleDesktop: {
-    fontSize: 19,
-    lineHeight: 23,
-  },
-  streakFlame: {
-    fontSize: 11,
-    lineHeight: 13,
-  },
-  streakFlameDesktop: {
-    fontSize: 14,
-    lineHeight: 17,
-  },
-  todaySubtitle: {
-    fontWeight: freshFontFamily.bold,
-    fontSize: 11.5,
-    lineHeight: 15,
-  },
-  todaySubtitleDesktop: {
-    fontSize: 12.5,
-    lineHeight: 16,
-  },
-  todayRingWrap: {
-    width: 42,
-    height: 42,
-    alignItems: 'center',
-    justifyContent: 'center',
-    flexShrink: 0,
-  },
-  todayRingWrapDesktop: {
-    width: 44,
-    height: 44,
-  },
-  todayRingCenter: {
-    position: 'absolute',
-    alignItems: 'center',
-    justifyContent: 'center',
-    flexDirection: 'row',
-    gap: 0,
-  },
-  todayRingValue: {
-    fontWeight: freshFontFamily.extrabold,
-    fontSize: 14,
-    lineHeight: 17,
-  },
-  todayRingValueDesktop: {
-    fontSize: 15,
-    lineHeight: 18,
-  },
-  todayRingGoal: {
-    fontWeight: freshFontFamily.extrabold,
-    fontSize: 9,
-    lineHeight: 11,
-    marginTop: 4,
-  },
-  todayRingGoalDesktop: {
-    fontSize: 9,
-    lineHeight: 12,
-  },
-  todayRows: {
-    flexDirection: 'row',
-    gap: 6,
-    marginTop: 6,
-  },
-  todayMetricRow: {
-    flex: 1,
-    minWidth: 0,
-    minHeight: 56,
-    borderRadius: uiRadii.panel,
-    paddingHorizontal: 8,
-    paddingVertical: 6,
-    alignItems: 'center',
-    justifyContent: 'center',
-    overflow: 'hidden',
-  },
-  todayMetricIcon: {
-    width: 36,
-    height: 36,
-    borderRadius: 13,
-    alignItems: 'center',
-    justifyContent: 'center',
-    overflow: 'hidden',
-  },
-  todayMetricCopy: {
-    alignItems: 'center',
-    alignSelf: 'stretch',
-    minWidth: 0,
-    marginTop: 4,
-  },
-  todayMetricLabel: {
-    fontWeight: freshFontFamily.extrabold,
-    fontSize: 10,
-    textTransform: 'uppercase',
-    marginBottom: 2,
-    textAlign: 'center',
-  },
-  todayMetricLabelDesktop: {
-    fontSize: 10.5,
-    lineHeight: 13,
-  },
-  todayMetricValue: {
-    fontWeight: freshFontFamily.extrabold,
-    fontSize: 16,
-    lineHeight: 20,
-    textAlign: 'center',
-  },
-  todayMetricValueDesktop: {
-    fontSize: 16,
-    lineHeight: 20,
-  },
-  headerSearchButton: {
-    width: 44,
-    height: 44,
+  levelBadgeIcon: { fontSize: 9, lineHeight: 11 },
+  levelBadgeText: { fontWeight: '800', fontSize: 11, lineHeight: 13 },
+  weekRow: { gap: 14 },
+  weekRowWide: { flexDirection: 'row', gap: 16 },
+  weekCol: { flex: 1.7, minWidth: 0 },
+  wordsCol: { flex: 1, minWidth: 0 },
+  grid: { flexDirection: 'row', flexWrap: 'wrap', gap: 14 },
+  tileCell: { width: '47.5%', flexGrow: 1 },
+  tile: {
+    minHeight: 76,
     borderRadius: 22,
-    borderWidth: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  continueCard: {
-    minHeight: 84,
-    marginHorizontal: 16,
-    marginTop: 12,
-    marginBottom: 2,
-    borderRadius: uiRadii.panel,
-    paddingHorizontal: 14,
-    paddingVertical: 12,
+    paddingVertical: 18,
+    paddingHorizontal: 24,
+    marginBottom: 5,
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 12,
-  },
-  continueIcon: {
-    width: 48,
-    height: 48,
-    borderRadius: 12,
-    borderWidth: 1,
-    alignItems: 'center',
     justifyContent: 'center',
-  },
-  continueCopy: {
-    flex: 1,
-    minWidth: 0,
-  },
-  continueLabel: {
-    fontWeight: freshFontFamily.bold,
-    fontSize: 10,
-    lineHeight: 13,
-    textTransform: 'uppercase',
-    letterSpacing: 0.6,
-  },
-  continueCardDesktop: {
-    minHeight: 100,
-    paddingHorizontal: 20,
-    paddingVertical: 16,
-  },
-  continueLabelDesktop: {
-    fontSize: 12,
-    lineHeight: 15,
-  },
-  continueTitle: {
-    fontWeight: freshFontFamily.extrabold,
-    fontSize: 16,
-    lineHeight: 20,
-    marginTop: 2,
-  },
-  continueTitleDesktop: {
-    fontSize: 20,
-    lineHeight: 25,
-  },
-  continueMeta: {
-    fontWeight: freshFontFamily.semibold,
-    fontSize: 12,
-    lineHeight: 16,
-    marginTop: 1,
-  },
-  continueMetaDesktop: {
-    fontSize: 14,
-    lineHeight: 18,
-  },
-  categoriesContainer: {
-    padding: 16,
-
-
-    paddingTop: 28,
-    paddingBottom: 8,
-  },
-  categoriesContainerDesktop: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    justifyContent: 'space-between',
-  },
-  categoryCard: {
-    padding: 20,
-    borderRadius: uiRadii.largeTile,
-    marginBottom: 16,
-  },
-  categoryCardGrid: {
-    minHeight: 108,
-    padding: 16,
-    justifyContent: 'center',
-  },
-  categoryCardGridDesktop: {
-    minHeight: 116,
-    padding: 20,
-  },
-  categoryCardPressed: {
-    transform: [{ translateX: 1 }, { translateY: 1 }],
-  },
-  categoryCardDesktop: {
-    width: '48%',
-    alignItems: 'center',
-  },
-  categoryCardFullRow: {
-    width: '100%',
-    alignItems: 'center',
-  },
-  categoryTitleRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
     gap: 10,
   },
-  categoryTitleRowCentered: {
-    justifyContent: 'center',
-    // Without this, a wrapped (2-line) title claims the row's full width and the icon
-    // ends up pinned to the left instead of staying centered next to the title as a unit.
-    alignSelf: 'center',
-  },
-  categoryTitle: {
-    fontWeight: freshFontFamily.extrabold,
-    fontSize: 21,
-    color: 'white',
-    textAlign: 'center',
-  },
-  categoryTitleDesktop: {
-    fontSize: 21,
-    lineHeight: 26,
-  },
-  categoryDescription: {
-    fontWeight: freshFontFamily.semibold,
-    fontSize: 14.5,
-    color: 'white',
-    marginTop: 8,
-    opacity: 0.85,
-  },
-  categoryDescriptionCentered: {
-    textAlign: 'center',
-    fontSize: 12.5,
-  },
-  categoryDescriptionDesktop: {
-    fontSize: 13.5,
-    lineHeight: 18,
-  },
+  tileIcon: { width: 28, height: 28 },
+  tileTitle: { fontWeight: '800', fontSize: 20, flexShrink: 1 },
 });
