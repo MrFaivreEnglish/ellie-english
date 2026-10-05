@@ -2417,6 +2417,7 @@ const styles = StyleSheet.create({
     fontWeight: '800',
   },
   listenPromptWrap: {
+    flexGrow: 1,
     alignItems: 'center',
     gap: 10,
   },
