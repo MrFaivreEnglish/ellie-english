@@ -64,7 +64,8 @@ const PracticeSheet: React.FC<PracticeSheetProps> = ({
     scrim: withColorAlpha(isDarkMode ? '#000000' : '#2B2620', isDarkMode ? 0.56 : SCRIM_MAX_OPACITY),
     background: colors.background,
     edge: colors.border,
-    dragHandle: colors.borderStrong,
+    // The usual neutral grabber grey, not the theme's saturated blue.
+    dragHandle: isDarkMode ? '#5A6272' : '#C5CAD3',
   };
 
   const { width, height } = useWindowDimensions();
