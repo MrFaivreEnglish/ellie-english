@@ -426,15 +426,20 @@ export default function HomeScreen() {
                 accessibilityRole="button"
                 accessibilityLabel={category.title}
               >
-                <Image
-                  source={TILE_ICONS[category.route]}
-                  style={styles.tileIcon}
-                  resizeMode="contain"
-                  fadeDuration={0}
-                  accessibilityIgnoresInvertColors
-                />
-                <Text style={[styles.tileTitle, !isWide && styles.tileTitleNarrow, { color: homeMenuTextColor }]} numberOfLines={isWide ? 1 : 2}>
-                  {category.title}
+                <View style={[styles.tileTitleRow, !isWide && styles.tileTitleRowNarrow]}>
+                  <Image
+                    source={TILE_ICONS[category.route]}
+                    style={styles.tileIcon}
+                    resizeMode="contain"
+                    fadeDuration={0}
+                    accessibilityIgnoresInvertColors
+                  />
+                  <Text style={[styles.tileTitle, !isWide && styles.tileTitleNarrow, { color: homeMenuTextColor }]} numberOfLines={isWide ? 1 : 2}>
+                    {category.title}
+                  </Text>
+                </View>
+                <Text style={[styles.tileDescription, !isWide && styles.tileDescriptionNarrow, { color: homeMenuTextColor }]} numberOfLines={2}>
+                  {category.description}
                 </Text>
                 {!!tileHighlights[category.route] && <LessonHighlightBadge kind={tileHighlights[category.route]!} />}
               </Pressable>
@@ -502,18 +507,22 @@ const styles = StyleSheet.create({
   grid: { flexDirection: 'row', flexWrap: 'wrap', gap: 14 },
   tileCell: { width: '47.5%', flexGrow: 1 },
   tile: {
-    minHeight: 132,
+    flexGrow: 1,
+    minHeight: 150,
     borderRadius: 24,
     paddingVertical: 26,
     paddingHorizontal: 24,
     marginBottom: 5,
-    flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 10,
+    gap: 8,
   },
+  tileTitleRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10, maxWidth: '100%' },
+  tileTitleRowNarrow: { flexDirection: 'column', gap: 6 },
+  tileDescription: { fontWeight: '600', fontSize: 15, lineHeight: 20, opacity: 0.9, textAlign: 'center' },
+  tileDescriptionNarrow: { fontSize: 12.5, lineHeight: 16 },
   tileTitleNarrow: { fontSize: 18 },
-  tileNarrow: { flexDirection: 'column', minHeight: 140, paddingHorizontal: 10, paddingVertical: 18, gap: 6 },
+  tileNarrow: { minHeight: 156, paddingHorizontal: 10, paddingVertical: 18 },
   tileIcon: { width: 40, height: 40 },
   tileTitle: { fontWeight: '800', fontSize: 24, flexShrink: 1, textAlign: 'center' },
 });
