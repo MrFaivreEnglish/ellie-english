@@ -291,7 +291,7 @@ export const ThemeProvider = ({ children }: { children: React.ReactNode }) => {
 const [isTypingStrictMode, setIsTypingStrictMode] = useState(false);
   const [isHapticsEnabled, setIsHapticsEnabled] = useState(hapticsAreSupported);
   const [isSoundEffectsEnabled, setIsSoundEffectsEnabled] = useState(true);
-  const [isReduceAnimationsEnabled, setIsReduceAnimationsEnabled] = useState(false);
+  const [, setIsReduceAnimationsEnabled] = useState(false);
   const [isTodayCardEnabled, setIsTodayCardEnabled] = useState(false);
   const [isAndroidStatusBarEnabled, setIsAndroidStatusBarEnabled] = useState(true);
   const [isShinyEllieUnlocked, setIsShinyEllieUnlocked] = useState(false);
@@ -862,7 +862,9 @@ const [isTypingStrictMode, setIsTypingStrictMode] = useState(false);
       isSoundEffectsEnabled,
       toggleSoundEffects,
       updateSoundEffects,
-      isReduceAnimationsEnabled,
+      // The "Fewer animations" setting was removed; the phone's own reduce-motion setting still
+      // applies. A value saved by an earlier version is ignored.
+      isReduceAnimationsEnabled: false,
       toggleReduceAnimations,
       isTodayCardEnabled,
       toggleTodayCard,
