@@ -385,6 +385,8 @@ export default function HomeScreen() {
           </View>
         </View>
 
+        {goalWeek && <WeekCard week={goalWeek} compact={!isWide} />}
+
         {pendingMilestone > 0 && (
           <MilestoneBanner
             milestone={pendingMilestone}
@@ -400,14 +402,10 @@ export default function HomeScreen() {
           <ContinueCard
             type={continueLessonTarget.type === 'grammar' ? 'grammar' : 'vocabulary'}
             title={continueLessonTarget.title}
-            stacked={!isWide}
-            icon={continueLessonTarget.type === 'grammar' ? GRAMMAR_ICON_SOURCE : VOCABULARY_ICON_SOURCE}
             onContinue={openContinueLesson}
           />
         )}
 
-
-        {goalWeek && <WeekCard week={goalWeek} compact={!isWide} />}
 
         <View style={styles.grid}>
           {localizedCategories.map((category) => (

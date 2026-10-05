@@ -1,6 +1,7 @@
 import { Svg, Circle } from 'react-native-svg';
-import { Image, Pressable, StyleSheet, TouchableOpacity, View } from 'react-native';
+import { Pressable, StyleSheet, TouchableOpacity, View } from 'react-native';
 import Text from '../shared/ThemedText';
+import MaterialIcons from '../shared/ThemedMaterialIcon';
 import { useTheme } from '../settings/ThemeContext';
 import { BONUS_DAY_XP, type DayState, type GoalWeek } from '../progress/dailyGoal';
 import type { Word } from '../../types/VocabularyTypes';
@@ -23,37 +24,6 @@ const useCardStyle = () => {
     boxShadow: `0px 3px 0px ${isDarkMode ? '#2C3340' : SHADOW_SOFT}`,
   } as const;
 };
-
-type TactileButtonProps = {
-  label: string;
-  color: string;
-  edge: string;
-  onPress: () => void;
-  accessibilityLabel?: string;
-  compact?: boolean;
-};
-
-// A button with a hard bottom edge that sinks when pressed.
-export function TactileButton({ label, color, edge, onPress, accessibilityLabel, compact = false }: TactileButtonProps) {
-  return (
-    <Pressable
-      onPress={onPress}
-      accessibilityRole="button"
-      accessibilityLabel={accessibilityLabel ?? label}
-      style={({ pressed }) => [
-        styles.tactile,
-        compact && styles.tactileCompact,
-        {
-          backgroundColor: color,
-          boxShadow: pressed ? `0px 1px 0px ${edge}` : `0px 4px 0px ${edge}`,
-          transform: [{ translateY: pressed ? 3 : 0 }],
-        },
-      ]}
-    >
-      <Text style={styles.tactileLabel}>{label}</Text>
-    </Pressable>
-  );
-}
 
 type MilestoneBannerProps = {
   milestone: number;
@@ -107,38 +77,33 @@ const SECTION = {
 type ContinueCardProps = {
   type: 'vocabulary' | 'grammar';
   title: string;
-  icon?: number;
-  // Narrow screens: no icon and a tighter card, still title left and button right.
-  stacked?: boolean;
   onContinue: () => void;
 };
 
-// Where the student left off: the lesson's title and one button.
-export function ContinueCard({ type, title, icon, stacked = false, onContinue }: ContinueCardProps) {
-  const { colors } = useTheme();
+// Where the student left off. The whole card is the button: icon, title, arrow.
+export function ContinueCard({ type, title, onContinue }: ContinueCardProps) {
+  const { colors, isDarkMode } = useTheme();
   const section = SECTION[type];
   const cardStyle = useCardStyle();
 
   return (
-    <View style={[styles.continueCard, cardStyle, stacked && styles.continueCardNarrow]}>
-      {icon && !stacked ? (
-        <View style={[styles.continueIcon, { backgroundColor: section.text + '22' }]}>
-          <Image source={icon} style={styles.continueIconImage} resizeMode="contain" fadeDuration={0} accessibilityIgnoresInvertColors />
-        </View>
-      ) : null}
-      <View style={styles.continueLeft}>
-        <Text style={[styles.eyebrow, { color: section.text }]}>{section.label}</Text>
-        <Text style={[styles.continueTitle, stacked && styles.continueTitleNarrow, { color: colors.text }]} numberOfLines={2}>{title}</Text>
+    <TouchableOpacity
+      onPress={onContinue}
+      activeOpacity={0.85}
+      style={[styles.continueCard, cardStyle]}
+      accessibilityRole="button"
+      accessibilityLabel={'Continue ' + title}
+    >
+      <View style={[styles.continueIcon, { backgroundColor: isDarkMode ? section.text + '33' : section.text + '1F' }]}>
+        <MaterialIcons name={type === 'grammar' ? 'edit' : 'style'} size={26} color={section.text} />
       </View>
-      <TactileButton
-        label="Continue"
-        color={section.text}
-        edge={section.edge}
-        onPress={onContinue}
-        compact={stacked}
-        accessibilityLabel={'Continue ' + title}
-      />
-    </View>
+      <View style={styles.continueLeft}>
+        <Text style={[styles.eyebrow, { color: section.text }]}>Continue</Text>
+        <Text style={[styles.continueTitle, { color: colors.text }]} numberOfLines={1}>{title}</Text>
+        <Text style={[styles.continueMeta, { color: colors.secondaryText }]}>{type === 'grammar' ? 'Grammar' : 'Vocabulary'}</Text>
+      </View>
+      <MaterialIcons name="arrow-forward" size={26} color={colors.secondaryText} />
+    </TouchableOpacity>
   );
 }
 
@@ -271,18 +236,6 @@ const styles = StyleSheet.create({
   dayStar: { color: '#FFE27A', fontWeight: '900', fontSize: 18, lineHeight: 22 },
   daySlotText: { fontWeight: '800', fontSize: 11 },
   dashed: { borderWidth: 2, borderStyle: 'dashed' },
-  tactile: {
-    minHeight: 44,
-    minWidth: 130,
-    paddingHorizontal: 28,
-    paddingVertical: 0,
-    borderRadius: 16,
-    alignItems: 'center',
-    justifyContent: 'center',
-    alignSelf: 'flex-start',
-  },
-  tactileCompact: { minWidth: 0, paddingHorizontal: 18 },
-  tactileLabel: { color: '#FFFFFF', fontWeight: '800', fontSize: 16 },
 
   banner: {
     flexDirection: 'row',
@@ -307,19 +260,17 @@ const styles = StyleSheet.create({
 
   continueCard: {
     borderRadius: 24,
-    paddingVertical: 20,
-    paddingHorizontal: 22,
+    paddingVertical: 14,
+    paddingHorizontal: 16,
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 16,
+    gap: 14,
   },
-  continueCardNarrow: { paddingVertical: 16, paddingHorizontal: 16, gap: 10 },
-  continueTitleNarrow: { fontSize: 22, lineHeight: 27 },
-  continueIcon: { width: 64, height: 64, borderRadius: 18, alignItems: 'center', justifyContent: 'center' },
-  continueIconImage: { width: 38, height: 38 },
+  continueIcon: { width: 56, height: 56, borderRadius: 16, alignItems: 'center', justifyContent: 'center' },
+  continueMeta: { fontWeight: '600', fontSize: 14, lineHeight: 18 },
   continueLeft: { flex: 1, minWidth: 0, gap: 6 },
-  eyebrow: { fontWeight: '800', fontSize: 13, letterSpacing: 1, textTransform: 'uppercase' },
-  continueTitle: { fontWeight: '900', fontSize: 28, lineHeight: 33 },
+  eyebrow: { fontWeight: '800', fontSize: 13, letterSpacing: 0.8, textTransform: 'uppercase' },
+  continueTitle: { fontWeight: '900', fontSize: 22, lineHeight: 27 },
 
 
 });
